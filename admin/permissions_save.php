@@ -10,6 +10,8 @@ if (!isPlatformOwner() && !hasRole('farm_admin')) {
     header('Location: ' . BASE_URL . '/no_access.php'); exit();
 }
 
+require_valid_csrf_post();
+
 $permissionFarmId = requireCurrentFarmId();
 if (isPlatformOwner()) {
     $requestedFarmId = filter_var($_POST['farm_id'] ?? 0, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: 0;
