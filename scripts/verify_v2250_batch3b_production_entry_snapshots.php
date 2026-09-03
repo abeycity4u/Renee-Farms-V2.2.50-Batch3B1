@@ -15,9 +15,12 @@ ck($checks,strpos($service,"version_no']+1")!==false,'revision appends a new ver
 ck($checks,strpos($service,'UPDATE poultry_production_entry_snapshots')===false,'approved snapshots are not overwritten');
 ck($checks,strpos($service,'production_entry_confirmation')!==false && strpos($service,'source_transaction_correction')!==false,'structured correction categories are enforced');
 ck($checks,strpos($service,'Bird Cost Basis')===false && strpos($service,'bird_unit_cost')===false,'snapshot service does not mutate mortality valuation basis');
-ck($checks,strpos($page,'Historical economics changed after the latest approval.')!==false,'workspace detects changed source-derived economics');
+ck($checks,strpos($page,'Historical source economics changed after the latest approval.')!==false,'workspace detects changed source-derived economics');
+ck($checks,strpos($page,'Attributed investment changed:')!==false && strpos($page,'Production-entry flock changed:')!==false,'workspace distinguishes changed investment from changed entry flock');
+ck($checks,strpos($page,'Current economic basis / bird is')!==false,'workspace reports the resulting current per-bird economic basis separately');
 ck($checks,strpos($page,'Confirm Entry Basis')!==false && strpos($page,'Approve Revised Basis')!==false,'workspace separates first approval from revisions');
 ck($checks,strpos($page,'Attributed Rearing Investment')!==false && strpos($page,'Complete Rearing Investment')===false,'financial terminology uses attributed rather than falsely complete');
 ck($checks,strpos($page,'do not replace source accounting here')!==false,'revision UI directs correction to source records');
 ck($checks,strpos($page,'Bird Cost Basis is not changed')!==false,'workspace preserves Bird Cost Basis boundary');
+ck($checks,strpos($page,'Used for mortality valuation only; separate from Production-Entry Economic Basis.')!==false,'workspace clearly separates mortality valuation basis from production-entry economics');
 $fail=count(array_filter($checks,fn($x)=>!$x[0])); echo "\n".(count($checks)-$fail)."/".count($checks)." checks passed.\n"; exit($fail?1:0);
