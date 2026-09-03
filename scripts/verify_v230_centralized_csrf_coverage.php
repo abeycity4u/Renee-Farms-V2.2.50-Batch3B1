@@ -30,13 +30,13 @@ $users = $read('management/users.php');
 $add('Shared CSRF field renderer exists', $contains($csrf, 'function csrf_field'));
 $add('Shared browser POST CSRF guard exists', $contains($csrf, 'function require_valid_csrf_post'));
 $add('Shared token extraction helper exists', $contains($csrf, 'function csrf_request_token'));
-$add('Shared token assertion helper exists', $contains($csrf, 'function csrf_token_is_valid'));
+$add('Shared token validation helper exists', $contains($csrf, 'function csrf_request_is_valid'));
 $add('CSRF helpers load from application bootstrap', $contains($init, "require_once __DIR__ . '/includes/csrf.php';"));
 
 $add('Module Permissions form uses centralized CSRF field', $contains($permissions, '<?= csrf_field() ?>'));
 $add('Module Permissions save uses centralized POST guard', $contains($permissionsSave, 'require_valid_csrf_post();'));
 $add('Production-entry basis approval uses centralized POST guard', $contains($poultryCycle, 'require_valid_csrf_post();'));
-$add('API helper delegates token validation to shared CSRF helper', $contains($apiHelpers, 'csrf_token_is_valid(csrf_request_token())'));
+$add('API helper delegates token validation to shared CSRF helper', $contains($apiHelpers, 'csrf_request_is_valid()'));
 $add('Inventory Add Category uses centralized POST guard', $contains($inventoryAdd, 'require_valid_csrf_post();'));
 $add('Inventory Delete Category uses centralized POST guard', $contains($inventoryDelete, 'require_valid_csrf_post();'));
 $add('Ruminant Animal Registry uses centralized POST guard', $contains($animalRegistry, 'require_valid_csrf_post();'));
