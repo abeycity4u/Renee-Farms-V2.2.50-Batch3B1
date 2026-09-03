@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../includes/csrf.php';
 
 requireLogin();
 
@@ -13,10 +14,7 @@ $message = '';
 $farmId = requireCurrentFarmId();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
-        http_response_code(419);
-        exit('Invalid request token.');
-    }
+    require_valid_csrf_post();
     $categoryId = (int)($_POST['category_id'] ?? 0);
 
     if ($categoryId <= 0) {
@@ -74,7 +72,7 @@ $categories = $categoriesStmt->fetchAll();
     <?php endif; ?>
 
     <form method="post">
-      <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES) ?>" />
+      <?= csrf_field() ?>
       <div class="mb-3">
         <label class="form-label">Select Category to Delete</label>
         <select name="category_id" class="form-select" required>
