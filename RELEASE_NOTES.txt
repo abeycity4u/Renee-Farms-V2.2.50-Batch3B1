@@ -1,0 +1,394 @@
+RENEE FARMS PLATFORM — CONSOLIDATED RELEASE NOTES
+================================================
+This is the single release-notes file. Future release entries must be appended here.
+
+V2.2.48 — Inventory Financial Foundation
+----------------------------------------
+- Inventory received-stock transactions are surfaced as purchase/spending activity on the matching Layer, Broiler and Ruminant Expense pages.
+- Business transaction date is user-controlled for inventory receipts/usage; system creation time remains separate.
+- Total Spending combines Inventory Purchases and manually recorded non-stock Expenses for management reporting, while profitability continues to avoid double-counting stocked items.
+- Feed purchases are entered through Inventory; Feed is hidden from new manual Expense entry while historical Feed expenses remain visible/editable for audit.
+- Medication/Vaccine purchases are now also entered through Inventory; Medication is hidden from new manual Expense entry while historical Medication expenses remain visible/editable for audit.
+- Inventory Category is now the single source of truth for stocked-item financial grouping.
+- Manage Categories assigns one controlled Financial Type to each farmer-defined category.
+- Add Item and Update Stock no longer ask for a duplicate Financial Classification.
+- Expense Inventory Purchase rows display the farmer's category name without redundant labels such as "Feeds · Feed".
+- Controlled Inventory Financial Types: Feed; Medication / Vaccine; Supplement; Consumables; Equipment / Tools; Spare Parts / Maintenance Materials; General / Other Stock.
+- Fuel / Energy remains a manual non-stock Expense under the agreed farm workflow.
+- Migration 026_inventory_category_financial_type.sql adds category-level financial_type and safely normalizes Batch 2 classifications.
+
+Earlier V2.2.46/V2.2.47 release history was consolidated from the prior release files when this single-file documentation policy was adopted.
+
+ARCHIVED PRIOR RELEASE ENTRIES
+==============================
+
+--- RELEASE_V2.2.46_MAINTENANCE.txt ---
+Renee Farms V2.2.46 - Maintenance Architecture Cleanup, Batch 3
+
+Baseline
+- Built directly from Renee-Farms-V2.2.46-Maintenance-Batch2.zip.
+- V2.2.46 remains the functional release baseline.
+
+Change in this batch
+- Simplified includes/pdf/PdfReportService.php::pdf_report_begin().
+- Removed a redundant conditional where both branches executed the same ob_start() call.
+- Behavior is unchanged: each PDF report request still starts a dedicated output buffer.
+
+Architecture review decisions
+- Deferred broad removal of repeated config.php require_once statements. Although many are redundant under the normal init.php bootstrap, changing dozens of entry points provides little runtime benefit and increases regression surface.
+- Deferred migration filename renaming/renumbering because existing installations may already track those exact filenames.
+- Deferred financial, receivables, stock, allocation, daily-feed, permissions, and tenant logic from maintenance refactoring.
+- Retained operational recovery/migration scripts.
+
+Validation
+- All non-vendor PHP files must pass php -l before packaging.
+- Runtime delta from Batch 2 is intentionally restricted to PdfReportService.php plus this release note.
+
+--- RELEASE_V2.2.47_MORTALITY_VALUATION_REFINEMENT.txt ---
+Renee Farms V2.2.47 — Mortality Valuation Refinement
+
+Decision:
+- Layer/Broiler mortality remains recorded and valued using the explicit cycle Bird Cost Basis.
+- Mortality Value is management intelligence for productive biological assets lost.
+- Mortality Value is NOT added to Feed Consumed, Other Operating Cost, Total Operating Cost, or period Profit/Loss.
+- No expense transaction is created by mortality.
+- Profit/Loss remains Revenue - Feed Consumed - Other Operating Cost.
+- Per-bird, per-egg, and per-crate operating economics use operating cost only.
+- Profit/Bird and Profit Margin use the same period Profit/Loss.
+- Missing Bird Cost Basis leaves mortality valuation incomplete without inventing a value and without changing Profit/Loss.
+
+Rationale:
+Layer birds are productive biological assets held to produce eggs over their productive cycle. Mortality reduces productive capacity and is tracked as a flock/asset KPI. Charging the original cost basis again as a period expense can double-count acquisition cost and does not represent a new cash/operating transaction.
+
+--- RELEASE_V2.2.47_POULTRY_UNIT_ECONOMICS.txt ---
+Renee Farms V2.2.47 — Poultry Unit Economics
+Source baseline: Renee-Farms-V2.2.46-FINAL-FROZEN.zip
+Baseline SHA-256: 15b7b0550e98fd8a28d21c84a6d039c1451d8315c7d0c3632fb200dadf73750a
+
+Scope
+- Adds traceable Layer/Broiler unit economics to Management > Profitability.
+- Adds optional Bird Cost Basis (₦/bird) to poultry production cycles.
+- Mortality cost is calculated only from explicit cycle bird cost; missing values remain visibly uncosted.
+- Existing profitability, stock, feed, sales, expense, allocation, receivable, permissions, and tenant logic are not replaced.
+
+New KPI behavior
+- Layer: average live flock, feed/operating cost per bird, profit per bird,
+  eggs, crate equivalent, feed cost per egg/crate, total cost per egg/crate,
+  mortality cost, operating margin.
+- Broiler: average live flock, feed/operating cost per bird, profit per bird,
+  mortality cost, operating margin.
+- Daily and monthly use the same existing profitability summary plus Daily Record denominators.
+
+Deployment
+1. Back up files and database.
+2. Upload V2.2.47 files.
+3. Run scripts/run_migrations.php once so 024_poultry_unit_economics.sql is applied.
+4. Open Production Cycles and set Bird Cost Basis for poultry cycles where a defensible value is known.
+5. Test Management > Profitability using Poultry + Layer/Broiler, Daily and Monthly.
+
+Mortality profitability refinement
+- Mortality is classified as a non-cash livestock/production loss.
+- Costed mortality is included in the poultry Profit / Loss bottom line.
+- No duplicate farm_expenses cash transaction is created.
+- Profitability cards retain Feed Consumed and add Mortality Loss for Layer/Broiler views.
+- Traceable formula: Revenue - Feed Consumed - Other Operating Cost - Mortality Loss = Profit / Loss.
+- If mortality exists without a Bird Cost Basis, it remains uncosted and the page warns that Profit / Loss may be understated.
+
+V2.2.48 — Update Stock Unit Cost Regression Fix
+-----------------------------------------------
+- Restores Unit Cost (₦) for Received Stock in the Inventory Update Stock modal.
+- Receipt unit cost remains mandatory so each restock captures its actual purchase price and historical inventory cost snapshot.
+- Used Stock continues to hide the receipt-cost field.
+- No database migration is required for this correction.
+
+V2.2.48 — General Stock Attribution & Central Calendar Date Architecture
+------------------------------------------------------------------------
+- General / Non-feed inventory now has a Default Production Attribution so stocked medication, vaccines, supplements, consumables, equipment and other non-feed items can post purchase spending to the correct operation.
+- Poultry General stock can default to Layer, Broiler or Shared Poultry.
+- Ruminant General stock can default to Cattle, Goat, Sheep, Other or Shared Ruminant.
+- Feed usage classifications remain automatic: Layer Feed -> Layer, Broiler Feed -> Broiler, Ruminant Feed -> Shared Ruminant until cycle usage gives a more specific owner.
+- Stock transactions continue to snapshot production attribution at posting time; changing an item's default later does not rewrite historical ledger rows.
+- Added central APP_TIMEZONE support (default Africa/Lagos, environment-overridable).
+- PHP business dates, MySQL session CURDATE()/NOW(), calendar defaults, max-date validation, and daily-record modal defaults now use one application date boundary.
+- Removed UTC toISOString() date defaults from Layer, Broiler and Ruminant Daily Records, fixing the after-midnight +01:00 rollback to the previous day.
+- Migration 027_inventory_default_production_attribution.sql is required.
+
+V2.2.48 - Inventory Consumption Profitability Integration
+- Eligible USED non-feed operating inventory now contributes to Other Operating Cost.
+- Eligible types: Medication / Vaccine, Supplement, Consumables.
+- Feed remains separately recognised as Feed Consumed.
+- Equipment / Tools, Spare Parts / Maintenance Materials, and General / Other Stock are not automatically expensed by usage.
+- General / Non-feed USED movements can optionally target an active production cycle after production attribution.
+- Purchase receipts remain spending/cash-flow records and are not charged again to profitability.
+- Profitability calculation view shows manual/non-stock vs consumed operating inventory components for auditability.
+- No database migration required; existing stock_transactions.cycle_id and historical cost/classification snapshots are reused.
+
+
+V2.2.48 - Stock History Attribution Transparency
+- Stock History now shows the operation attached to every stock movement: Poultry Layer/Broiler/Shared Poultry, Ruminant species/Shared Ruminant, or Farm-wide/General.
+- Stock History now shows the exact Production Cycle code when cycle_id is present.
+- Cycle-less movements are displayed explicitly as Shared / No specific cycle rather than appearing unattributed.
+- Historical attribution is read from the stock transaction snapshot; changing an item default later does not rewrite prior history.
+- No database migration required; existing stock_transactions farm_type, production_type and cycle_id are reused.
+
+V2.2.48 - Ruminant Expense Animal Allocation
+- Ruminant non-stock expenses can now remain as a Shared cost with no individual animal allocation or be attributed to one or more registered animals.
+- Selected-animal allocation supports Equal split and Custom split.
+- The original farm_expenses row remains the single financial source of truth; animal rows are attribution only and do not create duplicate expenses.
+- Custom allocations must reconcile exactly to the expense transaction total (Amount x Unit).
+- Individual animal selections must match the chosen ruminant production type/species; Shared Ruminant expenses remain herd/cycle-level until a specific production type is chosen.
+- Detailed Ruminant Expenses now shows Animal Attribution and each allocated amount for transparency.
+- Editing an expense atomically replaces its animal allocations; deleting the expense cascades allocation cleanup.
+- Historical manual Medication/Feed records remain editable only as legacy records; new stock purchases continue through Inventory.
+- Migration 028_ruminant_expense_animal_allocations.sql is required.
+
+- Clarified Ruminant Expense Animal Attribution terminology: unallocated costs are now shown as "Shared cost — no individual animal allocation"; Production Type/Cycle continue to define the cost scope. No migration required.
+
+V2.2.48 - Expense Production/Cycle Transparency
+- Detailed Expenses now shows a combined Production / Cycle column on Layer, Broiler, and Ruminant Expense pages.
+- The production line identifies Layer, Broiler, Cattle, Goat, Sheep, Other, Shared Poultry, or Shared Ruminant as applicable.
+- The cycle line shows the exact production cycle code when present; otherwise it explicitly shows that the cost is shared between cycles at that production scope.
+- Ruminant Animal Attribution remains a separate concept: Production/Cycle defines where the cost belongs, while Animal Attribution defines whether it is assigned to specific animals.
+- No database migration required; existing farm_expenses.production_type and cycle_id are reused.
+
+V2.2.48 — Ruminant Sale Animal Revenue Attribution
+- Ruminant sales can remain shared or be allocated to selected registered animals by equal or custom revenue split.
+- sales_records remains the single revenue source of truth; animal allocation rows do not duplicate revenue.
+- Sales Report now shows Animal Revenue Attribution for ruminant sales.
+- Allocation is validated against the selected ruminant production type and custom amounts must equal the sale total.
+- Revenue attribution does not automatically change animal lifecycle status; sale-vs-status workflow remains explicit future lifecycle work.
+- Migration 029 adds ruminant_sale_animal_allocations.
+
+V2.2.48 — Explicit Ruminant Sale Exit Outcomes
+-----------------------------------------------
+- Revenue attribution and animal lifecycle are now explicitly separated in Ruminant Sales.
+- Each selected ruminant animal can be marked Revenue only, Sold live, or Culled/slaughtered.
+- Revenue only never changes Animal Registry status.
+- Sold live changes an Active animal to Sold; Culled/slaughtered changes an Active animal to Culled.
+- Exit decisions are per animal, not inferred from free-text Product Type.
+- Sale edit/delete safely reconciles sale-linked exit events and refuses to overwrite a later unrelated registry status change.
+- Sales Report shows each selected animal's revenue allocation together with its lifecycle outcome.
+- Animal Profile now shows sale-linked Animal Exit History with sale, attributed revenue, customer, and recorder.
+- Migration 030_ruminant_animal_exit_events.sql is required.
+
+
+V2.2.48 — Sales Unit of Measure
+--------------------------------
+- Sales now records an explicit Unit of Measure so Quantity has commercial meaning (for example Head, Crate, Kg, Litre, Bag, Bottle, or a custom unit).
+- New sales require a unit; historical sales are intentionally left unclassified rather than guessed and display as Not specified (legacy).
+- Add/Edit Sale supports controlled common units plus Other / Custom.
+- Sales Report and PDF now show Unit next to Quantity; Unit Price is explicitly per selected unit.
+- Existing revenue, receivable, animal allocation, exit-outcome, and profitability calculations remain amount-based and are unchanged.
+- Migration 031_sales_unit_of_measure.sql is required.
+
+- Layer egg pooled allocation remains crate-based: Crate/Tray map 1:1, Piece converts at 30 eggs/crate, and Dozen converts at 12 eggs/dozen. Unsupported custom egg units are left unallocated rather than guessed. Historical pre-UOM Layer egg sales preserve the prior crate interpretation.
+
+V2.2.48 Individual Ruminant Animal Economics
+The Animal Profile now presents a directly attributable economic position using the animal's registered purchase cost, explicit expense allocations, and explicit sale revenue allocations. Shared herd/cycle costs are not automatically pushed to individual animals. Exit-linked sale revenue is identified separately for transparency but remains part of total attributed revenue, avoiding double counting.
+
+V2.2.48 Ruminant Shared-Cost / Fully Allocated Animal Economics
+Ruminant Animal Profile now supports a second, explicitly labelled Fully Allocated view without changing the locked Direct Economics calculation. A new date-ranged production-cycle membership history provides the auditable population used for shared-cost allocation. Species/cycle shared operating costs are allocated by active headcount on each transaction date (animal-days across a period), using cent-exact deterministic splits. Feed and eligible operating inventory are recognised from effective USED stock cost snapshots; directly allocated animal expenses are excluded from the shared pool to prevent double counting. Uncovered membership dates and cross-species Shared Ruminant pools remain unallocated and are disclosed instead of guessed. Migration 032_ruminant_animal_cycle_memberships.sql is required.
+
+V2.2.48 Final Ruminant Lifecycle & Membership Integrity Hardening
+- Preserves the locked direct and fully allocated animal economics formulas.
+- Replaces free-form registry status editing with explicit dated non-sale lifecycle exits (Dead, Culled, Transferred).
+- Non-sale exits use the existing ruminant_animal_exit_events audit trail and close an open cycle membership on the effective exit date.
+- Species changes are blocked once an animal has operational/economic history, preventing historical attribution corruption.
+- Production-cycle membership removal is blocked when financial activity exists in its date range; open memberships can instead be closed with an effective end date.
+- Sale-linked lifecycle behavior remains unchanged and all existing V2.2.48 verification suites continue to pass.
+
+V2.2.49 — Farm Intelligence Completion — Batch 1: Canonical Financial Intelligence Foundation
+-----------------------------------------------------------------------------------------------
+- Added lib/farm_intelligence.php as the shared read-model layer for management intelligence.
+- Dashboard current-month Revenue, Operating Cost and Profit/Loss now delegate to the locked getProfitabilitySummary() consumed-cost engine; legacy profit_loss_summary rows are no longer used as dashboard truth.
+- Analytics Dashboard monthly/yearly Profit/Loss now uses the same canonical engine as Profitability, including actual Feed Consumed and eligible operating inventory USED cost.
+- Analytics no longer relies on the old hard-coded feeds/medication/salary/logistic/fuel/misc profit formula.
+- Expense intelligence separates Feed Consumed, manual non-feed operating expenses and eligible inventory consumption without double-counting feed purchases.
+- Top-product intelligence is Unit-of-Measure aware: quantities are grouped by Product + Unit rather than combining Head, Kg, Litre, Crate, etc. Historical NULL units remain Not specified (legacy).
+- Chart API profit/loss now uses rolling canonical monthly summaries; the old year=12-days bug is removed.
+- Chart API Sales keeps General sales separate instead of silently classifying every non-Poultry sale as Ruminant.
+- Chart API now requires business-report access before returning management intelligence.
+- No database migration is required. V2.2.48 locked economics formulas remain unchanged.
+
+V2.2.49 Batch 2 — Explainable Farm Intelligence Core
+The Dashboard intelligence layer now reports explainable, severity-led management signals rather than an opaque farm-health percentage. Signals expose the measured value, reason, source period and action target and reuse the canonical financial engine. Added inventory/data-quality, poultry completeness and ruminant lifecycle/withdrawal coverage signals. No migration required.
+Farm Intelligence is also available as a complete Management page so Dashboard prioritization does not hide lower-severity signals. Analytics CSV export labels now match the canonical financial model.
+
+V2.2.49 Batch 2 UI/UX Refinement
+- Compacted Dashboard intelligence to a management summary plus the top three actionable Danger/Warning insights.
+- Reworked Management > Farm Intelligence into a restrained two-column desktop layout with compact category panels and signal rows.
+- Removed user-facing references to the retired percentage/hidden-score approach; interface copy now describes only the current intelligence behavior.
+- Intelligence calculations and severity logic are unchanged.
+
+V2.2.49 Batch 3 — Operational & Performance Intelligence
+Farm Intelligence now extends beyond financial/data-quality alerts into farm-history production trends, recorded-usage stock cover, receivables visibility, and individual ruminant weight signals. New signals remain explainable and avoid inventing breed or industry benchmarks. No migration required.
+
+V2.2.49 Batch 4A — Poultry Health & Diagnostic Data Foundation
+Structured poultry health/treatment history is now available under Poultry → Health & Treatment. This closes the structured-health data gap identified during the diagnostic-intelligence audit and prepares Layer/Broiler root-cause investigation without changing locked profitability or production economics.
+V2.2.49 Batch 4A reliability fix: restored the local Bootstrap bundle on Poultry Health & Treatment so Record Health Event/Edit modals open correctly. No database or economics logic changed.
+
+V2.2.49 Batch 4B — Root-Cause Investigation Engine
+Farm Intelligence can now investigate Layer production declines and Broiler mortality increases using the farm's own recorded feed, water, feed-item, structured health and daily-note history. Findings separate observed evidence, possible contributors, evidence gaps and suggested management checks. The feature does not diagnose disease or prescribe medication.
+
+V2.2.49 Batch 4B refinement
+- Added Feed Item visibility to Layer, Broiler and Ruminant Detailed Daily Records (including explicit Not assigned state).
+- Strengthened Layer diagnostics with mortality-driven investigation, absolute egg-output and flock-survival context, normalized feed/water evidence, dated feed-change context and age-entry anomaly checks.
+
+V2.2.49 Batch 4B table alignment refinement
+- Fixed Detailed Daily Records column alignment for Layer, Broiler and Ruminant after historical Feed Item transparency was added.
+- Ruminant now displays the Feed Item header explicitly.
+- Monthly TOTAL rows now keep Feed Item as a non-summable “--” column and place Water/remaining summaries under their correct headings.
+- No migration required.
+
+V2.2.49 Batch 4C
+- Poultry Investigation now includes an Evidence Timeline so managers can review the recorded sequence around a detected flock problem while preserving the platform's evidence-not-diagnosis safeguards.
+- No database migration required.
+
+V2.2.49 Batch 4C — Farm Intelligence Mobile Action Layout Fix
+- Fixed Farm Intelligence signal action buttons being clipped or pushed outside cards on narrow/mobile screens.
+- Mobile signal rows now stack the action beneath the evidence text at full available width.
+- Long measured values and signal text may wrap safely instead of forcing horizontal overflow.
+- Desktop two-column intelligence layout and diagnostic calculations are unchanged.
+
+V2.2.49 Batch 4C — Platform-wide Mobile Responsive Foundation
+- Added a centralized assets/css/responsive.css loaded after the shared theme so mobile layout corrections apply across authenticated application pages instead of being duplicated page by page.
+- Centralized responsive primitives now constrain fixed-width controls, protect flex/grid children from horizontal overflow, standardize responsive tables, stack page toolbars/forms on phones, and reset collapsed-navbar spacing through tablet widths.
+- Dashboard Management Intelligence now uses the shared responsive foundation so insight titles, badges, reasons and action links remain readable/tappable on narrow screens.
+- Farm Intelligence mobile action behavior was moved from page-local CSS into the shared responsive foundation; future fixes to the shared signal/action pattern can be made once centrally.
+- Added shared responsive toolbar/form hooks to high-risk page headers and filters, including Poultry Health, Poultry Investigation, Profitability, Platform Farms, Animal Profile and Sales filters.
+- Inventory Categories and Analytics fallback tables are now protected by responsive table wrappers; Profitability KPI cards use explicit responsive columns.
+- No database migration and no financial, inventory, lifecycle or diagnostic calculation changes.
+- Mobile wide-data hardening: operational tables now remain readable and horizontally scroll inside their own containers; daily-record calendars preserve seven columns; user/permissions/inventory tables no longer collapse into letter-by-letter columns on portrait phones.
+
+V2.2.49 Batch 4C - Platform Navigation Reliability
+- Centralized the mobile navbar collapse controller in assets/js/navigation.js.
+- Mobile hamburger navigation no longer depends on individual pages loading Bootstrap JavaScript.
+- All page hierarchies that include the shared navbar head now inherit the same mobile navigation behavior.
+- Navbar collapse state and aria-expanded are synchronized centrally; mobile navigation closes after selecting a destination.
+
+V2.2.49 Batch 4C Final: Poultry Investigation health-context integrity was hardened. Exact-cycle Health & Treatment events now feed the evidence/timeline path, while same-type events attached to another/no cycle are explicitly identified as attribution gaps instead of being described as absent. The Health & Treatment review link now opens on the investigated type/cycle. No economics or diagnostic thresholds changed.
+
+V2.2.49 Batch 4D — Broiler Diagnostic Intelligence Depth
+- Extended the shared Poultry Investigation engine with Broiler flock-survival context so mortality signals also show the recorded physical flock decline across the comparison window.
+- Added descriptive Broiler mortality-concentration evidence: the highest-mortality recent day is shown as a share of recent 7-day mortality and normalized to that day's opening flock. This is explicitly a pattern to review, not a disease diagnosis.
+- Added day-to-day feed-intake-per-bird movement to the Evidence Timeline alongside the existing water, feed-item, mortality, health and note sequence.
+- Preserved farm-history-only reasoning: no breed target, target weight, FCR benchmark, disease diagnosis or medication prescription is invented because the current Broiler daily record does not structurally capture body weight.
+- No database migration required. Locked profitability, inventory costing and lifecycle economics are unchanged.
+
+V2.2.49 Batch 4E
+- Added Ruminant Investigation for recorded individual-animal weight decline, reusing the explainable Farm Intelligence architecture.
+- Farm Intelligence's weight-decline warning now provides an Investigate action for the largest decline.
+- Added cycle-scoped herd feed, individual health, withdrawal, direct-expense and membership context without inventing individual feed intake or veterinary diagnoses.
+
+V2.2.49 Batch 4E reliability correction: fixed Ruminant Investigation HTTP 500 by loading the shared permission helpers before calling ensureAllowed(). No migration or economics logic change.
+
+V2.2.49 Batch 4E — Ruminant lifecycle/membership integrity hardening
+- Added a central dated exit-boundary service for ruminant cycle memberships.
+- Manual and sale exits now close any membership crossing the exit date through the same service.
+- Exit-driven membership closures remember the prior end date so sale reversals can restore history without guessing.
+- Added migration 034_ruminant_membership_exit_boundary_integrity.sql.
+- Added Management > Ruminant Membership Integrity review/repair page for legacy exited animals with stale open memberships.
+- Farm Intelligence now links the stale-membership warning directly to the review page.
+- Exited animals cannot be assigned a new open membership beyond their recorded lifecycle exit date.
+- Historical repairs are explicit, CSRF protected and audit logged; Farm Intelligence never edits history silently.
+
+V2.2.49 Batch 4E — Central Confirmation UX
+- Removed the remaining traditional browser confirmation prompt from Ruminant Membership Integrity.
+- Standardized confirmations through one globally loaded Renee Farms confirmation component for consistent desktop/mobile behavior.
+
+V2.2.49 Batch 4F — Proactive Record Quality & Measurement Integrity
+- Farm Intelligence now catches bird-age sequence inconsistencies before they silently distort diagnostic context.
+- Daily Record medication quick notes that lack same-cycle structured Health & Treatment history are surfaced as informational data-quality coverage, not treated as missing proof of treatment.
+- Rapid individual ruminant weight movements now prompt scale/entry verification before biological interpretation while preserving the existing evidence-led diagnostic safeguards.
+- No database migration required.
+
+V2.2.49 Batch 4G — Management Follow-through & Investigation Outcomes
+Farm Intelligence investigations can now retain auditable management findings/actions and an explicit open/resolved outcome without silently changing source farm records. Migration 035 required.
+
+V2.2.49 Batch 4G follow-through HTTP 500 correction
+- Fixed Save follow-up and Resolve investigation POST handlers on Poultry and Ruminant Investigation pages.
+- Replaced an undefined csrf_verify() call with the platform's canonical verify_csrf_token() validation.
+- Invalid CSRF now returns HTTP 419 instead of causing a PHP fatal error.
+- No investigation, profitability, lifecycle, feed, health, inventory or financial formulas changed.
+
+Batch 4G Poultry follow-through POST reliability correction
+- Live QA confirmed Ruminant follow-through now saves/resolves, while Poultry follow-through still returned HTTP 500.
+- Root cause: management/investigation.php called ensureAllowed() on POST without loading includes/functions.php, where the canonical permission helper is defined.
+- Poultry Investigation now loads the shared permission helper before any ensureAllowed() call, matching the already-corrected Ruminant page.
+- No migration or diagnostic/economic formula change.
+
+V2.2.49 Batch 4H — Follow-through Awareness in Farm Intelligence
+- Farm Intelligence and Dashboard now surface Open / Previously resolved management follow-through state on investigation-capable signals.
+- A resolved follow-through never suppresses a still-detected source condition or changes its severity.
+- If the source condition disappears, the signal disappears naturally; if it persists, the latest review remains visible as context.
+- Follow-up lookup is batched centrally to avoid per-signal database queries.
+- No migration required.
+
+V2.2.49 Batch 4I
+- Added recurrence-aware management intelligence so new production/weight evidence after a resolved investigation is surfaced as new activity requiring review while prior resolution history remains intact.
+- Added explicit as-of scoping to poultry investigation links.
+
+V2.2.49 Batch 4J — Investigation Episode Isolation
+- Management follow-through is now keyed to the actual diagnostic evidence window, not merely the page as-of date.
+- A later recurrence opens a fresh follow-through form and cannot inherit a prior episode's Resolved state, finding or action.
+- The latest prior review is shown separately as historical context when useful.
+- Migration 036 adds episode_key and preserves all existing follow-through rows as legacy historical reviews without guessing their former evidence window.
+
+V2.2.49 Batch 4K — Persistent Investigation History
+- Investigation pages now retain and display prior management-review episodes even after the current recurrence is saved or resolved.
+- History is read-only context: prior outcomes, findings, actions, recorder and resolution time remain visible without changing the current evidence window.
+- Current episode remains isolated by the Batch 4J episode key; historical episodes never resolve a new recurrence.
+- Applied consistently to Ruminant and Poultry investigations.
+- No database migration required beyond Batch 4J migration 036.
+
+V2.2.50 Batch 1 — Poultry Lifecycle Foundation
+- Added explicit dated biological phase history for Layer and Broiler production cycles through migration 037_poultry_cycle_phase_history.sql.
+- production_cycles remains the parent; operational cycle status is deliberately separate from biological lifecycle phase.
+- Layer phases: Rearing -> Production. Broiler phases: Growing / Rearing -> Harvest / Sale.
+- Existing cycles are not backfilled or inferred from age, eggs, feed, mortality or cycle status; they remain "Lifecycle history not yet defined" until management records known history.
+- Added tenant-scoped lifecycle service with date validation, allowed transition rules, append-only phase starts, auditable transitions, terminal phase ending and no edit/delete workflow.
+- Added Production Cycles UI for lifecycle status, initial phase recording, controlled transitions, terminal phase ending and read-only phase history.
+- Lifecycle writes use existing CSRF/access controls, centralized confirmation UI where consequential, tenant checks and audit logging.
+- No canonical profitability, inventory costing, Daily Record, mortality valuation, sales allocation, Farm Intelligence or Dashboard calculation was changed in this batch.
+- Tenant deletion was extended to purge production_cycle_phases before production_cycles so the new RESTRICT lifecycle foreign key cannot break an intentional full-farm purge.
+
+V2.2.50 Batch 2 — Poultry Entry & Acquisition Foundation
+- Added canonical poultry_cycle_acquisitions history for explicit flock entry/acquisition facts.
+- Broiler entry age is first-class: the platform does not assume every Broiler cycle begins at DOC. Management may record the actual known age in days, including older started birds such as 2-week or 4-week stock.
+- Layer Point-of-Lay purchase is an explicit Layer-only acquisition type; the platform does not fabricate on-farm rearing history for purchased POL birds.
+- Added external purchase and farm-raised/transferred-in entry modes with quantity, actual age, total bird acquisition cost, source/reference, notes and audit identity.
+- Purchased entries require an actual total bird acquisition amount. Internal carry-in may remain uncosted until a defensible basis exists.
+- Acquisition date is validated against the cycle and, when lifecycle history exists, cannot occur after the first known biological phase begins.
+- Acquisition does not post Inventory or Expense transactions, alter canonical period profitability, modify Bird Cost Basis, or rewrite lifecycle/Daily Record history.
+- Existing poultry cycles are not backfilled from opening headcount, bird cost basis, age, lifecycle, expenses, inventory or sales.
+- Production Cycles now shows acquisition status, recorded quantity, total acquisition basis and effective acquisition cost per bird, plus append-only acquisition history.
+- Tenant deletion now purges poultry acquisition rows before production cycles so the acquisition RESTRICT foreign key cannot block an intentional full-farm purge.
+
+V2.2.50 Batch 2A — Acquisition Submission Safety & Auditable Corrections
+- Fixed live QA duplicate flock-entry records caused by successful POST pages remaining refreshable as browser form resubmissions.
+- Successful acquisition and acquisition-correction writes now use POST -> Redirect -> GET, so refreshing the resulting Production Cycles page does not replay the write request.
+- Added request-token idempotency for flock-entry submissions through migration 039. Replaying the same acquisition POST returns the already-recorded entry instead of creating another row.
+- Clarified acquisition pricing UI with a Unit Purchase Price (₦ / bird) helper and a separate Total Bird Acquisition Amount field explicitly labelled as the amount for all birds. Quantity × unit price can populate the total while the actual invoice total remains authoritative.
+- Added auditable Void Erroneous Entry workflow for mistaken/duplicate acquisition rows. Voided history is retained with reason/user/time and excluded from active acquisition quantity, total cost and effective cost/bird.
+- No acquisition row is physically deleted. No Inventory, Expense, period-profitability, Bird Cost Basis, lifecycle, Daily Record, Farm Intelligence or Dashboard formula was changed.
+
+V2.2.50 Batch 3A — Poultry Cycle Workspace + Layer Rearing Economics Read Layer
+- Added a dedicated Manage Cycle workspace for poultry so cycle-specific context can move off the increasingly complex Production Cycles page without breaking existing workflows.
+- Added read-only Layer rearing/production-entry economics derived from explicit lifecycle dates and already-recorded acquisition, consumed inventory and expense attribution.
+- Rearing economics do not change canonical period profitability and do not create duplicate financial transactions.
+- Purchased POL birds are shown as a direct production-entry acquisition model; no artificial Rearing history is created.
+- Missing cost snapshots, missing acquisition basis, unreconciled production-entry flock boundaries and unallocated shared Layer costs remain visible limitations rather than being guessed or silently allocated.
+- No migration required.
+
+
+V2.2.50 Batch 3A1 — Poultry Cycle Workspace Runtime Dependency Hotfix
+- Fixed HTTP 500 when opening a Layer Manage Cycle workspace with a completed Rearing phase.
+- Root cause: the rearing-economics helper referenced the canonical stock_feed_item_sql_predicate() without loading lib/stock_costing.php.
+- Added the missing explicit dependency; no economics formula, schema, source transaction, lifecycle, acquisition, profitability, or dashboard behaviour changed.
+- Strengthened the Batch 3A verifier so the stock-costing dependency must be explicitly loaded.
+
+V2.2.50 Batch 3A2 — Tenant-Aware Economics Polish
+- Refined tenant-facing operational wording and added a separate Known Attributable Rearing Cost display without changing canonical economics or source transactions.
+
+V2.2.50 Batch 3B1 — Commercial UI Cleanup
+- Tenant operational screens no longer display internal V2.2.50 batch/version labels.
