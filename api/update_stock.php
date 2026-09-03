@@ -1,6 +1,7 @@
 <?php require_once(dirname(__DIR__) . '/init.php'); ?>
 <?php
 require_once(__DIR__ . '/../config.php');
+require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/api_helpers.php');
 require_once(__DIR__ . '/../includes/audit_helpers.php');
 require_once(__DIR__ . '/../lib/stock_service.php');
@@ -9,6 +10,12 @@ requireLogin();
 require_http_method('POST');
 require_csrf_token();
 require_rate_limit('update_stock', 80, 60);
+
+$userType = getUserType();
+$isOwnerOrAdmin = isPlatformOwner() || hasRole('farm_admin');
+if (!$isOwnerOrAdmin && !hasPermission($userType, 'update_stock')) {
+    send_json(['success' => false, 'error' => 'You do not have permission to update inventory stock.'], 403);
+}
 
 $data = json_input();
 if (!isset($data['item_id'], $data['type'], $data['quantity'])) {
