@@ -157,7 +157,12 @@ $expensesUrl=$type==='layer'?'/poultry/layer_expenses.php':'/poultry/broiler_exp
         <?php if($economics['production_entry_headcount_source']): ?><div class="small text-muted mt-2">Headcount source: <?php echo htmlspecialchars($economics['production_entry_headcount_source']); ?></div><?php endif; ?>
         <?php if((float)$economics['unallocated_shared_expense_pool']>0): ?><div class="alert alert-warning mt-3 mb-0"><strong>Unallocated shared Layer expense pool in this rearing window:</strong> <?php echo moneyOrDash($economics['unallocated_shared_expense_pool']); ?>. It is disclosed but not silently assigned to this cycle.</div><?php endif; ?>
       <?php endif; ?>
-      <?php if(!empty($economics['warnings'])): ?><div class="mt-3"><?php foreach($economics['warnings'] as $w): ?><div class="alert alert-warning py-2 mb-2"><?php echo htmlspecialchars($w); ?></div><?php endforeach; ?></div><?php endif; ?>
+      <?php if(!empty($economics['warnings'])): ?>
+        <?php $visibleWarnings=array_values(array_filter($economics['warnings'],static function($warning) use ($economics): bool {
+          return !((float)$economics['unallocated_shared_expense_pool']>0 && str_starts_with((string)$warning,'Unallocated shared Layer expenses exist in the Rearing window.'));
+        })); ?>
+        <?php if($visibleWarnings): ?><div class="mt-3"><?php foreach($visibleWarnings as $w): ?><div class="alert alert-warning py-2 mb-2"><?php echo htmlspecialchars($w); ?></div><?php endforeach; ?></div><?php endif; ?>
+      <?php endif; ?>
       <div class="small text-muted mt-3">This is a read layer over recorded source transactions. It does not alter monthly profitability, Bird Cost Basis, inventory, expenses, mortality records, or lifecycle history.</div>
     </div>
   </div>
