@@ -242,6 +242,7 @@ unset($_SESSION['permission_error_detail']);
     <?php endif; ?>
 
     <form method="post" action="permissions_save.php">
+      <?= csrf_field() ?>
       <input type="hidden" name="farm_id" value="<?= (int)$permissionFarmId ?>">
       <div class="card permissions-card">
         <div class="card-header">
