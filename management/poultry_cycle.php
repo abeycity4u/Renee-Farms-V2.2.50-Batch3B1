@@ -88,14 +88,25 @@ $expensesUrl=$type==='layer'?'/poultry/layer_expenses.php':'/poultry/broiler_exp
         <div class="col-md-4"><div class="text-muted small">Opening Headcount</div><strong><?php echo number_format((int)$cycle['opening_headcount']); ?></strong></div>
         <div class="col-md-4"><div class="text-muted small">Expected End</div><strong><?php echo htmlspecialchars($cycle['expected_end_date']??'-'); ?></strong></div>
       </div>
-      <div class="workspace-actions d-flex flex-wrap gap-2 mt-3">
-        <a class="btn btn-outline-primary btn-sm" href="#entry">Entry & Acquisition</a>
-        <a class="btn btn-outline-primary btn-sm" href="#lifecycle">Lifecycle</a>
-        <?php if($type==='layer'): ?><a class="btn btn-outline-primary btn-sm" href="#economics">Rearing Economics</a><?php endif; ?>
-        <a class="btn btn-outline-secondary btn-sm" href="<?php echo BASE_URL.$dailyUrl; ?>">Daily Records</a>
-        <a class="btn btn-outline-secondary btn-sm" href="<?php echo BASE_URL.$feedsUrl; ?>">Feed Records</a>
-        <a class="btn btn-outline-secondary btn-sm" href="<?php echo BASE_URL; ?>/poultry/health.php">Health & Treatment</a>
-        <a class="btn btn-outline-secondary btn-sm" href="<?php echo BASE_URL.$expensesUrl; ?>">Expenses</a>
+      <div class="mt-3">
+        <div class="small text-muted fw-semibold mb-2">Workspace sections</div>
+        <div class="workspace-actions d-flex flex-wrap gap-2">
+          <a class="btn btn-outline-primary btn-sm" href="#entry">Entry & Acquisition</a>
+          <a class="btn btn-outline-primary btn-sm" href="#lifecycle">Lifecycle</a>
+          <?php if($type==='layer'): ?>
+            <a class="btn btn-outline-primary btn-sm" href="#economics">Rearing Economics</a>
+            <a class="btn btn-outline-primary btn-sm" href="#economic-basis">Economic Basis</a>
+          <?php endif; ?>
+        </div>
+      </div>
+      <div class="mt-3 pt-2 border-top">
+        <div class="small text-muted fw-semibold mb-2">Source modules</div>
+        <div class="workspace-actions d-flex flex-wrap gap-2">
+          <a class="btn btn-outline-secondary btn-sm" href="<?php echo BASE_URL.$dailyUrl; ?>">Daily Records ↗</a>
+          <a class="btn btn-outline-secondary btn-sm" href="<?php echo BASE_URL.$feedsUrl; ?>">Feed Records ↗</a>
+          <a class="btn btn-outline-secondary btn-sm" href="<?php echo BASE_URL; ?>/poultry/health.php">Health & Treatment ↗</a>
+          <a class="btn btn-outline-secondary btn-sm" href="<?php echo BASE_URL.$expensesUrl; ?>">Expenses ↗</a>
+        </div>
       </div>
     </div>
   </div>
