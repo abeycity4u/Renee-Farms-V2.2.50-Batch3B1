@@ -57,7 +57,7 @@ $expensesUrl=$type==='layer'?'/poultry/layer_expenses.php':'/poultry/broiler_exp
 <title>Poultry Cycle Workspace</title>
 <?php include(dirname(__DIR__).'/navbar_head.php'); ?>
 <style>
-.workspace-stat{min-height:100%}.workspace-stat .value{font-size:1.25rem;font-weight:700}.explain-row{display:flex;justify-content:space-between;gap:18px;padding:.55rem 0;border-bottom:1px solid rgba(127,127,127,.16)}.explain-row:last-child{border-bottom:0}.explain-row .label{color:var(--bs-secondary-color)}.workspace-actions .btn{min-width:150px}.compact-table td,.compact-table th{vertical-align:middle}.section-anchor{scroll-margin-top:90px}
+.workspace-stat{min-height:100%}.workspace-stat .value{font-size:1.25rem;font-weight:700}.explain-row{display:flex;justify-content:space-between;gap:18px;padding:.55rem 0;border-bottom:1px solid rgba(127,127,127,.16)}.explain-row:last-child{border-bottom:0}.explain-row .label{color:var(--bs-secondary-color)}.workspace-actions .btn{min-width:150px}.compact-table td,.compact-table th{vertical-align:middle}.section-anchor{scroll-margin-top:90px}.basis-history-table{min-width:1040px}.basis-history-table .history-version{white-space:nowrap;font-weight:700}.basis-history-table .history-number{white-space:nowrap}.basis-history-table .history-category{font-weight:600;text-transform:capitalize}.basis-history-table .history-reason{display:block;margin-top:.2rem;color:var(--bs-secondary-color);line-height:1.35}.basis-history-table .history-approved{white-space:nowrap}.basis-history-table tbody tr:first-child{background:rgba(25,135,84,.06)}
 </style>
 </head><body>
 <?php include(dirname(__DIR__).'/navbar.php'); ?>
@@ -88,14 +88,25 @@ $expensesUrl=$type==='layer'?'/poultry/layer_expenses.php':'/poultry/broiler_exp
         <div class="col-md-4"><div class="text-muted small">Opening Headcount</div><strong><?php echo number_format((int)$cycle['opening_headcount']); ?></strong></div>
         <div class="col-md-4"><div class="text-muted small">Expected End</div><strong><?php echo htmlspecialchars($cycle['expected_end_date']??'-'); ?></strong></div>
       </div>
-      <div class="workspace-actions d-flex flex-wrap gap-2 mt-3">
-        <a class="btn btn-outline-primary btn-sm" href="#entry">Entry & Acquisition</a>
-        <a class="btn btn-outline-primary btn-sm" href="#lifecycle">Lifecycle</a>
-        <?php if($type==='layer'): ?><a class="btn btn-outline-primary btn-sm" href="#economics">Rearing Economics</a><?php endif; ?>
-        <a class="btn btn-outline-secondary btn-sm" href="<?php echo BASE_URL.$dailyUrl; ?>">Daily Records</a>
-        <a class="btn btn-outline-secondary btn-sm" href="<?php echo BASE_URL.$feedsUrl; ?>">Feed Records</a>
-        <a class="btn btn-outline-secondary btn-sm" href="<?php echo BASE_URL; ?>/poultry/health.php">Health & Treatment</a>
-        <a class="btn btn-outline-secondary btn-sm" href="<?php echo BASE_URL.$expensesUrl; ?>">Expenses</a>
+      <div class="mt-3">
+        <div class="small text-muted fw-semibold mb-2">Workspace sections</div>
+        <div class="workspace-actions d-flex flex-wrap gap-2">
+          <a class="btn btn-outline-primary btn-sm" href="#entry">Entry & Acquisition</a>
+          <a class="btn btn-outline-primary btn-sm" href="#lifecycle">Lifecycle</a>
+          <?php if($type==='layer'): ?>
+            <a class="btn btn-outline-primary btn-sm" href="#economics">Rearing Economics</a>
+            <a class="btn btn-outline-primary btn-sm" href="#economic-basis">Economic Basis</a>
+          <?php endif; ?>
+        </div>
+      </div>
+      <div class="mt-3 pt-2 border-top">
+        <div class="small text-muted fw-semibold mb-2">Source modules</div>
+        <div class="workspace-actions d-flex flex-wrap gap-2">
+          <a class="btn btn-outline-secondary btn-sm" href="<?php echo BASE_URL.$dailyUrl; ?>">Daily Records ↗</a>
+          <a class="btn btn-outline-secondary btn-sm" href="<?php echo BASE_URL.$feedsUrl; ?>">Feed Records ↗</a>
+          <a class="btn btn-outline-secondary btn-sm" href="<?php echo BASE_URL; ?>/poultry/health.php">Health & Treatment ↗</a>
+          <a class="btn btn-outline-secondary btn-sm" href="<?php echo BASE_URL.$expensesUrl; ?>">Expenses ↗</a>
+        </div>
       </div>
     </div>
   </div>
@@ -157,7 +168,12 @@ $expensesUrl=$type==='layer'?'/poultry/layer_expenses.php':'/poultry/broiler_exp
         <?php if($economics['production_entry_headcount_source']): ?><div class="small text-muted mt-2">Headcount source: <?php echo htmlspecialchars($economics['production_entry_headcount_source']); ?></div><?php endif; ?>
         <?php if((float)$economics['unallocated_shared_expense_pool']>0): ?><div class="alert alert-warning mt-3 mb-0"><strong>Unallocated shared Layer expense pool in this rearing window:</strong> <?php echo moneyOrDash($economics['unallocated_shared_expense_pool']); ?>. It is disclosed but not silently assigned to this cycle.</div><?php endif; ?>
       <?php endif; ?>
-      <?php if(!empty($economics['warnings'])): ?><div class="mt-3"><?php foreach($economics['warnings'] as $w): ?><div class="alert alert-warning py-2 mb-2"><?php echo htmlspecialchars($w); ?></div><?php endforeach; ?></div><?php endif; ?>
+      <?php if(!empty($economics['warnings'])): ?>
+        <?php $visibleWarnings=array_values(array_filter($economics['warnings'],static function($warning) use ($economics): bool {
+          return !((float)$economics['unallocated_shared_expense_pool']>0 && str_starts_with((string)$warning,'Unallocated shared Layer expenses exist in the Rearing window.'));
+        })); ?>
+        <?php if($visibleWarnings): ?><div class="mt-3"><?php foreach($visibleWarnings as $w): ?><div class="alert alert-warning py-2 mb-2"><?php echo htmlspecialchars($w); ?></div><?php endforeach; ?></div><?php endif; ?>
+      <?php endif; ?>
       <div class="small text-muted mt-3">This is a read layer over recorded source transactions. It does not alter monthly profitability, Bird Cost Basis, inventory, expenses, mortality records, or lifecycle history.</div>
     </div>
   </div>
@@ -231,14 +247,18 @@ $expensesUrl=$type==='layer'?'/poultry/layer_expenses.php':'/poultry/broiler_exp
       <?php endif; ?>
 
       <?php if($entrySnapshots): ?>
-      <div class="table-responsive"><table class="table table-sm compact-table mb-0">
-        <thead><tr><th>Version</th><th>Status</th><th>Entry Date</th><th class="text-end">Investment</th><th class="text-end">Entry Flock</th><th class="text-end">Basis/Bird</th><th>Category / Reason</th><th>Approved</th></tr></thead>
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-1 mb-2">
+        <strong>Approved Basis History</strong>
+        <span class="small text-muted">Newest approved version first · previous versions remain immutable</span>
+      </div>
+      <div class="table-responsive"><table class="table table-sm compact-table basis-history-table mb-0">
+        <thead><tr><th>Version</th><th>Status</th><th>Entry Date</th><th class="text-end">Investment</th><th class="text-end">Entry Flock</th><th class="text-end">Basis / Bird</th><th>Revision Details</th><th>Approved</th></tr></thead>
         <tbody><?php foreach($entrySnapshots as $snap): ?><tr>
-          <td>V<?php echo (int)$snap['version_no']; ?></td><td><?php echo htmlspecialchars(ucfirst($snap['snapshot_status'])); ?></td>
-          <td><?php echo htmlspecialchars($snap['production_entry_date']); ?></td><td class="text-end"><?php echo moneyOrDash($snap['attributed_investment']); ?></td>
-          <td class="text-end"><?php echo number_format((int)$snap['production_entry_headcount']); ?></td><td class="text-end"><?php echo moneyOrDash($snap['investment_per_entry_bird']); ?></td>
-          <td><?php echo htmlspecialchars(str_replace('_',' ',(string)$snap['revision_category'])); ?><?php echo !empty($snap['revision_reason'])?' · '.htmlspecialchars($snap['revision_reason']):''; ?></td>
-          <td><?php echo htmlspecialchars($snap['approved_at']); ?><?php echo !empty($snap['approved_by_name'])?' · '.htmlspecialchars($snap['approved_by_name']):''; ?></td>
+          <td class="history-version">V<?php echo (int)$snap['version_no']; ?><?php if((int)$snap['version_no']===(int)$latestEntrySnapshot['version_no']): ?><span class="badge bg-success ms-1">Current</span><?php endif; ?></td><td><?php echo htmlspecialchars(ucfirst($snap['snapshot_status'])); ?></td>
+          <td class="history-number"><?php echo htmlspecialchars($snap['production_entry_date']); ?></td><td class="text-end history-number"><?php echo moneyOrDash($snap['attributed_investment']); ?></td>
+          <td class="text-end history-number"><?php echo number_format((int)$snap['production_entry_headcount']); ?></td><td class="text-end history-number"><?php echo moneyOrDash($snap['investment_per_entry_bird']); ?></td>
+          <td><span class="history-category"><?php echo htmlspecialchars(str_replace('_',' ',(string)$snap['revision_category'])); ?></span><?php if(!empty($snap['revision_reason'])): ?><span class="history-reason"><?php echo htmlspecialchars($snap['revision_reason']); ?></span><?php endif; ?></td>
+          <td class="history-approved"><?php echo htmlspecialchars($snap['approved_at']); ?><?php echo !empty($snap['approved_by_name'])?'<span class="history-reason">'.htmlspecialchars($snap['approved_by_name']).'</span>':''; ?></td>
         </tr><?php endforeach; ?></tbody>
       </table></div>
       <?php endif; ?>
