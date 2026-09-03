@@ -50,17 +50,32 @@ if ($farmType === 'both') {
 $lowStockCount = $lowStockStmt->fetchColumn();
 
 // Get total stock value
-$valueQuery = "SELECT SUM(current_stock * 100) as total_value FROM stock_items 
-               WHERE farm_id = ? AND farm_type IN (?, 'both')";
-$valueStmt = $pdo->prepare($valueQuery);
-$valueStmt->execute([$tenantFarmId, $farmType]);
+if ($farmType === 'both') {
+    $valueQuery = "SELECT SUM(current_stock * 100) as total_value FROM stock_items
+                   WHERE farm_id = ? AND farm_type IN ('poultry', 'ruminant', 'both')";
+    $valueStmt = $pdo->prepare($valueQuery);
+    $valueStmt->execute([$tenantFarmId]);
+} else {
+    $valueQuery = "SELECT SUM(current_stock * 100) as total_value FROM stock_items
+                   WHERE farm_id = ? AND farm_type IN (?, 'both')";
+    $valueStmt = $pdo->prepare($valueQuery);
+    $valueStmt->execute([$tenantFarmId, $farmType]);
+}
 $totalValue = $valueStmt->fetchColumn();
 
 // Get recent stock changes
-$changesQuery = "SELECT COUNT(*) as recent_changes FROM stock_transactions 
-                 WHERE farm_id = ? AND farm_type = ? AND is_reversed = 0 AND transaction_date = CURDATE()";
-$changesStmt = $pdo->prepare($changesQuery);
-$changesStmt->execute([$tenantFarmId, $farmType]);
+if ($farmType === 'both') {
+    $changesQuery = "SELECT COUNT(*) as recent_changes FROM stock_transactions
+                     WHERE farm_id = ? AND farm_type IN ('poultry', 'ruminant', 'both')
+                     AND is_reversed = 0 AND transaction_date = CURDATE()";
+    $changesStmt = $pdo->prepare($changesQuery);
+    $changesStmt->execute([$tenantFarmId]);
+} else {
+    $changesQuery = "SELECT COUNT(*) as recent_changes FROM stock_transactions
+                     WHERE farm_id = ? AND farm_type = ? AND is_reversed = 0 AND transaction_date = CURDATE()";
+    $changesStmt = $pdo->prepare($changesQuery);
+    $changesStmt->execute([$tenantFarmId, $farmType]);
+}
 $recentChanges = $changesStmt->fetchColumn();
 
 echo json_encode([
