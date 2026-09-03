@@ -57,7 +57,7 @@ $expensesUrl=$type==='layer'?'/poultry/layer_expenses.php':'/poultry/broiler_exp
 <title>Poultry Cycle Workspace</title>
 <?php include(dirname(__DIR__).'/navbar_head.php'); ?>
 <style>
-.workspace-stat{min-height:100%}.workspace-stat .value{font-size:1.25rem;font-weight:700}.explain-row{display:flex;justify-content:space-between;gap:18px;padding:.55rem 0;border-bottom:1px solid rgba(127,127,127,.16)}.explain-row:last-child{border-bottom:0}.explain-row .label{color:var(--bs-secondary-color)}.workspace-actions .btn{min-width:150px}.compact-table td,.compact-table th{vertical-align:middle}.section-anchor{scroll-margin-top:90px}
+.workspace-stat{min-height:100%}.workspace-stat .value{font-size:1.25rem;font-weight:700}.explain-row{display:flex;justify-content:space-between;gap:18px;padding:.55rem 0;border-bottom:1px solid rgba(127,127,127,.16)}.explain-row:last-child{border-bottom:0}.explain-row .label{color:var(--bs-secondary-color)}.workspace-actions .btn{min-width:150px}.compact-table td,.compact-table th{vertical-align:middle}.section-anchor{scroll-margin-top:90px}.basis-history-table{min-width:1040px}.basis-history-table .history-version{white-space:nowrap;font-weight:700}.basis-history-table .history-number{white-space:nowrap}.basis-history-table .history-category{font-weight:600;text-transform:capitalize}.basis-history-table .history-reason{display:block;margin-top:.2rem;color:var(--bs-secondary-color);line-height:1.35}.basis-history-table .history-approved{white-space:nowrap}.basis-history-table tbody tr:first-child{background:rgba(25,135,84,.06)}
 </style>
 </head><body>
 <?php include(dirname(__DIR__).'/navbar.php'); ?>
@@ -236,14 +236,18 @@ $expensesUrl=$type==='layer'?'/poultry/layer_expenses.php':'/poultry/broiler_exp
       <?php endif; ?>
 
       <?php if($entrySnapshots): ?>
-      <div class="table-responsive"><table class="table table-sm compact-table mb-0">
-        <thead><tr><th>Version</th><th>Status</th><th>Entry Date</th><th class="text-end">Investment</th><th class="text-end">Entry Flock</th><th class="text-end">Basis/Bird</th><th>Category / Reason</th><th>Approved</th></tr></thead>
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-1 mb-2">
+        <strong>Approved Basis History</strong>
+        <span class="small text-muted">Newest approved version first · previous versions remain immutable</span>
+      </div>
+      <div class="table-responsive"><table class="table table-sm compact-table basis-history-table mb-0">
+        <thead><tr><th>Version</th><th>Status</th><th>Entry Date</th><th class="text-end">Investment</th><th class="text-end">Entry Flock</th><th class="text-end">Basis / Bird</th><th>Revision Details</th><th>Approved</th></tr></thead>
         <tbody><?php foreach($entrySnapshots as $snap): ?><tr>
-          <td>V<?php echo (int)$snap['version_no']; ?></td><td><?php echo htmlspecialchars(ucfirst($snap['snapshot_status'])); ?></td>
-          <td><?php echo htmlspecialchars($snap['production_entry_date']); ?></td><td class="text-end"><?php echo moneyOrDash($snap['attributed_investment']); ?></td>
-          <td class="text-end"><?php echo number_format((int)$snap['production_entry_headcount']); ?></td><td class="text-end"><?php echo moneyOrDash($snap['investment_per_entry_bird']); ?></td>
-          <td><?php echo htmlspecialchars(str_replace('_',' ',(string)$snap['revision_category'])); ?><?php echo !empty($snap['revision_reason'])?' · '.htmlspecialchars($snap['revision_reason']):''; ?></td>
-          <td><?php echo htmlspecialchars($snap['approved_at']); ?><?php echo !empty($snap['approved_by_name'])?' · '.htmlspecialchars($snap['approved_by_name']):''; ?></td>
+          <td class="history-version">V<?php echo (int)$snap['version_no']; ?><?php if((int)$snap['version_no']===(int)$latestEntrySnapshot['version_no']): ?><span class="badge bg-success ms-1">Current</span><?php endif; ?></td><td><?php echo htmlspecialchars(ucfirst($snap['snapshot_status'])); ?></td>
+          <td class="history-number"><?php echo htmlspecialchars($snap['production_entry_date']); ?></td><td class="text-end history-number"><?php echo moneyOrDash($snap['attributed_investment']); ?></td>
+          <td class="text-end history-number"><?php echo number_format((int)$snap['production_entry_headcount']); ?></td><td class="text-end history-number"><?php echo moneyOrDash($snap['investment_per_entry_bird']); ?></td>
+          <td><span class="history-category"><?php echo htmlspecialchars(str_replace('_',' ',(string)$snap['revision_category'])); ?></span><?php if(!empty($snap['revision_reason'])): ?><span class="history-reason"><?php echo htmlspecialchars($snap['revision_reason']); ?></span><?php endif; ?></td>
+          <td class="history-approved"><?php echo htmlspecialchars($snap['approved_at']); ?><?php echo !empty($snap['approved_by_name'])?'<span class="history-reason">'.htmlspecialchars($snap['approved_by_name']).'</span>':''; ?></td>
         </tr><?php endforeach; ?></tbody>
       </table></div>
       <?php endif; ?>
