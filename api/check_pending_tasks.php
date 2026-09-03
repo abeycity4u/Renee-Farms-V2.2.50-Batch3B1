@@ -5,9 +5,32 @@ requireLogin();
 
 header('Content-Type: application/json');
 
-$farmType = $_GET['farm_type'] ?? 'both';
+$farmType = strtolower(trim((string)($_GET['farm_type'] ?? 'both')));
 $date = $_GET['date'] ?? date('Y-m-d');
 $tenantFarmId = requireCurrentFarmId();
+
+if (!in_array($farmType, ['poultry', 'ruminant', 'both'], true)) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Invalid farm type']);
+    exit;
+}
+
+if (!(isPlatformOwner() || hasRole('farm_admin'))) {
+    if ($farmType === 'both') {
+        $accessibleTypes = array_values(array_intersect(accessibleFarmTypes(), ['poultry', 'ruminant']));
+        if (count($accessibleTypes) === 1) {
+            $farmType = $accessibleTypes[0];
+        } elseif (count($accessibleTypes) === 0) {
+            http_response_code(403);
+            echo json_encode(['error' => 'You do not have access to pending-task data.']);
+            exit;
+        }
+    } elseif (!checkAccess($farmType)) {
+        http_response_code(403);
+        echo json_encode(['error' => 'You do not have access to this farm module.']);
+        exit;
+    }
+}
 
 $pendingTasks = 0;
 
