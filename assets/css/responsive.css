@@ -1,0 +1,449 @@
+/*
+ * Renee Farms platform-wide responsive foundation.
+ * Keep mobile behavior centralized here so shared layout fixes apply across modules.
+ * Page-specific CSS should only handle truly page-specific presentation.
+ */
+
+/* Always allow flex/grid children to shrink instead of forcing horizontal overflow. */
+.row > *,
+.d-flex > *,
+.card,
+.card-header,
+.card-body,
+.modal-content,
+.dropdown-menu {
+    min-width: 0;
+}
+
+img,
+video,
+svg {
+    max-width: 100%;
+}
+
+.table-responsive {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-inline: contain;
+}
+
+/* Long labels may wrap at sensible boundaries without collapsing into one letter per line. */
+.card,
+.alert,
+.badge,
+.btn,
+.dropdown-item,
+.form-text,
+.small {
+    overflow-wrap: break-word;
+    word-break: normal;
+}
+
+@media (max-width: 767.98px) {
+    html,
+    body {
+        max-width: 100%;
+    }
+
+    body {
+        overflow-x: hidden;
+    }
+
+    .container,
+    .container-fluid {
+        width: 100%;
+        max-width: 100%;
+        padding-left: .75rem;
+        padding-right: .75rem;
+    }
+
+    /* Forms with historic inline/fixed widths remain inside the viewport. */
+    .form-control,
+    .form-select,
+    .input-group,
+    textarea,
+    select,
+    input {
+        max-width: 100%;
+    }
+
+    /* Shared mobile action pattern: headers and toolbars stack predictably. */
+    .card-header.d-flex.justify-content-between,
+    .card-header.d-flex.align-items-center.justify-content-between,
+    .app-responsive-stack,
+    .app-responsive-actions {
+        flex-direction: column !important;
+        align-items: stretch !important;
+    }
+
+    .card-header.d-flex.justify-content-between > .btn,
+    .card-header.d-flex.justify-content-between > a.btn,
+    .app-responsive-actions > .btn,
+    .app-responsive-actions > a.btn {
+        width: 100%;
+    }
+
+    .btn {
+        max-width: 100%;
+        white-space: normal;
+    }
+
+    .btn-group,
+    .btn-toolbar {
+        max-width: 100%;
+        flex-wrap: wrap;
+    }
+
+    /* DataTables search/length controls should not create side scrolling. */
+    .dataTables_wrapper .row > div {
+        min-width: 0;
+    }
+    .dataTables_wrapper .dataTables_filter input,
+    .dataTables_wrapper .dataTables_length select {
+        max-width: 100%;
+    }
+
+    /* Farm Intelligence shared signal cards. */
+    .intel-shell,
+    .inv-shell {
+        width: 100%;
+        max-width: 100% !important;
+    }
+
+    .intel-row > .d-flex {
+        display: grid !important;
+        grid-template-columns: 34px minmax(0, 1fr) !important;
+        gap: .65rem !important;
+    }
+
+    .intel-row .intel-action {
+        grid-column: 1 / -1;
+        width: 100%;
+        min-width: 0 !important;
+        text-align: stretch !important;
+    }
+
+    .intel-row .intel-action .btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        min-height: 42px;
+    }
+
+    .intel-row .intel-measure {
+        white-space: normal !important;
+        overflow-wrap: anywhere;
+    }
+
+    .intel-category-head {
+        gap: .5rem;
+        flex-wrap: wrap;
+    }
+
+    /* Dashboard Management Intelligence uses the same stacked action principle. */
+    .smart-command-card .card-body > .d-flex:first-child {
+        align-items: stretch !important;
+    }
+
+    .smart-command-card .smart-intel-summary {
+        width: 100%;
+        min-width: 0 !important;
+    }
+
+    .smart-command-card .card-body > .d-flex:first-child > a {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 40px;
+        padding: .45rem .65rem;
+        border: 1px solid var(--bs-primary);
+        border-radius: .45rem;
+    }
+
+    .smart-command-card .smart-insight > .d-flex {
+        display: grid !important;
+        grid-template-columns: 30px minmax(0, 1fr) !important;
+        gap: .65rem !important;
+    }
+
+    .smart-command-card .smart-insight h6.text-truncate {
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+    }
+
+    .smart-command-card .smart-insight .d-flex.justify-content-between {
+        flex-wrap: wrap;
+        align-items: flex-start;
+    }
+
+    .smart-command-card .smart-insight a {
+        display: flex !important;
+        width: 100%;
+        justify-content: center;
+        align-items: center;
+        min-height: 38px;
+        margin-top: .6rem !important;
+        padding: .4rem .6rem;
+        border: 1px solid var(--bs-primary);
+        border-radius: .4rem;
+    }
+
+    /* Investigation page: preserve readable evidence/check layout on phones. */
+    .inv-row {
+        padding: .75rem;
+    }
+    .inv-check {
+        overflow-wrap: anywhere;
+    }
+
+    /* Navbar: constrain long tenant names without losing the menu button. */
+    #appNavbar .container-fluid {
+        flex-wrap: wrap;
+    }
+    #appNavbar .navbar-brand {
+        max-width: calc(100% - 64px);
+        min-width: 0;
+    }
+    #appNavbar .navbar-brand .brand-text {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    #appNavbar .navbar-collapse {
+        width: 100%;
+    }
+    #appNavbar .main-nav-spacing {
+        margin-left: 0 !important;
+    }
+    #appNavbar .dropdown-menu {
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 420px) {
+    .container,
+    .container-fluid {
+        padding-left: .6rem;
+        padding-right: .6rem;
+    }
+
+    .card-body {
+        padding-left: .8rem;
+        padding-right: .8rem;
+    }
+
+    .farm-brand .brand-text {
+        font-size: .96rem;
+    }
+}
+
+/* Bootstrap navbar collapses below lg, so nav spacing must reset through tablet widths too. */
+@media (max-width: 991.98px) {
+    #appNavbar .main-nav-spacing {
+        margin-left: 0 !important;
+    }
+    #appNavbar .navbar-collapse {
+        width: 100%;
+    }
+}
+
+@media (max-width: 767.98px) {
+    /* Reusable semantic primitives for page headers, filter bars and action rows. */
+    .app-responsive-toolbar {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: .65rem !important;
+    }
+
+    .app-responsive-toolbar > .btn,
+    .app-responsive-toolbar > a.btn,
+    .app-responsive-toolbar > .btn-group,
+    .app-responsive-toolbar > form {
+        width: 100%;
+    }
+
+    .app-responsive-form {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: .6rem !important;
+        width: 100%;
+    }
+
+    .app-responsive-form > *,
+    .app-responsive-form .form-control,
+    .app-responsive-form .form-select,
+    .app-responsive-form .btn {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }
+}
+
+@media (max-width: 767.98px) {
+    /* Common label/value rows may wrap, but only semantic toolbars are forced to stack. */
+    .d-flex.justify-content-between {
+        flex-wrap: wrap;
+        gap: .5rem;
+    }
+
+    .app-responsive-toolbar > .d-flex {
+        flex-wrap: wrap;
+        width: 100%;
+    }
+
+    .app-responsive-toolbar > .d-flex > .btn,
+    .app-responsive-toolbar > .d-flex > a.btn {
+        flex: 1 1 auto;
+    }
+
+    .card h1,
+    .card h2,
+    .card h3,
+    .card h4,
+    .card h5,
+    .card h6 {
+        overflow-wrap: anywhere;
+    }
+}
+
+
+/* ================================================================
+ * V2.2.49 centralized wide-data mobile architecture
+ * Data-heavy tables stay readable on phones: the table scrolls, not the page.
+ * ================================================================ */
+@media (max-width: 767.98px) {
+    /* Never compress a multi-column operational table into character-wide cells. */
+    .table-responsive {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: auto !important;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-x pan-y;
+    }
+
+    .table-responsive > table,
+    .table-responsive table.table {
+        width: 100% !important;
+        max-width: none !important;
+        table-layout: auto !important;
+    }
+
+    .table-responsive > table th,
+    .table-responsive > table td,
+    .table-responsive table.table th,
+    .table-responsive table.table td {
+        min-width: 7rem;
+        word-break: normal !important;
+        overflow-wrap: normal !important;
+        hyphens: none !important;
+        vertical-align: middle;
+    }
+
+    .table-responsive > table th,
+    .table-responsive table.table th {
+        white-space: nowrap !important;
+    }
+
+    /* Keep identifiers, dates, money and action controls together. */
+    .table-responsive td.text-nowrap,
+    .table-responsive th.text-nowrap,
+    .table-responsive .btn-group,
+    .table-responsive .d-inline-flex,
+    .table-responsive .inventory-action-group {
+        white-space: nowrap !important;
+    }
+
+    /* Text-heavy cells may wrap at spaces, but never letter-by-letter. */
+    .table-responsive td .small,
+    .table-responsive td .text-muted,
+    .table-responsive td p,
+    .table-responsive td div:not(.btn-group):not(.d-inline-flex):not(.inventory-action-group) {
+        word-break: normal !important;
+        overflow-wrap: break-word !important;
+    }
+
+    /* More columns automatically create a wider swipe surface. */
+    .table-responsive table:has(thead th:nth-child(5)) { min-width: 42rem !important; }
+    .table-responsive table:has(thead th:nth-child(7)) { min-width: 52rem !important; }
+    .table-responsive table:has(thead th:nth-child(9)) { min-width: 66rem !important; }
+    .table-responsive table:has(thead th:nth-child(11)) { min-width: 78rem !important; }
+    .table-responsive table:has(thead th:nth-child(13)) { min-width: 90rem !important; }
+
+    /* Common action columns need enough room for usable controls. */
+    .table-responsive table th:last-child,
+    .table-responsive table td:last-child {
+        min-width: 8rem;
+    }
+
+    /* Calendar grids preserve seven real columns and scroll as a unit. */
+    .app-calendar-scroll {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto !important;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-inline: contain;
+        padding-bottom: .35rem;
+    }
+
+    .app-calendar-scroll > .row {
+        min-width: 43.75rem;
+        flex-wrap: nowrap !important;
+        margin-left: 0;
+        margin-right: 0;
+    }
+
+    .app-calendar-scroll > .row > .col {
+        flex: 0 0 14.285714%;
+        width: 14.285714%;
+        min-width: 0;
+    }
+
+    .app-calendar-scroll .calendar-weekday,
+    .app-calendar-scroll .calendar-date,
+    .app-calendar-scroll .calendar-meta,
+    .app-calendar-scroll .calendar-day,
+    .app-calendar-scroll .badge {
+        word-break: normal !important;
+        overflow-wrap: normal !important;
+    }
+
+    .app-calendar-scroll .calendar-weekday {
+        white-space: nowrap;
+    }
+
+    .app-calendar-scroll .calendar-meta {
+        white-space: normal;
+        line-height: 1.2;
+    }
+
+    /* User/permissions screens and similar management shells must not clip their scroll wrappers. */
+    .users-table-wrap.table-responsive,
+    .permissions-card .table-responsive,
+    .inventory-table-card .table-responsive {
+        overflow-x: auto !important;
+    }
+
+    /* Prevent page-wide horizontal scrolling; only dedicated data surfaces scroll. */
+    main,
+    .container,
+    .container-fluid,
+    .card,
+    .card-body,
+    .modal-body {
+        min-width: 0;
+        max-width: 100%;
+    }
+}
