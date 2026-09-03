@@ -26,8 +26,7 @@ if (!function_exists('json_input')) {
 }
 if (!function_exists('require_csrf_token')) {
     function require_csrf_token(): void {
-        $token=$_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($_POST['csrf_token'] ?? '');
-        if (!function_exists('verify_csrf_token') || !verify_csrf_token($token)) {
+        if (!function_exists('csrf_request_is_valid') || !csrf_request_is_valid()) {
             send_json(['success'=>false,'error'=>'Invalid CSRF token'],419);
         }
     }
