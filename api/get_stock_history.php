@@ -16,12 +16,37 @@ try {
     $days = max(1, min(3650, (int)($_GET['days'] ?? 30)));
     $dateLimit = date('Y-m-d', strtotime("-{$days} days"));
 
+    $userType = getUserType();
+    $isOwnerOrAdmin = isPlatformOwner() || hasRole('farm_admin');
+    $hasInventoryPermission = hasPermission($userType, 'inventory');
+    $hasPoultryAccess = checkAccess('poultry');
+    $hasRuminantAccess = checkAccess('ruminant');
+
+    if (!($isOwnerOrAdmin || $hasInventoryPermission || $hasPoultryAccess || $hasRuminantAccess)) {
+        http_response_code(403);
+        echo json_encode(['error' => 'You do not have access to inventory data.']);
+        exit;
+    }
+
     $itemStmt = $pdo->prepare("SELECT * FROM stock_items WHERE id = ? AND farm_id = ?");
     $itemStmt->execute([$itemId, $farmId]);
     $item = $itemStmt->fetch(PDO::FETCH_ASSOC);
     if (!$item) {
         echo json_encode(['error' => 'Inventory item not found.']);
         exit;
+    }
+
+    if (!($isOwnerOrAdmin || $hasInventoryPermission)) {
+        $itemFarmType = strtolower((string)($item['farm_type'] ?? ''));
+        $canReadItem = ($itemFarmType === 'poultry' && $hasPoultryAccess)
+            || ($itemFarmType === 'ruminant' && $hasRuminantAccess)
+            || ($itemFarmType === 'both' && ($hasPoultryAccess || $hasRuminantAccess));
+
+        if (!$canReadItem) {
+            http_response_code(403);
+            echo json_encode(['error' => 'You do not have access to this inventory item.']);
+            exit;
+        }
     }
 
     // Keep the full audit trail. Physical balances use every posted movement;
