@@ -16,13 +16,21 @@ $cycleId = isset($_GET['cycle_id']) ? (int)$_GET['cycle_id'] : 0;
 $animalType = isset($_GET['animal_type']) ? strtolower(trim($_GET['animal_type'])) : '';
 
 $tableMap = [
-    'layer' => ['table' => 'layer_daily_records', 'animal' => false],
-    'broiler' => ['table' => 'broiler_daily_records', 'animal' => false],
-    'ruminant' => ['table' => 'ruminant_daily_records', 'animal' => true],
+    'layer' => ['table' => 'layer_daily_records', 'animal' => false, 'module' => 'poultry'],
+    'broiler' => ['table' => 'broiler_daily_records', 'animal' => false, 'module' => 'poultry'],
+    'ruminant' => ['table' => 'ruminant_daily_records', 'animal' => true, 'module' => 'ruminant'],
 ];
 
 if (!isset($tableMap[$type]) || ($tableMap[$type]['animal'] && $animalType === '')) {
     echo json_encode(['closing_stock' => null, 'error' => 'Invalid parameters']);
+    exit;
+}
+
+$isOwnerOrAdmin = isPlatformOwner() || hasRole('farm_admin');
+$requiredModule = $tableMap[$type]['module'];
+if (!$isOwnerOrAdmin && !checkAccess($requiredModule)) {
+    http_response_code(403);
+    echo json_encode(['closing_stock' => null, 'error' => 'You do not have access to this farm module.']);
     exit;
 }
 
