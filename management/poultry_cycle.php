@@ -16,6 +16,7 @@ if (!isPlatformOwner() && !hasRole('farm_admin') && !hasPermission(getUserType()
 $cycleId=(int)($_GET['id']??($_POST['cycle_id']??0));
 $flashError=''; $flashSuccess='';
 if ($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['action']??'')==='approve_production_entry_basis') {
+    require_valid_csrf_post();
     try {
         $category=(string)($_POST['revision_category']??'');
         $reason=(string)($_POST['revision_reason']??'');
@@ -217,6 +218,7 @@ $expensesUrl=$type==='layer'?'/poultry/layer_expenses.php':'/poultry/broiler_exp
         <?php $needsApproval=!$latestEntrySnapshot || !hash_equals((string)$latestEntrySnapshot['source_fingerprint'],(string)$entryCandidate['source_fingerprint']); ?>
         <?php if($needsApproval): ?>
         <form method="post" class="border rounded p-3 mb-3">
+          <?php echo csrf_field(); ?>
           <input type="hidden" name="action" value="approve_production_entry_basis">
           <input type="hidden" name="cycle_id" value="<?php echo (int)$cycleId; ?>">
           <div class="row g-3">
