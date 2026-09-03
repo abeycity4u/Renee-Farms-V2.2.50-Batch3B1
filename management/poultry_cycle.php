@@ -77,7 +77,7 @@ $expensesUrl=$type==='layer'?'/poultry/layer_expenses.php':'/poultry/broiler_exp
     <div class="col-6 col-lg-3"><div class="card workspace-stat"><div class="card-body"><div class="text-muted small">Operational Status</div><div class="value text-uppercase"><?php echo htmlspecialchars($cycle['status']); ?></div></div></div></div>
     <div class="col-6 col-lg-3"><div class="card workspace-stat"><div class="card-body"><div class="text-muted small">Biological Phase</div><div class="value"><?php echo htmlspecialchars($current ? poultry_lifecycle_phase_label($type,$current['phase']) : 'Not defined'); ?></div></div></div></div>
     <div class="col-6 col-lg-3"><div class="card workspace-stat"><div class="card-body"><div class="text-muted small">Current Flock</div><div class="value"><?php echo $currentFlock===null?'-':number_format($currentFlock); ?></div></div></div></div>
-    <div class="col-6 col-lg-3"><div class="card workspace-stat"><div class="card-body"><div class="text-muted small">Bird Cost Basis</div><div class="value"><?php echo moneyOrDash($cycle['bird_unit_cost']); ?></div><div class="small text-muted">Mortality valuation basis only</div></div></div></div>
+    <div class="col-6 col-lg-3"><div class="card workspace-stat"><div class="card-body"><div class="text-muted small">Bird Cost Basis</div><div class="value"><?php echo moneyOrDash($cycle['bird_unit_cost']); ?></div><div class="small text-muted"><?php echo $cycle['bird_unit_cost']===null?'Not configured · ':''; ?>Used for mortality valuation only; separate from Production-Entry Economic Basis.</div></div></div></div>
   </div>
 
   <div class="card mb-3">
@@ -165,19 +165,25 @@ $expensesUrl=$type==='layer'?'/poultry/layer_expenses.php':'/poultry/broiler_exp
   <div id="economic-basis" class="card mb-3 section-anchor">
     <div class="card-header d-flex justify-content-between align-items-center"><strong>Production-Entry Economic Basis</strong></div>
     <div class="card-body">
+      <div class="small text-muted mb-3">Production-Entry Economic Basis is accumulated attributable rearing investment per surviving bird at production entry. It is a separate management-costing measure and does not replace Bird Cost Basis used for mortality valuation.</div>
       <?php if($latestEntrySnapshot): ?>
-        <?php $changed=$entryCandidate && !empty($entryCandidate['ready']) && !hash_equals((string)$latestEntrySnapshot['source_fingerprint'],(string)$entryCandidate['source_fingerprint']); ?>
+        <?php
+          $changed=$entryCandidate && !empty($entryCandidate['ready']) && !hash_equals((string)$latestEntrySnapshot['source_fingerprint'],(string)$entryCandidate['source_fingerprint']);
+          $investmentChanged=$entryCandidate && !empty($entryCandidate['ready']) && abs((float)$entryCandidate['attributed_investment']-(float)$latestEntrySnapshot['attributed_investment'])>0.0049;
+          $flockChanged=$entryCandidate && !empty($entryCandidate['ready']) && (int)$entryCandidate['production_entry_headcount']!==(int)$latestEntrySnapshot['production_entry_headcount'];
+        ?>
         <div class="row g-3 mb-3">
           <div class="col-md-3"><div class="text-muted small">Current Approved Version</div><h5>V<?php echo (int)$latestEntrySnapshot['version_no']; ?> · <?php echo htmlspecialchars(ucfirst($latestEntrySnapshot['snapshot_status'])); ?></h5></div>
           <div class="col-md-3"><div class="text-muted small">Approved Attributed Investment</div><h5><?php echo moneyOrDash($latestEntrySnapshot['attributed_investment']); ?></h5></div>
-          <div class="col-md-3"><div class="text-muted small">Production-entry Flock</div><h5><?php echo number_format((int)$latestEntrySnapshot['production_entry_headcount']); ?></h5></div>
-          <div class="col-md-3"><div class="text-muted small">Approved Basis / Entry Bird</div><h5><?php echo moneyOrDash($latestEntrySnapshot['investment_per_entry_bird']); ?></h5></div>
+          <div class="col-md-3"><div class="text-muted small">Approved Production-entry Flock</div><h5><?php echo number_format((int)$latestEntrySnapshot['production_entry_headcount']); ?></h5></div>
+          <div class="col-md-3"><div class="text-muted small">Approved Economic Basis / Entry Bird</div><h5><?php echo moneyOrDash($latestEntrySnapshot['investment_per_entry_bird']); ?></h5></div>
         </div>
         <?php if($changed): ?>
-          <div class="alert alert-warning"><strong>Historical economics changed after the latest approval.</strong>
-            Current source-derived basis: <?php echo moneyOrDash($entryCandidate['attributed_investment']); ?>;
-            approved V<?php echo (int)$latestEntrySnapshot['version_no']; ?>: <?php echo moneyOrDash($latestEntrySnapshot['attributed_investment']); ?>.
-            Review the corrected source records before approving a revision.
+          <div class="alert alert-warning"><strong>Historical source economics changed after the latest approval.</strong>
+            <?php if($investmentChanged): ?><div class="mt-2"><strong>Attributed investment changed:</strong> current <?php echo moneyOrDash($entryCandidate['attributed_investment']); ?> vs approved V<?php echo (int)$latestEntrySnapshot['version_no']; ?> <?php echo moneyOrDash($latestEntrySnapshot['attributed_investment']); ?>.</div><?php endif; ?>
+            <?php if($flockChanged): ?><div class="mt-1"><strong>Production-entry flock changed:</strong> current <?php echo number_format((int)$entryCandidate['production_entry_headcount']); ?> vs approved V<?php echo (int)$latestEntrySnapshot['version_no']; ?> <?php echo number_format((int)$latestEntrySnapshot['production_entry_headcount']); ?>.</div><?php endif; ?>
+            <?php if(!$investmentChanged && !$flockChanged): ?><div class="mt-2">Source records changed, but the approved attributed investment and production-entry flock remain numerically unchanged.</div><?php endif; ?>
+            <div class="mt-1">Current economic basis / bird is <?php echo moneyOrDash($entryCandidate['investment_per_entry_bird']); ?>; approved V<?php echo (int)$latestEntrySnapshot['version_no']; ?> is <?php echo moneyOrDash($latestEntrySnapshot['investment_per_entry_bird']); ?>. Review the corrected source records before approving a revision.</div>
           </div>
         <?php elseif($entryCandidate && !empty($entryCandidate['ready'])): ?>
           <div class="alert alert-success">Current source-derived economics match the latest approved version.</div>
@@ -189,8 +195,8 @@ $expensesUrl=$type==='layer'?'/poultry/layer_expenses.php':'/poultry/broiler_exp
       <?php if($entryCandidate && !empty($entryCandidate['ready'])): ?>
         <div class="row g-3 mb-3">
           <div class="col-md-4"><div class="text-muted small">Current Source-Derived Attributed Investment</div><strong><?php echo moneyOrDash($entryCandidate['attributed_investment']); ?></strong></div>
-          <div class="col-md-4"><div class="text-muted small">Production-entry Flock</div><strong><?php echo number_format((int)$entryCandidate['production_entry_headcount']); ?></strong></div>
-          <div class="col-md-4"><div class="text-muted small">Current Source-Derived Basis / Bird</div><strong><?php echo moneyOrDash($entryCandidate['investment_per_entry_bird']); ?></strong></div>
+          <div class="col-md-4"><div class="text-muted small">Current Production-entry Flock</div><strong><?php echo number_format((int)$entryCandidate['production_entry_headcount']); ?></strong></div>
+          <div class="col-md-4"><div class="text-muted small">Current Source-Derived Economic Basis / Bird</div><strong><?php echo moneyOrDash($entryCandidate['investment_per_entry_bird']); ?></strong></div>
         </div>
         <?php $needsApproval=!$latestEntrySnapshot || !hash_equals((string)$latestEntrySnapshot['source_fingerprint'],(string)$entryCandidate['source_fingerprint']); ?>
         <?php if($needsApproval): ?>
