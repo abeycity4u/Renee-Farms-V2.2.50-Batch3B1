@@ -21,4 +21,7 @@ if (!isset($pdo)) {
     // try to load config.php which should create $pdo
     if (file_exists(__DIR__ . '/config.php')) require_once __DIR__ . '/config.php';
 }
+
+// Central browser-form CSRF rendering and POST enforcement helpers.
+require_once __DIR__ . '/includes/csrf.php';
 ?>
