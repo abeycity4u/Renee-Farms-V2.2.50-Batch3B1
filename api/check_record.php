@@ -5,10 +5,18 @@ requireLogin();
 
 header('Content-Type: application/json');
 
+$isOwnerOrAdmin = isPlatformOwner() || hasRole('farm_admin');
+if (!$isOwnerOrAdmin && !checkAccess('poultry')) {
+    http_response_code(403);
+    echo json_encode(['error' => 'You do not have access to the poultry module.']);
+    exit;
+}
+
 if (isset($_GET['type']) && isset($_GET['date'])) {
     $type = $_GET['type'];
     $date = $_GET['date'];
     $cycleId = isset($_GET['cycle_id']) ? (int)$_GET['cycle_id'] : 0;
+    $exists = false;
     
     if ($type === 'layer') {
         $sql = "SELECT id FROM layer_daily_records WHERE record_date = ? AND farm_id = ?";
