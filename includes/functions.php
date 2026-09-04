@@ -155,6 +155,21 @@ function hasPermission($role, $module) {
         return true;
     }
 
+    // Compatibility bridge for the legacy Layer/Broiler expense pages. Those pages
+    // still use `poultry_expenses` only to decide whether to render the Actions
+    // column. Treat that legacy rendering flag as enabled when the current page has
+    // either exact Edit or Delete permission; the action APIs still enforce the
+    // granular permission and the visibility layer hides the other action.
+    if ($module === 'poultry_expenses') {
+        $path = '/' . ltrim(str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? '')), '/');
+        if ($path === '/poultry/layer_expenses.php' || str_ends_with($path, '/poultry/layer_expenses.php')) {
+            return hasPermission($role, 'poultry_layer_expenses_edit') || hasPermission($role, 'poultry_layer_expenses_delete');
+        }
+        if ($path === '/poultry/broiler_expenses.php' || str_ends_with($path, '/poultry/broiler_expenses.php')) {
+            return hasPermission($role, 'poultry_broiler_expenses_edit') || hasPermission($role, 'poultry_broiler_expenses_delete');
+        }
+    }
+
     // Read current roles from the database on every request. This makes role and
     // permission changes effective as soon as the affected user refreshes/navigates.
     $roles = function_exists('currentUserRoles') ? currentUserRoles() : [$role];
