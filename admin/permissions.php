@@ -96,7 +96,6 @@ unset($_SESSION['permission_error_detail']);
     .permission-module { min-width: 370px; }
     .permission-module strong { color: #1f2937; font-size: 0.95rem; }
     .permission-module small { color: #6b7280; line-height: 1.35; display: block; margin-top: .15rem; }
-    .permission-code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .72rem; opacity: .72; }
     .permission-action { font-size: .72rem; vertical-align: middle; }
     .permission-action-destructive { border-color: #dc3545 !important; color: #dc3545 !important; }
     .permission-check { transform: scale(1.2); cursor: pointer; }
@@ -202,11 +201,10 @@ unset($_SESSION['permission_error_detail']);
                   <tr>
                     <td class="permission-module">
                       <div class="d-flex align-items-center flex-wrap gap-2">
-                        <strong><?= htmlspecialchars((string)($meta['label'] ?? $module)) ?></strong>
+                        <strong><?= htmlspecialchars((string)($meta['label'] ?? 'Permission')) ?></strong>
                         <span class="badge rounded-pill text-bg-light border permission-action <?= $isDestructive ? 'permission-action-destructive' : '' ?>"><?= htmlspecialchars($action) ?></span>
                       </div>
                       <small><?= htmlspecialchars((string)($meta['description'] ?? '')) ?></small>
-                      <span class="permission-code"><?= htmlspecialchars($module) ?></span>
                     </td>
                     <?php foreach ($roles as $role):
                       $applicable = permission_catalog_applicable($role,$module);
@@ -220,7 +218,7 @@ unset($_SESSION['permission_error_detail']);
                           name="perm[<?= htmlspecialchars($role) ?>][<?= htmlspecialchars($module) ?>]"
                           value="1"
                           <?= $checked ?> <?= $disabled ?>
-                          aria-label="<?= htmlspecialchars($role) ?> permission for <?= htmlspecialchars((string)($meta['label'] ?? $module)) ?> <?= htmlspecialchars($action) ?>"
+                          aria-label="<?= htmlspecialchars($role) ?> permission for <?= htmlspecialchars((string)($meta['label'] ?? 'Permission')) ?> <?= htmlspecialchars($action) ?>"
                         />
                       </td>
                     <?php endforeach; ?>
