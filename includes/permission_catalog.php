@@ -6,10 +6,12 @@ function permission_catalog(): array
     return [
         'Poultry Operations' => [
             'poultry_overview' => ['label' => 'Poultry Overview', 'action' => 'View', 'description' => 'View the Poultry dashboard and overall summary.', 'roles' => ['poultry_manager']],
-            'poultry_daily_layer' => ['label' => 'Layer Daily Records', 'action' => 'View / Record', 'description' => 'View Layer daily records and record new daily entries.', 'roles' => ['poultry_manager']],
+            'poultry_daily_layer' => ['label' => 'Layer Daily Records', 'action' => 'View', 'description' => 'View existing Layer daily records.', 'roles' => ['poultry_manager']],
+            'poultry_daily_layer_add' => ['label' => 'Layer Daily Records', 'action' => 'Add', 'description' => 'Record new Layer daily entries.', 'roles' => ['poultry_manager']],
             'poultry_daily_layer_edit' => ['label' => 'Layer Daily Records', 'action' => 'Edit', 'description' => 'Modify existing Layer daily records.', 'roles' => ['poultry_manager']],
             'poultry_daily_layer_delete' => ['label' => 'Layer Daily Records', 'action' => 'Delete', 'description' => 'Delete Layer daily records and trigger linked restoration/rebuild logic.', 'roles' => ['poultry_manager']],
-            'poultry_daily_broiler' => ['label' => 'Broiler Daily Records', 'action' => 'View / Record', 'description' => 'View Broiler daily records and record new daily entries.', 'roles' => ['poultry_manager']],
+            'poultry_daily_broiler' => ['label' => 'Broiler Daily Records', 'action' => 'View', 'description' => 'View existing Broiler daily records.', 'roles' => ['poultry_manager']],
+            'poultry_daily_broiler_add' => ['label' => 'Broiler Daily Records', 'action' => 'Add', 'description' => 'Record new Broiler daily entries.', 'roles' => ['poultry_manager']],
             'poultry_daily_broiler_edit' => ['label' => 'Broiler Daily Records', 'action' => 'Edit', 'description' => 'Modify existing Broiler daily records.', 'roles' => ['poultry_manager']],
             'poultry_daily_broiler_delete' => ['label' => 'Broiler Daily Records', 'action' => 'Delete', 'description' => 'Delete Broiler daily records and restore linked stock usage.', 'roles' => ['poultry_manager']],
             'poultry_feeds' => ['label' => 'Poultry Feed Records', 'action' => 'View / Record', 'description' => 'View Layer and Broiler feed records and record feed usage.', 'roles' => ['poultry_manager']],
@@ -31,7 +33,8 @@ function permission_catalog(): array
         ],
         'Ruminant Operations' => [
             'ruminant_overview' => ['label' => 'Ruminant Overview', 'action' => 'View', 'description' => 'View the Ruminant dashboard and overall summary.', 'roles' => ['ruminant_manager']],
-            'ruminant_daily' => ['label' => 'Ruminant Daily Records', 'action' => 'View / Record', 'description' => 'View Ruminant daily records and record new daily entries.', 'roles' => ['ruminant_manager']],
+            'ruminant_daily' => ['label' => 'Ruminant Daily Records', 'action' => 'View', 'description' => 'View existing Ruminant daily records.', 'roles' => ['ruminant_manager']],
+            'ruminant_daily_add' => ['label' => 'Ruminant Daily Records', 'action' => 'Add', 'description' => 'Record new Ruminant daily entries.', 'roles' => ['ruminant_manager']],
             'ruminant_daily_edit' => ['label' => 'Ruminant Daily Records', 'action' => 'Edit', 'description' => 'Modify existing Ruminant daily records.', 'roles' => ['ruminant_manager']],
             'ruminant_daily_delete' => ['label' => 'Ruminant Daily Records', 'action' => 'Delete', 'description' => 'Delete existing Ruminant daily records.', 'roles' => ['ruminant_manager']],
             'ruminant_feeds' => ['label' => 'Ruminant Feed Records', 'action' => 'View / Record', 'description' => 'View Ruminant feed records and record feed usage.', 'roles' => ['ruminant_manager']],
