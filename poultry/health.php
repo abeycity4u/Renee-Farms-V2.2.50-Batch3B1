@@ -7,7 +7,11 @@ require_once(__DIR__ . '/../lib/poultry_health.php');
 requireLogin();
 ensureAllowed('poultry_health');
 $farmId = requireCurrentFarmId();
-$canManage = isPlatformOwner() || hasRole('farm_admin') || hasRole('poultry_manager');
+$isPrivilegedHealthManager = isPlatformOwner() || hasRole('farm_admin');
+$canAddHealth = $isPrivilegedHealthManager || hasPermission(getUserType(), 'poultry_health_add');
+$canEditHealth = $isPrivilegedHealthManager || hasPermission(getUserType(), 'poultry_health_edit');
+$canDeleteHealth = $isPrivilegedHealthManager || hasPermission(getUserType(), 'poultry_health_delete');
+$canUseHealthForm = $canAddHealth || $canEditHealth;
 
 $eventTypes = poultry_health_event_types();
 $productionFilter = strtolower(trim((string)($_GET['production_type'] ?? '')));
@@ -31,12 +35,14 @@ $stockStmt->execute([$farmId]);
 $stockItems = $stockStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!$canManage) { http_response_code(403); exit('Access denied.'); }
     if (!verify_csrf_token($_POST['csrf_token'] ?? '')) { http_response_code(419); exit('Invalid request token.'); }
     $action = (string)($_POST['action'] ?? '');
     try {
         if ($action === 'save_event') {
             $id = (int)($_POST['event_id'] ?? 0);
+            if ($id > 0 && !$canEditHealth) { http_response_code(403); exit('You do not have permission to edit poultry health events.'); }
+            if ($id <= 0 && !$canAddHealth) { http_response_code(403); exit('You do not have permission to add poultry health events.'); }
+
             $productionType = strtolower(trim((string)($_POST['production_type'] ?? '')));
             $cycleId = (int)($_POST['cycle_id'] ?? 0);
             $eventDate = trim((string)($_POST['event_date'] ?? ''));
@@ -73,6 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['success'] = 'Poultry health event recorded.';
             }
         } elseif ($action === 'delete_event') {
+            if (!$canDeleteHealth) { http_response_code(403); exit('You do not have permission to delete poultry health events.'); }
             $id = (int)($_POST['event_id'] ?? 0);
             $stmt = $pdo->prepare('DELETE FROM poultry_health_events WHERE id=? AND farm_id=?');
             $stmt->execute([$id, $farmId]);
@@ -97,7 +104,7 @@ require_once(__DIR__ . '/../navbar.php');
       <h3 class="mb-1"><i class="bi bi-heart-pulse"></i> Poultry Health & Treatment</h3>
       <div class="text-muted">Structured flock health history for Layer and Broiler cycles. Daily Record medication notes remain available as quick notes.</div>
     </div>
-    <?php if ($canManage): ?><button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#eventModal" onclick="newHealthEvent()"><i class="bi bi-plus-lg"></i> Record Health Event</button><?php endif; ?>
+    <?php if ($canAddHealth): ?><button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#eventModal" onclick="newHealthEvent()"><i class="bi bi-plus-lg"></i> Record Health Event</button><?php endif; ?>
   </div>
 
   <?php if (!empty($_SESSION['success'])): ?><div class="alert alert-success py-2"><?php echo htmlspecialchars($_SESSION['success']); unset($_SESSION['success']); ?></div><?php endif; ?>
@@ -114,7 +121,7 @@ require_once(__DIR__ . '/../navbar.php');
 
   <div class="card"><div class="card-header d-flex justify-content-between align-items-center"><strong>Health & Treatment History</strong><span class="badge bg-secondary"><?php echo count($events); ?> records</span></div>
     <div class="table-responsive"><table class="table table-hover align-middle mb-0">
-      <thead><tr><th>Date</th><th>Cycle</th><th>Type</th><th>Event</th><th>Product / Medicine / Vaccine</th><th>Dosage</th><th>Reason / Symptoms</th><th>Linked Inventory</th><th>Recorded By</th><?php if ($canManage): ?><th class="text-end">Actions</th><?php endif; ?></tr></thead>
+      <thead><tr><th>Date</th><th>Cycle</th><th>Type</th><th>Event</th><th>Product / Medicine / Vaccine</th><th>Dosage</th><th>Reason / Symptoms</th><th>Linked Inventory</th><th>Recorded By</th><?php if ($canEditHealth || $canDeleteHealth): ?><th class="text-end">Actions</th><?php endif; ?></tr></thead>
       <tbody><?php if (!$events): ?><tr><td colspan="10" class="text-center text-muted py-4">No structured poultry health events recorded yet.</td></tr><?php endif; ?>
       <?php foreach ($events as $e): ?><tr>
         <td><?php echo htmlspecialchars(date('d/m/Y', strtotime($e['event_date']))); ?></td>
@@ -126,9 +133,9 @@ require_once(__DIR__ . '/../navbar.php');
         <td style="max-width:300px"><?php echo nl2br(htmlspecialchars((string)($e['reason_symptoms'] ?: '—'))); ?></td>
         <td><?php echo htmlspecialchars((string)($e['linked_item_name'] ?: '—')); ?></td>
         <td><?php echo htmlspecialchars((string)($e['recorded_by_name'] ?: '—')); ?></td>
-        <?php if ($canManage): ?><td class="text-end text-nowrap">
-          <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#eventModal" onclick='editHealthEvent(<?php echo json_encode($e, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE); ?>)'><i class="bi bi-pencil"></i></button>
-          <button type="button" class="btn btn-sm btn-outline-danger" onclick="confirmDeleteEvent(<?php echo (int)$e['id']; ?>)"><i class="bi bi-trash"></i></button>
+        <?php if ($canEditHealth || $canDeleteHealth): ?><td class="text-end text-nowrap">
+          <?php if ($canEditHealth): ?><button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#eventModal" onclick='editHealthEvent(<?php echo json_encode($e, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE); ?>)'><i class="bi bi-pencil"></i></button><?php endif; ?>
+          <?php if ($canDeleteHealth): ?><button type="button" class="btn btn-sm btn-outline-danger" onclick="confirmDeleteEvent(<?php echo (int)$e['id']; ?>)"><i class="bi bi-trash"></i></button><?php endif; ?>
         </td><?php endif; ?>
       </tr><?php endforeach; ?></tbody>
     </table></div>
@@ -137,7 +144,7 @@ require_once(__DIR__ . '/../navbar.php');
   <div class="alert alert-info mt-3 mb-0 py-2"><strong>Inventory link:</strong> this is a reference to the medicine, vaccine or supplement used. It does not deduct stock by itself; continue recording physical stock usage through Inventory so stock and cost history remain auditable.</div>
 </div>
 
-<?php if ($canManage): ?>
+<?php if ($canUseHealthForm): ?>
 <div class="modal fade" id="eventModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
 <form method="post" id="eventForm"><div class="modal-header"><h5 class="modal-title" id="eventModalTitle">Record Poultry Health Event</h5><button class="btn-close" type="button" data-bs-dismiss="modal"></button></div>
 <div class="modal-body">
@@ -156,7 +163,7 @@ require_once(__DIR__ . '/../navbar.php');
 <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-success">Save Health Event</button></div></form>
 </div></div></div>
 <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/bootstrap5/js/bootstrap.bundle.min.js'); ?>"></script>
-<form method="post" id="deleteEventForm" class="d-none"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token()); ?>"><input type="hidden" name="action" value="delete_event"><input type="hidden" name="event_id" id="delete_event_id"></form>
+<?php if ($canDeleteHealth): ?><form method="post" id="deleteEventForm" class="d-none"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token()); ?>"><input type="hidden" name="action" value="delete_event"><input type="hidden" name="event_id" id="delete_event_id"></form><?php endif; ?>
 <script>
 function filterCycleOptions(){
   const type=document.getElementById('production_type').value;
@@ -176,10 +183,12 @@ function editHealthEvent(e){
   document.getElementById('cycle_id').value=e.cycle_id||''; document.getElementById('event_date').value=e.event_date||''; document.getElementById('event_type').value=e.event_type||'other';
   document.getElementById('product_name').value=e.product_name||''; document.getElementById('dosage').value=e.dosage||''; document.getElementById('reason_symptoms').value=e.reason_symptoms||''; document.getElementById('notes').value=e.notes||''; document.getElementById('stock_item_id').value=e.stock_item_id||'0';
 }
+<?php if ($canDeleteHealth): ?>
 async function confirmDeleteEvent(id){
   const confirmed = await AppConfirm.ask('Delete this poultry health event? This removes the structured clinical/history record only; linked Inventory transactions are not changed.', {title:'Delete health event?', confirmText:'Delete', danger:true});
   if(confirmed){ document.getElementById('delete_event_id').value=id; document.getElementById('deleteEventForm').submit(); }
 }
+<?php endif; ?>
 document.addEventListener('DOMContentLoaded',filterCycleOptions);
 </script>
 <?php endif; ?>
