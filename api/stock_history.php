@@ -22,6 +22,25 @@ if (!$item) {
     exit();
 }
 
+$userType = getUserType();
+$isOwnerOrAdmin = isPlatformOwner() || hasRole('farm_admin');
+$hasInventoryPermission = hasPermission($userType, 'inventory');
+$hasPoultryAccess = checkAccess('poultry');
+$hasRuminantAccess = checkAccess('ruminant');
+
+if (!($isOwnerOrAdmin || $hasInventoryPermission)) {
+    $itemFarmType = strtolower((string)($item['farm_type'] ?? ''));
+    $canReadItem = ($itemFarmType === 'poultry' && $hasPoultryAccess)
+        || ($itemFarmType === 'ruminant' && $hasRuminantAccess)
+        || ($itemFarmType === 'both' && ($hasPoultryAccess || $hasRuminantAccess));
+
+    if (!$canReadItem) {
+        $_SESSION['error'] = 'You do not have access to this inventory item.';
+        header('Location: ' . BASE_URL . '/inventory.php');
+        exit();
+    }
+}
+
 $pageTitle = 'Stock History - ' . htmlspecialchars($item['item_name']);
 ?>
 <!DOCTYPE html>
