@@ -69,7 +69,7 @@ function permission_catalog(): array
         ],
         'Cycles, Reports & Team' => [
             'production_cycles' => ['label' => 'Production Cycles', 'action' => 'View', 'description' => 'View production cycles. Creation and lifecycle management remain Farm Admin controlled during this audit.', 'roles' => ['poultry_manager','ruminant_manager']],
-            'reports' => ['label' => 'Reports', 'action' => 'View / Export', 'description' => 'View and generate farm reports available to the role.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
+            'reports' => ['label' => 'Poultry & Ruminant Report', 'action' => 'View / Export', 'description' => 'View and generate farm reports available to the role.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
             'users' => ['label' => 'Team Users', 'action' => 'Manage', 'description' => 'Manage tenant team-user accounts where delegated.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
         ],
     ];
