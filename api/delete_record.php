@@ -2,6 +2,7 @@
 <?php
 require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/api_helpers.php');
+require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/../lib/daily_feed_sync.php');
 require_once(__DIR__ . '/../lib/sales_allocation.php');
 requireLogin();
@@ -15,12 +16,19 @@ if (!$type || !$id) {
     send_json(['success' => false, 'error' => 'type and id are required'], 400);
 }
 
-if (!isPlatformOwner() && !hasRole('farm_admin')) {
-    send_json(['success' => false, 'error' => 'You do not have permission to delete daily records.'], 403);
+$deletePermission = match ($type) {
+    'layer' => 'poultry_daily_layer_delete',
+    'broiler' => 'poultry_daily_broiler_delete',
+    default => null,
+};
+if ($deletePermission === null) {
+    send_json(['success' => false, 'error' => 'Unsupported record type'], 400);
 }
 
-if (($type === 'layer' || $type === 'broiler') && !checkAccess('poultry')) {
-    send_json(['success' => false, 'error' => 'Unauthorized for poultry records'], 403);
+if (!isPlatformOwner() && !hasRole('farm_admin')) {
+    if (!checkAccess('poultry') || !hasPermission(getUserType(), $deletePermission)) {
+        send_json(['success' => false, 'error' => 'You do not have permission to delete this daily record.'], 403);
+    }
 }
 
 try {
@@ -32,12 +40,9 @@ try {
         $layerRecordDate = $recordStmt->fetchColumn();
         $stmt = $pdo->prepare("DELETE FROM layer_daily_records WHERE id = ? AND farm_id = ?");
         $sourceType = 'daily_layer_record';
-    } elseif ($type === 'broiler') {
+    } else {
         $stmt = $pdo->prepare("DELETE FROM broiler_daily_records WHERE id = ? AND farm_id = ?");
         $sourceType = 'daily_broiler_record';
-    } else {
-        $pdo->rollBack();
-        send_json(['success' => false, 'error' => 'Unsupported record type'], 400);
     }
 
     // Restore inventory consumed by the daily record before removing the record.
