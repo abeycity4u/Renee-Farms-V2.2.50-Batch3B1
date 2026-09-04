@@ -137,14 +137,17 @@ function hasPermission($role, $module) {
 
     if (function_exists('hasRole')) {
         if (hasRole('farm_admin')) return true;
+        // Tenant permission administration itself is never delegable to an
+        // operational specialist role. Farm Admin and Platform Owner bypass above.
+        if ($module === 'permissions') return false;
         if (hasRole('viewer')) return in_array($module, ['management', 'reports'], true);
 
         // Production-module permissions normally belong to their specialist role,
-        // but expense entry is intentionally delegable to Sales Representatives.
-        // Do not reject that delegated permission before the tenant permission
-        // matrix has a chance to evaluate it.
-        $delegatedPoultryExpense = $module === 'poultry_expenses' && hasRole('sales_rep');
-        $delegatedRuminantExpense = $module === 'ruminant_expenses' && hasRole('sales_rep');
+        // but expense permissions are intentionally delegable to Sales Representatives.
+        // This must include the granular add/edit/delete codes, otherwise a granted
+        // tenant permission can be rejected before the permission matrix is evaluated.
+        $delegatedPoultryExpense = str_starts_with($module, 'poultry_') && str_contains($module, '_expenses') && hasRole('sales_rep');
+        $delegatedRuminantExpense = str_starts_with($module, 'ruminant_expenses') && hasRole('sales_rep');
         if (str_starts_with($module, 'poultry') && !hasRole('poultry_manager') && !$delegatedPoultryExpense) return false;
         if (str_starts_with($module, 'ruminant') && !hasRole('ruminant_manager') && !$delegatedRuminantExpense) return false;
         if ($module === 'sales' && !hasRole('sales_rep')) return false;
