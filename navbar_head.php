@@ -14,7 +14,33 @@ if (($headPath === '/poultry/broiler_daily_record.php' || str_ends_with($headPat
 if (($headPath === '/ruminant/ruminant_daily_record.php' || str_ends_with($headPath, '/ruminant/ruminant_daily_record.php')) && isset($canDeleteRecords)) {
     $canDeleteRecords = isPlatformOwner() || hasRole('farm_admin') || hasPermission(getUserType(), 'ruminant_daily_delete');
 }
+
+// Customer Debt Management still renders its ledger actions from one legacy
+// admin-only flag. Keep View/Edit/Delete independent without reconstructing the
+// large Sales Records page: View controls whether the debt section renders,
+// while Edit/Delete independently control their existing action buttons.
+$salesReceivableActionRules = [];
+if (($headPath === '/management/sales_records.php' || str_ends_with($headPath, '/management/sales_records.php')) && isset($debtFeatureEnabled, $canManageLedger)) {
+    $receivablePrivileged = isPlatformOwner() || hasRole('farm_admin');
+    $canViewReceivables = $receivablePrivileged || hasPermission(getUserType(), 'sales_receivables');
+    $canEditReceivables = $receivablePrivileged || hasPermission(getUserType(), 'sales_receivables_edit');
+    $canDeleteReceivables = $receivablePrivileged || hasPermission(getUserType(), 'sales_receivables_delete');
+
+    if (!$canViewReceivables) {
+        $debtFeatureEnabled = false;
+    }
+    $canManageLedger = $canViewReceivables && ($canEditReceivables || $canDeleteReceivables);
+    if ($canViewReceivables && !$canEditReceivables) {
+        $salesReceivableActionRules[] = '.edit-ledger-btn{display:none!important;}';
+    }
+    if ($canViewReceivables && !$canDeleteReceivables) {
+        $salesReceivableActionRules[] = 'button[name="delete_ledger_entry"]{display:none!important;}';
+    }
+}
 ?>
+<?php if ($salesReceivableActionRules): ?>
+<style><?php echo implode("\n", $salesReceivableActionRules); ?></style>
+<?php endif; ?>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="csrf-token" content="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>">
