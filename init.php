@@ -24,4 +24,9 @@ if (!isset($pdo)) {
 
 // Central browser-form CSRF rendering and POST enforcement helpers.
 require_once __DIR__ . '/includes/csrf.php';
+
+// Runtime route/action permission enforcement for legacy pages that still carry
+// older role/module checks internally. This keeps View/Add/Edit/Delete behavior
+// consistent while those individual pages are migrated gradually.
+require_once __DIR__ . '/includes/permission_runtime.php';
 ?>
