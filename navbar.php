@@ -52,7 +52,8 @@ $canViewFarmIntelligence = $navHas('farm_intelligence');
 $canViewProfitability = $navHas('profitability');
 $canViewProductionCycles = $navHas('production_cycles');
 $canManageUsers = $navHas('users');
-$showManagementMenu = $canViewSales || $canViewExpenseReport || $canViewReports || $canViewFarmIntelligence || $canViewProfitability || $canViewProductionCycles || $canManageUsers || isPlatformOwner();
+$canManagePermissions = isPlatformOwner() || hasRole('farm_admin');
+$showManagementMenu = $canViewSales || $canViewExpenseReport || $canViewReports || $canViewFarmIntelligence || $canViewProfitability || $canViewProductionCycles || $canManageUsers || $canManagePermissions || isPlatformOwner();
 ?>
 
 <div id="appNotifications" class="app-notifications" aria-live="polite" aria-atomic="false">
@@ -163,12 +164,15 @@ $showManagementMenu = $canViewSales || $canViewExpenseReport || $canViewReports 
             <?php if ($canViewProductionCycles): ?>
             <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/management/production_cycles.php"><i class="bi bi-arrow-repeat menu-icon me-2"></i> Production Cycles</a></li>
             <?php endif; ?>
-            <?php if ($canManageUsers || isPlatformOwner()): ?>
+            <?php if ($canManageUsers || $canManagePermissions || isPlatformOwner()): ?>
             <li><hr class="dropdown-divider"></li>
             <li><h6 class="dropdown-header">Administration <span class="dropdown-section-badge">Secure</span></h6></li>
             <?php endif; ?>
             <?php if ($canManageUsers): ?>
             <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/management/users.php"><i class="bi bi-people menu-icon me-2"></i> Users</a></li>
+            <?php endif; ?>
+            <?php if ($canManagePermissions): ?>
+            <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/admin/permissions.php"><i class="bi bi-shield-lock menu-icon me-2"></i> Permissions</a></li>
             <?php endif; ?>
             <?php if (isPlatformOwner()): ?>
             <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/management/farms.php"><i class="bi bi-buildings menu-icon me-2"></i> Platform Farms</a></li>
