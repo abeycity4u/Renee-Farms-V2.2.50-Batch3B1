@@ -61,6 +61,10 @@ if ($path === '/ruminant/ruminant_expenses.php' || str_ends_with($path, '/rumina
     if (!permission_prepaint_has('ruminant_expenses_add')) $rules[] = 'button[data-bs-target="#addExpenseModal"]{display:none!important;}';
 }
 
+if ($path === '/poultry/layer_feeds.php' || str_ends_with($path, '/poultry/layer_feeds.php') || $path === '/poultry/broiler_feeds.php' || str_ends_with($path, '/poultry/broiler_feeds.php')) {
+    if (!permission_prepaint_has('poultry_feeds_add')) $rules[] = 'button[data-bs-target="#addTransactionModal"]{display:none!important;}';
+}
+
 if ($path === '/management/sales_records.php' || str_ends_with($path, '/management/sales_records.php')) {
     if (!permission_prepaint_has('sales_add')) {
         $rules[] = 'button[data-bs-target="#addSaleModal"],button[onclick*="addSale"]{display:none!important;}';
