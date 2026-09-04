@@ -16,8 +16,6 @@ function permission_catalog(): array
             'poultry_daily_broiler_delete' => ['label' => 'Broiler Daily Records', 'action' => 'Delete', 'description' => 'Delete Broiler daily records and restore linked stock usage.', 'roles' => ['poultry_manager']],
             'poultry_feeds' => ['label' => 'Poultry Feed Records', 'action' => 'View', 'description' => 'View Layer and Broiler feed records.', 'roles' => ['poultry_manager']],
             'poultry_feeds_add' => ['label' => 'Poultry Feed Records', 'action' => 'Add', 'description' => 'Record new Layer and Broiler feed usage transactions.', 'roles' => ['poultry_manager']],
-            'poultry_feeds_edit' => ['label' => 'Poultry Feed Records', 'action' => 'Edit', 'description' => 'Modify existing Poultry feed records where supported.', 'roles' => ['poultry_manager']],
-            'poultry_feeds_delete' => ['label' => 'Poultry Feed Records', 'action' => 'Delete', 'description' => 'Delete Poultry feed records where supported.', 'roles' => ['poultry_manager']],
             'poultry_health' => ['label' => 'Poultry Health & Treatment', 'action' => 'View', 'description' => 'View structured flock health and treatment history.', 'roles' => ['poultry_manager']],
             'poultry_health_add' => ['label' => 'Poultry Health & Treatment', 'action' => 'Add', 'description' => 'Record new health and treatment events.', 'roles' => ['poultry_manager']],
             'poultry_health_edit' => ['label' => 'Poultry Health & Treatment', 'action' => 'Edit', 'description' => 'Modify existing health and treatment events.', 'roles' => ['poultry_manager']],
