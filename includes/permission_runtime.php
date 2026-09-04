@@ -1,9 +1,8 @@
 <?php
 /**
  * Runtime permission enforcement for routes that still contain legacy role/module
- * checks. This layer is intentionally conservative: Farm Admin and Platform Owner
- * retain their administrative bypass, while delegated operational roles must match
- * the tenant permission matrix.
+ * checks. Farm Admin and Platform Owner retain their administrative bypass, while
+ * delegated operational roles must match the tenant permission matrix.
  */
 
 require_once __DIR__ . '/functions.php';
@@ -91,12 +90,9 @@ function permission_runtime_existing_daily_record(PDO $pdo, string $kind): bool
 }
 
 if (!function_exists('permission_runtime_client_script')) {
-function permission_runtime_client_script(array $dailyCapability, array $navCapability): string
+function permission_runtime_client_script(array $dailyCapability, array $navCapability, array $extraCapability = []): string
 {
-    $config = [
-        'daily' => $dailyCapability,
-        'nav' => $navCapability,
-    ];
+    $config = ['daily' => $dailyCapability, 'nav' => $navCapability, 'extra' => $extraCapability];
     $json = json_encode($config, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     if ($json === false) $json = '{}';
 
@@ -111,14 +107,19 @@ function permission_runtime_client_script(array $dailyCapability, array $navCapa
         . 'if(!d.delete){document.querySelectorAll("table button.btn-outline-danger,table button[onclick*=\"deleteLayerDailyRecord\"],table button[onclick*=\"deleteBroilerDailyRecord\"]").forEach(function(el){el.remove();});}'
         . 'if(!d.edit&&!d.delete)stripActionColumn();'
         . '}'
+        . 'const x=cfg.extra||{};'
+        . 'if(x.expenseAdd===false){document.querySelectorAll("button[data-bs-target=\"#addExpenseModal\"]").forEach(function(el){el.remove();});}'
+        . 'if(x.salesAdd===false){document.querySelectorAll("button[data-bs-target=\"#addSaleModal\"],button[onclick*=\"addSale\"]").forEach(function(el){el.remove();});}'
+        . 'if(x.salesPayment===false){document.querySelectorAll("button[data-bs-target*=\"payment\" i],button[onclick*=\"payment\" i],form button[name=\"record_payment\"]").forEach(function(el){el.remove();});}'
+        . 'if(x.animalAdd===false){document.querySelectorAll("button[onclick*=\"newAnimal\"]").forEach(function(el){el.remove();});}'
+        . 'if(x.animalEdit===false){document.querySelectorAll("button[onclick*=\"editAnimal\"]").forEach(function(el){el.remove();});}'
+        . 'if(x.animalExit===false){document.querySelectorAll("button[onclick*=\"exitAnimal\"]").forEach(function(el){el.remove();});}'
         . 'const nav=cfg.nav||{};Object.keys(nav).forEach(function(suffix){if(nav[suffix])return;document.querySelectorAll("#appNavbar a[href]").forEach(function(a){try{const p=new URL(a.href,window.location.origin).pathname;if(p.endsWith(suffix))a.closest("li")?.remove();}catch(e){}});});'
         . 'document.querySelectorAll("#appNavbar .dropdown").forEach(function(drop){if(drop.querySelector("#manageMenu")&&!drop.querySelector(".dropdown-item[href]"))drop.remove();});'
         . '});})();</script>';
 }
 }
 
-// No authenticated user means there is nothing to enforce here. Login guards on
-// each route remain responsible for unauthenticated requests.
 if (!isset($_SESSION['user_id'])) return;
 
 $path = permission_runtime_path();
@@ -130,9 +131,11 @@ $routeViews = [
     '/poultry/layer_feeds.php' => 'poultry_feeds',
     '/poultry/broiler_feeds.php' => 'poultry_feeds',
     '/poultry/health.php' => 'poultry_health',
-    '/poultry/layer_expenses.php' => 'poultry_expenses',
-    '/poultry/broiler_expenses.php' => 'poultry_expenses',
+    '/poultry/layer_expenses.php' => 'poultry_layer_expenses',
+    '/poultry/broiler_expenses.php' => 'poultry_broiler_expenses',
     '/ruminant/ruminant_daily_record.php' => 'ruminant_daily',
+    '/ruminant/animal_registry.php' => 'ruminant_animals',
+    '/ruminant/animal_view.php' => 'ruminant_animals',
     '/ruminant/ruminant_feeds_record.php' => 'ruminant_feeds',
     '/ruminant/ruminant_expenses.php' => 'ruminant_expenses',
     '/inventory.php' => 'inventory',
@@ -153,6 +156,7 @@ foreach ($routeViews as $suffix => $permission) {
 }
 
 $dailyCapability = [];
+$extraCapability = [];
 if (permission_runtime_ends_with($path, '/poultry/layers_daily_record.php')) {
     $dailyCapability = [
         'add' => permission_runtime_has('poultry_daily_layer_add'),
@@ -186,12 +190,40 @@ if (permission_runtime_ends_with($path, '/poultry/layers_daily_record.php')) {
     if ($method === 'POST' && isset($_POST['delete_record']) && !permission_runtime_has('ruminant_daily_delete')) {
         permission_runtime_deny('You do not have permission to delete Ruminant daily records.');
     }
+} elseif (permission_runtime_ends_with($path, '/poultry/layer_expenses.php')) {
+    $extraCapability['expenseAdd'] = permission_runtime_has('poultry_layer_expenses_add');
+    if ($method === 'POST' && isset($_POST['add_expense']) && !$extraCapability['expenseAdd']) permission_runtime_deny('You do not have permission to add Layer expenses.');
+} elseif (permission_runtime_ends_with($path, '/poultry/broiler_expenses.php')) {
+    $extraCapability['expenseAdd'] = permission_runtime_has('poultry_broiler_expenses_add');
+    if ($method === 'POST' && isset($_POST['add_expense']) && !$extraCapability['expenseAdd']) permission_runtime_deny('You do not have permission to add Broiler expenses.');
+} elseif (permission_runtime_ends_with($path, '/ruminant/ruminant_expenses.php')) {
+    $extraCapability['expenseAdd'] = permission_runtime_has('ruminant_expenses_add');
+    if ($method === 'POST' && isset($_POST['add_expense']) && !$extraCapability['expenseAdd']) permission_runtime_deny('You do not have permission to add Ruminant expenses.');
+} elseif (permission_runtime_ends_with($path, '/management/sales_records.php')) {
+    $extraCapability['salesAdd'] = permission_runtime_has('sales_add');
+    $extraCapability['salesPayment'] = permission_runtime_has('sales_payment');
+    if ($method === 'POST' && isset($_POST['add_sale']) && !$extraCapability['salesAdd']) permission_runtime_deny('You do not have permission to add sales.');
+    if ($method === 'POST' && isset($_POST['record_payment']) && !$extraCapability['salesPayment']) permission_runtime_deny('You do not have permission to record customer payments.');
+} elseif (permission_runtime_ends_with($path, '/ruminant/animal_registry.php')) {
+    $extraCapability['animalAdd'] = permission_runtime_has('ruminant_animals_add');
+    $extraCapability['animalEdit'] = permission_runtime_has('ruminant_animals_edit');
+    $extraCapability['animalExit'] = permission_runtime_has('ruminant_animals_exit');
+    if ($method === 'POST') {
+        $action = (string)($_POST['action'] ?? '');
+        if ($action === 'save') {
+            $required = ((int)($_POST['id'] ?? 0) > 0) ? 'ruminant_animals_edit' : 'ruminant_animals_add';
+            if (!permission_runtime_has($required)) permission_runtime_deny('You do not have permission to save this animal record.');
+        } elseif ($action === 'manual_exit' && !permission_runtime_has('ruminant_animals_exit')) {
+            permission_runtime_deny('You do not have permission to record animal exits.');
+        }
+    }
 }
 
-// Navigation visibility must mirror direct-route permission enforcement. The
-// underlying page checks remain the security boundary; this only removes links
-// the user is not allowed to follow.
 $navCapability = [
+    '/inventory.php' => permission_runtime_has('inventory'),
+    '/poultry/layer_expenses.php' => permission_runtime_has('poultry_layer_expenses'),
+    '/poultry/broiler_expenses.php' => permission_runtime_has('poultry_broiler_expenses'),
+    '/ruminant/animal_registry.php' => permission_runtime_has('ruminant_animals'),
     '/management/sales_records.php' => permission_runtime_has('sales'),
     '/management/expenses.php' => permission_runtime_has('expenses'),
     '/management/poultry_ruminant_report.php' => permission_runtime_has('reports'),
@@ -202,9 +234,9 @@ $navCapability = [
     '/management/users.php' => permission_runtime_has('users'),
 ];
 
-if ($method === 'GET' && ($dailyCapability || $navCapability)) {
-    ob_start(static function (string $html) use ($dailyCapability, $navCapability): string {
+if ($method === 'GET' && ($dailyCapability || $navCapability || $extraCapability)) {
+    ob_start(static function (string $html) use ($dailyCapability, $navCapability, $extraCapability): string {
         if (stripos($html, '</body>') === false) return $html;
-        return str_ireplace('</body>', permission_runtime_client_script($dailyCapability, $navCapability) . '</body>', $html);
+        return str_ireplace('</body>', permission_runtime_client_script($dailyCapability, $navCapability, $extraCapability) . '</body>', $html);
     });
 }
