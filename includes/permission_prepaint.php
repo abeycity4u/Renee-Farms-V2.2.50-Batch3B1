@@ -72,6 +72,8 @@ if ($path === '/management/sales_records.php' || str_ends_with($path, '/manageme
     if (!permission_prepaint_has('sales_payment')) {
         $rules[] = 'button[data-bs-target*="payment" i],button[onclick*="payment" i],form button[name="record_payment"]{display:none!important;}';
     }
+    if (!permission_prepaint_has('sales_edit')) $rules[] = '.edit-sale-btn{display:none!important;}';
+    if (!permission_prepaint_has('sales_delete')) $rules[] = 'button[onclick*="deleteSale"]{display:none!important;}';
 }
 
 if ($path === '/ruminant/animal_registry.php' || str_ends_with($path, '/ruminant/animal_registry.php')) {
