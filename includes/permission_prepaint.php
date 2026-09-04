@@ -41,34 +41,47 @@ if ($path === '/poultry/layers_daily_record.php' || str_ends_with($path, '/poult
 
 if ($dailyPermissions) {
     [$addPermission, $editPermission, $deletePermission] = $dailyPermissions;
-    $canAdd = permission_prepaint_has($addPermission);
-    $canEdit = permission_prepaint_has($editPermission);
-    $canDelete = permission_prepaint_has($deletePermission);
-
-    if (!$canAdd) {
-        $rules[] = 'button[onclick*="openRecordModal"]{display:none!important;}';
-    }
-    if (!$canEdit) {
-        $rules[] = 'table .edit-record-btn{display:none!important;}';
-    }
-    if (!$canDelete) {
-        $rules[] = 'table button.btn-outline-danger,table button[onclick*="deleteLayerDailyRecord"],table button[onclick*="deleteBroilerDailyRecord"]{display:none!important;}';
-    }
+    if (!permission_prepaint_has($addPermission)) $rules[] = 'button[onclick*="openRecordModal"]{display:none!important;}';
+    if (!permission_prepaint_has($editPermission)) $rules[] = 'table .edit-record-btn{display:none!important;}';
+    if (!permission_prepaint_has($deletePermission)) $rules[] = 'table button.btn-outline-danger,table button[onclick*="deleteLayerDailyRecord"],table button[onclick*="deleteBroilerDailyRecord"]{display:none!important;}';
 }
 
-// Expense Report contains edit/delete controls even though its primary purpose is
-// reporting. Keep View independent from those actions and prevent controls from
-// flashing before the granular API/runtime checks apply.
 if ($path === '/management/expenses.php' || str_ends_with($path, '/management/expenses.php')) {
-    $canEditExpense = permission_prepaint_has('expenses_edit');
-    $canDeleteExpense = permission_prepaint_has('expenses_delete');
-    if (!$canEditExpense) $rules[] = '.edit-expense-btn{display:none!important;}';
-    if (!$canDeleteExpense) $rules[] = 'button[onclick*="deleteExpense"]{display:none!important;}';
+    if (!permission_prepaint_has('expenses_edit')) $rules[] = '.edit-expense-btn{display:none!important;}';
+    if (!permission_prepaint_has('expenses_delete')) $rules[] = 'button[onclick*="deleteExpense"]{display:none!important;}';
 }
 
-// Hide unauthorized Management links before first paint. permission_runtime.php
-// still removes their list items after DOM load and direct routes remain blocked.
-$managementLinks = [
+if ($path === '/poultry/layer_expenses.php' || str_ends_with($path, '/poultry/layer_expenses.php')) {
+    if (!permission_prepaint_has('poultry_layer_expenses_add')) $rules[] = 'button[data-bs-target="#addExpenseModal"]{display:none!important;}';
+}
+if ($path === '/poultry/broiler_expenses.php' || str_ends_with($path, '/poultry/broiler_expenses.php')) {
+    if (!permission_prepaint_has('poultry_broiler_expenses_add')) $rules[] = 'button[data-bs-target="#addExpenseModal"]{display:none!important;}';
+}
+if ($path === '/ruminant/ruminant_expenses.php' || str_ends_with($path, '/ruminant/ruminant_expenses.php')) {
+    if (!permission_prepaint_has('ruminant_expenses_add')) $rules[] = 'button[data-bs-target="#addExpenseModal"]{display:none!important;}';
+}
+
+if ($path === '/management/sales_records.php' || str_ends_with($path, '/management/sales_records.php')) {
+    if (!permission_prepaint_has('sales_add')) {
+        $rules[] = 'button[data-bs-target="#addSaleModal"],button[onclick*="addSale"]{display:none!important;}';
+    }
+    if (!permission_prepaint_has('sales_payment')) {
+        $rules[] = 'button[data-bs-target*="payment" i],button[onclick*="payment" i],form button[name="record_payment"]{display:none!important;}';
+    }
+}
+
+if ($path === '/ruminant/animal_registry.php' || str_ends_with($path, '/ruminant/animal_registry.php')) {
+    if (!permission_prepaint_has('ruminant_animals_add')) $rules[] = 'button[onclick*="newAnimal"]{display:none!important;}';
+    if (!permission_prepaint_has('ruminant_animals_edit')) $rules[] = 'button[onclick*="editAnimal"]{display:none!important;}';
+    if (!permission_prepaint_has('ruminant_animals_exit')) $rules[] = 'button[onclick*="exitAnimal"]{display:none!important;}';
+}
+
+// Hide unauthorized top-level/module links before first paint.
+$navLinks = [
+    '/inventory.php' => 'inventory',
+    '/poultry/layer_expenses.php' => 'poultry_layer_expenses',
+    '/poultry/broiler_expenses.php' => 'poultry_broiler_expenses',
+    '/ruminant/animal_registry.php' => 'ruminant_animals',
     '/management/sales_records.php' => 'sales',
     '/management/expenses.php' => 'expenses',
     '/management/poultry_ruminant_report.php' => 'reports',
@@ -78,13 +91,21 @@ $managementLinks = [
     '/management/production_cycles.php' => 'production_cycles',
     '/management/users.php' => 'users',
 ];
+$managementSuffixes = [
+    '/management/sales_records.php',
+    '/management/expenses.php',
+    '/management/poultry_ruminant_report.php',
+    '/management/reports.php',
+    '/management/intelligence.php',
+    '/management/profitability.php',
+    '/management/production_cycles.php',
+    '/management/users.php',
+];
 $anyManagement = false;
-foreach ($managementLinks as $hrefSuffix => $permission) {
+foreach ($navLinks as $hrefSuffix => $permission) {
     $allowed = permission_prepaint_has($permission);
-    if ($allowed) {
-        $anyManagement = true;
-        continue;
-    }
+    if ($allowed && in_array($hrefSuffix, $managementSuffixes, true)) $anyManagement = true;
+    if ($allowed) continue;
     $escaped = str_replace('"', '\\"', $hrefSuffix);
     $rules[] = '#appNavbar a[href$="' . $escaped . '"]{display:none!important;}';
 }
