@@ -4,6 +4,10 @@ require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/../includes/pdf/PdfReportService.php');
 requireLogin();
 requireBusinessReportAccess();
+if (!isPlatformOwner() && !hasRole('farm_admin') && !hasPermission(getUserType(), 'sales_receivables')) {
+    http_response_code(403);
+    exit('Sales receivables view access required.');
+}
 $tenantFarmId = requireCurrentFarmId();
 $customer = trim((string)($_GET['customer'] ?? ''));
 if ($customer === '') { http_response_code(400); exit('Customer is required.'); }
