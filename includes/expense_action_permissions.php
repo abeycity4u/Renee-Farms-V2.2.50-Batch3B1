@@ -33,10 +33,12 @@ $canDelete = $privileged || hasPermission(getUserType(), $permissionPair[1]);
 
 $rules = [];
 if (!$canEdit) {
-    $rules[] = '.edit-expense-btn{display:none!important;}';
+    // Poultry page theme rules use more-specific !important button display rules.
+    // Scope through body/table so this permission rule wins without touching page CSS.
+    $rules[] = 'html body table .edit-expense-btn{display:none!important;}';
 }
 if (!$canDelete) {
-    $rules[] = 'button[onclick^="deleteExpense("],button[onclick*="deleteExpense("]{display:none!important;}';
+    $rules[] = 'html body table button[onclick^="deleteExpense("],html body table button[onclick*="deleteExpense("]{display:none!important;}';
 }
 if (!$rules) return;
 
