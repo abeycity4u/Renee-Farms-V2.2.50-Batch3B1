@@ -29,4 +29,8 @@ require_once __DIR__ . '/includes/csrf.php';
 // older role/module checks internally. This keeps View/Add/Edit/Delete behavior
 // consistent while those individual pages are migrated gradually.
 require_once __DIR__ . '/includes/permission_runtime.php';
+
+// Hide permission-controlled controls before first paint so read-only users never
+// see restricted buttons or links flash briefly while client cleanup runs.
+require_once __DIR__ . '/includes/permission_prepaint.php';
 ?>
