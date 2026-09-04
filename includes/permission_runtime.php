@@ -6,6 +6,7 @@
  */
 
 require_once __DIR__ . '/functions.php';
+require_once dirname(__DIR__) . '/lib/daily_feed_sync.php';
 
 if (!function_exists('permission_runtime_privileged')) {
 function permission_runtime_privileged(): bool
@@ -193,8 +194,55 @@ if (permission_runtime_ends_with($path, '/poultry/layers_daily_record.php')) {
         $required = permission_runtime_existing_daily_record($pdo, 'ruminant') ? 'ruminant_daily_edit' : 'ruminant_daily_add';
         if (!permission_runtime_has($required)) permission_runtime_deny('You do not have permission to save this Ruminant daily record.');
     }
-    if ($method === 'POST' && isset($_POST['delete_record']) && !permission_runtime_has('ruminant_daily_delete')) {
-        permission_runtime_deny('You do not have permission to delete Ruminant daily records.');
+    if ($method === 'POST' && isset($_POST['delete_record'])) {
+        if (!$dailyCapability['delete']) {
+            permission_runtime_deny('You do not have permission to delete Ruminant daily records.');
+        }
+
+        // The legacy page still executes delegated deletes only for Farm Admin.
+        // Handle an explicitly permitted Ruminant Manager here before that old
+        // guard runs, while preserving the page's tenant/CSRF/feed-restoration rules.
+        if (!permission_runtime_privileged()) {
+            if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
+                http_response_code(419);
+                exit('Invalid request token.');
+            }
+
+            $recordId = (int)($_POST['record_id'] ?? 0);
+            if ($recordId <= 0) {
+                $_SESSION['error'] = 'Invalid daily record.';
+            } else {
+                $farmId = requireCurrentFarmId();
+                $managedTypes = ['cattle', 'goat', 'sheep', 'other'];
+                $recordStmt = $pdo->prepare('SELECT animal_type FROM ruminant_daily_records WHERE id = ? AND farm_id = ? LIMIT 1');
+                $recordStmt->execute([$recordId, $farmId]);
+                $animalType = strtolower((string)($recordStmt->fetchColumn() ?: ''));
+
+                if (!in_array($animalType, $managedTypes, true)) {
+                    $_SESSION['error'] = 'Daily record not found or you do not have permission to delete it.';
+                } else {
+                    try {
+                        $pdo->beginTransaction();
+                        delete_daily_feed_usage($pdo, $farmId, $recordId, 'daily_ruminant_record');
+                        $deleteStmt = $pdo->prepare('DELETE FROM ruminant_daily_records WHERE id = ? AND farm_id = ?');
+                        $deleteStmt->execute([$recordId, $farmId]);
+                        if ($deleteStmt->rowCount() !== 1) {
+                            throw new RuntimeException('The daily record could not be deleted.');
+                        }
+                        $pdo->commit();
+                        $_SESSION['success'] = 'Ruminant daily record deleted successfully.';
+                    } catch (Throwable $e) {
+                        if ($pdo->inTransaction()) $pdo->rollBack();
+                        $_SESSION['error'] = safeUserExceptionMessage($e, 'The daily record could not be deleted.');
+                    }
+                }
+            }
+
+            $month = preg_match('/^\d{4}-\d{2}$/', (string)($_GET['month'] ?? '')) ? (string)$_GET['month'] : date('Y-m');
+            $cycleId = max(0, (int)($_GET['cycle_id'] ?? 0));
+            header('Location: ' . BASE_URL . '/ruminant/ruminant_daily_record.php?month=' . urlencode($month) . '&cycle_id=' . $cycleId);
+            exit();
+        }
     }
 } elseif (permission_runtime_ends_with($path, '/poultry/layer_expenses.php')) {
     $extraCapability['expenseAdd'] = permission_runtime_has('poultry_layer_expenses_add');
