@@ -64,7 +64,7 @@ if ($salesOnlyScope) {
 $productionTypeFilter = strtolower(trim((string)($_GET['production_type'] ?? 'all')));
 $reportProductionOptions = $farmType === 'all' ? [] : attribution_production_types($farmType);
 if ($productionTypeFilter !== 'all' && !isset($reportProductionOptions[$productionTypeFilter])) $productionTypeFilter='all';
-$showActions = isPlatformOwner() || hasRole('farm_admin');
+$showActions = isPlatformOwner() || hasRole('farm_admin') || hasPermission(getUserType(), 'sales_edit') || hasPermission(getUserType(), 'sales_delete');
 // Sales entitlement enables a separate Sales Representative account; farm admins
 // retain operational entry rights in their own workspace. Viewers are read-only.
 $canRecordSales = isPlatformOwner() || hasRole('farm_admin') || (farmHasModule('sales') && hasRole('sales_rep'));
@@ -503,7 +503,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         header("Location: sales_records.php?report_mode={$reportMode}&month={$month}&year={$year}&farm_type={$farmType}&customer=" . urlencode($customerName));
         exit();
     } elseif (isset($_POST['update_sale'])) {
-        if (!isPlatformOwner() && !hasRole('farm_admin')) {
+        if (!isPlatformOwner() && !hasRole('farm_admin') && !hasPermission(getUserType(), 'sales_edit')) {
             $_SESSION['error'] = "You do not have permission to update sales.";
             header("Location: sales_records.php?report_mode={$reportMode}&month={$month}&year={$year}&farm_type={$farmType}");
             exit();
@@ -1224,7 +1224,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
         </div>
     </div>
 
-    <!-- Edit Sale Modal (Owner/Admin Only) -->
+    <!-- Edit Sale Modal -->
     <div class="modal fade" id="editSaleModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
