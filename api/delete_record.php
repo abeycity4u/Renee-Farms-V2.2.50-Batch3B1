@@ -15,6 +15,10 @@ if (!$type || !$id) {
     send_json(['success' => false, 'error' => 'type and id are required'], 400);
 }
 
+if (!isPlatformOwner() && !hasRole('farm_admin')) {
+    send_json(['success' => false, 'error' => 'You do not have permission to delete daily records.'], 403);
+}
+
 if (($type === 'layer' || $type === 'broiler') && !checkAccess('poultry')) {
     send_json(['success' => false, 'error' => 'Unauthorized for poultry records'], 403);
 }
