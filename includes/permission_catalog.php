@@ -98,3 +98,26 @@ function permission_catalog_applicable(string $role, string $code): bool
     return in_array($role, $catalog[$code]['roles'] ?? [], true);
 }
 }
+
+if (!function_exists('permission_catalog_expense_action_code')) {
+function permission_catalog_expense_action_code(array $expense, string $action): ?string
+{
+    if (!in_array($action, ['edit', 'delete'], true)) return null;
+
+    $farmType = strtolower((string)($expense['farm_type'] ?? ''));
+    $productionType = strtolower((string)($expense['production_type'] ?? ''));
+    $poultryCategory = strtolower((string)($expense['poultry_category'] ?? ''));
+
+    if ($farmType === 'poultry') {
+        $poultryType = in_array($productionType, ['layer', 'broiler'], true) ? $productionType : $poultryCategory;
+        if (in_array($poultryType, ['layer', 'broiler'], true)) {
+            return 'poultry_' . $poultryType . '_expenses_' . $action;
+        }
+        return null;
+    }
+    if ($farmType === 'ruminant') return 'ruminant_expenses_' . $action;
+    if ($farmType === 'general' || $farmType === 'both') return 'expenses_' . $action;
+
+    return null;
+}
+}
