@@ -51,7 +51,8 @@ try {
     }
 
     $pdo->commit();
-    header('Location: permissions.php?updated=1&farm_id=' . $permissionFarmId);
+    $_SESSION['permission_success'] = 'Permissions updated successfully!';
+    header('Location: permissions.php?farm_id=' . $permissionFarmId);
     exit();
 } catch (PDOException $e) {
     if ($pdo->inTransaction()) {
