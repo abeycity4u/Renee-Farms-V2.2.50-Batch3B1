@@ -54,10 +54,9 @@ function permission_catalog(): array
             'sales' => ['label' => 'Sales Records', 'action' => 'View / Record', 'description' => 'View sales records and record new sales.', 'roles' => ['sales_rep']],
             'sales_edit' => ['label' => 'Sales Records', 'action' => 'Edit', 'description' => 'Modify existing sales records where supported.', 'roles' => ['sales_rep']],
             'sales_delete' => ['label' => 'Sales Records', 'action' => 'Delete', 'description' => 'Delete sales records where supported.', 'roles' => ['sales_rep']],
-            'expenses' => ['label' => 'General Expense Report', 'action' => 'View', 'description' => 'View general expense records and reports.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
-            'expenses_add' => ['label' => 'General Expenses', 'action' => 'Add', 'description' => 'Record new general non-stock expenses.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
-            'expenses_edit' => ['label' => 'General Expense Report', 'action' => 'Edit', 'description' => 'Modify expense records from the general expense workflow.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
-            'expenses_delete' => ['label' => 'General Expense Report', 'action' => 'Delete', 'description' => 'Delete expense records from the general expense workflow.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
+            'expenses' => ['label' => 'Expense Report', 'action' => 'View', 'description' => 'View the consolidated expense report and export it to PDF.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
+            'expenses_edit' => ['label' => 'Expense Report', 'action' => 'Edit', 'description' => 'Edit an existing expense directly from the consolidated Expense Report.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
+            'expenses_delete' => ['label' => 'Expense Report', 'action' => 'Delete', 'description' => 'Delete an existing expense directly from the consolidated Expense Report.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
         ],
         'Management Insights' => [
             'profitability' => ['label' => 'Profitability', 'action' => 'View', 'description' => 'View farm profitability, revenue, cost and profit/loss analysis available to the role.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
