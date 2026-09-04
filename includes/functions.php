@@ -132,7 +132,7 @@ function hasPermission($role, $module) {
     if (function_exists('farmHasModule')) {
         if (str_starts_with($module, 'poultry') && !farmHasModule('poultry')) return false;
         if (str_starts_with($module, 'ruminant') && !farmHasModule('ruminant')) return false;
-        if ($module === 'sales' && !farmHasModule('sales')) return false;
+        if (str_starts_with($module, 'sales') && !farmHasModule('sales')) return false;
     }
 
     if (function_exists('hasRole')) {
@@ -150,7 +150,7 @@ function hasPermission($role, $module) {
         $delegatedRuminantExpense = str_starts_with($module, 'ruminant_expenses') && hasRole('sales_rep');
         if (str_starts_with($module, 'poultry') && !hasRole('poultry_manager') && !$delegatedPoultryExpense) return false;
         if (str_starts_with($module, 'ruminant') && !hasRole('ruminant_manager') && !$delegatedRuminantExpense) return false;
-        if ($module === 'sales' && !hasRole('sales_rep')) return false;
+        if (str_starts_with($module, 'sales') && !hasRole('sales_rep')) return false;
     } elseif ($role === 'farm_admin') {
         return true;
     }
