@@ -101,7 +101,7 @@ function permission_runtime_client_script(array $dailyCapability, array $navCapa
         . 'function blockCalendar(btn){btn.classList.remove("add-record-btn","edit-record-btn");btn.classList.add("no-action");btn.style.cursor="default";btn.addEventListener("click",function(e){e.preventDefault();e.stopImmediatePropagation();},true);}'
         . 'function stripActionColumn(){document.querySelectorAll("table").forEach(function(table){const headers=Array.from(table.querySelectorAll("thead th"));headers.forEach(function(th,index){if(th.textContent.trim().toLowerCase()==="actions"){table.querySelectorAll("tr").forEach(function(row){const cells=row.children;if(cells[index])cells[index].remove();});}});});}'
         . 'document.addEventListener("DOMContentLoaded",function(){'
-        . 'const d=cfg.daily||null;if(d){'
+        . 'const d=(cfg.daily&&Object.keys(cfg.daily).length)?cfg.daily:null;if(d){'
         . 'if(!d.add){document.querySelectorAll("button[onclick*=\"openRecordModal\"]").forEach(function(el){el.remove();});}'
         . 'document.querySelectorAll(".calendar-day").forEach(function(btn){const text=btn.textContent||"";const hasRecord=btn.classList.contains("has-record")||btn.hasAttribute("data-opening-stock")||/record\\(s\\)/i.test(text);if((hasRecord&&!d.edit)||(!hasRecord&&!d.add))blockCalendar(btn);});'
         . 'if(!d.edit){document.querySelectorAll("table .edit-record-btn").forEach(function(el){el.remove();});}'
