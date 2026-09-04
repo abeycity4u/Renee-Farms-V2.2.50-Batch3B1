@@ -34,6 +34,10 @@ require_once __DIR__ . '/includes/permission_runtime.php';
 // legacy feed page still combines those capabilities internally.
 require_once __DIR__ . '/includes/ruminant_feed_permissions.php';
 
+// Keep Layer, Broiler and Ruminant expense Edit/Delete controls independent on
+// legacy operational expense pages. The APIs remain the authorization boundary.
+require_once __DIR__ . '/includes/expense_action_permissions.php';
+
 // Server-side dashboard overview filtering for the large legacy dashboard page.
 // This keeps Poultry/Ruminant overview summaries independent from page/action
 // permissions without reconstructing dashboard.php during the hardening pass.
