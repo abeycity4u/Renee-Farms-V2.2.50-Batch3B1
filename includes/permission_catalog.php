@@ -57,8 +57,6 @@ function permission_catalog(): array
             'sales' => ['label' => 'Sales Records', 'action' => 'View', 'description' => 'View sales records and receivable history.', 'roles' => ['sales_rep']],
             'sales_add' => ['label' => 'Sales Records', 'action' => 'Add Sale', 'description' => 'Record a new sale.', 'roles' => ['sales_rep']],
             'sales_payment' => ['label' => 'Sales Receivables', 'action' => 'Record Payment', 'description' => 'Record customer payments against outstanding sales.', 'roles' => ['sales_rep']],
-            'sales_edit' => ['label' => 'Sales Records', 'action' => 'Edit', 'description' => 'Modify existing sales records where supported.', 'roles' => ['sales_rep']],
-            'sales_delete' => ['label' => 'Sales Records', 'action' => 'Delete', 'description' => 'Delete sales records where supported.', 'roles' => ['sales_rep']],
             'expenses' => ['label' => 'Expense Report', 'action' => 'View', 'description' => 'View expense records and reports.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
             'expenses_edit' => ['label' => 'Expense Report', 'action' => 'Edit', 'description' => 'Modify expense records from the Expense Report page.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
             'expenses_delete' => ['label' => 'Expense Report', 'action' => 'Delete', 'description' => 'Delete expense records from the Expense Report page.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
