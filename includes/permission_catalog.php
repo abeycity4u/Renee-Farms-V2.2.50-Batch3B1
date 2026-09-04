@@ -56,12 +56,15 @@ function permission_catalog(): array
         'Sales & General Expenses' => [
             'sales' => ['label' => 'Sales Records', 'action' => 'View', 'description' => 'View sales records and receivable history.', 'roles' => ['sales_rep']],
             'sales_add' => ['label' => 'Sales Records', 'action' => 'Add Sale', 'description' => 'Record a new sale.', 'roles' => ['sales_rep']],
-            'sales_payment' => ['label' => 'Sales Receivables', 'action' => 'Record Payment', 'description' => 'Record customer payments against outstanding sales.', 'roles' => ['sales_rep']],
             'sales_edit' => ['label' => 'Sales Records', 'action' => 'Edit', 'description' => 'Modify existing sales records, including linked receivable and allocation synchronization.', 'roles' => ['sales_rep']],
             'sales_delete' => ['label' => 'Sales Records', 'action' => 'Delete', 'description' => 'Delete sales records using the existing receivable, allocation and lifecycle safety checks.', 'roles' => ['sales_rep']],
-            'expenses' => ['label' => 'Expense Report', 'action' => 'View', 'description' => 'View expense records and reports.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
-            'expenses_edit' => ['label' => 'Expense Report', 'action' => 'Edit', 'description' => 'Modify expense records from the Expense Report page.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
-            'expenses_delete' => ['label' => 'Expense Report', 'action' => 'Delete', 'description' => 'Delete expense records from the Expense Report page.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
+            'sales_receivables' => ['label' => 'Sales Receivables', 'action' => 'View', 'description' => 'View customer debt balances, credit sales and payment history.', 'roles' => ['sales_rep']],
+            'sales_payment' => ['label' => 'Sales Receivables', 'action' => 'Record Payment', 'description' => 'Record payments against outstanding customer debt.', 'roles' => ['sales_rep']],
+            'sales_receivables_edit' => ['label' => 'Sales Receivables', 'action' => 'Edit', 'description' => 'Modify eligible sales receivable and payment records.', 'roles' => ['sales_rep']],
+            'sales_receivables_delete' => ['label' => 'Sales Receivables', 'action' => 'Delete', 'description' => 'Delete eligible sales receivable and payment records.', 'roles' => ['sales_rep']],
+            'expenses' => ['label' => 'Expense & Cost Report', 'action' => 'View', 'description' => 'View entire farm expense and cost records.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
+            'expenses_edit' => ['label' => 'Expense & Cost Report', 'action' => 'Edit', 'description' => 'Modify eligible expense records from the Expense & Cost Report page.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
+            'expenses_delete' => ['label' => 'Expense & Cost Report', 'action' => 'Delete', 'description' => 'Delete eligible expense records from the Expense & Cost Report page.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
         ],
         'Management Insights' => [
             'profitability' => ['label' => 'Profitability', 'action' => 'View', 'description' => 'View farm profitability, revenue, cost and profit/loss analysis available to the role.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
@@ -69,7 +72,7 @@ function permission_catalog(): array
         ],
         'Cycles, Reports & Team' => [
             'production_cycles' => ['label' => 'Production Cycles', 'action' => 'View', 'description' => 'View production cycles. Creation and lifecycle management remain Farm Admin controlled during this audit.', 'roles' => ['poultry_manager','ruminant_manager']],
-            'reports' => ['label' => 'Poultry & Ruminant Report', 'action' => 'View / Export', 'description' => 'View and generate farm reports available to the role.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
+            'reports' => ['label' => 'Operational Reports', 'action' => 'View / Export', 'description' => 'View and generate Poultry and Ruminant operational reports available to the role.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
             'users' => ['label' => 'Team Users', 'action' => 'Manage', 'description' => 'Manage tenant team-user accounts where delegated.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
         ],
     ];
