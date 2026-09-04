@@ -37,9 +37,40 @@ if (($headPath === '/management/sales_records.php' || str_ends_with($headPath, '
         $salesReceivableActionRules[] = 'button[name="delete_ledger_entry"]{display:none!important;}';
     }
 }
+
+// The consolidated Expense & Cost Report contains Layer, Broiler, Ruminant and
+// general rows. Its legacy page uses one broad Actions flag, while the APIs
+// already enforce the exact row permission. Mirror that canonical mapping here
+// so only the Edit/Delete controls authorized for each rendered row are visible.
+$managementExpenseActionRules = [];
+if (($headPath === '/management/expenses.php' || str_ends_with($headPath, '/management/expenses.php')) && isset($expenses, $canManageExpenses) && is_array($expenses)) {
+    require_once __DIR__ . '/includes/permission_catalog.php';
+    $expensePrivileged = isPlatformOwner() || hasRole('farm_admin');
+    $canManageAnyExpenseAction = false;
+
+    foreach ($expenses as $expenseRow) {
+        $expenseId = (int)($expenseRow['id'] ?? 0);
+        if ($expenseId <= 0) continue;
+
+        $editPermission = permission_catalog_expense_action_code($expenseRow, 'edit');
+        $deletePermission = permission_catalog_expense_action_code($expenseRow, 'delete');
+        $canEditExpenseRow = $expensePrivileged || ($editPermission && hasPermission(getUserType(), $editPermission));
+        $canDeleteExpenseRow = $expensePrivileged || ($deletePermission && hasPermission(getUserType(), $deletePermission));
+        $canManageAnyExpenseAction = $canManageAnyExpenseAction || $canEditExpenseRow || $canDeleteExpenseRow;
+
+        $editSelector = 'body .edit-expense-btn[data-id="' . $expenseId . '"]';
+        $deleteSelector = 'body button[onclick="deleteExpense(' . $expenseId . ')"]';
+        $managementExpenseActionRules[] = $editSelector . '{display:' . ($canEditExpenseRow ? 'inline-flex' : 'none') . '!important;}';
+        $managementExpenseActionRules[] = $deleteSelector . '{display:' . ($canDeleteExpenseRow ? 'inline-flex' : 'none') . '!important;}';
+    }
+
+    // If none of the visible rows carries an authorized action, let the legacy
+    // template omit its Actions column and edit modal completely.
+    $canManageExpenses = $canManageAnyExpenseAction;
+}
 ?>
-<?php if ($salesReceivableActionRules): ?>
-<style><?php echo implode("\n", $salesReceivableActionRules); ?></style>
+<?php if ($salesReceivableActionRules || $managementExpenseActionRules): ?>
+<style><?php echo implode("\n", array_merge($salesReceivableActionRules, $managementExpenseActionRules)); ?></style>
 <?php endif; ?>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
