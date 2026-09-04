@@ -144,12 +144,10 @@ unset($_SESSION['permission_error_detail']);
     </div>
 
     <div class="alert alert-warning security-note py-2 mb-3">
-      <strong>Security rule:</strong> viewing operational records does not automatically mean a user should be able to edit or delete them. Grant destructive actions only where they are operationally required.
+      <strong>Security rule:</strong> viewing operational records does not automatically mean a user should be able to add, edit or delete them. Grant action permissions only where they are operationally required.
     </div>
 
-    <?php if (isset($_GET['updated'])): ?>
-      <?php renderNotification('success', 'Permissions updated successfully!', 'Permissions updated successfully!'); ?>
-    <?php elseif (isset($_GET['error'])): ?>
+    <?php if (isset($_GET['error'])): ?>
       <?php renderNotification('error', 'Unable to save permissions. Please try again or check the error log.', 'Unable to save permissions.'); ?>
       <?php if ($errorDetail): ?>
         <?php renderNotification('warning', $errorDetail, 'Additional details'); ?>
@@ -230,7 +228,7 @@ unset($_SESSION['permission_error_detail']);
         </div>
 
         <div class="sticky-actions">
-          <small class="permission-tip">Tip: Keep Edit/Delete unchecked unless that role genuinely needs to alter historical farm records.</small>
+          <small class="permission-tip">Tip: Keep Add/Edit/Delete unchecked unless that role genuinely needs to create or alter farm records.</small>
           <button class="btn btn-success" type="submit">
             <i class="bi bi-check2-circle me-1"></i> Save Permissions
           </button>
