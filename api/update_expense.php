@@ -4,15 +4,12 @@ require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/api_helpers.php');
 requireLogin();
 require_once(__DIR__ . '/../includes/functions.php');
+require_once(__DIR__ . '/../includes/permission_catalog.php');
 require_once(__DIR__ . '/../lib/attribution.php');
 require_once(__DIR__ . '/../lib/ruminant_expense_allocation.php');
 require_http_method('POST');
 require_csrf_token();
 require_rate_limit('update_expense', 60, 60);
-
-if (!isPlatformOwner() && !hasRole('farm_admin') && !hasPermission(getUserType(), 'expenses')) {
-    send_json(['success' => false, 'error' => 'Unauthorized: Only owners can edit expenses.'], 403);
-}
 
 $requiredFields = ['expense_id', 'expense_date', 'farm_type', 'category', 'amount', 'unit'];
 
@@ -36,11 +33,15 @@ $description = $_POST['description'] ?? '';
 
 try {
     $farmId=requireCurrentFarmId();
-    $existingStmt=$pdo->prepare("SELECT production_type,cycle_id,category FROM farm_expenses WHERE id=? AND farm_id=? LIMIT 1");
+    $existingStmt=$pdo->prepare("SELECT farm_type,production_type,poultry_category,cycle_id,category FROM farm_expenses WHERE id=? AND farm_id=? LIMIT 1");
     $existingStmt->execute([$expenseId,$farmId]);
     $existing=$existingStmt->fetch(PDO::FETCH_ASSOC) ?: [];
     if (!$existing) {
         send_json(['success' => false, 'error' => 'Expense record not found.'], 404);
+    }
+    $existingPermission = permission_catalog_expense_action_code($existing, 'edit');
+    if (!isPlatformOwner() && !hasRole('farm_admin') && (!$existingPermission || !hasPermission(getUserType(), $existingPermission))) {
+        send_json(['success' => false, 'error' => 'You do not have permission to edit this expense record.'], 403);
     }
     $allowedManualCategories = ['salary','logistic','fuel','misc'];
     $isLegacyFeedEdit = (($existing['category'] ?? '') === 'feeds' && $category === 'feeds');
@@ -51,6 +52,14 @@ try {
     $requestedProduction=$_POST['production_type'] ?? ($existing['production_type'] ?? null);
     if ($farmType==='poultry' && in_array((string)$poultryCategory,['layer','broiler'],true)) $requestedProduction=$poultryCategory;
     $productionType=attribution_normalize_production_type($farmType,$requestedProduction);
+    $targetPermission = permission_catalog_expense_action_code([
+        'farm_type' => $farmType,
+        'production_type' => $productionType,
+        'poultry_category' => $poultryCategory,
+    ], 'edit');
+    if (!isPlatformOwner() && !hasRole('farm_admin') && (!$targetPermission || !hasPermission(getUserType(), $targetPermission))) {
+        send_json(['success' => false, 'error' => 'You do not have permission to move or edit an expense in the requested area.'], 403);
+    }
     $cycleId=(int)($_POST['cycle_id'] ?? ($existing['cycle_id'] ?? 0));
     if ($cycleId>0) attribution_validate_cycle($pdo,$farmId,$cycleId,$farmType,$productionType);
     $scope=attribution_scope($cycleId>0?$cycleId:null,$farmType,$productionType);
