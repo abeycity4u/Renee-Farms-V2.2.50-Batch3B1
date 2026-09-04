@@ -95,6 +95,8 @@ function getExpenseData($period) {
 function getStockData($period) {
     global $pdo;
     $farmId = requireCurrentFarmId();
+    $scope = chartFarmScope();
+    if ($scope === '') return ['labels'=>[], 'datasets'=>[]];
     $limit = $period == 'week' ? 7 : 30;
     $dateLimit = date('Y-m-d', strtotime("-{$limit} days"));
 
@@ -105,10 +107,17 @@ function getStockData($period) {
                      t.transaction_date, t.created_at, t.id
               FROM stock_transactions t
               JOIN stock_items s ON t.stock_item_id = s.id AND s.farm_id = t.farm_id
-              WHERE t.farm_id = ?
-              ORDER BY t.created_at, t.id";
+              WHERE t.farm_id = ?";
+    $params = [$farmId];
+    if ($scope === 'poultry' || $scope === 'ruminant') {
+        $query .= " AND s.farm_type IN (?, 'both')";
+        $params[] = $scope;
+    } elseif ($scope === 'general') {
+        $query .= " AND s.farm_type = 'general'";
+    }
+    $query .= " ORDER BY t.created_at, t.id";
     $stmt = $pdo->prepare($query);
-    $stmt->execute([$farmId]);
+    $stmt->execute($params);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $running = [];
