@@ -113,6 +113,8 @@ function permission_runtime_client_script(array $dailyCapability, array $navCapa
         . 'if(x.feedAdd===false){document.querySelectorAll("button[data-bs-target=\"#addTransactionModal\"]").forEach(function(el){el.remove();});}'
         . 'if(x.salesAdd===false){document.querySelectorAll("button[data-bs-target=\"#addSaleModal\"],button[onclick*=\"addSale\"]").forEach(function(el){el.remove();});}'
         . 'if(x.salesPayment===false){document.querySelectorAll("button[data-bs-target*=\"payment\" i],button[onclick*=\"payment\" i],form button[name=\"record_payment\"]").forEach(function(el){el.remove();});}'
+        . 'if(x.salesEdit===false){document.querySelectorAll(".edit-sale-btn").forEach(function(el){el.remove();});}'
+        . 'if(x.salesDelete===false){document.querySelectorAll("button[onclick*=\"deleteSale\"]").forEach(function(el){el.remove();});}'
         . 'if(x.animalAdd===false){document.querySelectorAll("button[onclick*=\"newAnimal\"]").forEach(function(el){el.remove();});}'
         . 'if(x.animalEdit===false){document.querySelectorAll("button[onclick*=\"editAnimal\"]").forEach(function(el){el.remove();});}'
         . 'if(x.animalExit===false){document.querySelectorAll("button[onclick*=\"exitAnimal\"]").forEach(function(el){el.remove();});}'
@@ -256,6 +258,8 @@ if (permission_runtime_ends_with($path, '/poultry/layers_daily_record.php')) {
 } elseif (permission_runtime_ends_with($path, '/management/sales_records.php')) {
     $extraCapability['salesAdd'] = permission_runtime_has('sales_add');
     $extraCapability['salesPayment'] = permission_runtime_has('sales_payment');
+    $extraCapability['salesEdit'] = permission_runtime_has('sales_edit');
+    $extraCapability['salesDelete'] = permission_runtime_has('sales_delete');
     if ($method === 'POST' && isset($_POST['add_sale']) && !$extraCapability['salesAdd']) permission_runtime_deny('You do not have permission to add sales.');
     if ($method === 'POST' && isset($_POST['record_payment']) && !$extraCapability['salesPayment']) permission_runtime_deny('You do not have permission to record customer payments.');
 } elseif (permission_runtime_ends_with($path, '/ruminant/animal_registry.php')) {
