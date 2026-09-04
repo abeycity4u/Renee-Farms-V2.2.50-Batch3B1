@@ -30,6 +30,10 @@ require_once __DIR__ . '/includes/csrf.php';
 // consistent while those individual pages are migrated gradually.
 require_once __DIR__ . '/includes/permission_runtime.php';
 
+// Keep Customer Debt Management ledger Edit/Delete independently delegable
+// while the large Sales Records page still carries an admin-only legacy flag.
+require_once __DIR__ . '/includes/sales_receivable_permissions.php';
+
 // Keep Ruminant Feed Records View and Add permissions independent while the
 // legacy feed page still combines those capabilities internally.
 require_once __DIR__ . '/includes/ruminant_feed_permissions.php';
