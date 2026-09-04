@@ -4,7 +4,7 @@ require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/../includes/audit_helpers.php');
 require_once(__DIR__ . '/../lib/ruminant_lifecycle_integrity.php');
-requireLogin(); ensureAllowed('ruminant_daily');
+requireLogin(); ensureAllowed('ruminant_animals');
 $farmId=requireCurrentFarmId();
 $canManage=isPlatformOwner()||hasRole('farm_admin')||hasRole('ruminant_manager');
 $editId=(int)($_GET['edit']??0);
