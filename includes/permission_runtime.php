@@ -109,6 +109,7 @@ function permission_runtime_client_script(array $dailyCapability, array $navCapa
         . '}'
         . 'const x=cfg.extra||{};'
         . 'if(x.expenseAdd===false){document.querySelectorAll("button[data-bs-target=\"#addExpenseModal\"]").forEach(function(el){el.remove();});}'
+        . 'if(x.feedAdd===false){document.querySelectorAll("button[data-bs-target=\"#addTransactionModal\"]").forEach(function(el){el.remove();});}'
         . 'if(x.salesAdd===false){document.querySelectorAll("button[data-bs-target=\"#addSaleModal\"],button[onclick*=\"addSale\"]").forEach(function(el){el.remove();});}'
         . 'if(x.salesPayment===false){document.querySelectorAll("button[data-bs-target*=\"payment\" i],button[onclick*=\"payment\" i],form button[name=\"record_payment\"]").forEach(function(el){el.remove();});}'
         . 'if(x.animalAdd===false){document.querySelectorAll("button[onclick*=\"newAnimal\"]").forEach(function(el){el.remove();});}'
@@ -176,6 +177,11 @@ if (permission_runtime_ends_with($path, '/poultry/layers_daily_record.php')) {
     if ($method === 'POST' && isset($_POST['save_record'])) {
         $required = permission_runtime_existing_daily_record($pdo, 'broiler') ? 'poultry_daily_broiler_edit' : 'poultry_daily_broiler_add';
         if (!permission_runtime_has($required)) permission_runtime_deny('You do not have permission to save this Broiler daily record.');
+    }
+} elseif (permission_runtime_ends_with($path, '/poultry/layer_feeds.php') || permission_runtime_ends_with($path, '/poultry/broiler_feeds.php')) {
+    $extraCapability['feedAdd'] = permission_runtime_has('poultry_feeds_add');
+    if ($method === 'POST' && isset($_POST['add_transaction']) && !$extraCapability['feedAdd']) {
+        permission_runtime_deny('You do not have permission to record Poultry feed transactions.');
     }
 } elseif (permission_runtime_ends_with($path, '/ruminant/ruminant_daily_record.php')) {
     $dailyCapability = [
