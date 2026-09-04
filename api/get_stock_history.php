@@ -124,23 +124,51 @@ function prepareChartData(array $allPostedTransactions, string $dateLimit): arra
 {
     $running = 0.0;
     $pointsByDate = [];
+    $inRangeEvents = [];
+    $balanceBeforeRange = 0.0;
+
     foreach ($allPostedTransactions as $trans) {
         $qty = (float)$trans['quantity'];
-        $running += $trans['transaction_type'] === 'received' ? $qty : -$qty;
         $date = (string)$trans['transaction_date'];
-        if ($date >= $dateLimit) {
-            // Multiple posted events can share a business date. The latest
-            // posted event for that date is the end-of-day physical balance.
-            $pointsByDate[$date] = round($running, 2);
+
+        if ($date < $dateLimit) {
+            $running += $trans['transaction_type'] === 'received' ? $qty : -$qty;
+            $balanceBeforeRange = $running;
+            continue;
         }
+
+        $running += $trans['transaction_type'] === 'received' ? $qty : -$qty;
+        $pointsByDate[$date] = round($running, 2);
+        $inRangeEvents[] = [
+            'date' => $date,
+            'balance' => round($running, 2),
+        ];
     }
+
     ksort($pointsByDate);
-    $labels = array_map(static fn($date) => date('d M', strtotime($date)), array_keys($pointsByDate));
+
+    if (count($pointsByDate) === 1 && count($inRangeEvents) > 1) {
+        $singleDate = array_key_first($pointsByDate);
+        $labels = [date('d M', strtotime($singleDate)) . ' · Start'];
+        $data = [round($balanceBeforeRange, 2)];
+        $sequence = 1;
+
+        foreach ($inRangeEvents as $event) {
+            if ($event['date'] !== $singleDate) continue;
+            $labels[] = date('d M', strtotime($singleDate)) . ' · ' . $sequence;
+            $data[] = $event['balance'];
+            $sequence++;
+        }
+    } else {
+        $labels = array_map(static fn($date) => date('d M', strtotime($date)), array_keys($pointsByDate));
+        $data = array_values($pointsByDate);
+    }
+
     return [
         'labels' => $labels,
         'datasets' => [[
             'label' => 'Stock Level',
-            'data' => array_values($pointsByDate),
+            'data' => $data,
             'borderColor' => 'rgb(75, 192, 192)',
             'backgroundColor' => 'rgba(75, 192, 192, 0.2)',
             'fill' => true
