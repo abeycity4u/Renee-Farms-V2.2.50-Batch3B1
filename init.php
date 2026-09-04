@@ -30,6 +30,11 @@ require_once __DIR__ . '/includes/csrf.php';
 // consistent while those individual pages are migrated gradually.
 require_once __DIR__ . '/includes/permission_runtime.php';
 
+// Server-side dashboard overview filtering for the large legacy dashboard page.
+// This keeps Poultry/Ruminant overview summaries independent from page/action
+// permissions without reconstructing dashboard.php during the hardening pass.
+require_once __DIR__ . '/includes/dashboard_overview_permissions.php';
+
 // Hide permission-controlled controls before first paint so read-only users never
 // see restricted buttons or links flash briefly while client cleanup runs.
 require_once __DIR__ . '/includes/permission_prepaint.php';
