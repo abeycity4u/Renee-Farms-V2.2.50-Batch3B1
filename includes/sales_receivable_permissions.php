@@ -68,6 +68,13 @@ if ($receivableAction === 'edit') {
         $redirect($selectedCustomer);
     }
 
+    $existsStmt = $pdo->prepare('SELECT customer_name FROM customer_ledger_entries WHERE id = ? AND farm_id = ? LIMIT 1');
+    $existsStmt->execute([$ledgerId, $tenantFarmId]);
+    if ($existsStmt->fetchColumn() === false) {
+        $_SESSION['error'] = 'Ledger entry not found.';
+        $redirect($selectedCustomer);
+    }
+
     $stmt = $pdo->prepare('UPDATE customer_ledger_entries
         SET customer_name = ?, entry_date = ?, amount = ?, notes = ?
         WHERE id = ? AND farm_id = ?');
@@ -85,10 +92,19 @@ if ($ledgerId <= 0) {
 
 $getCustomerStmt = $pdo->prepare('SELECT customer_name FROM customer_ledger_entries WHERE id = ? AND farm_id = ?');
 $getCustomerStmt->execute([$ledgerId, $tenantFarmId]);
-$customerName = (string)($getCustomerStmt->fetchColumn() ?: $selectedCustomer);
+$existingCustomer = $getCustomerStmt->fetchColumn();
+if ($existingCustomer === false) {
+    $_SESSION['error'] = 'Ledger entry not found.';
+    $redirect($selectedCustomer);
+}
+$customerName = (string)$existingCustomer;
 
 $deleteStmt = $pdo->prepare('DELETE FROM customer_ledger_entries WHERE id = ? AND farm_id = ?');
 $deleteStmt->execute([$ledgerId, $tenantFarmId]);
+if ($deleteStmt->rowCount() !== 1) {
+    $_SESSION['error'] = 'Ledger entry not found.';
+    $redirect($selectedCustomer);
+}
 
 $_SESSION['success'] = 'Ledger entry deleted successfully.';
 $redirect($customerName);
