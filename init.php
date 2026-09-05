@@ -46,6 +46,7 @@ require_once __DIR__ . '/includes/platform_owner_nav_discoverability.php';
 // read-only operational drill-down details while preserving owner identity.
 require_once __DIR__ . '/includes/platform_owner_tenant_drilldown.php';
 require_once __DIR__ . '/includes/platform_owner_tenant_commercial_drilldown.php';
+require_once __DIR__ . '/includes/platform_owner_tenant_expense_drilldown.php';
 
 // Enforce the subscription boundary before legacy role/permission runtime guards
 // so Farm Admin bypasses cannot expose a module the tenant no longer subscribes to.
