@@ -43,8 +43,9 @@ require_once __DIR__ . '/includes/team_user_role_visibility.php';
 require_once __DIR__ . '/includes/platform_owner_nav_discoverability.php';
 
 // Extend the dedicated Platform Owner tenant support page with tenant-scoped,
-// read-only drill-down details while preserving the separate owner identity.
+// read-only operational drill-down details while preserving owner identity.
 require_once __DIR__ . '/includes/platform_owner_tenant_drilldown.php';
+require_once __DIR__ . '/includes/platform_owner_tenant_commercial_drilldown.php';
 
 // Enforce the subscription boundary before legacy role/permission runtime guards
 // so Farm Admin bypasses cannot expose a module the tenant no longer subscribes to.
