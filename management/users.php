@@ -31,6 +31,9 @@ $moduleStmt = $pdo->prepare('SELECT module_code FROM farm_modules WHERE farm_id 
 $moduleStmt->execute([$farmId]);
 $managedFarmModules = $moduleStmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
 $managedFarmHasModule = static fn(string $module): bool => in_array($module, $managedFarmModules, true);
+$managedFarmHasSales = function_exists('farm_entitlement_sales_available')
+    ? farm_entitlement_sales_available($pdo, $farmId)
+    : ($managedFarmHasModule('poultry') || $managedFarmHasModule('ruminant') || $managedFarmHasModule('sales'));
 $userManagerUrl = BASE_URL . '/management/users.php' . (isPlatformOwner() ? '?farm_id=' . $farmId : '');
 $availableRoles = ['poultry_manager' => 'Poultry Manager', 'ruminant_manager' => 'Ruminant Manager', 'sales_rep' => 'Sales Representative', 'viewer' => 'Viewer'];
 function tenantRoleLimits(PDO $pdo, int $farmId): array {
@@ -64,10 +67,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (!verify_csrf_token($_POST['csrf_token'] ?? '')) { http_response_code(419); exit('Invalid request token.'); }
     if (isset($_POST['add_user'])) {
         $roles = array_values(array_intersect($_POST['roles'] ?? [], array_keys($availableRoles)));
-        $roles = array_values(array_filter($roles, static function ($role) use ($managedFarmHasModule) {
+        $roles = array_values(array_filter($roles, static function ($role) use ($managedFarmHasModule, $managedFarmHasSales) {
             if ($role === 'poultry_manager') return $managedFarmHasModule('poultry');
             if ($role === 'ruminant_manager') return $managedFarmHasModule('ruminant');
-            if ($role === 'sales_rep') return $managedFarmHasModule('sales');
+            if ($role === 'sales_rep') return $managedFarmHasSales;
             return $role === 'viewer';
         }));
         if (!$roles) { $_SESSION['error'] = 'Select at least one role enabled by the platform owner.'; header('Location: ' . $userManagerUrl); exit(); }
@@ -115,10 +118,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $protectStmt->execute([$editTargetId, $farmId]);
         if ($protectStmt->fetchColumn() === 'farm_admin') { $_SESSION['error'] = 'The Farm Admin account is managed from the farm profile and is protected here.'; header('Location: ' . $userManagerUrl); exit(); }
         $roles = array_values(array_intersect($_POST['roles'] ?? [], array_keys($availableRoles)));
-        $roles = array_values(array_filter($roles, static function ($role) use ($managedFarmHasModule) {
+        $roles = array_values(array_filter($roles, static function ($role) use ($managedFarmHasModule, $managedFarmHasSales) {
             if ($role === 'poultry_manager') return $managedFarmHasModule('poultry');
             if ($role === 'ruminant_manager') return $managedFarmHasModule('ruminant');
-            if ($role === 'sales_rep') return $managedFarmHasModule('sales');
+            if ($role === 'sales_rep') return $managedFarmHasSales;
             return $role === 'viewer';
         }));
         if (!$roles) { $_SESSION['error'] = 'Select at least one role enabled by the platform owner.'; header('Location: ' . $userManagerUrl); exit(); }
@@ -395,8 +398,8 @@ foreach ($users as $existingUser) {
                         </div>
                         <div class="mb-3">
                             <label class="d-block">Roles</label>
-                            <?php foreach ($availableRoles as $code => $label): $disabled = ($code === 'poultry_manager' && !$managedFarmHasModule('poultry')) || ($code === 'ruminant_manager' && !$managedFarmHasModule('ruminant')) || ($code === 'sales_rep' && !$managedFarmHasModule('sales')); ?>
-                            <div class="form-check"><input class="form-check-input" type="checkbox" name="roles[]" value="<?php echo $code; ?>" id="add-<?php echo $code; ?>" <?php echo $disabled ? 'disabled' : ''; ?>><label class="form-check-label" for="add-<?php echo $code; ?>"><?php echo $label; ?><?php if (isset($tenantRoleLimits[$code])): ?> <span class="small text-muted">(<?php echo tenantRoleCount($pdo,$farmId,$code); ?>/<?php echo (int)$tenantRoleLimits[$code]; ?> used)</span><?php endif; ?></label></div><?php endforeach; ?>
+                            <?php foreach ($availableRoles as $code => $label): $disabled = ($code === 'poultry_manager' && !$managedFarmHasModule('poultry')) || ($code === 'ruminant_manager' && !$managedFarmHasModule('ruminant')) || ($code === 'sales_rep' && !$managedFarmHasSales); ?>
+                            <div class="form-check"><input class="form-check-input" type="checkbox" name="roles[]" value="<?php echo $code; ?>" id="add-<?php echo $code; ?>" <?php echo $disabled ? 'disabled' : ''; ?>><label class="form-check-label" for="add-<?php echo $code; ?>"><?php echo $label; ?><?php if (isset($tenantRoleLimits[$code])): ?> <span class="small text-muted">(<?php echo tenantRoleCount($pdo,$farmId,$code); ?>/<?php echo (int)$tenantRoleLimits[$code]; ?> used)</span><?php endif; ?></label><?php if ($code === 'sales_rep' && !$disabled): ?><div class="small text-muted ms-4">Shared Sales role available with an active Poultry or Ruminant subscription.</div><?php endif; ?></div><?php endforeach; ?>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -431,8 +434,8 @@ foreach ($users as $existingUser) {
                         </div>
                         <div class="mb-3">
                             <label class="d-block">Roles</label>
-                            <?php foreach ($availableRoles as $code => $label): $disabled = ($code === 'poultry_manager' && !$managedFarmHasModule('poultry')) || ($code === 'ruminant_manager' && !$managedFarmHasModule('ruminant')) || ($code === 'sales_rep' && !$managedFarmHasModule('sales')); ?>
-                            <div class="form-check"><input class="form-check-input" type="checkbox" name="roles[]" value="<?php echo $code; ?>" id="edit-<?php echo $code; ?>" <?php echo $disabled ? 'disabled' : ''; ?>><label class="form-check-label" for="edit-<?php echo $code; ?>"><?php echo $label; ?></label></div><?php endforeach; ?>
+                            <?php foreach ($availableRoles as $code => $label): $disabled = ($code === 'poultry_manager' && !$managedFarmHasModule('poultry')) || ($code === 'ruminant_manager' && !$managedFarmHasModule('ruminant')) || ($code === 'sales_rep' && !$managedFarmHasSales); ?>
+                            <div class="form-check"><input class="form-check-input" type="checkbox" name="roles[]" value="<?php echo $code; ?>" id="edit-<?php echo $code; ?>" <?php echo $disabled ? 'disabled' : ''; ?>><label class="form-check-label" for="edit-<?php echo $code; ?>"><?php echo $label; ?></label><?php if ($code === 'sales_rep' && !$disabled): ?><div class="small text-muted ms-4">Shared Sales role available with an active Poultry or Ruminant subscription.</div><?php endif; ?></div><?php endforeach; ?>
                         </div>
                         <div class="mb-3">
                             <label>New Password (leave blank to keep current)</label>
