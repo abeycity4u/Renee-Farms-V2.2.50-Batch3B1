@@ -30,6 +30,10 @@ require_once __DIR__ . '/includes/csrf.php';
 // consistent while those individual pages are migrated gradually.
 require_once __DIR__ . '/includes/permission_runtime.php';
 
+// Reject Team Users edit targets that do not belong to the current/selected
+// tenant before legacy role-assignment code can touch user_roles.
+require_once __DIR__ . '/includes/user_management_tenant_guard.php';
+
 // Keep Customer Debt Management ledger Edit/Delete independently delegable
 // while the large Sales Records page still carries an admin-only legacy flag.
 require_once __DIR__ . '/includes/sales_receivable_permissions.php';
