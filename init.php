@@ -55,6 +55,10 @@ require_once __DIR__ . '/includes/expense_action_permissions.php';
 // permissions without reconstructing dashboard.php during the hardening pass.
 require_once __DIR__ . '/includes/dashboard_overview_permissions.php';
 
+// Keep Dashboard Farm Intelligence content and stock quick-actions aligned with
+// their delegated permissions while backend routes/APIs remain authoritative.
+require_once __DIR__ . '/includes/dashboard_action_permissions.php';
+
 // Hide permission-controlled controls before first paint so read-only users never
 // see restricted buttons or links flash briefly while client cleanup runs.
 require_once __DIR__ . '/includes/permission_prepaint.php';
