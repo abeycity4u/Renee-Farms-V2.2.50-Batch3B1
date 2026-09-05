@@ -66,9 +66,14 @@ HTML;
             '<h5 class="modal-title">Quick Stock Use</h5>',
             $html
         );
+        $transactionMarkup = <<<'HTML'
+<label>Transaction</label>
+                                    <input type="text" class="form-control" value="Use / Deduct Stock" readonly>
+                                    <input type="hidden" id="transType" value="used">
+HTML;
         $html = preg_replace(
             '~<label>Transaction Type</label>\s*<select class="form-select" id="transType" required>.*?</select>~s',
-            '<label>Transaction</label>\n                                    <input type="text" class="form-control" value="Use / Deduct Stock" readonly>\n                                    <input type="hidden" id="transType" value="used">',
+            $transactionMarkup,
             $html,
             1
         ) ?? $html;
@@ -77,9 +82,13 @@ HTML;
             '<small>This quick action deducts stock for operational use. Use Inventory for receiving stock or full stock management.</small>',
             $html
         );
+        $footerMarkup = <<<'HTML'
+<a class="btn btn-outline-primary" href="inventory.php">Full Stock Update</a>
+                            <button type="submit" class="btn btn-primary">Deduct Stock</button>
+HTML;
         $html = str_replace(
             '<button type="submit" class="btn btn-primary">Update Stock</button>',
-            '<a class="btn btn-outline-primary" href="inventory.php">Full Stock Update</a>\n                            <button type="submit" class="btn btn-primary">Deduct Stock</button>',
+            $footerMarkup,
             $html
         );
 
