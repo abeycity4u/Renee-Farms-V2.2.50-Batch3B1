@@ -42,6 +42,14 @@ if (!function_exists('farm_entitlement_runtime_deny')) {
     }
 }
 
+if (!function_exists('farm_entitlement_runtime_remove_nav_dropdown')) {
+    function farm_entitlement_runtime_remove_nav_dropdown(string $html, string $menuId): string
+    {
+        $pattern = '~<li class="nav-item dropdown">\s*<button[^>]*id="' . preg_quote($menuId, '~') . '"[^>]*>.*?</li>~s';
+        return preg_replace($pattern, '', $html, 1) ?? $html;
+    }
+}
+
 $path = farm_entitlement_runtime_path();
 $routeModules = [
     '/poultry/layers_daily_record.php' => 'poultry',
@@ -62,5 +70,21 @@ $routeModules = [
 foreach ($routeModules as $suffix => $module) {
     if (farm_entitlement_runtime_ends_with($path, $suffix) && !user_can_access_entitled_module($module)) {
         farm_entitlement_runtime_deny($module);
+    }
+}
+
+// Keep navigation presentation aligned with the same authoritative entitlement
+// boundary. Basic Sales is intentionally not stripped here: the canonical helper
+// makes Sales available whenever the farm has an operational subscription.
+if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'GET') {
+    $allowPoultry = user_can_access_entitled_module('poultry');
+    $allowRuminant = user_can_access_entitled_module('ruminant');
+
+    if (!$allowPoultry || !$allowRuminant) {
+        ob_start(static function (string $html) use ($allowPoultry, $allowRuminant): string {
+            if (!$allowPoultry) $html = farm_entitlement_runtime_remove_nav_dropdown($html, 'poultryMenu');
+            if (!$allowRuminant) $html = farm_entitlement_runtime_remove_nav_dropdown($html, 'ruminantMenu');
+            return $html;
+        });
     }
 }
