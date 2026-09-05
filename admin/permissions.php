@@ -35,6 +35,15 @@ if (isPlatformOwner()) {
 
 $permissionGroups = permission_catalog();
 $modules = permission_catalog_codes();
+$permissionGroupClasses = [
+    'Poultry Operations' => 'permission-group-poultry-ops',
+    'Poultry Expenses' => 'permission-group-poultry-expenses',
+    'Ruminant Operations' => 'permission-group-ruminant',
+    'Inventory & Stock' => 'permission-group-inventory',
+    'Sales & General Expenses' => 'permission-group-sales',
+    'Management Insights' => 'permission-group-insights',
+    'Cycles, Reports & Team' => 'permission-group-cycles',
+];
 
 $enabledRoleStmt=$pdo->prepare('SELECT module_code FROM farm_modules WHERE farm_id=? AND is_enabled=1');
 $enabledRoleStmt->execute([$permissionFarmId]);
@@ -86,19 +95,40 @@ unset($_SESSION['permission_error_detail']);
     }
     .permissions-intro { color: #5c6770; margin-bottom: 0; font-size: 0.95rem; }
     .permission-group-title {
-      background: #f8faf9;
-      color: #1f5136;
-      font-weight: 700;
+      font-weight: 800;
       font-size: 0.88rem;
-      letter-spacing: .02em;
+      letter-spacing: .025em;
       text-transform: uppercase;
+      border-top: 2px solid rgba(15, 23, 42, .08);
     }
+    .permission-group-title td { padding-top: .72rem; padding-bottom: .72rem; }
+    .permission-group-poultry-ops { background: #e8f7ed; color: #17683a; }
+    .permission-group-poultry-expenses { background: #fff3cd; color: #7a5b00; }
+    .permission-group-ruminant { background: #e7f1ff; color: #174a7e; }
+    .permission-group-inventory { background: #eee8ff; color: #51358a; }
+    .permission-group-sales { background: #ffe8ef; color: #8a3150; }
+    .permission-group-insights { background: #e6f7f7; color: #176368; }
+    .permission-group-cycles { background: #f1f3f5; color: #495057; }
     .permission-module { min-width: 370px; }
     .permission-module strong { color: #1f2937; font-size: 0.95rem; }
     .permission-module small { color: #6b7280; line-height: 1.35; display: block; margin-top: .15rem; }
     .permission-action { font-size: .72rem; vertical-align: middle; }
     .permission-action-destructive { border-color: #dc3545 !important; color: #dc3545 !important; }
     .permission-check { transform: scale(1.2); cursor: pointer; }
+    .permission-not-applicable {
+      display: inline-flex;
+      width: 1.55rem;
+      height: 1.55rem;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: #f1f3f5;
+      color: #9aa0a6;
+      border: 1px solid #d8dde3;
+      font-weight: 800;
+      font-size: .92rem;
+      line-height: 1;
+    }
     .sticky-actions {
       position: sticky;
       bottom: 0;
@@ -119,12 +149,26 @@ unset($_SESSION['permission_error_detail']);
     html[data-theme="dark"] .permission-tip,
     html[data-theme="dark"] .permissions-shell .permission-tip,
     html[data-bs-theme="dark"] .permissions-shell .permission-tip { color: #dbe5f3 !important; opacity: 1 !important; }
-    html[data-theme="dark"] .permissions-shell .permission-group-title,
-    html[data-bs-theme="dark"] .permissions-shell .permission-group-title { background: #172235 !important; color: #e8f2ff !important; }
+    html[data-theme="dark"] .permissions-shell .permission-group-poultry-ops,
+    html[data-bs-theme="dark"] .permissions-shell .permission-group-poultry-ops { background: #173626 !important; color: #b9f2cf !important; }
+    html[data-theme="dark"] .permissions-shell .permission-group-poultry-expenses,
+    html[data-bs-theme="dark"] .permissions-shell .permission-group-poultry-expenses { background: #3a3018 !important; color: #ffe7a3 !important; }
+    html[data-theme="dark"] .permissions-shell .permission-group-ruminant,
+    html[data-bs-theme="dark"] .permissions-shell .permission-group-ruminant { background: #172d45 !important; color: #b9d8ff !important; }
+    html[data-theme="dark"] .permissions-shell .permission-group-inventory,
+    html[data-bs-theme="dark"] .permissions-shell .permission-group-inventory { background: #2b2344 !important; color: #d8c9ff !important; }
+    html[data-theme="dark"] .permissions-shell .permission-group-sales,
+    html[data-bs-theme="dark"] .permissions-shell .permission-group-sales { background: #402332 !important; color: #ffc6d8 !important; }
+    html[data-theme="dark"] .permissions-shell .permission-group-insights,
+    html[data-bs-theme="dark"] .permissions-shell .permission-group-insights { background: #17383a !important; color: #b9eff1 !important; }
+    html[data-theme="dark"] .permissions-shell .permission-group-cycles,
+    html[data-bs-theme="dark"] .permissions-shell .permission-group-cycles { background: #293241 !important; color: #e5e7eb !important; }
     html[data-theme="dark"] .permissions-shell .permission-module strong,
     html[data-bs-theme="dark"] .permissions-shell .permission-module strong { color: #f8fafc !important; }
     html[data-theme="dark"] .permissions-shell .sticky-actions,
     html[data-bs-theme="dark"] .permissions-shell .sticky-actions { background: #111c2f !important; border-color: #334155 !important; }
+    html[data-theme="dark"] .permission-not-applicable,
+    html[data-bs-theme="dark"] .permission-not-applicable { background: #202b3d; color: #7f8aa0; border-color: #3b475c; }
     @media (max-width: 768px) {
       .permission-module { min-width: 290px; }
       .sticky-actions { flex-direction: column; align-items: stretch; }
@@ -174,7 +218,7 @@ unset($_SESSION['permission_error_detail']);
       <div class="card permissions-card">
         <div class="card-header">
           <h5 class="mb-1">Role Permission Matrix</h5>
-          <small>Checked means granted. Unchecked means blocked. Greyed-out combinations do not apply to that role.</small>
+          <small>Checked means granted. Unchecked means blocked. X means that permission is not available for that role.</small>
         </div>
 
         <div class="table-responsive">
@@ -189,7 +233,8 @@ unset($_SESSION['permission_error_detail']);
             </thead>
             <tbody>
               <?php foreach ($permissionGroups as $groupName => $groupPermissions): ?>
-                <tr class="permission-group-title">
+                <?php $groupClass = $permissionGroupClasses[$groupName] ?? 'permission-group-cycles'; ?>
+                <tr class="permission-group-title <?= htmlspecialchars($groupClass) ?>">
                   <td colspan="<?= count($roles) + 1 ?>"><?= htmlspecialchars($groupName) ?></td>
                 </tr>
                 <?php foreach ($groupPermissions as $module => $meta):
@@ -207,17 +252,20 @@ unset($_SESSION['permission_error_detail']);
                     <?php foreach ($roles as $role):
                       $applicable = permission_catalog_applicable($role,$module);
                       $checked = ($applicable && !empty($permissions[$role][$module]) && (int)$permissions[$role][$module] === 1) ? 'checked' : '';
-                      $disabled = $applicable ? '' : 'disabled';
                     ?>
                       <td class="text-center">
-                        <input
-                          class="form-check-input permission-check"
-                          type="checkbox"
-                          name="perm[<?= htmlspecialchars($role) ?>][<?= htmlspecialchars($module) ?>]"
-                          value="1"
-                          <?= $checked ?> <?= $disabled ?>
-                          aria-label="<?= htmlspecialchars($role) ?> permission for <?= htmlspecialchars((string)($meta['label'] ?? 'Permission')) ?> <?= htmlspecialchars($action) ?>"
-                        />
+                        <?php if ($applicable): ?>
+                          <input
+                            class="form-check-input permission-check"
+                            type="checkbox"
+                            name="perm[<?= htmlspecialchars($role) ?>][<?= htmlspecialchars($module) ?>]"
+                            value="1"
+                            <?= $checked ?>
+                            aria-label="<?= htmlspecialchars($role) ?> permission for <?= htmlspecialchars((string)($meta['label'] ?? 'Permission')) ?> <?= htmlspecialchars($action) ?>"
+                          />
+                        <?php else: ?>
+                          <span class="permission-not-applicable" title="Not available for this role" aria-label="Not available for this role">×</span>
+                        <?php endif; ?>
                       </td>
                     <?php endforeach; ?>
                   </tr>
