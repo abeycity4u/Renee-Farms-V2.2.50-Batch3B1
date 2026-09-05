@@ -19,6 +19,17 @@ if (!function_exists('farm_entitlement_known_modules')) {
     }
 }
 
+if (!function_exists('farm_entitlement_module_labels')) {
+    function farm_entitlement_module_labels(): array
+    {
+        return [
+            'poultry' => 'Poultry',
+            'ruminant' => 'Ruminant',
+            'sales' => 'Sales',
+        ];
+    }
+}
+
 if (!function_exists('farm_entitlement_normalize_modules')) {
     function farm_entitlement_normalize_modules(array $modules): array
     {
@@ -141,6 +152,28 @@ if (!function_exists('sync_farm_entitlements')) {
             'INSERT INTO farm_modules (farm_id, module_code, is_enabled) VALUES (?, ?, 1)'
         );
         foreach ($modules as $module) $stmt->execute([$farmId, $module]);
+    }
+}
+
+if (!function_exists('assign_protected_farm_admin_role')) {
+    function assign_protected_farm_admin_role(PDO $pdo, int $farmId, int $userId): void
+    {
+        if ($farmId < 1 || $userId < 1) throw new InvalidArgumentException('A valid farm admin account is required.');
+
+        $userStmt = $pdo->prepare("SELECT 1 FROM users WHERE id = ? AND farm_id = ? AND user_type = 'farm_admin' LIMIT 1");
+        $userStmt->execute([$userId, $farmId]);
+        if (!$userStmt->fetchColumn()) throw new RuntimeException('The protected Farm Admin account could not be verified.');
+
+        $roleStmt = $pdo->prepare("SELECT id FROM roles WHERE code = 'farm_admin' LIMIT 1");
+        $roleStmt->execute();
+        $farmAdminRoleId = (int) $roleStmt->fetchColumn();
+        if ($farmAdminRoleId < 1) throw new RuntimeException('Required farm_admin role is missing from the roles table.');
+
+        // The protected tenant administrator has one identity only. Module access is
+        // controlled by farm_modules, never by attaching specialist roles here.
+        $pdo->prepare('DELETE FROM user_roles WHERE user_id = ?')->execute([$userId]);
+        $insert = $pdo->prepare('INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)');
+        $insert->execute([$userId, $farmAdminRoleId]);
     }
 }
 
