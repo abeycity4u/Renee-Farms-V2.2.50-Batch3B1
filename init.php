@@ -22,6 +22,10 @@ if (!isset($pdo)) {
     if (file_exists(__DIR__ . '/config.php')) require_once __DIR__ . '/config.php';
 }
 
+// Canonical V2.3 subscription/module entitlement layer. Keep farm subscription,
+// user identity/roles and granular permissions as separate concerns.
+require_once __DIR__ . '/includes/farm_entitlements.php';
+
 // Central browser-form CSRF rendering and POST enforcement helpers.
 require_once __DIR__ . '/includes/csrf.php';
 
