@@ -4,7 +4,8 @@
  *
  * The underlying destination routes/APIs remain the authorization boundary.
  * This bridge prevents the legacy Dashboard from exposing Farm Intelligence
- * content or Update Stock controls when those permissions are not granted.
+ * content or Update Stock controls when those permissions are not granted, and
+ * keeps the Dashboard quick-stock request aligned with the CSRF-protected API.
  */
 
 require_once __DIR__ . '/functions.php';
@@ -16,12 +17,8 @@ if (!($path === '/dashboard.php' || str_ends_with($path, '/dashboard.php'))) ret
 if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'GET') return;
 
 $privileged = isPlatformOwner() || hasRole('farm_admin');
-if ($privileged) return;
-
-$canViewIntelligence = hasPermission(getUserType(), 'farm_intelligence');
-$canUpdateStock = hasPermission(getUserType(), 'update_stock');
-
-if ($canViewIntelligence && $canUpdateStock) return;
+$canViewIntelligence = $privileged || hasPermission(getUserType(), 'farm_intelligence');
+$canUpdateStock = $privileged || hasPermission(getUserType(), 'update_stock');
 
 ob_start(static function (string $html) use ($canViewIntelligence, $canUpdateStock): string {
     if (!$canViewIntelligence) {
@@ -52,6 +49,61 @@ document.addEventListener('DOMContentLoaded',function(){
     const cells=row.children;
     if(cells[actionIndex])cells[actionIndex].remove();
   });
+});
+</script>
+HTML;
+        if (stripos($html, '</body>') !== false) {
+            $html = preg_replace('/<\/body>/i', $script . '</body>', $html, 1) ?? $html;
+        }
+    } else {
+        // The legacy Dashboard submits JSON without the X-CSRF-Token required by
+        // api/update_stock.php and reads only data.message even though API failures
+        // use data.error. Intercept only this Dashboard form and leave the API as the
+        // authoritative permission/tenant/validation boundary.
+        $script = <<<'HTML'
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  const form=document.getElementById('quickStockForm');
+  if(!form)return;
+
+  form.addEventListener('submit',async function(event){
+    event.preventDefault();
+    event.stopImmediatePropagation();
+
+    const submitBtn=form.querySelector('button[type="submit"]');
+    if(!submitBtn)return;
+    const originalText=submitBtn.innerHTML;
+    submitBtn.innerHTML='<span class="spinner-border spinner-border-sm"></span> Updating...';
+    submitBtn.disabled=true;
+
+    try {
+      const csrf=document.querySelector('meta[name="csrf-token"]')?.content||'';
+      const payload={
+        item_id:document.getElementById('stockItemId')?.value||'',
+        type:document.getElementById('transType')?.value||'',
+        quantity:document.getElementById('quantity')?.value||'',
+        remarks:document.getElementById('remarks')?.value||''
+      };
+      const response=await fetch('api/update_stock.php',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},
+        body:JSON.stringify(payload)
+      });
+      const data=await response.json();
+      if(response.ok&&data.success){
+        showAlert('success',data.message||'Stock updated successfully!');
+        bootstrap.Modal.getInstance(document.getElementById('quickStockModal'))?.hide();
+        setTimeout(function(){location.reload();},1000);
+        return;
+      }
+      showAlert('danger','Error: '+(data.error||data.message||'Action could not be completed.'));
+    } catch(error) {
+      showAlert('danger','Network error: '+error.message);
+    }
+
+    submitBtn.innerHTML=originalText;
+    submitBtn.disabled=false;
+  },true);
 });
 </script>
 HTML;
