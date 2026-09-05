@@ -10,6 +10,10 @@
  * farm_role_limits remains the persisted effective seat allowance. Add-ons are
  * derived as effective limit minus the selected plan's included allowance, so this
  * batch needs no new database table or migration.
+ *
+ * Legacy farm_modules rows may still contain "sales" until that farm is saved.
+ * Keep those rows readable for backwards compatibility, but never expose Sales as
+ * a separately purchasable module in the commercial Platform Farms interface.
  */
 
 $subscriptionPlanFarmPath = '/' . ltrim(str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? '')), '/');
@@ -22,7 +26,8 @@ if (!$subscriptionPlanFarmIsOwner) return;
 // On create/update, derive effective role limits from the selected plan plus only
 // explicitly submitted non-negative seat add-ons. Do not trust browser-supplied
 // role_limits totals. Sales is shared with any active livestock subscription, so
-// only Poultry/Ruminant are persisted as commercial module selections here.
+// only Poultry/Ruminant are persisted as commercial module selections here. Saving
+// an older farm therefore retires any legacy standalone Sales entitlement row.
 if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST'
     && (isset($_POST['create_farm']) || isset($_POST['update_farm']))) {
     $planCode = strtolower(trim((string)($_POST['plan'] ?? 'starter')));
@@ -62,6 +67,27 @@ ob_start(static function (string $html) use ($planCatalogJson): string {
         '',
         $html,
         1
+    ) ?? $html;
+
+    $html = str_replace(
+        'Select at least one subscribed module (Poultry, Ruminant, or Sales) so the farm workspace has an active service entitlement.',
+        'Select Poultry, Ruminant, or both so the farm workspace has an active service entitlement.',
+        $html
+    );
+
+    // Existing tenants can still carry a legacy stored "sales" row. Keep the DB
+    // compatible, but present only commercial livestock modules in the farm list.
+    $html = preg_replace_callback(
+        '~<td>((?:poultry|ruminant|sales)(?:, (?:poultry|ruminant|sales))*)</td>~i',
+        static function (array $match): string {
+            $modules = array_values(array_filter(
+                array_map('strtolower', explode(', ', $match[1])),
+                static fn(string $module): bool => in_array($module, ['poultry', 'ruminant'], true)
+            ));
+            $label = $modules ? implode(', ', array_map('ucfirst', $modules)) : 'None';
+            return '<td>' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</td>';
+        },
+        $html
     ) ?? $html;
 
     $html = str_replace(
