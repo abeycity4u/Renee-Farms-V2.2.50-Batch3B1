@@ -98,6 +98,25 @@ function dashboard_overview_filter_ticker(string $html, bool $allowPoultry, bool
 }
 }
 
+if (!function_exists('dashboard_overview_filter_operational_surfaces')) {
+function dashboard_overview_filter_operational_surfaces(string $html, bool $allowPoultry, bool $allowRuminant): string
+{
+    if (!$allowPoultry) {
+        $html = preg_replace('~\s*<a href="poultry/(?:layers_daily_record|broiler_daily_record)\.php" class="smart-action-card[^>]*>.*?</a>~s', '', $html) ?? $html;
+        $html = preg_replace('~\s*<li><a class="dropdown-item" href="#" data-stock-filter="poultry">.*?</a></li>~s', '', $html) ?? $html;
+        $html = preg_replace('~\s*<tr data-farm-type="poultry".*?</tr>~s', '', $html) ?? $html;
+    }
+
+    if (!$allowRuminant) {
+        $html = preg_replace('~\s*<a href="ruminant/ruminant_daily_record\.php" class="smart-action-card[^>]*>.*?</a>~s', '', $html) ?? $html;
+        $html = preg_replace('~\s*<li><a class="dropdown-item" href="#" data-stock-filter="ruminant">.*?</a></li>~s', '', $html) ?? $html;
+        $html = preg_replace('~\s*<tr data-farm-type="ruminant".*?</tr>~s', '', $html) ?? $html;
+    }
+
+    return $html;
+}
+}
+
 if (!isset($_SESSION['user_id'])) return;
 
 $overviewPath = '/' . ltrim(str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? '')), '/');
@@ -113,6 +132,7 @@ $canViewRuminantOverview = user_can_access_entitled_module('ruminant')
 
 ob_start(static function (string $html) use ($canViewPoultryOverview, $canViewRuminantOverview): string {
     $html = dashboard_overview_filter_ticker($html, $canViewPoultryOverview, $canViewRuminantOverview);
+    $html = dashboard_overview_filter_operational_surfaces($html, $canViewPoultryOverview, $canViewRuminantOverview);
 
     if (!$canViewPoultryOverview) {
         $html = dashboard_overview_remove_div_containing($html, '<strong>Layers</strong>', 'production-tile');
