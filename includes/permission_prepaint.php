@@ -92,16 +92,15 @@ if (($path === '/management/production_cycles.php' || str_ends_with($path, '/man
 
 // Subscription entitlement is the outer navigation boundary. Platform Owner
 // remains exempt because it uses the dedicated owner workspace plus explicit
-// tenant-view context rather than customer farm_modules rows.
+// tenant-view context rather than customer farm_modules rows. Use direct menu-ID
+// selectors as a prepaint fallback; the runtime helper removes the full dropdown
+// server-side from the final response.
 if (!isPlatformOwner()) {
     if (!user_can_access_entitled_module('poultry')) {
-        $rules[] = '#appNavbar .nav-item.dropdown:has(#poultryMenu){display:none!important;}';
+        $rules[] = '#poultryMenu,#poultryMenu + .dropdown-menu{display:none!important;}';
     }
     if (!user_can_access_entitled_module('ruminant')) {
-        $rules[] = '#appNavbar .nav-item.dropdown:has(#ruminantMenu){display:none!important;}';
-    }
-    if (!user_can_access_entitled_module('sales')) {
-        $rules[] = '#appNavbar a[href$="/management/sales_records.php"]{display:none!important;}';
+        $rules[] = '#ruminantMenu,#ruminantMenu + .dropdown-menu{display:none!important;}';
     }
 }
 
