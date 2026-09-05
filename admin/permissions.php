@@ -101,7 +101,12 @@ unset($_SESSION['permission_error_detail']);
       text-transform: uppercase;
       border-top: 2px solid rgba(15, 23, 42, .08);
     }
-    .permission-group-title td { padding-top: .72rem; padding-bottom: .72rem; }
+    .permission-group-title td {
+      padding-top: .72rem;
+      padding-bottom: .72rem;
+      background-color: inherit !important;
+      color: inherit !important;
+    }
     .permission-group-poultry-ops { background: #cfeeda; color: #155f35; }
     .permission-group-poultry-expenses { background: #ffe49a; color: #6d5200; }
     .permission-group-ruminant { background: #cfe5ff; color: #153f6b; }
