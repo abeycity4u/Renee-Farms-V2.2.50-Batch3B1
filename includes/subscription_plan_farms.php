@@ -92,7 +92,7 @@ ob_start(static function (string $html) use ($planCatalogJson): string {
 
     $html = str_replace(
         'Disabling a module removes current operational access but preserves its historical farm records.',
-        'Choose Poultry, Ruminant, or both. Basic Sales is included with any active livestock subscription. Disabling a livestock module removes current operational access but preserves its historical farm records.',
+        'Choose Poultry, Ruminant, or both. Sales access is included with any active livestock subscription. Disabling a livestock module removes current operational access but preserves its historical farm records.',
         $html
     );
 
