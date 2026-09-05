@@ -82,13 +82,9 @@ HTML;
             '<small>This quick action deducts stock for operational use. Use Inventory for receiving stock or full stock management.</small>',
             $html
         );
-        $footerMarkup = <<<'HTML'
-<a class="btn btn-outline-primary" href="inventory.php">Full Stock Update</a>
-                            <button type="submit" class="btn btn-primary">Deduct Stock</button>
-HTML;
         $html = str_replace(
             '<button type="submit" class="btn btn-primary">Update Stock</button>',
-            $footerMarkup,
+            '<button type="submit" class="btn btn-primary">Deduct Stock</button>',
             $html
         );
 
