@@ -82,6 +82,14 @@ if ($path === '/ruminant/animal_registry.php' || str_ends_with($path, '/ruminant
     if (!permission_prepaint_has('ruminant_animals_exit')) $rules[] = 'button[onclick*="exitAnimal"]{display:none!important;}';
 }
 
+// Production Cycles is intentionally a View-only delegated permission during
+// commercial hardening. The page already rejects every POST from non-admins;
+// hide those management forms before first paint so delegated viewers get a
+// genuinely read-only workspace rather than controls they cannot use.
+if (($path === '/management/production_cycles.php' || str_ends_with($path, '/management/production_cycles.php')) && !permission_prepaint_privileged()) {
+    $rules[] = 'form[method="post"],form[method="POST"]{display:none!important;}';
+}
+
 // Hide unauthorized top-level/module links before first paint.
 $navLinks = [
     '/inventory.php' => 'inventory',
