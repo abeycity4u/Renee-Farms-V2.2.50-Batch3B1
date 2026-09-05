@@ -26,6 +26,10 @@ if (!isset($pdo)) {
 // user identity/roles and granular permissions as separate concerns.
 require_once __DIR__ . '/includes/farm_entitlements.php';
 
+// Enforce the subscription boundary before legacy role/permission runtime guards
+// so Farm Admin bypasses cannot expose a module the tenant no longer subscribes to.
+require_once __DIR__ . '/includes/farm_entitlement_runtime.php';
+
 // Central browser-form CSRF rendering and POST enforcement helpers.
 require_once __DIR__ . '/includes/csrf.php';
 
