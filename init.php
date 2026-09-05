@@ -34,6 +34,10 @@ require_once __DIR__ . '/includes/permission_runtime.php';
 // tenant before legacy role-assignment code can touch user_roles.
 require_once __DIR__ . '/includes/user_management_tenant_guard.php';
 
+// Production Cycles is delegated as View only; keep delegated cycle/workspace
+// pages read-only and enforce the admin-only mutation boundary server-side.
+require_once __DIR__ . '/includes/production_cycle_view_permissions.php';
+
 // Keep Customer Debt Management ledger Edit/Delete independently delegable
 // while the large Sales Records page still carries an admin-only legacy flag.
 require_once __DIR__ . '/includes/sales_receivable_permissions.php';
