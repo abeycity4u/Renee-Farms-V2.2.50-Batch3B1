@@ -102,13 +102,13 @@ unset($_SESSION['permission_error_detail']);
       border-top: 2px solid rgba(15, 23, 42, .08);
     }
     .permission-group-title td { padding-top: .72rem; padding-bottom: .72rem; }
-    .permission-group-poultry-ops { background: #e8f7ed; color: #17683a; }
-    .permission-group-poultry-expenses { background: #fff3cd; color: #7a5b00; }
-    .permission-group-ruminant { background: #e7f1ff; color: #174a7e; }
-    .permission-group-inventory { background: #eee8ff; color: #51358a; }
-    .permission-group-sales { background: #ffe8ef; color: #8a3150; }
-    .permission-group-insights { background: #e6f7f7; color: #176368; }
-    .permission-group-cycles { background: #f1f3f5; color: #495057; }
+    .permission-group-poultry-ops { background: #cfeeda; color: #155f35; }
+    .permission-group-poultry-expenses { background: #ffe49a; color: #6d5200; }
+    .permission-group-ruminant { background: #cfe5ff; color: #153f6b; }
+    .permission-group-inventory { background: #ddd1ff; color: #4a2f80; }
+    .permission-group-sales { background: #f8c7d7; color: #7a2945; }
+    .permission-group-insights { background: #c8ecec; color: #14595d; }
+    .permission-group-cycles { background: #dfe3e7; color: #3f464d; }
     .permission-module { min-width: 370px; }
     .permission-module strong { color: #1f2937; font-size: 0.95rem; }
     .permission-module small { color: #6b7280; line-height: 1.35; display: block; margin-top: .15rem; }
