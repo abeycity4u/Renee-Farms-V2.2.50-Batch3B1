@@ -61,17 +61,10 @@ $drilldownRoleLabel = static function (string $role): string {
     ][$role] ?? ucwords(str_replace('_', ' ', $role));
 };
 
-ob_start(static function (string $html) use (
-    $drilldownTenantId,
-    $drilldownLivestockModules,
-    $drilldownCycles,
-    $drilldownUsers,
-    $drilldownRoleLabel
-): string {
-    if ($drilldownTenantId < 1 || stripos($html, 'id="platformTenantDrilldown"') !== false) {
-        return $html;
-    }
-
+// Build the injected HTML before registering the output-buffer callback.
+// PHP does not allow starting a new output buffer from inside an output handler.
+$drilldownSection = '';
+if ($drilldownTenantId > 0) {
     ob_start();
     ?>
     <div id="platformTenantDrilldown" class="row g-3 mt-1">
@@ -147,7 +140,13 @@ ob_start(static function (string $html) use (
         </div>
     </div>
     <?php
-    $section = (string)ob_get_clean();
+    $drilldownSection = (string)ob_get_clean();
+}
+
+ob_start(static function (string $html) use ($drilldownTenantId, $drilldownSection): string {
+    if ($drilldownTenantId < 1 || $drilldownSection === '' || stripos($html, 'id="platformTenantDrilldown"') !== false) {
+        return $html;
+    }
 
     $needle = '<div class="alert alert-secondary mt-3 mb-0">';
     $position = strpos($html, $needle);
@@ -155,5 +154,5 @@ ob_start(static function (string $html) use (
         return $html;
     }
 
-    return substr($html, 0, $position) . $section . substr($html, $position);
+    return substr($html, 0, $position) . $drilldownSection . substr($html, $position);
 });
