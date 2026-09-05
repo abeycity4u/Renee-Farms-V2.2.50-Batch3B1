@@ -6,9 +6,6 @@ requirePlatformOwner();
 const PLATFORM_WORKSPACE_SLUG = 'owner';
 const FARM_OWNER_MIN_PASSWORD_LENGTH = 8;
 
-$roleLabels = ['farm_admin' => 'Admin / Farm Owner', 'poultry_manager' => 'Poultry Manager', 'ruminant_manager' => 'Ruminant Manager', 'sales_rep' => 'Sales Representative', 'viewer' => 'Viewer'];
-$moduleRoles = ['poultry_manager' => 'poultry', 'ruminant_manager' => 'ruminant', 'sales_rep' => 'sales'];
-
 function redirectFarms(): void { header('Location: ' . BASE_URL . '/management/farms.php'); exit(); }
 function validFarmId($value): int { return filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: 0; }
 function validSubscriptionDate(string $value): bool {
@@ -43,31 +40,9 @@ function saveFarmLogoUpload(?array $file, int $farmId, ?string $existing = null,
     if (!move_uploaded_file($file['tmp_name'], $directory . '/' . $filename)) throw new RuntimeException('Unable to save the logo.');
     return '/uploads/farms/' . $filename;
 }
-function selectedRoles(array $input): array {
-    global $roleLabels;
-    return array_values(array_unique(array_intersect($input, array_keys($roleLabels))));
-}
 function ensureTenantRoles(PDO $pdo): void {
-    global $roleLabels;
-    $stmt = $pdo->prepare('INSERT INTO roles (code, name, is_platform_role) VALUES (?, ?, 0) ON DUPLICATE KEY UPDATE name = VALUES(name), is_platform_role = 0');
-    foreach ($roleLabels as $code => $name) $stmt->execute([$code, $name]);
-}
-function saveModulesAndRoles(PDO $pdo, int $farmId, int $ownerId, array $roles): void {
-    global $moduleRoles;
-    $modules = selectedModulesFromRoles($roles);
-    $pdo->prepare('DELETE FROM farm_modules WHERE farm_id = ?')->execute([$farmId]);
-    $moduleStmt = $pdo->prepare('INSERT INTO farm_modules (farm_id, module_code, is_enabled) VALUES (?, ?, 1)');
-    foreach ($modules as $module) $moduleStmt->execute([$farmId, $module]);
-    $pdo->prepare('DELETE FROM user_roles WHERE user_id = ?')->execute([$ownerId]);
-    $roleStmt = $pdo->prepare('INSERT INTO user_roles (user_id, role_id) SELECT ?, id FROM roles WHERE code = ?');
-    foreach ($roles as $role) {
-        $roleStmt->execute([$ownerId, $role]);
-        if ($roleStmt->rowCount() !== 1) throw new RuntimeException("Required role '{$role}' is missing from the roles table.");
-    }
-}
-function selectedModulesFromRoles(array $roles): array {
-    global $moduleRoles;
-    return array_values(array_unique(array_intersect_key($moduleRoles, array_flip($roles))));
+    $stmt = $pdo->prepare("INSERT INTO roles (code, name, is_platform_role) VALUES ('farm_admin', 'Admin / Farm Owner', 0) ON DUPLICATE KEY UPDATE name = VALUES(name), is_platform_role = 0");
+    $stmt->execute();
 }
 function findFarmAdminId(PDO $pdo, int $farmId): int {
     $stmt = $pdo->prepare("SELECT u.id FROM users u LEFT JOIN user_roles ur ON ur.user_id = u.id LEFT JOIN roles r ON r.id = ur.role_id WHERE u.farm_id = ? AND (r.code = 'farm_admin' OR u.user_type = 'farm_admin') ORDER BY (r.code = 'farm_admin') DESC, u.id LIMIT 1");
@@ -83,17 +58,6 @@ function tableHasFarmId(PDO $pdo, string $table): bool {
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = 'farm_id'");
     $stmt->execute([$table]);
     return (int)$stmt->fetchColumn() > 0;
-}
-
-function normalizeRoleLimits(array $input, array $roles): array {
-    $defaults = ['poultry_manager'=>1, 'ruminant_manager'=>1, 'sales_rep'=>1, 'viewer'=>1];
-    $out = [];
-    foreach ($defaults as $role => $default) {
-        $value = filter_var($input[$role] ?? $default, FILTER_VALIDATE_INT, ['options'=>['min_range'=>0,'max_range'=>500]]);
-        $out[$role] = $value === false ? $default : (int)$value;
-        if (!in_array($role, $roles, true) && $role !== 'viewer') $out[$role] = 0;
-    }
-    return $out;
 }
 function saveRoleLimits(PDO $pdo, int $farmId, array $limits): void {
     if (!tableExists($pdo, 'farm_role_limits')) return;
@@ -121,8 +85,6 @@ function deleteFarmData(PDO $pdo, int $farmId): void {
     foreach (['customer_ledger_entries', 'stock_transactions', 'stock_batches', 'layer_daily_records', 'broiler_daily_records', 'ruminant_daily_records', 'ruminant_animals', 'farm_expenses', 'profit_loss_summary', 'sales_records', 'production_cycles', 'stock_items', 'inventory_categories', 'financial_settings', 'permissions', 'farm_role_limits', 'v2_audit_log', 'farm_modules', 'subscriptions'] as $table) {
         deleteFarmRows($pdo, $table, $farmId);
     }
-    // Remove role links before users so both legacy RESTRICT and current CASCADE
-    // installations behave consistently.
     $pdo->prepare('DELETE ur FROM user_roles ur INNER JOIN users u ON u.id = ur.user_id WHERE u.farm_id = ?')->execute([$farmId]);
     deleteFarmRows($pdo, 'users', $farmId);
     $deleteFarm = $pdo->prepare('DELETE FROM farms WHERE id = ? AND slug <> ?');
@@ -130,6 +92,7 @@ function deleteFarmData(PDO $pdo, int $farmId): void {
     if ($deleteFarm->rowCount() !== 1) throw new RuntimeException('Farm account could not be removed.');
 }
 
+$submittedModules = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verify_csrf_token($_POST['csrf_token'] ?? '')) { http_response_code(419); exit('Invalid request token.'); }
     $farmId = validFarmId($_POST['farm_id'] ?? null);
@@ -152,13 +115,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $name = trim($_POST['name'] ?? ''); $slug = strtolower(trim($_POST['slug'] ?? '')); $color = trim($_POST['primary_color'] ?? '#198754');
-    $roles = selectedRoles($_POST['roles'] ?? []); $roleLimits = normalizeRoleLimits($_POST['role_limits'] ?? [], $roles); $username = trim($_POST['owner_username'] ?? ''); $password = $_POST['owner_password'] ?? ''; $email = trim($_POST['owner_email'] ?? '');
+    $submittedModules = farm_entitlement_normalize_modules($_POST['modules'] ?? []);
+    $roleLimits = normalize_role_limits_for_entitlements($_POST['role_limits'] ?? [], $submittedModules);
+    $username = trim($_POST['owner_username'] ?? ''); $password = $_POST['owner_password'] ?? ''; $email = trim($_POST['owner_email'] ?? '');
     $startDate = trim($_POST['subscription_starts_at'] ?? ''); $endDate = trim($_POST['subscription_ends_at'] ?? '');
     $plan = $_POST['plan'] ?? 'starter'; $status = $_POST['status'] ?? 'trial';
     $repairOwnerNeeded = isset($_POST['update_farm']) && $farmId > 0 && findFarmAdminId($pdo, $farmId) === 0;
-    if ($name === '' || !preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) || $slug === PLATFORM_WORKSPACE_SLUG || !preg_match('/^#[0-9a-fA-F]{6}$/', $color) || $username === '' || !in_array('farm_admin', $roles, true)) {
-        $error = 'Enter farm details, select Admin / Farm Owner, and use a unique lowercase Farm Workspace ID.';
-    } elseif (count(selectedModulesFromRoles($roles)) < 1) $error = 'Select at least one subscribed access module (Poultry, Ruminant, or Sales) so the farm dashboard can load active statistics.';
+    if ($name === '' || !preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) || $slug === PLATFORM_WORKSPACE_SLUG || !preg_match('/^#[0-9a-fA-F]{6}$/', $color) || $username === '') {
+        $error = 'Enter the Farm Admin details and use a unique lowercase Farm Workspace ID.';
+    } elseif (!$submittedModules) $error = 'Select at least one subscribed module (Poultry, Ruminant, or Sales) so the farm workspace has an active service entitlement.';
     elseif ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) $error = 'Enter a valid owner email address.';
     elseif (!in_array($plan, ['starter', 'growth', 'pro'], true) || !in_array($status, ['trial', 'active', 'past_due', 'suspended'], true)) $error = 'Select a valid subscription plan and status.';
     elseif (($startDate !== '' && !validSubscriptionDate($startDate)) || ($endDate !== '' && !validSubscriptionDate($endDate))) $error = 'Subscription dates must be valid dates.';
@@ -179,7 +144,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($logoPath) $pdo->prepare('UPDATE farms SET logo_path = ? WHERE id = ?')->execute([$logoPath, $farmId]);
             $owner = $pdo->prepare('INSERT INTO users (farm_id, username, password, email, user_type, full_name) VALUES (?, ?, ?, ?, ?, ?)');
             $owner->execute([$farmId, $username, password_hash($password, PASSWORD_DEFAULT), $email, 'farm_admin', trim($_POST['owner_name'] ?? $username)]); $ownerId = (int)$pdo->lastInsertId();
-            saveModulesAndRoles($pdo, $farmId, $ownerId, $roles); saveRoleLimits($pdo, $farmId, $roleLimits); $message = "Created {$name}.";
+            sync_farm_entitlements($pdo, $farmId, $submittedModules);
+            assign_protected_farm_admin_role($pdo, $farmId, $ownerId);
+            saveRoleLimits($pdo, $farmId, $roleLimits);
+            $message = "Created {$name}.";
         } elseif (isset($_POST['update_farm'])) {
             $farm = editableFarm($pdo, $farmId); if (!$farm) throw new RuntimeException('That farm cannot be edited.');
             $ownerId = findFarmAdminId($pdo, $farmId);
@@ -191,7 +159,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $logoPath = saveFarmLogoUpload($_FILES['logo'] ?? null, $farmId, $farm['logo_path'], $logoExtension); $newLogoPath = ($logoPath !== ($farm['logo_path'] ?? null)) ? $logoPath : null;
             $pdo->prepare('UPDATE farms SET name = ?, slug = ?, primary_color = ?, contact_name = ?, contact_email = ?, subscription_plan = ?, subscription_status = ?, subscription_starts_at = ?, subscription_ends_at = ?, logo_path = ? WHERE id = ?')->execute([$name, $slug, $color, trim($_POST['contact_name'] ?? ''), trim($_POST['contact_email'] ?? ''), $plan, $status, $startDate ? "$startDate 00:00:00" : null, $endDate ? "$endDate 23:59:59" : null, $logoPath, $farmId]);
             $ownerSql = 'UPDATE users SET username = ?, email = ?, full_name = ?, user_type = ?' . ($password !== '' ? ', password = ?' : '') . ' WHERE id = ? AND farm_id = ?'; $params = [$username, $email, trim($_POST['owner_name'] ?? $username), 'farm_admin']; if ($password !== '') $params[] = password_hash($password, PASSWORD_DEFAULT); $params[] = $ownerId; $params[] = $farmId; $pdo->prepare($ownerSql)->execute($params);
-            saveModulesAndRoles($pdo, $farmId, $ownerId, $roles); saveRoleLimits($pdo, $farmId, $roleLimits); $message = "Updated {$name}.";
+            sync_farm_entitlements($pdo, $farmId, $submittedModules);
+            assign_protected_farm_admin_role($pdo, $farmId, $ownerId);
+            saveRoleLimits($pdo, $farmId, $roleLimits);
+            $message = "Updated {$name}.";
         } else throw new RuntimeException('Unknown farm action.');
         $pdo->commit(); $_SESSION['success'] = $message; redirectFarms();
     } catch (Throwable $e) {
@@ -205,7 +176,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $editFarm = null; $editOwner = null; $editModules = [];
-if (isset($_GET['edit'])) { $editFarm = editableFarm($pdo, validFarmId($_GET['edit'])); if ($editFarm) { $ownerId = findFarmAdminId($pdo, (int)$editFarm['id']); if ($ownerId) { $stmt = $pdo->prepare('SELECT * FROM users WHERE id = ? AND farm_id = ?'); $stmt->execute([$ownerId, $editFarm['id']]); $editOwner = $stmt->fetch(PDO::FETCH_ASSOC); } $moduleStmt = $pdo->prepare('SELECT module_code FROM farm_modules WHERE farm_id = ? AND is_enabled = 1'); $moduleStmt->execute([$editFarm['id']]); $editModules = $moduleStmt->fetchAll(PDO::FETCH_COLUMN); } }
+if (isset($_GET['edit'])) {
+    $editFarm = editableFarm($pdo, validFarmId($_GET['edit']));
+    if ($editFarm) {
+        $ownerId = findFarmAdminId($pdo, (int)$editFarm['id']);
+        if ($ownerId) { $stmt = $pdo->prepare('SELECT * FROM users WHERE id = ? AND farm_id = ?'); $stmt->execute([$ownerId, $editFarm['id']]); $editOwner = $stmt->fetch(PDO::FETCH_ASSOC); }
+        $editModules = farm_entitlement_modules($pdo, (int)$editFarm['id']);
+    }
+}
 $farms = $pdo->query("SELECT f.*, GROUP_CONCAT(CASE WHEN fm.is_enabled = 1 THEN fm.module_code END ORDER BY fm.module_code SEPARATOR ', ') AS modules, DATEDIFF(f.subscription_ends_at, CURDATE()) AS days_remaining FROM farms f LEFT JOIN farm_modules fm ON fm.farm_id = f.id WHERE f.slug <> 'owner' GROUP BY f.id ORDER BY f.created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
 $form = $editFarm ?: ['name'=>'','slug'=>'','primary_color'=>'#198754','contact_name'=>'','contact_email'=>'','subscription_plan'=>'starter','subscription_status'=>'trial','subscription_starts_at'=>'','subscription_ends_at'=>''];
 $owner = $editOwner ?: ['username'=>'','email'=>'','full_name'=>''];
@@ -227,20 +205,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($error)) {
         'email' => trim($_POST['owner_email'] ?? ''),
         'full_name' => trim($_POST['owner_name'] ?? ''),
     ]);
+    $editModules = $submittedModules ?? [];
 }
 
 $editRoleLimits = loadRoleLimits($pdo, (int)($editFarm['id'] ?? 0));
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($error) && isset($roleLimits)) $editRoleLimits = $roleLimits;
+$moduleLabels = farm_entitlement_module_labels();
 ?>
 <!doctype html><html lang="en"><head><?php include dirname(__DIR__) . '/navbar_head.php'; ?><title>Platform farms</title></head><body><?php include dirname(__DIR__) . '/navbar.php'; ?>
 <main class="container py-4"><div class="d-flex justify-content-between app-responsive-toolbar"><h1 class="h3">Platform farms</h1><span class="badge bg-dark">Owner / Developer</span></div>
 <?php if (!empty($error)): ?><?php renderNotification('error', $error, 'Farm action could not be completed.'); ?><?php endif; ?>
-<?php if ($ownerNeedsRepair): ?><?php renderNotification('warning', 'This farm was only partially created and has no admin account. Complete the username, password, name, and subscribed access below; saving will create and link its admin safely.', 'Farm setup needs attention.'); ?><?php endif; ?>
+<?php if ($ownerNeedsRepair): ?><?php renderNotification('warning', 'This farm was only partially created and has no admin account. Complete the username, password, name, and subscribed modules below; saving will create and link its admin safely.', 'Farm setup needs attention.'); ?><?php endif; ?>
 <div class="card my-3"><div class="card-body"><h2 class="h5"><?php echo $editFarm ? 'Edit Farm' : 'Add New Farm'; ?></h2><form method="post" enctype="multipart/form-data" class="row g-3" id="farmAccountForm" novalidate><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token()); ?>"><?php if ($editFarm): ?><input type="hidden" name="farm_id" value="<?php echo (int)$editFarm['id']; ?>"><?php endif; ?>
 <div class="col-md-4"><label class="form-label">Username</label><input class="form-control" name="owner_username" value="<?php echo htmlspecialchars($owner['username']); ?>" required></div><div class="col-md-4"><label class="form-label">Password<?php echo $editFarm && !$ownerNeedsRepair ? ' (leave blank to keep)' : ''; ?></label><input class="form-control" type="password" name="owner_password" <?php echo !$editFarm || $ownerNeedsRepair ? 'minlength="' . FARM_OWNER_MIN_PASSWORD_LENGTH . '" required' : ''; ?>></div><div class="col-md-4"><label class="form-label">Email</label><input class="form-control" type="email" name="owner_email" value="<?php echo htmlspecialchars($owner['email']); ?>"></div>
 <div class="col-md-6"><label class="form-label">Full Name</label><input class="form-control" name="owner_name" value="<?php echo htmlspecialchars($owner['full_name']); ?>" required></div><div class="col-md-6"><label class="form-label">Farm name</label><input class="form-control" name="name" value="<?php echo htmlspecialchars($form['name']); ?>" required></div><div class="col-md-6"><label class="form-label">Farm Workspace ID</label><input class="form-control" name="slug" value="<?php echo htmlspecialchars($form['slug']); ?>" pattern="[a-z0-9]+(-[a-z0-9]+)*" required></div><div class="col-md-6"><label class="form-label">Logo upload</label><input class="form-control" type="file" name="logo" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"><?php if ($editFarm && !empty($editFarm['logo_path'])): ?><div class="form-text">Current logo is saved and will be kept unless you choose a replacement.</div><img src="<?php echo BASE_URL . htmlspecialchars($editFarm['logo_path']); ?>" alt="Current farm logo" class="img-thumbnail mt-2" style="max-height:72px;"><?php endif; ?></div>
 <div class="col-md-4"><label class="form-label">Primary colour</label><input class="form-control form-control-color" type="color" name="primary_color" value="<?php echo htmlspecialchars($form['primary_color']); ?>"></div><div class="col-md-4"><label class="form-label">Contact name</label><input class="form-control" name="contact_name" value="<?php echo htmlspecialchars($form['contact_name']); ?>"></div><div class="col-md-4"><label class="form-label">Contact email</label><input class="form-control" type="email" name="contact_email" value="<?php echo htmlspecialchars($form['contact_email']); ?>"></div>
-<div class="col-md-12"><label class="form-label d-block">Roles / subscribed access</label><?php foreach ($roleLabels as $value => $label): ?><div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="roles[]" value="<?php echo $value; ?>" <?php echo isset($moduleRoles[$value]) ? 'data-module-role="1"' : ''; ?> <?php echo $value === 'farm_admin' || ($editFarm && isset($moduleRoles[$value]) && in_array($moduleRoles[$value], $editModules, true)) ? 'checked' : ''; ?>><label class="form-check-label"><?php echo $label; ?></label></div><?php endforeach; ?></div>
-<div class="col-12"><div class="card border"><div class="card-body"><h3 class="h6 mb-1">User limits by role</h3><p class="form-text mt-0">Platform limit for how many login accounts this farm may create under each role. Farm Admin is one protected account. Set a role to 0 to block additional accounts for that role.</p><div class="row g-2">
+<div class="col-12"><div class="card border"><div class="card-body"><h3 class="h6 mb-1">Farm Admin</h3><p class="form-text mt-0 mb-0">Protected tenant administrator. Identity is always <strong>Farm Admin</strong>; operational access comes from the subscribed modules below, not specialist roles.</p></div></div></div>
+<div class="col-md-12"><label class="form-label d-block">Subscribed Modules</label><?php foreach ($moduleLabels as $value => $label): ?><div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="modules[]" value="<?php echo htmlspecialchars($value); ?>" data-module-entitlement="1" <?php echo in_array($value, $editModules, true) ? 'checked' : ''; ?>><label class="form-check-label"><?php echo htmlspecialchars($label); ?></label></div><?php endforeach; ?><div class="form-text">Disabling a module removes current operational access but preserves its historical farm records.</div></div>
+<div class="col-12"><div class="card border"><div class="card-body"><h3 class="h6 mb-1">User limits by role</h3><p class="form-text mt-0">Platform limit for how many login accounts this farm may create under each specialist role. Farm Admin is one protected account. Disabled modules force their specialist limit to 0 when saved.</p><div class="row g-2">
 <?php foreach (['poultry_manager'=>'Poultry users','ruminant_manager'=>'Ruminant users','sales_rep'=>'Sales users','viewer'=>'Viewer users'] as $limitRole=>$limitLabel): ?><div class="col-sm-6 col-lg-3"><label class="form-label"><?php echo $limitLabel; ?></label><input class="form-control" type="number" min="0" max="500" name="role_limits[<?php echo $limitRole; ?>]" value="<?php echo (int)($editRoleLimits[$limitRole] ?? 1); ?>"></div><?php endforeach; ?>
 </div></div></div></div>
 <div class="col-md-3"><label class="form-label">Plan</label><select class="form-select" name="plan"><?php foreach (['starter'=>'Starter','growth'=>'Growth','pro'=>'Pro'] as $value=>$label): ?><option value="<?php echo $value; ?>" <?php echo $form['subscription_plan']===$value?'selected':''; ?>><?php echo $label; ?></option><?php endforeach; ?></select></div><div class="col-md-3"><label class="form-label">Status</label><select class="form-select" name="status"><?php foreach (['trial'=>'Trial','active'=>'Active','past_due'=>'Past Due','suspended'=>'Suspended'] as $value=>$label): ?><option value="<?php echo $value; ?>" <?php echo $form['subscription_status']===$value?'selected':''; ?>><?php echo $label; ?></option><?php endforeach; ?></select></div><div class="col-md-3"><label class="form-label">Starts Date</label><input class="form-control" type="date" name="subscription_starts_at" value="<?php echo htmlspecialchars($form['subscription_starts_at'] ? date('Y-m-d', strtotime($form['subscription_starts_at'])) : ''); ?>"></div><div class="col-md-3"><label class="form-label">End Date</label><input class="form-control" type="date" name="subscription_ends_at" value="<?php echo htmlspecialchars($form['subscription_ends_at'] ? date('Y-m-d', strtotime($form['subscription_ends_at'])) : ''); ?>"></div>
@@ -251,8 +233,8 @@ $editRoleLimits = loadRoleLimits($pdo, (int)($editFarm['id'] ?? 0));
     const form = document.getElementById('farmAccountForm');
     if (!form) return;
 
-    const moduleCheckboxes = Array.from(form.querySelectorAll('[data-module-role="1"]'));
-    const moduleMessage = 'Select at least one subscribed access module so dashboard statistics and active-cycle stock can load.';
+    const moduleCheckboxes = Array.from(form.querySelectorAll('[data-module-entitlement="1"]'));
+    const moduleMessage = 'Select at least one subscribed module so this farm has an active service entitlement.';
     const logoInput = form.querySelector('input[name="logo"]');
     const allowedLogoTypes = ['image/jpeg', 'image/png', 'image/webp'];
 
