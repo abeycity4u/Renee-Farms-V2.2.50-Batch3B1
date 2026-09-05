@@ -6,6 +6,10 @@ require_once(__DIR__ . '/../lib/attribution.php');
 require_once(__DIR__ . '/../lib/sales_units.php');
 requireLogin();
 requireBusinessReportAccess();
+if (!isPlatformOwner() && !hasRole('farm_admin') && !hasPermission(getUserType(), 'sales')) {
+    http_response_code(403);
+    exit('Sales view access required.');
+}
 
 $tenantFarmId = requireCurrentFarmId();
 $canChooseFarmType = isPlatformOwner() || hasRole('farm_admin', 'sales_rep');
@@ -41,6 +45,10 @@ if ($farmType !== 'all') {
     $productionType = 'all';
 }
 $selectedCustomer = trim((string)($_GET['customer'] ?? ''));
+if ($selectedCustomer !== '' && !isPlatformOwner() && !hasRole('farm_admin') && !hasPermission(getUserType(), 'sales_receivables')) {
+    http_response_code(403);
+    exit('Sales receivables view access required.');
+}
 
 $sql = "SELECT s.*, u.full_name AS seller, pc.cycle_code
         FROM sales_records s
@@ -121,4 +129,4 @@ ob_start();
 <?php
 $html = ob_get_clean() ?: '';
 $service = new PdfReportService();
-$service->streamHtml($html, 'sales-report-' . strtolower(str_replace(' ','-',$periodLabel)) . '.pdf', 'landscape', 'Sales Report - ' . $periodLabel);
+$service->streamHtml($html, 'sales-report-' . strtolower(str_replace(' ','-',$periodLabel)) . '.pdf', 'landscape', 'Sales Report - '.$periodLabel);
