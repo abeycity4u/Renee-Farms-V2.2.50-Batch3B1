@@ -26,6 +26,10 @@ if (!isset($pdo)) {
 // user identity/roles and granular permissions as separate concerns.
 require_once __DIR__ . '/includes/farm_entitlements.php';
 
+// Central commercial plan catalog. Plans define included allowances; farm_modules
+// and farm_role_limits remain the persisted tenant entitlement/seat sources.
+require_once __DIR__ . '/includes/subscription_plan_catalog.php';
+
 // Enforce the subscription boundary before legacy role/permission runtime guards
 // so Farm Admin bypasses cannot expose a module the tenant no longer subscribes to.
 require_once __DIR__ . '/includes/farm_entitlement_runtime.php';
