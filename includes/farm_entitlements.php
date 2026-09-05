@@ -7,6 +7,7 @@
  * - user_roles describes who a user is.
  * - permissions describes what an eligible role may do.
  * - historical operational records are never deleted when an entitlement is disabled.
+ * - basic Sales is a shared farm capability whenever Poultry or Ruminant is enabled.
  *
  * Keep subscription/module decisions centralized here so Dashboard, navigation,
  * farm administration and operational routes do not reimplement entitlement logic.
@@ -70,6 +71,15 @@ if (!function_exists('farm_entitlement_has')) {
     }
 }
 
+if (!function_exists('farm_entitlement_sales_available')) {
+    function farm_entitlement_sales_available(PDO $pdo, int $farmId): bool
+    {
+        if ($farmId < 1) return false;
+        $enabled = farm_entitlement_modules($pdo, $farmId);
+        return (bool) array_intersect(['poultry', 'ruminant', 'sales'], $enabled);
+    }
+}
+
 if (!function_exists('current_farm_entitlement_modules')) {
     function current_farm_entitlement_modules(): array
     {
@@ -84,7 +94,10 @@ if (!function_exists('current_farm_has_entitlement')) {
     {
         global $pdo;
         if (!($pdo instanceof PDO) || !function_exists('getCurrentFarmId')) return false;
-        return farm_entitlement_has($pdo, (int) getCurrentFarmId(), $module);
+        $farmId = (int) getCurrentFarmId();
+        $module = strtolower(trim($module));
+        if ($module === 'sales') return farm_entitlement_sales_available($pdo, $farmId);
+        return farm_entitlement_has($pdo, $farmId, $module);
     }
 }
 
@@ -99,12 +112,18 @@ if (!function_exists('effective_user_modules')) {
         if (!function_exists('hasRole')) return [];
 
         $enabled = current_farm_entitlement_modules();
-        if (hasRole('farm_admin')) return $enabled;
+        $salesAvailable = (bool) array_intersect(['poultry', 'ruminant', 'sales'], $enabled);
+
+        if (hasRole('farm_admin')) {
+            $effective = $enabled;
+            if ($salesAvailable && !in_array('sales', $effective, true)) $effective[] = 'sales';
+            return $effective;
+        }
 
         $effective = [];
         if (hasRole('poultry_manager') && in_array('poultry', $enabled, true)) $effective[] = 'poultry';
         if (hasRole('ruminant_manager') && in_array('ruminant', $enabled, true)) $effective[] = 'ruminant';
-        if (hasRole('sales_rep') && in_array('sales', $enabled, true)) $effective[] = 'sales';
+        if (hasRole('sales_rep') && $salesAvailable) $effective[] = 'sales';
         return $effective;
     }
 }
@@ -181,11 +200,7 @@ if (!function_exists('normalize_role_limits_for_entitlements')) {
     function normalize_role_limits_for_entitlements(array $input, array $modules): array
     {
         $modules = farm_entitlement_normalize_modules($modules);
-        $roleModules = [
-            'poultry_manager' => 'poultry',
-            'ruminant_manager' => 'ruminant',
-            'sales_rep' => 'sales',
-        ];
+        $salesAvailable = (bool) array_intersect(['poultry', 'ruminant', 'sales'], $modules);
         $defaults = [
             'poultry_manager' => 1,
             'ruminant_manager' => 1,
@@ -201,9 +216,10 @@ if (!function_exists('normalize_role_limits_for_entitlements')) {
                 ['options' => ['min_range' => 0, 'max_range' => 500]]
             );
             $out[$role] = $value === false ? $default : (int) $value;
-            if (isset($roleModules[$role]) && !in_array($roleModules[$role], $modules, true)) {
-                $out[$role] = 0;
-            }
+
+            if ($role === 'poultry_manager' && !in_array('poultry', $modules, true)) $out[$role] = 0;
+            if ($role === 'ruminant_manager' && !in_array('ruminant', $modules, true)) $out[$role] = 0;
+            if ($role === 'sales_rep' && !$salesAvailable) $out[$role] = 0;
         }
         return $out;
     }
