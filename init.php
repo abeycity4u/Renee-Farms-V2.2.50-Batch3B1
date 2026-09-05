@@ -42,6 +42,10 @@ require_once __DIR__ . '/includes/team_user_role_visibility.php';
 // support view without changing session farm identity or impersonating a tenant.
 require_once __DIR__ . '/includes/platform_owner_nav_discoverability.php';
 
+// Present a friendly 403 page when a tenant account manually opens the dedicated
+// Platform Owner support route. Authorization remains Platform Owner-only.
+require_once __DIR__ . '/includes/platform_owner_tenant_access_message.php';
+
 // Extend the dedicated Platform Owner tenant support page with tenant-scoped,
 // read-only operational drill-down details while preserving owner identity.
 require_once __DIR__ . '/includes/platform_owner_tenant_drilldown.php';
