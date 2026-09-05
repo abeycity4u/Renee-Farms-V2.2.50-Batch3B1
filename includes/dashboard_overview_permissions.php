@@ -5,8 +5,9 @@
  * The dashboard is still a large legacy page whose livestock summary blocks are
  * rendered from farm scope. Until those blocks are migrated to page-local
  * permission checks, filter the completed dashboard response on the server so
- * delegated users only receive livestock overview sections they were granted.
- * Farm Admin and Platform Owner retain their normal bypass.
+ * users only receive livestock overview sections allowed by both subscription
+ * entitlement and delegated permission. Platform Owner retains its owner-workspace
+ * bypass; Farm Admin is still constrained by the tenant's subscribed modules.
  */
 
 require_once __DIR__ . '/functions.php';
@@ -103,11 +104,12 @@ $overviewPath = '/' . ltrim(str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAM
 if (!($overviewPath === '/dashboard.php' || str_ends_with($overviewPath, '/dashboard.php'))) return;
 if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'GET') return;
 
-$overviewPrivileged = isPlatformOwner() || hasRole('farm_admin');
-if ($overviewPrivileged) return;
+if (isPlatformOwner()) return;
 
-$canViewPoultryOverview = hasPermission(getUserType(), 'poultry_overview');
-$canViewRuminantOverview = hasPermission(getUserType(), 'ruminant_overview');
+$canViewPoultryOverview = user_can_access_entitled_module('poultry')
+    && (hasRole('farm_admin') || hasPermission(getUserType(), 'poultry_overview'));
+$canViewRuminantOverview = user_can_access_entitled_module('ruminant')
+    && (hasRole('farm_admin') || hasPermission(getUserType(), 'ruminant_overview'));
 
 ob_start(static function (string $html) use ($canViewPoultryOverview, $canViewRuminantOverview): string {
     $html = dashboard_overview_filter_ticker($html, $canViewPoultryOverview, $canViewRuminantOverview);
