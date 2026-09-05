@@ -137,9 +137,9 @@ function hasPermission($role, $module) {
 
     if (function_exists('hasRole')) {
         if (hasRole('farm_admin')) return true;
-        // Tenant permission administration itself is never delegable to an
+        // Tenant permission and user administration are never delegable to an
         // operational specialist role. Farm Admin and Platform Owner bypass above.
-        if ($module === 'permissions') return false;
+        if ($module === 'permissions' || $module === 'users') return false;
         if (hasRole('viewer')) return in_array($module, ['management', 'reports'], true);
 
         // Production-module permissions normally belong to their specialist role,
