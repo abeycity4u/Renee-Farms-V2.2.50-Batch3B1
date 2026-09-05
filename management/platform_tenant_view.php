@@ -75,7 +75,7 @@ if ($tenantId > 0) {
     $recentStock = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
     $stmt = $pdo->prepare(
-        "SELECT sale_date, product, quantity, total_amount, customer_name
+        "SELECT sale_date, product_type AS product, quantity, total_amount, customer_name
          FROM sales_records
          WHERE farm_id = ?
          ORDER BY sale_date DESC, id DESC
@@ -85,7 +85,7 @@ if ($tenantId > 0) {
     $recentSales = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
     $stmt = $pdo->prepare(
-        "SELECT expense_date, expense_type, amount, description
+        "SELECT expense_date, category AS expense_type, amount, description
          FROM farm_expenses
          WHERE farm_id = ?
          ORDER BY expense_date DESC, id DESC
