@@ -64,6 +64,10 @@ require_once __DIR__ . '/includes/csrf.php';
 // consistent while those individual pages are migrated gradually.
 require_once __DIR__ . '/includes/permission_runtime.php';
 
+// Legacy read APIs historically stopped at module-role checks. Align those data
+// endpoints with the same explicit View permissions used by their browser pages.
+require_once __DIR__ . '/includes/legacy_api_view_permissions.php';
+
 // Reject Team Users edit targets that do not belong to the current/selected
 // tenant before legacy role-assignment code can touch user_roles.
 require_once __DIR__ . '/includes/user_management_tenant_guard.php';
