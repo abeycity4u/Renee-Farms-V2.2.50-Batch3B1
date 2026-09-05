@@ -399,7 +399,7 @@ foreach ($users as $existingUser) {
                         <div class="mb-3">
                             <label class="d-block">Roles</label>
                             <?php foreach ($availableRoles as $code => $label): $disabled = ($code === 'poultry_manager' && !$managedFarmHasModule('poultry')) || ($code === 'ruminant_manager' && !$managedFarmHasModule('ruminant')) || ($code === 'sales_rep' && !$managedFarmHasSales); ?>
-                            <div class="form-check"><input class="form-check-input" type="checkbox" name="roles[]" value="<?php echo $code; ?>" id="add-<?php echo $code; ?>" <?php echo $disabled ? 'disabled' : ''; ?>><label class="form-check-label" for="add-<?php echo $code; ?>"><?php echo $label; ?><?php if (isset($tenantRoleLimits[$code])): ?> <span class="small text-muted">(<?php echo tenantRoleCount($pdo,$farmId,$code); ?>/<?php echo (int)$tenantRoleLimits[$code]; ?> used)</span><?php endif; ?></label><?php if ($code === 'sales_rep' && !$disabled): ?><div class="small text-muted ms-4">Shared Sales role available with an active Poultry or Ruminant subscription.</div><?php endif; ?></div><?php endforeach; ?>
+                            <div class="form-check"><input class="form-check-input" type="checkbox" name="roles[]" value="<?php echo $code; ?>" id="add-<?php echo $code; ?>" <?php echo $disabled ? 'disabled' : ''; ?>><label class="form-check-label" for="add-<?php echo $code; ?>"><?php echo $label; ?><?php if (isset($tenantRoleLimits[$code])): ?> <span class="small text-muted">(<?php echo tenantRoleCount($pdo,$farmId,$code); ?>/<?php echo (int)$tenantRoleLimits[$code]; ?> used)</span><?php endif; ?></label></div><?php endforeach; ?>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -435,7 +435,7 @@ foreach ($users as $existingUser) {
                         <div class="mb-3">
                             <label class="d-block">Roles</label>
                             <?php foreach ($availableRoles as $code => $label): $disabled = ($code === 'poultry_manager' && !$managedFarmHasModule('poultry')) || ($code === 'ruminant_manager' && !$managedFarmHasModule('ruminant')) || ($code === 'sales_rep' && !$managedFarmHasSales); ?>
-                            <div class="form-check"><input class="form-check-input" type="checkbox" name="roles[]" value="<?php echo $code; ?>" id="edit-<?php echo $code; ?>" <?php echo $disabled ? 'disabled' : ''; ?>><label class="form-check-label" for="edit-<?php echo $code; ?>"><?php echo $label; ?></label><?php if ($code === 'sales_rep' && !$disabled): ?><div class="small text-muted ms-4">Shared Sales role available with an active Poultry or Ruminant subscription.</div><?php endif; ?></div><?php endforeach; ?>
+                            <div class="form-check"><input class="form-check-input" type="checkbox" name="roles[]" value="<?php echo $code; ?>" id="edit-<?php echo $code; ?>" <?php echo $disabled ? 'disabled' : ''; ?>><label class="form-check-label" for="edit-<?php echo $code; ?>"><?php echo $label; ?></label></div><?php endforeach; ?>
                         </div>
                         <div class="mb-3">
                             <label>New Password (leave blank to keep current)</label>
