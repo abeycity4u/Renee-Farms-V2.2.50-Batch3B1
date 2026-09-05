@@ -25,11 +25,12 @@ function production_cycle_view_permissions_privileged(): bool
 if (!function_exists('production_cycle_view_permissions_filter')) {
 function production_cycle_view_permissions_filter(string $html): string
 {
-    $style = '<style id="production-cycle-readonly-prepaint">body.production-cycle-readonly form[method="post"],body.production-cycle-readonly form[method="POST"]{display:none!important}</style>';
+    // This helper only buffers the two Production Cycle routes for a delegated
+    // non-admin viewer, so hiding POST forms here is safely route-scoped.
+    $style = '<style id="production-cycle-readonly-prepaint">form[method="post"],form[method="POST"]{display:none!important}</style>';
     $script = <<<'HTML'
 <script>
 document.addEventListener('DOMContentLoaded',function(){
-  document.body.classList.add('production-cycle-readonly');
   document.querySelectorAll('form[method="post"],form[method="POST"]').forEach(function(form){
     const action=form.querySelector('input[name="action"]')?.value||'';
     if(action==='create_cycle'||action==='close_cycle'){
