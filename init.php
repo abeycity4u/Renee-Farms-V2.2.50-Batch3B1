@@ -38,6 +38,10 @@ require_once __DIR__ . '/includes/subscription_plan_farms.php';
 // backend role/module validation in management/users.php remains authoritative.
 require_once __DIR__ . '/includes/team_user_role_visibility.php';
 
+// Give Platform Owner a direct route to the existing read-only selected-tenant
+// support view without changing session farm identity or impersonating a tenant.
+require_once __DIR__ . '/includes/platform_owner_nav_discoverability.php';
+
 // Enforce the subscription boundary before legacy role/permission runtime guards
 // so Farm Admin bypasses cannot expose a module the tenant no longer subscribes to.
 require_once __DIR__ . '/includes/farm_entitlement_runtime.php';
