@@ -30,6 +30,10 @@ require_once __DIR__ . '/includes/farm_entitlements.php';
 // and farm_role_limits remain the persisted tenant entitlement/seat sources.
 require_once __DIR__ . '/includes/subscription_plan_catalog.php';
 
+// Platform Farms bridge: apply plan-driven included seats while keeping livestock
+// module selection independent and Sales as a shared core capability.
+require_once __DIR__ . '/includes/subscription_plan_farms.php';
+
 // Enforce the subscription boundary before legacy role/permission runtime guards
 // so Farm Admin bypasses cannot expose a module the tenant no longer subscribes to.
 require_once __DIR__ . '/includes/farm_entitlement_runtime.php';
