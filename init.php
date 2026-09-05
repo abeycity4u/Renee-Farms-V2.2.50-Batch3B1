@@ -34,6 +34,10 @@ require_once __DIR__ . '/includes/subscription_plan_catalog.php';
 // module selection independent and Sales as a shared core capability.
 require_once __DIR__ . '/includes/subscription_plan_farms.php';
 
+// Keep Team Users role pickers clean by omitting roles for unsubscribed modules;
+// backend role/module validation in management/users.php remains authoritative.
+require_once __DIR__ . '/includes/team_user_role_visibility.php';
+
 // Enforce the subscription boundary before legacy role/permission runtime guards
 // so Farm Admin bypasses cannot expose a module the tenant no longer subscribes to.
 require_once __DIR__ . '/includes/farm_entitlement_runtime.php';
