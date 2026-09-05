@@ -1,10 +1,18 @@
 <?php
 /**
- * V2.3 compatibility bridge for Customer Debt Management actions.
+ * V2.3 compatibility bridge for Customer Debt Management actions and visibility.
  *
  * The legacy Sales Records page still handles debt-ledger Edit/Delete as
  * Farm-Admin-only POST branches. Intercept only those two delegated actions
  * here, enforce their exact permissions, preserve tenant scoping and then exit.
+ *
+ * The same legacy page also renders Customer Debt Management behind a database
+ * feature probe rather than the granular Sales Receivables View permission.
+ * For delegated GET requests, remove that debt workspace before the response is
+ * sent when Sales Receivables View is OFF. This also suppresses the legacy
+ * "run migrations" fallback, which is a schema-status message and must not be
+ * shown merely because the user lacks receivables permission.
+ *
  * Platform Owner/Farm Admin continue through the legacy page unchanged.
  */
 
@@ -12,11 +20,56 @@ $receivablePath = '/' . ltrim(str_replace('\\', '/', (string)($_SERVER['SCRIPT_N
 $isSalesRecordsPage = $receivablePath === '/management/sales_records.php'
     || str_ends_with($receivablePath, '/management/sales_records.php');
 
-if (!$isSalesRecordsPage || strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'POST') {
+if (!$isSalesRecordsPage) {
     return;
 }
 
-if (isPlatformOwner() || hasRole('farm_admin')) {
+$receivableMethod = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+$receivablePrivileged = isPlatformOwner() || hasRole('farm_admin');
+
+if ($receivableMethod === 'GET') {
+    $canViewReceivables = $receivablePrivileged || hasPermission(getUserType(), 'sales_receivables');
+    if ($canViewReceivables) {
+        return;
+    }
+
+    // Do not allow an unauthorized customer query-string selection to drive the
+    // customer-specific ledger branches later in the legacy Sales page.
+    $_GET['customer'] = '';
+
+    ob_start(static function (string $html): string {
+        $salesTableMarker = '<!-- Sales Table -->';
+        $debtHeading = 'Customer Debt Management';
+        $cardStartNeedle = '<div class="card border-secondary mb-4">';
+
+        $headingPos = strpos($html, $debtHeading);
+        $salesTablePos = strpos($html, $salesTableMarker);
+        if ($headingPos !== false && $salesTablePos !== false && $headingPos < $salesTablePos) {
+            $cardStart = strrpos(substr($html, 0, $headingPos), $cardStartNeedle);
+            if ($cardStart !== false) {
+                $html = substr($html, 0, $cardStart) . substr($html, $salesTablePos);
+            }
+        }
+
+        // If the database feature probe rendered its legacy fallback instead of
+        // the debt card, hide that fallback from users who simply lack permission.
+        $html = preg_replace(
+            '#<div class="alert alert-warning">\s*Debt management tables are not available yet\.\s*Run migrations to enable customer credit tracking\.\s*</div>#i',
+            '',
+            $html
+        ) ?? $html;
+
+        return $html;
+    });
+
+    return;
+}
+
+if ($receivableMethod !== 'POST') {
+    return;
+}
+
+if ($receivablePrivileged) {
     return;
 }
 
