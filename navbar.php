@@ -29,23 +29,27 @@ $navHas = static function (string $permission): bool {
     return isPlatformOwner() || hasRole('farm_admin') || hasPermission(getUserType(), $permission);
 };
 
+$poultryEntitled = isPlatformOwner() || user_can_access_entitled_module('poultry');
+$ruminantEntitled = isPlatformOwner() || user_can_access_entitled_module('ruminant');
+$salesEntitled = isPlatformOwner() || user_can_access_entitled_module('sales');
+
 $canViewInventory = $navHas('inventory');
 
-$canViewLayerDaily = $navHas('poultry_daily_layer');
-$canViewBroilerDaily = $navHas('poultry_daily_broiler');
-$canViewPoultryFeeds = $navHas('poultry_feeds');
-$canViewPoultryHealth = $navHas('poultry_health');
-$canViewLayerExpenses = $navHas('poultry_layer_expenses');
-$canViewBroilerExpenses = $navHas('poultry_broiler_expenses');
+$canViewLayerDaily = $poultryEntitled && $navHas('poultry_daily_layer');
+$canViewBroilerDaily = $poultryEntitled && $navHas('poultry_daily_broiler');
+$canViewPoultryFeeds = $poultryEntitled && $navHas('poultry_feeds');
+$canViewPoultryHealth = $poultryEntitled && $navHas('poultry_health');
+$canViewLayerExpenses = $poultryEntitled && $navHas('poultry_layer_expenses');
+$canViewBroilerExpenses = $poultryEntitled && $navHas('poultry_broiler_expenses');
 $showPoultryMenu = $canViewLayerDaily || $canViewBroilerDaily || $canViewPoultryFeeds || $canViewPoultryHealth || $canViewLayerExpenses || $canViewBroilerExpenses;
 
-$canViewRuminantDaily = $navHas('ruminant_daily');
-$canViewRuminantAnimals = $navHas('ruminant_animals');
-$canViewRuminantFeeds = $navHas('ruminant_feeds');
-$canViewRuminantExpenses = $navHas('ruminant_expenses');
+$canViewRuminantDaily = $ruminantEntitled && $navHas('ruminant_daily');
+$canViewRuminantAnimals = $ruminantEntitled && $navHas('ruminant_animals');
+$canViewRuminantFeeds = $ruminantEntitled && $navHas('ruminant_feeds');
+$canViewRuminantExpenses = $ruminantEntitled && $navHas('ruminant_expenses');
 $showRuminantMenu = $canViewRuminantDaily || $canViewRuminantAnimals || $canViewRuminantFeeds || $canViewRuminantExpenses;
 
-$canViewSales = $navHas('sales');
+$canViewSales = $salesEntitled && $navHas('sales');
 $canViewExpenseReport = $navHas('expenses');
 $canViewReports = $navHas('reports');
 $canViewFarmIntelligence = $navHas('farm_intelligence');
