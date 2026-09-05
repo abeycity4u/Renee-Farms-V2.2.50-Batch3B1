@@ -38,6 +38,16 @@ if ($legacyApiEndsWith('/api/check_ruminant_record.php')) {
     elseif ($type === 'ruminant') $legacyApiRequiredPermission = 'ruminant_daily';
 } elseif ($legacyApiEndsWith('/api/get_item_details.php') || $legacyApiEndsWith('/api/get_stock_history.php')) {
     $legacyApiRequiredPermission = 'inventory';
+} elseif ($legacyApiEndsWith('/api/get_chart_data.php')) {
+    $type = strtolower(trim((string)($_GET['type'] ?? 'profit_loss')));
+    $legacyApiRequiredPermission = match ($type) {
+        'profit_loss' => 'profitability',
+        'sales' => 'sales',
+        'expenses' => 'expenses',
+        'stock' => 'inventory',
+        'production' => 'poultry_overview',
+        default => null,
+    };
 } elseif ($legacyApiEndsWith('/api/stock_history.php')) {
     if (!hasPermission(getUserType(), 'inventory')) {
         $_SESSION['error'] = 'You do not have permission to view Inventory stock history.';
