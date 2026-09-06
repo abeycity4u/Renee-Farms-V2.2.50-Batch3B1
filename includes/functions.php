@@ -146,26 +146,27 @@ function hasPermission($role, $module) {
         if ($module === 'permissions' || $module === 'users') return false;
         if (hasRole('viewer')) return in_array($module, ['management', 'reports'], true);
 
-        // A dedicated Sales Representative is intentionally a commercial role.
-        // Inventory, livestock operating expenses, profitability/intelligence and
-        // livestock operational reports remain outside that role even if stale
-        // permission rows still exist from an older configuration. Multi-role users
-        // keep the capabilities of their additional Poultry/Ruminant manager role.
+        // Dedicated Sales Representatives remain outside Inventory and Farm
+        // Intelligence. Expense records, Expense Report, Profitability and Farm
+        // Reports & Analytics are optional Farm Admin delegations.
         $dedicatedSalesRep = hasRole('sales_rep')
             && !hasRole('poultry_manager')
             && !hasRole('ruminant_manager');
-        if ($dedicatedSalesRep) {
-            if (in_array($module, ['inventory', 'inventory_add_new_item', 'update_stock', 'profitability', 'farm_intelligence', 'reports'], true)) {
-                return false;
-            }
-            if ((str_starts_with($module, 'poultry_') && str_contains($module, '_expenses'))
-                || str_starts_with($module, 'ruminant_expenses')) {
-                return false;
-            }
+        if ($dedicatedSalesRep
+            && in_array($module, ['inventory', 'inventory_add_new_item', 'update_stock', 'farm_intelligence'], true)) {
+            return false;
         }
 
-        if (str_starts_with($module, 'poultry') && !hasRole('poultry_manager')) return false;
-        if (str_starts_with($module, 'ruminant') && !hasRole('ruminant_manager')) return false;
+        // Livestock expense records are intentionally delegable to a Sales Rep
+        // without granting the underlying operational manager role.
+        $delegatedPoultryExpense = str_starts_with($module, 'poultry_')
+            && str_contains($module, '_expenses')
+            && hasRole('sales_rep');
+        $delegatedRuminantExpense = str_starts_with($module, 'ruminant_expenses')
+            && hasRole('sales_rep');
+
+        if (str_starts_with($module, 'poultry') && !hasRole('poultry_manager') && !$delegatedPoultryExpense) return false;
+        if (str_starts_with($module, 'ruminant') && !hasRole('ruminant_manager') && !$delegatedRuminantExpense) return false;
         if (str_starts_with($module, 'sales') && function_exists('user_has_shared_sales_role') && !user_has_shared_sales_role()) return false;
         if (str_starts_with($module, 'sales') && !function_exists('user_has_shared_sales_role') && !hasRole('sales_rep')) return false;
     } elseif ($role === 'farm_admin') {
