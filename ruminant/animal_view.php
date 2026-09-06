@@ -29,7 +29,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $weight = (float)($_POST['weight_kg'] ?? 0);
         $notes = trim($_POST['weight_notes'] ?? '');
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || $weight <= 0 || $weight > 10000) {
-            http_response_code(422); exit('Enter a valid weighing date and weight.');
+            $_SESSION['error'] = 'Enter a valid weighing date and weight.';
+            header('Location: animal_view.php?id='.$animalId.'#weight-history');
+            exit();
         }
         $stmt = $pdo->prepare('INSERT INTO ruminant_animal_weights (farm_id, animal_id, weight_date, weight_kg, notes, recorded_by) VALUES (?,?,?,?,?,?)');
         $stmt->execute([$farmId, $animalId, $date, $weight, $notes ?: null, $_SESSION['user_id'] ?? null]);
@@ -81,10 +83,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $withdrawal = $_POST['withdrawal_until'] ?? '';
         $types = ['vaccination','treatment','diagnosis','vet_visit','deworming','other'];
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || !in_array($type, $types, true)) {
-            http_response_code(422); exit('Enter a valid health-event date and type.');
+            $_SESSION['error'] = 'Enter a valid health-event date and type.';
+            header('Location: animal_view.php?id='.$animalId.'#health-history');
+            exit();
         }
         if ($withdrawal !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $withdrawal)) {
-            http_response_code(422); exit('Enter a valid withdrawal date.');
+            $_SESSION['error'] = 'Enter a valid withdrawal date.';
+            header('Location: animal_view.php?id='.$animalId.'#health-history');
+            exit();
         }
         $stmt = $pdo->prepare('INSERT INTO ruminant_health_events (farm_id, animal_id, event_date, event_type, description, medicine, dosage, withdrawal_until, recorded_by) VALUES (?,?,?,?,?,?,?,?,?)');
         $stmt->execute([$farmId, $animalId, $date, $type, $description ?: null, $medicine ?: null, $dosage ?: null, $withdrawal ?: null, $_SESSION['user_id'] ?? null]);
