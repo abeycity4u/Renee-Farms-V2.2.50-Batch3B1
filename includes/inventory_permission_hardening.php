@@ -241,7 +241,7 @@ if (inventory_permission_ends_with($inventoryPath, '/inventory.php')) {
             if (!function_exists('csrf_field')) return $html;
             $tokenField = csrf_field();
             return preg_replace_callback(
-                '~<form\b([^>]*)method=("|\')POST\2([^>]*)>~i',
+                '~<form\b([^>]*)method=(["\x27])POST\2([^>]*)>~i',
                 static fn(array $m): string => $m[0] . $tokenField,
                 $html
             ) ?? $html;
