@@ -128,8 +128,12 @@ function hasPermission($role, $module) {
     if (!$role && !function_exists('currentUserRoles')) return false;
     if (function_exists('isPlatformOwner') && isPlatformOwner()) return true;
 
-    // Farm subscription/module entitlement is always the outer boundary.
-    if (function_exists('farmHasModule')) {
+    // Farm subscription/module entitlement is always the outer boundary. Shared
+    // Sales follows the canonical entitlement helper so a Poultry/Ruminant tenant
+    // does not need a legacy standalone farm_modules.sales row.
+    if (str_starts_with($module, 'sales') && function_exists('current_farm_has_entitlement')) {
+        if (!current_farm_has_entitlement('sales')) return false;
+    } elseif (function_exists('farmHasModule')) {
         if (str_starts_with($module, 'poultry') && !farmHasModule('poultry')) return false;
         if (str_starts_with($module, 'ruminant') && !farmHasModule('ruminant')) return false;
         if (str_starts_with($module, 'sales') && !farmHasModule('sales')) return false;
@@ -150,7 +154,8 @@ function hasPermission($role, $module) {
         $delegatedRuminantExpense = str_starts_with($module, 'ruminant_expenses') && hasRole('sales_rep');
         if (str_starts_with($module, 'poultry') && !hasRole('poultry_manager') && !$delegatedPoultryExpense) return false;
         if (str_starts_with($module, 'ruminant') && !hasRole('ruminant_manager') && !$delegatedRuminantExpense) return false;
-        if (str_starts_with($module, 'sales') && !hasRole('sales_rep')) return false;
+        if (str_starts_with($module, 'sales') && function_exists('user_has_shared_sales_role') && !user_has_shared_sales_role()) return false;
+        if (str_starts_with($module, 'sales') && !function_exists('user_has_shared_sales_role') && !hasRole('sales_rep')) return false;
     } elseif ($role === 'farm_admin') {
         return true;
     }
