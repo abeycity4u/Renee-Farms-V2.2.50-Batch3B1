@@ -16,18 +16,27 @@ if (!$type || !$id) {
     send_json(['success' => false, 'error' => 'type and id are required'], 400);
 }
 
+$viewPermission = match ($type) {
+    'layer' => 'poultry_daily_layer',
+    'broiler' => 'poultry_daily_broiler',
+    default => null,
+};
 $deletePermission = match ($type) {
     'layer' => 'poultry_daily_layer_delete',
     'broiler' => 'poultry_daily_broiler_delete',
     default => null,
 };
-if ($deletePermission === null) {
+if ($viewPermission === null || $deletePermission === null) {
     send_json(['success' => false, 'error' => 'Unsupported record type'], 400);
 }
 
 if (!isPlatformOwner() && !hasRole('farm_admin')) {
-    if (!checkAccess('poultry') || !hasPermission(getUserType(), $deletePermission)) {
-        send_json(['success' => false, 'error' => 'You do not have permission to delete this daily record.'], 403);
+    if (
+        !checkAccess('poultry')
+        || !hasPermission(getUserType(), $viewPermission)
+        || !hasPermission(getUserType(), $deletePermission)
+    ) {
+        send_json(['success' => false, 'error' => 'View and Delete permissions are required for this daily record.'], 403);
     }
 }
 
