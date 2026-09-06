@@ -30,6 +30,11 @@ require_once __DIR__ . '/includes/farm_entitlements.php';
 // and farm_role_limits remain the persisted tenant entitlement/seat sources.
 require_once __DIR__ . '/includes/subscription_plan_catalog.php';
 
+// Durable current-subscription seat policy. Purchased extras are stored separately
+// from the effective farm_role_limits runtime allowance and plan reductions must
+// not leave an active commercial role above its new seat capacity.
+require_once __DIR__ . '/includes/subscription_seat_policy.php';
+
 // Platform Farms bridge: apply plan-driven included seats while keeping livestock
 // module selection independent and Sales as a shared core capability.
 require_once __DIR__ . '/includes/subscription_plan_farms.php';
