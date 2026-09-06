@@ -35,6 +35,10 @@ require_once __DIR__ . '/includes/subscription_plan_catalog.php';
 // not leave an active commercial role above its new seat capacity.
 require_once __DIR__ . '/includes/subscription_seat_policy.php';
 
+// Canonical commercial subscription history service. farms remains the current
+// runtime snapshot while subscriptions stores auditable commercial snapshots.
+require_once __DIR__ . '/includes/subscription_record.php';
+
 // Platform Farms bridge: apply plan-driven included seats while keeping livestock
 // module selection independent and Sales as a shared core capability.
 require_once __DIR__ . '/includes/subscription_plan_farms.php';
