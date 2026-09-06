@@ -57,7 +57,7 @@ function dashboard_overview_filter_ticker(string $html, bool $allowPoultry, bool
 {
     if (!$allowPoultry && !$allowRuminant) {
         return preg_replace(
-            '~\s*<!-- Dashboard Statistics -->.*?(?=\s*<!-- Management Intelligence -->)~s',
+            '~\s*<!-- Dashboard Statistics -->.*?(?=\s*<!-- (?:Management Intelligence(?: hidden by permission)?|Main Content Area) -->)~s',
             "\n        <!-- Dashboard Statistics hidden by overview permission -->\n        ",
             $html,
             1
