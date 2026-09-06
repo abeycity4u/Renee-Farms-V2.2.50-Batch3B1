@@ -7,7 +7,7 @@ require_once(__DIR__ . '/../lib/sales_allocation.php');
 require_once(__DIR__ . '/../lib/sales_receivables.php');
 require_once(__DIR__ . '/../lib/ruminant_animal_exit.php');
 requireLogin(); require_http_method('POST'); require_csrf_token(); require_rate_limit('delete_sale',20,60);
-if (!isPlatformOwner() && !hasRole('farm_admin') && !hasPermission(getUserType(), 'sales_delete')) send_json(['success'=>false,'error'=>'You do not have permission to delete sale records.'],403);
+if (!isPlatformOwner() && !hasRole('farm_admin') && (!hasPermission(getUserType(), 'sales') || !hasPermission(getUserType(), 'sales_delete'))) send_json(['success'=>false,'error'=>'You do not have permission to delete sale records.'],403);
 $id=$_POST['id']??null;
 if(!$id || !ctype_digit((string)$id)) send_json(['success'=>false,'error'=>'A valid record ID is required.'],400);
 $farmId=requireCurrentFarmId();
