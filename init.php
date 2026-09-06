@@ -97,6 +97,11 @@ require_once __DIR__ . '/includes/dashboard_overview_permissions.php';
 // their delegated permissions while backend routes/APIs remain authoritative.
 require_once __DIR__ . '/includes/dashboard_action_permissions.php';
 
+// Shape a dedicated Sales Representative dashboard around Sales/Receivables and
+// hide unrelated farm-wide dashboard surfaces unless their own View permission is
+// granted. Multi-role specialists continue to use the normal dashboard assembly.
+require_once __DIR__ . '/includes/dashboard_sales_workspace.php';
+
 // Hide permission-controlled controls before first paint so read-only users never
 // see restricted buttons or links flash briefly while client cleanup runs.
 require_once __DIR__ . '/includes/permission_prepaint.php';
