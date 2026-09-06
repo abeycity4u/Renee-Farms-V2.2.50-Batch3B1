@@ -96,11 +96,22 @@ $submittedModules = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verify_csrf_token($_POST['csrf_token'] ?? '')) { http_response_code(419); exit('Invalid request token.'); }
     $farmId = validFarmId($_POST['farm_id'] ?? null);
+    $recordedByUserId = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
     if (isset($_POST['suspend_farm'], $_POST['farm_id']) || isset($_POST['reactivate_farm'], $_POST['farm_id'])) {
         if (!editableFarm($pdo, $farmId)) { $_SESSION['error'] = 'That farm account cannot be changed.'; redirectFarms(); }
         $status = isset($_POST['suspend_farm']) ? 'suspended' : 'active';
-        $pdo->prepare('UPDATE farms SET subscription_status = ? WHERE id = ?')->execute([$status, $farmId]);
-        $_SESSION['success'] = $status === 'suspended' ? 'Farm account suspended. All farm users are blocked from signing in.' : 'Farm account reactivated.';
+        $reason = $status === 'suspended' ? 'platform_owner_suspend' : 'platform_owner_reactivate';
+        try {
+            $pdo->beginTransaction();
+            $pdo->prepare('UPDATE farms SET subscription_status = ? WHERE id = ?')->execute([$status, $farmId]);
+            subscription_record_capture($pdo, $farmId, $reason, $recordedByUserId);
+            $pdo->commit();
+            $_SESSION['success'] = $status === 'suspended' ? 'Farm account suspended. All farm users are blocked from signing in.' : 'Farm account reactivated.';
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            error_log('Farm subscription status change failed for farm ' . $farmId . ': ' . $e->getMessage());
+            $_SESSION['error'] = 'Unable to change this farm subscription status. No subscription change was saved.';
+        }
         redirectFarms();
     }
     if (isset($_POST['delete_farm'], $_POST['farm_id'])) {
@@ -154,6 +165,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             assign_protected_farm_admin_role($pdo, $farmId, $ownerId);
             saveRoleLimits($pdo, $farmId, $roleLimits);
             subscription_seat_save_addons($pdo, $farmId, $seatAddOns);
+            subscription_record_capture($pdo, $farmId, 'tenant_created', $recordedByUserId);
             $message = "Created {$name}.";
         } elseif (isset($_POST['update_farm'])) {
             $farm = editableFarm($pdo, $farmId); if (!$farm) throw new RuntimeException('That farm cannot be edited.');
@@ -170,6 +182,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             assign_protected_farm_admin_role($pdo, $farmId, $ownerId);
             saveRoleLimits($pdo, $farmId, $roleLimits);
             subscription_seat_save_addons($pdo, $farmId, $seatAddOns);
+            subscription_record_capture($pdo, $farmId, 'platform_owner_update', $recordedByUserId);
             $message = "Updated {$name}.";
         } else throw new RuntimeException('Unknown farm action.');
         $pdo->commit(); $_SESSION['success'] = $message; redirectFarms();
