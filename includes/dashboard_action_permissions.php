@@ -1,13 +1,11 @@
 <?php
 /**
- * Align Dashboard intelligence and stock quick-actions with delegated permissions.
+ * Align Dashboard summary surfaces and stock quick-actions with delegated permissions.
  *
- * The underlying destination routes/APIs remain the authorization boundary.
- * This bridge prevents the legacy Dashboard from exposing Farm Intelligence
- * content or Update Stock controls when those permissions are not granted, and
- * keeps the Dashboard quick-stock request aligned with the CSRF-protected API.
- * Dashboard stock control is intentionally a quick operational deduction flow;
- * full receiving/cost/attribution work remains on Inventory.
+ * Dashboard is a monitoring surface. Module pages remain the place for operational
+ * actions, and their routes/APIs remain the authorization boundary. Keep the legacy
+ * dashboard readable without exposing Inventory, Sales, expense/profit figures or
+ * Farm Intelligence when the corresponding View permission is not granted.
  */
 
 require_once __DIR__ . '/functions.php';
@@ -18,11 +16,85 @@ $path = '/' . ltrim(str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? '
 if (!($path === '/dashboard.php' || str_ends_with($path, '/dashboard.php'))) return;
 if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'GET') return;
 
-$privileged = isPlatformOwner() || hasRole('farm_admin');
-$canViewIntelligence = $privileged || hasPermission(getUserType(), 'farm_intelligence');
-$canUpdateStock = $privileged || hasPermission(getUserType(), 'update_stock');
+if (!function_exists('dashboard_action_remove_div_containing')) {
+function dashboard_action_remove_div_containing(string $html, string $needle, string $requiredClass): string
+{
+    $needlePos = strpos($html, $needle);
+    if ($needlePos === false) return $html;
 
-ob_start(static function (string $html) use ($canViewIntelligence, $canUpdateStock): string {
+    $searchPos = $needlePos;
+    $start = false;
+    while ($searchPos > 0) {
+        $candidate = strrpos(substr($html, 0, $searchPos), '<div');
+        if ($candidate === false) break;
+        $tagEnd = strpos($html, '>', $candidate);
+        if ($tagEnd === false || $tagEnd >= $needlePos) break;
+        $tag = substr($html, $candidate, $tagEnd - $candidate + 1);
+        if (str_contains($tag, $requiredClass)) {
+            $start = $candidate;
+            break;
+        }
+        $searchPos = $candidate;
+    }
+    if ($start === false) return $html;
+
+    if (!preg_match_all('~<div\b|</div>~i', substr($html, $start), $matches, PREG_OFFSET_CAPTURE)) return $html;
+    $depth = 0;
+    foreach ($matches[0] as [$token, $offset]) {
+        if (stripos($token, '<div') === 0) {
+            $depth++;
+            continue;
+        }
+        $depth--;
+        if ($depth === 0) {
+            $end = $start + $offset + strlen($token);
+            return substr($html, 0, $start) . substr($html, $end);
+        }
+    }
+
+    return $html;
+}
+}
+
+if (!function_exists('dashboard_action_remove_card_containing')) {
+function dashboard_action_remove_card_containing(string $html, string $needle): string
+{
+    return dashboard_action_remove_div_containing($html, $needle, 'card dashboard-card');
+}
+}
+
+$privileged = isPlatformOwner() || hasRole('farm_admin');
+$canViewInventory = $privileged || hasPermission(getUserType(), 'inventory');
+$canViewSales = $privileged || (
+    user_can_access_entitled_module('sales')
+    && hasPermission(getUserType(), 'sales')
+);
+$canViewExpenses = $privileged || hasPermission(getUserType(), 'expenses');
+$canViewProfitability = $privileged || hasPermission(getUserType(), 'profitability');
+$canViewIntelligence = $privileged || hasPermission(getUserType(), 'farm_intelligence');
+$canUpdateStock = $canViewInventory && ($privileged || hasPermission(getUserType(), 'update_stock'));
+$dedicatedSalesRep = hasRole('sales_rep')
+    && !$privileged
+    && !hasRole('poultry_manager')
+    && !hasRole('ruminant_manager');
+
+ob_start(static function (string $html) use (
+    $canViewInventory,
+    $canViewSales,
+    $canViewExpenses,
+    $canViewProfitability,
+    $canViewIntelligence,
+    $canUpdateStock,
+    $dedicatedSalesRep
+): string {
+    if (!$canViewExpenses) {
+        $html = dashboard_action_remove_div_containing($html, '<span>Total Operating Cost</span>', 'col-');
+    }
+
+    if (!$canViewProfitability) {
+        $html = dashboard_action_remove_div_containing($html, '<span>Net Profit (This Month)</span>', 'col-');
+    }
+
     if (!$canViewIntelligence) {
         $html = preg_replace(
             '~\s*<!-- Management Intelligence -->.*?(?=\s*<!-- Main Content Area -->)~s',
@@ -32,7 +104,47 @@ ob_start(static function (string $html) use ($canViewIntelligence, $canUpdateSto
         ) ?? $html;
     }
 
-    if (!$canUpdateStock) {
+    if (!$canViewSales) {
+        $html = dashboard_action_remove_card_containing($html, 'Recent Sales');
+    }
+
+    if (!$canViewInventory) {
+        // Inventory summary figures belong to Inventory View.
+        $html = dashboard_action_remove_div_containing($html, '<span>Items in Stock</span>', 'col-');
+        $html = dashboard_action_remove_div_containing($html, '<span>Today\'s Activities</span>', 'col-');
+        $html = dashboard_action_remove_div_containing($html, '<span>Inventory Coverage</span>', 'col-');
+
+        // Inventory monitoring surfaces on the dashboard.
+        $html = dashboard_action_remove_card_containing($html, 'Smart Stock Control');
+        $html = dashboard_action_remove_card_containing($html, 'Today\'s Transactions');
+        $html = dashboard_action_remove_card_containing($html, 'Critical Inventory Snapshot');
+        $html = dashboard_action_remove_card_containing($html, 'Low Stock Alerts');
+
+        // Non-Sales specialist dashboards have native Quick Actions; do not leave an
+        // Inventory shortcut visible when Inventory View itself is denied.
+        $html = preg_replace(
+            '~\s*<a href="inventory\.php" class="smart-action-card[^>]*>.*?</a>~s',
+            '',
+            $html
+        ) ?? $html;
+
+        // A dedicated Sales Representative has no native Quick Actions. Once the
+        // stock card is removed, the left 8-column region is intentionally empty.
+        // Remove that empty layout column and let the native Recent Sales panel use
+        // the available width instead of inventing a second Sales workspace.
+        if ($dedicatedSalesRep) {
+            $html = dashboard_action_remove_div_containing($html, '<!-- Current Stock Levels -->', 'col-xl-8');
+            $html = preg_replace(
+                '~(<!-- Right Column: Recent Activity & Alerts -->\s*)<div class="col-xl-4">~',
+                '$1<div class="col-12">',
+                $html,
+                1
+            ) ?? $html;
+        }
+    }
+
+    // Stock mutation controls are meaningful only when Inventory itself is visible.
+    if ($canViewInventory && !$canUpdateStock) {
         $style = '<style id="dashboard-stock-update-prepaint">#stockTable button[onclick^="quickStockUpdate("]{display:none!important}</style>';
         if (stripos($html, '</head>') !== false) {
             $html = preg_replace('/<\/head>/i', $style . '</head>', $html, 1) ?? $html;
@@ -57,7 +169,7 @@ HTML;
         if (stripos($html, '</body>') !== false) {
             $html = preg_replace('/<\/body>/i', $script . '</body>', $html, 1) ?? $html;
         }
-    } else {
+    } elseif ($canViewInventory && $canUpdateStock) {
         // Keep the Dashboard deliberately lighter than Inventory: it records only
         // operational consumption. Receiving stock and economic basis belong to
         // the full Inventory workflow.
