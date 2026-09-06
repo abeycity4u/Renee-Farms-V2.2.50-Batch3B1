@@ -261,37 +261,37 @@ function checkForMessages() {
 }
 
 /**
- * Show alert message
+ * Show alert message through the shared fixed notification overlay.
  */
 function showAlert(type, message, duration = null) {
+    const mappedType = type === 'danger' ? 'error' : type;
+    if (window.AppNotify && typeof window.AppNotify.show === 'function') {
+        return window.AppNotify.show(mappedType, message, null, null, duration);
+    }
+
     if (duration === null) duration = type === 'success' ? 2500 : 5000;
     const alertContainer = document.getElementById('alert-container') || createAlertContainer();
-    
     const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show mb-0`;
     alertDiv.setAttribute('role', 'alert');
     alertDiv.innerHTML = `
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
-    
     alertContainer.appendChild(alertDiv);
-    
-    // Auto remove after duration
     setTimeout(() => {
-        if (alertDiv.parentNode) {
-            alertDiv.remove();
-        }
+        if (alertDiv.parentNode) alertDiv.remove();
     }, duration);
+    return alertDiv;
 }
 
 /**
- * Create alert container if it doesn't exist
+ * Compact fixed fallback used only if the shared notification system is absent.
  */
 function createAlertContainer() {
     const container = document.createElement('div');
     container.id = 'alert-container';
-    container.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; width: 300px;';
+    container.style.cssText = 'position:fixed;top:72px;right:12px;z-index:20000;width:min(360px,calc(100% - 24px));max-height:calc(100dvh - 88px);overflow:hidden;pointer-events:none;';
     document.body.appendChild(container);
     return container;
 }
