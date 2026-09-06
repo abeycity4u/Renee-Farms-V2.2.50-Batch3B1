@@ -77,9 +77,26 @@ if (legacy_authorization_closure_is($legacyAuthorizationPath, '/management/sales
 // The Animal Profile is parent-gated by Ruminant Animal Registry — View in the
 // central route map. Child-history writes (weights, health and cycle membership)
 // are modifications and therefore require the existing Edit capability.
-if (legacy_authorization_closure_is($legacyAuthorizationPath, '/ruminant/animal_view.php')
-    && $legacyAuthorizationMethod === 'POST') {
-    legacy_authorization_closure_require('ruminant_animals_edit');
+if (legacy_authorization_closure_is($legacyAuthorizationPath, '/ruminant/animal_view.php')) {
+    if ($legacyAuthorizationMethod === 'POST') {
+        legacy_authorization_closure_require('ruminant_animals_edit');
+    } elseif ($legacyAuthorizationMethod === 'GET'
+        && function_exists('permission_runtime_has')
+        && !permission_runtime_has('ruminant_animals_edit')) {
+        ob_start(static function (string $html): string {
+            $style = '<style id="v230AnimalProfileReadOnly">'
+                . 'a[href*="animal_registry.php?edit="],'
+                . 'button[data-bs-target="#weightModal"],'
+                . 'button[data-bs-target="#healthModal"],'
+                . 'button[data-bs-target="#membershipModal"],'
+                . 'button[onclick^="closeMembership"],'
+                . '#cycle-membership form[method="post"],'
+                . '#weightModal,#healthModal,#membershipModal,#closeMembershipModal'
+                . '{display:none!important}'
+                . '</style>';
+            return str_contains($html, '</head>') ? str_replace('</head>', $style . '</head>', $html) : $html;
+        });
+    }
 }
 
 // Investigation pages are drill-downs from Farm Intelligence. Require the same
