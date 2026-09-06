@@ -12,6 +12,7 @@ if ($appEnv === 'local' || $appEnv === 'development') {
 <?php
 require_once(__DIR__ . '/config.php');
 require_once(__DIR__ . '/includes/functions.php');
+require_once(__DIR__ . '/includes/dashboard_livestock_snapshot.php');
 require_once(__DIR__ . '/lib/farm_intelligence.php');
 requireLogin();
 
@@ -151,124 +152,10 @@ if ($farmAccess === 'ruminant' || $farmAccess === 'both') {
     $latestRuminantRecord = $ruminantStmt->fetch();
 }
 
-// Get active-cycle livestock totals for dashboard ticker
-$poultryCurrentStock = [
-    'Layer' => null,
-    'Broiler' => null,
-];
-$ruminantCurrentStock = [
-    'Cattle' => null,
-    'Goat' => null,
-    'Sheep' => null,
-    'Other' => null,
-];
-$cycleTablesAvailable = ($pdo->query("SHOW TABLES LIKE 'production_cycles'")->rowCount() > 0);
-
-if ($cycleTablesAvailable) {
-    if ($farmAccess === 'poultry' || $farmAccess === 'both') {
-        $poultryCycleStmt = $pdo->prepare(
-            "SELECT id, production_type
-             FROM production_cycles
-             WHERE farm_id = ? AND farm_type = 'poultry' AND status = 'active'"
-        );
-        $poultryCycleStmt->execute([$tenantFarmId]);
-        $poultryCycles = $poultryCycleStmt->fetchAll(PDO::FETCH_ASSOC);
-        $latestLayerStmt = $pdo->prepare(
-            "SELECT opening_stock, mortality
-             FROM layer_daily_records
-             WHERE cycle_id = ? AND farm_id = ?
-             ORDER BY record_date DESC, id DESC
-             LIMIT 1"
-        );
-        $latestBroilerStmt = $pdo->prepare(
-            "SELECT opening_stock, mortality
-             FROM broiler_daily_records
-             WHERE cycle_id = ? AND farm_id = ?
-             ORDER BY record_date DESC, id DESC
-             LIMIT 1"
-        );
-
-        $layerTotal = 0;
-        $broilerTotal = 0;
-        $layerFound = false;
-        $broilerFound = false;
-
-        foreach ($poultryCycles as $cycle) {
-            $cycleType = strtolower((string)$cycle['production_type']);
-            $cycleId = (int)$cycle['id'];
-            if ($cycleType === 'layer') {
-                $latestLayerStmt->execute([$cycleId, $tenantFarmId]);
-                $row = $latestLayerStmt->fetch(PDO::FETCH_ASSOC);
-                if ($row) {
-                    $layerFound = true;
-                    $layerTotal += max(0, (int)$row['opening_stock'] - (int)$row['mortality']);
-                }
-            } elseif ($cycleType === 'broiler') {
-                $latestBroilerStmt->execute([$cycleId, $tenantFarmId]);
-                $row = $latestBroilerStmt->fetch(PDO::FETCH_ASSOC);
-                if ($row) {
-                    $broilerFound = true;
-                    $broilerTotal += max(0, (int)$row['opening_stock'] - (int)$row['mortality']);
-                }
-            }
-        }
-
-        $poultryCurrentStock['Layer'] = $layerFound ? $layerTotal : null;
-        $poultryCurrentStock['Broiler'] = $broilerFound ? $broilerTotal : null;
-    }
-
-    if ($farmAccess === 'ruminant' || $farmAccess === 'both') {
-        $ruminantCycleStmt = $pdo->prepare(
-            "SELECT id, production_type
-             FROM production_cycles
-             WHERE farm_id = ? AND farm_type = 'ruminant' AND status = 'active'"
-        );
-        $ruminantCycleStmt->execute([$tenantFarmId]);
-        $ruminantCycles = $ruminantCycleStmt->fetchAll(PDO::FETCH_ASSOC);
-        $latestCycleDateStmt = $pdo->prepare(
-            "SELECT MAX(record_date) FROM ruminant_daily_records WHERE cycle_id = ? AND farm_id = ?"
-        );
-        $sumCycleStockStmt = $pdo->prepare(
-            "SELECT COALESCE(SUM(opening_stock - mortality), 0)
-             FROM ruminant_daily_records
-             WHERE cycle_id = ? AND farm_id = ? AND record_date = ?"
-        );
-        $ruminantTotals = [
-            'cattle' => 0,
-            'goat' => 0,
-            'sheep' => 0,
-            'other' => 0,
-        ];
-        $ruminantFound = [
-            'cattle' => false,
-            'goat' => false,
-            'sheep' => false,
-            'other' => false,
-        ];
-
-        foreach ($ruminantCycles as $cycle) {
-            $cycleType = strtolower((string)$cycle['production_type']);
-            if (!array_key_exists($cycleType, $ruminantTotals)) {
-                $cycleType = 'other';
-            }
-            $cycleId = (int)$cycle['id'];
-            $latestCycleDateStmt->execute([$cycleId, $tenantFarmId]);
-            $latestDate = $latestCycleDateStmt->fetchColumn();
-            if (!$latestDate) {
-                continue;
-            }
-            $sumCycleStockStmt->execute([$cycleId, $tenantFarmId, $latestDate]);
-            $cycleStock = (int)$sumCycleStockStmt->fetchColumn();
-            $ruminantTotals[$cycleType] += max(0, $cycleStock);
-            $ruminantFound[$cycleType] = true;
-        }
-
-        $ruminantCurrentStock['Cattle'] = $ruminantFound['cattle'] ? $ruminantTotals['cattle'] : null;
-        $ruminantCurrentStock['Goat'] = $ruminantFound['goat'] ? $ruminantTotals['goat'] : null;
-        $ruminantCurrentStock['Sheep'] = $ruminantFound['sheep'] ? $ruminantTotals['sheep'] : null;
-        $ruminantCurrentStock['Other'] = $ruminantFound['other'] ? $ruminantTotals['other'] : null;
-    }
-}
+// Get active-cycle livestock totals for the dashboard ticker with constant query count.
+$livestockSnapshot = dashboard_livestock_snapshot($pdo, $tenantFarmId, $farmAccess);
+$poultryCurrentStock = $livestockSnapshot['poultry'];
+$ruminantCurrentStock = $livestockSnapshot['ruminant'];
 
 // Load the user's previous login time (before the current session)
 $lastLoginAt = $_SESSION['last_login_at'] ?? null;
@@ -1817,7 +1704,7 @@ $pageTitle = "Dashboard";
         const timeString = now.toLocaleTimeString('en-US', { 
             hour: '2-digit', 
             minute: '2-digit',
-            hour12: true 
+            hour12: true
         });
         const dateString = now.toLocaleDateString('en-US', {
             weekday: 'long',
