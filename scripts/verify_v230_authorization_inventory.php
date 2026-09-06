@@ -94,13 +94,15 @@ foreach ($expectedApi as $name => $kind) {
     if ($kind === 'write') {
         auth_inv_check(
             "api/$name is POST-only",
-            str_contains($content, 'REQUEST_METHOD') && str_contains($content, "POST")
+            (str_contains($content, 'REQUEST_METHOD') && str_contains($content, 'POST'))
+                || str_contains($content, "require_http_method('POST')")
         );
         auth_inv_check(
             "api/$name enforces CSRF",
             str_contains($content, 'verify_csrf_token')
                 || str_contains($content, 'require_valid_csrf_post')
                 || str_contains($content, 'csrf_request_is_valid')
+                || str_contains($content, 'require_csrf_token()')
         );
         auth_inv_check(
             "api/$name binds mutation to current tenant",
@@ -224,7 +226,7 @@ auth_inv_check('Ruminant Investigation direct route requires Farm Intelligence V
 // Existing central bridges remain part of the closure contract.
 auth_inv_check('Production Cycle delegated mutation bridge remains loaded',
     str_contains($init, 'production_cycle_view_permissions.php')
-    && str_contains($productionCycleBridge, "REQUEST_METHOD"));
+    && str_contains($productionCycleBridge, 'REQUEST_METHOD'));
 auth_inv_check('granular permission runtime remains loaded before final legacy closure',
     strpos($init, 'permission_runtime.php') !== false
     && strpos($init, 'legacy_authorization_closure.php') !== false
@@ -235,15 +237,15 @@ auth_inv_check('final legacy closure is loaded by init.php', str_contains($init,
 // 4. Spot-check tenant scoping on the main legacy mutation families.
 // -------------------------------------------------------------------------
 $tenantScopedFiles = [
-    'management/users.php'             => ['requireCurrentFarmId', 'farm_id'],
-    'management/production_cycles.php' => ['requireCurrentFarmId', 'farm_id'],
-    'management/sales_records.php'     => ['requireCurrentFarmId', 'farm_id'],
-    'inventory.php'                    => ['requireCurrentFarmId', 'farm_id'],
-    'poultry/health.php'               => ['requireCurrentFarmId', 'farm_id'],
-    'poultry/layers_daily_record.php'  => ['requireCurrentFarmId', 'farm_id'],
-    'poultry/broiler_daily_record.php' => ['requireCurrentFarmId', 'farm_id'],
-    'ruminant/animal_registry.php'     => ['requireCurrentFarmId', 'farm_id'],
-    'ruminant/animal_view.php'         => ['requireCurrentFarmId', 'farm_id'],
+    'management/users.php'              => ['requireCurrentFarmId', 'farm_id'],
+    'management/production_cycles.php'  => ['requireCurrentFarmId', 'farm_id'],
+    'management/sales_records.php'      => ['requireCurrentFarmId', 'farm_id'],
+    'inventory.php'                     => ['requireCurrentFarmId', 'farm_id'],
+    'poultry/health.php'                => ['requireCurrentFarmId', 'farm_id'],
+    'poultry/layers_daily_record.php'   => ['requireCurrentFarmId', 'farm_id'],
+    'poultry/broiler_daily_record.php'  => ['requireCurrentFarmId', 'farm_id'],
+    'ruminant/animal_registry.php'      => ['requireCurrentFarmId', 'farm_id'],
+    'ruminant/animal_view.php'          => ['requireCurrentFarmId', 'farm_id'],
     'ruminant/ruminant_daily_record.php'=> ['requireCurrentFarmId', 'farm_id'],
 ];
 foreach ($tenantScopedFiles as $route => $needles) {
@@ -288,7 +290,7 @@ foreach ($inlineCsrfRoutes as $route) {
     auth_inv_check("$route has explicit CSRF protection/form token", $hasCsrf);
 }
 auth_inv_check('Inventory legacy POSTs are centrally CSRF-gated',
-    str_contains($inventoryBridge, "REQUEST_METHOD")
+    str_contains($inventoryBridge, 'REQUEST_METHOD')
     && (str_contains($inventoryBridge, 'require_valid_csrf_post') || str_contains($inventoryBridge, 'csrf_request_is_valid')));
 auth_inv_check('Sales legacy POSTs are centrally CSRF-gated',
     str_contains($closure, "'/management/sales_records.php'") && str_contains($closure, 'require_valid_csrf_post()'));
