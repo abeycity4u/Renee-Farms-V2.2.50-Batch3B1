@@ -1,7 +1,43 @@
 (function () {
   'use strict';
 
+  // Bootstrap tooltips require Popper. Some hosted pages currently expose a
+  // Bootstrap runtime where Tooltip can be constructed but Popper's
+  // createPopper function is unavailable, causing hover-time JS exceptions.
+  // Renee only uses these tooltips as decorative title hints, so keep native
+  // browser title behavior and neutralize only the Popper-dependent tooltip
+  // constructors. Other Bootstrap components remain untouched.
+  function installTooltipFallback() {
+    class NativeTitleTooltip {
+      constructor(element) {
+        this._element = element || null;
+      }
+      show() {}
+      hide() {}
+      toggle() {}
+      dispose() {}
+      enable() {}
+      disable() {}
+      toggleEnabled() {}
+      update() {}
+      static getInstance() { return null; }
+      static getOrCreateInstance(element) { return new NativeTitleTooltip(element); }
+    }
+
+    if (window.jQuery && window.jQuery.fn && typeof window.jQuery.fn.tooltip === 'function') {
+      window.jQuery.fn.tooltip = function () { return this; };
+    }
+
+    if (window.bootstrap && window.bootstrap.Tooltip) {
+      window.bootstrap.Tooltip = NativeTitleTooltip;
+    }
+  }
+
   function initNavigation() {
+    // Run before the navbar early-return so pages without the main navbar also
+    // receive the tooltip compatibility guard.
+    installTooltipFallback();
+
     const navbar = document.getElementById('appNavbar');
     if (!navbar || navbar.dataset.appNavigationReady === '1') return;
     navbar.dataset.appNavigationReady = '1';
