@@ -13,8 +13,8 @@ require_rate_limit('update_stock', 80, 60);
 
 $userType = getUserType();
 $isOwnerOrAdmin = isPlatformOwner() || hasRole('farm_admin');
-if (!$isOwnerOrAdmin && !hasPermission($userType, 'update_stock')) {
-    send_json(['success' => false, 'error' => 'You do not have permission to update inventory stock.'], 403);
+if (!$isOwnerOrAdmin && (!hasPermission($userType, 'inventory') || !hasPermission($userType, 'update_stock'))) {
+    send_json(['success' => false, 'error' => 'Inventory View and Update Stock permissions are required.'], 403);
 }
 
 $data = json_input();
@@ -44,6 +44,13 @@ try {
     $itemStmt->execute([$itemId, $farmId]);
     $item = $itemStmt->fetch(PDO::FETCH_ASSOC);
     if (!$item) throw new RuntimeException('Inventory item not found.');
+
+    if (!$isOwnerOrAdmin
+        && function_exists('inventory_permission_user_can_access_farm_type')
+        && !inventory_permission_user_can_access_farm_type((string)($item['farm_type'] ?? ''))) {
+        $pdo->rollBack();
+        send_json(['success' => false, 'error' => 'You do not have permission to update this Inventory item.'], 403);
+    }
 
     $movementProductionType = inventory_normalize_default_production_type(
         (string)$item['farm_type'],
