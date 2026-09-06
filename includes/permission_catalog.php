@@ -4,6 +4,8 @@ if (!function_exists('permission_catalog')) {
 function permission_catalog(): array
 {
     $sharedSalesRoles = ['poultry_manager','ruminant_manager','sales_rep'];
+    $salesOptionalExpenseRoles = ['poultry_manager','sales_rep'];
+    $salesOptionalRuminantExpenseRoles = ['ruminant_manager','sales_rep'];
 
     return [
         'Poultry Operations' => [
@@ -24,14 +26,14 @@ function permission_catalog(): array
             'poultry_health_delete' => ['label' => 'Poultry Health & Treatment', 'action' => 'Delete', 'description' => 'Delete health and treatment events.', 'roles' => ['poultry_manager']],
         ],
         'Poultry Expenses' => [
-            'poultry_layer_expenses' => ['label' => 'Layer Expenses', 'action' => 'View', 'description' => 'View Layer expense records.', 'roles' => ['poultry_manager']],
-            'poultry_layer_expenses_add' => ['label' => 'Layer Expenses', 'action' => 'Add', 'description' => 'Record new Layer non-stock expenses.', 'roles' => ['poultry_manager']],
-            'poultry_layer_expenses_edit' => ['label' => 'Layer Expenses', 'action' => 'Edit', 'description' => 'Modify existing Layer expense records.', 'roles' => ['poultry_manager']],
-            'poultry_layer_expenses_delete' => ['label' => 'Layer Expenses', 'action' => 'Delete', 'description' => 'Delete Layer expense records.', 'roles' => ['poultry_manager']],
-            'poultry_broiler_expenses' => ['label' => 'Broiler Expenses', 'action' => 'View', 'description' => 'View Broiler expense records.', 'roles' => ['poultry_manager']],
-            'poultry_broiler_expenses_add' => ['label' => 'Broiler Expenses', 'action' => 'Add', 'description' => 'Record new Broiler non-stock expenses.', 'roles' => ['poultry_manager']],
-            'poultry_broiler_expenses_edit' => ['label' => 'Broiler Expenses', 'action' => 'Edit', 'description' => 'Modify existing Broiler expense records.', 'roles' => ['poultry_manager']],
-            'poultry_broiler_expenses_delete' => ['label' => 'Broiler Expenses', 'action' => 'Delete', 'description' => 'Delete Broiler expense records.', 'roles' => ['poultry_manager']],
+            'poultry_layer_expenses' => ['label' => 'Layer Expenses', 'action' => 'View', 'description' => 'View Layer expense records.', 'roles' => $salesOptionalExpenseRoles],
+            'poultry_layer_expenses_add' => ['label' => 'Layer Expenses', 'action' => 'Add', 'description' => 'Record new Layer non-stock expenses.', 'roles' => $salesOptionalExpenseRoles],
+            'poultry_layer_expenses_edit' => ['label' => 'Layer Expenses', 'action' => 'Edit', 'description' => 'Modify existing Layer expense records.', 'roles' => $salesOptionalExpenseRoles],
+            'poultry_layer_expenses_delete' => ['label' => 'Layer Expenses', 'action' => 'Delete', 'description' => 'Delete Layer expense records.', 'roles' => $salesOptionalExpenseRoles],
+            'poultry_broiler_expenses' => ['label' => 'Broiler Expenses', 'action' => 'View', 'description' => 'View Broiler expense records.', 'roles' => $salesOptionalExpenseRoles],
+            'poultry_broiler_expenses_add' => ['label' => 'Broiler Expenses', 'action' => 'Add', 'description' => 'Record new Broiler non-stock expenses.', 'roles' => $salesOptionalExpenseRoles],
+            'poultry_broiler_expenses_edit' => ['label' => 'Broiler Expenses', 'action' => 'Edit', 'description' => 'Modify existing Broiler expense records.', 'roles' => $salesOptionalExpenseRoles],
+            'poultry_broiler_expenses_delete' => ['label' => 'Broiler Expenses', 'action' => 'Delete', 'description' => 'Delete Broiler expense records.', 'roles' => $salesOptionalExpenseRoles],
         ],
         'Ruminant Operations' => [
             'ruminant_overview' => ['label' => 'Ruminant Overview', 'action' => 'View', 'description' => 'View the Ruminant dashboard and overall summary.', 'roles' => ['ruminant_manager']],
@@ -45,10 +47,10 @@ function permission_catalog(): array
             'ruminant_animals_exit' => ['label' => 'Ruminant Animal Registry', 'action' => 'Record Exit', 'description' => 'Record dead, culled or transferred lifecycle exits.', 'roles' => ['ruminant_manager']],
             'ruminant_feeds' => ['label' => 'Ruminant Feed Records', 'action' => 'View', 'description' => 'View Ruminant feed records.', 'roles' => ['ruminant_manager']],
             'ruminant_feeds_add' => ['label' => 'Ruminant Feed Records', 'action' => 'Add', 'description' => 'Record new Ruminant feed usage transactions.', 'roles' => ['ruminant_manager']],
-            'ruminant_expenses' => ['label' => 'Ruminant Expenses', 'action' => 'View', 'description' => 'View Ruminant expense records available to the role.', 'roles' => ['ruminant_manager']],
-            'ruminant_expenses_add' => ['label' => 'Ruminant Expenses', 'action' => 'Add', 'description' => 'Record new Ruminant non-stock expenses.', 'roles' => ['ruminant_manager']],
-            'ruminant_expenses_edit' => ['label' => 'Ruminant Expenses', 'action' => 'Edit', 'description' => 'Modify existing Ruminant expense records.', 'roles' => ['ruminant_manager']],
-            'ruminant_expenses_delete' => ['label' => 'Ruminant Expenses', 'action' => 'Delete', 'description' => 'Delete Ruminant expense records.', 'roles' => ['ruminant_manager']],
+            'ruminant_expenses' => ['label' => 'Ruminant Expenses', 'action' => 'View', 'description' => 'View Ruminant expense records available to the role.', 'roles' => $salesOptionalRuminantExpenseRoles],
+            'ruminant_expenses_add' => ['label' => 'Ruminant Expenses', 'action' => 'Add', 'description' => 'Record new Ruminant non-stock expenses.', 'roles' => $salesOptionalRuminantExpenseRoles],
+            'ruminant_expenses_edit' => ['label' => 'Ruminant Expenses', 'action' => 'Edit', 'description' => 'Modify existing Ruminant expense records.', 'roles' => $salesOptionalRuminantExpenseRoles],
+            'ruminant_expenses_delete' => ['label' => 'Ruminant Expenses', 'action' => 'Delete', 'description' => 'Delete Ruminant expense records.', 'roles' => $salesOptionalRuminantExpenseRoles],
         ],
         'Inventory & Stock' => [
             'inventory' => ['label' => 'Inventory', 'action' => 'View', 'description' => 'View inventory items, balances and stock history.', 'roles' => ['poultry_manager','ruminant_manager']],
@@ -64,17 +66,17 @@ function permission_catalog(): array
             'sales_payment' => ['label' => 'Sales Receivables', 'action' => 'Record Payment', 'description' => 'Record payments against outstanding customer debt.', 'roles' => $sharedSalesRoles],
             'sales_receivables_edit' => ['label' => 'Sales Receivables', 'action' => 'Edit', 'description' => 'Modify eligible sales receivable and payment records.', 'roles' => $sharedSalesRoles],
             'sales_receivables_delete' => ['label' => 'Sales Receivables', 'action' => 'Delete', 'description' => 'Delete eligible sales receivable and payment records.', 'roles' => $sharedSalesRoles],
-            'expenses' => ['label' => 'General Expense Report', 'action' => 'View', 'description' => 'View General/commercial expense records. Dedicated Sales Representatives never receive Poultry or Ruminant operating expenses.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
-            'expenses_edit' => ['label' => 'General Expense Report', 'action' => 'Edit', 'description' => 'Modify eligible General/commercial expense records. Dedicated Sales Representatives remain limited to General expenses.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
-            'expenses_delete' => ['label' => 'General Expense Report', 'action' => 'Delete', 'description' => 'Delete eligible General/commercial expense records. Dedicated Sales Representatives remain limited to General expenses.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
+            'expenses' => ['label' => 'Expense Report', 'action' => 'View', 'description' => 'View the farm Expense Report when delegated by Farm Admin.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
+            'expenses_edit' => ['label' => 'Expense Report', 'action' => 'Edit', 'description' => 'Modify eligible expense records from the Expense Report page.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
+            'expenses_delete' => ['label' => 'Expense Report', 'action' => 'Delete', 'description' => 'Delete eligible expense records from the Expense Report page.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
         ],
         'Management Insights' => [
-            'profitability' => ['label' => 'Profitability', 'action' => 'View', 'description' => 'View farm profitability, revenue, cost and profit/loss analysis available to the role.', 'roles' => ['poultry_manager','ruminant_manager']],
+            'profitability' => ['label' => 'Profitability', 'action' => 'View', 'description' => 'View farm profitability, revenue, cost and profit/loss analysis available to the role.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
             'farm_intelligence' => ['label' => 'Farm Intelligence', 'action' => 'View', 'description' => 'View management signals and explainable farm intelligence.', 'roles' => ['poultry_manager','ruminant_manager']],
         ],
         'Cycles, Reports & Team' => [
             'production_cycles' => ['label' => 'Production Cycles', 'action' => 'View', 'description' => 'View production cycles. Creation and lifecycle management remain Farm Admin controlled during this audit.', 'roles' => ['poultry_manager','ruminant_manager']],
-            'reports' => ['label' => 'Operational Reports', 'action' => 'View / Export', 'description' => 'View and generate Poultry and Ruminant operational reports available to the role.', 'roles' => ['poultry_manager','ruminant_manager']],
+            'reports' => ['label' => 'Farm Reports & Analytics', 'action' => 'View / Export', 'description' => 'View the Poultry & Ruminant Report and Analytics Dashboard when delegated by Farm Admin.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
         ],
     ];
 }
