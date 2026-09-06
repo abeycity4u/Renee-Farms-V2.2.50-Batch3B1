@@ -18,7 +18,11 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   $id=(int)($_POST['id']??0); $tag=trim($_POST['tag_no']??''); $species=strtolower(trim($_POST['species']??'other'));
   $sex=strtolower(trim($_POST['sex']??'unknown')); $breed=trim($_POST['breed']??''); $birth=$_POST['birth_date']?:null;
   $source=trim($_POST['source']??''); $purchaseDate=$_POST['purchase_date']?:null; $purchaseCost=(float)($_POST['purchase_cost']??0); $status='active'; $notes=trim($_POST['notes']??'');
-  if($tag===''||!in_array($species,['cattle','goat','sheep','other'],true)||!in_array($sex,['male','female','unknown'],true)||!in_array($status,['active','sold','dead','culled','transferred'],true)||$purchaseCost<0) { exit('Invalid animal data.'); }
+  if($tag===''||!in_array($species,['cattle','goat','sheep','other'],true)||!in_array($sex,['male','female','unknown'],true)||!in_array($status,['active','sold','dead','culled','transferred'],true)||$purchaseCost<0) {
+    $_SESSION['error'] = 'Enter a tag number and select a valid species, sex, and non-negative purchase cost.';
+    header('Location: animal_registry.php' . ($id > 0 ? '?edit='.$id : ''));
+    exit();
+  }
   // A tag is unique within a species, not across all ruminants. This allows, for example,
   // Cattle #1 and Goat #1 to coexist while preventing two cattle from both being #1.
   $dupSql='SELECT id FROM ruminant_animals WHERE farm_id=? AND species=? AND tag_no=? AND id<>? LIMIT 1';
