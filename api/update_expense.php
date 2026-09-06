@@ -31,6 +31,12 @@ $amount = $_POST['amount'];
 $unit = $_POST['unit'];
 $description = $_POST['description'] ?? '';
 
+$expenseViewPermission = static function (?string $actionPermission): ?string {
+    if (!$actionPermission) return null;
+    $viewPermission = preg_replace('/_(?:edit|delete)$/', '', $actionPermission);
+    return is_string($viewPermission) && $viewPermission !== $actionPermission ? $viewPermission : null;
+};
+
 try {
     $farmId=requireCurrentFarmId();
     $existingStmt=$pdo->prepare("SELECT farm_type,production_type,poultry_category,cycle_id,category FROM farm_expenses WHERE id=? AND farm_id=? LIMIT 1");
@@ -40,7 +46,8 @@ try {
         send_json(['success' => false, 'error' => 'Expense record not found.'], 404);
     }
     $existingPermission = permission_catalog_expense_action_code($existing, 'edit');
-    if (!isPlatformOwner() && !hasRole('farm_admin') && (!$existingPermission || !hasPermission(getUserType(), $existingPermission))) {
+    $existingViewPermission = $expenseViewPermission($existingPermission);
+    if (!isPlatformOwner() && !hasRole('farm_admin') && (!$existingPermission || !$existingViewPermission || !hasPermission(getUserType(), $existingViewPermission) || !hasPermission(getUserType(), $existingPermission))) {
         send_json(['success' => false, 'error' => 'You do not have permission to edit this expense record.'], 403);
     }
     $allowedManualCategories = ['salary','logistic','fuel','misc'];
@@ -57,7 +64,8 @@ try {
         'production_type' => $productionType,
         'poultry_category' => $poultryCategory,
     ], 'edit');
-    if (!isPlatformOwner() && !hasRole('farm_admin') && (!$targetPermission || !hasPermission(getUserType(), $targetPermission))) {
+    $targetViewPermission = $expenseViewPermission($targetPermission);
+    if (!isPlatformOwner() && !hasRole('farm_admin') && (!$targetPermission || !$targetViewPermission || !hasPermission(getUserType(), $targetViewPermission) || !hasPermission(getUserType(), $targetPermission))) {
         send_json(['success' => false, 'error' => 'You do not have permission to move or edit an expense in the requested area.'], 403);
     }
     $cycleId=(int)($_POST['cycle_id'] ?? ($existing['cycle_id'] ?? 0));
