@@ -82,7 +82,7 @@ function deleteFarmData(PDO $pdo, int $farmId): void {
     foreach (['sales_allocations', 'financial_allocations', 'poultry_cycle_acquisitions', 'production_cycle_phases', 'poultry_health_events', 'ruminant_animal_weights', 'ruminant_health_events'] as $table) {
         deleteFarmRows($pdo, $table, $farmId);
     }
-    foreach (['customer_ledger_entries', 'stock_transactions', 'stock_batches', 'layer_daily_records', 'broiler_daily_records', 'ruminant_daily_records', 'ruminant_animals', 'farm_expenses', 'profit_loss_summary', 'sales_records', 'production_cycles', 'stock_items', 'inventory_categories', 'financial_settings', 'permissions', 'farm_role_limits', 'v2_audit_log', 'farm_modules', 'subscriptions'] as $table) {
+    foreach (['customer_ledger_entries', 'stock_transactions', 'stock_batches', 'layer_daily_records', 'broiler_daily_records', 'ruminant_daily_records', 'ruminant_animals', 'farm_expenses', 'profit_loss_summary', 'sales_records', 'production_cycles', 'stock_items', 'inventory_categories', 'financial_settings', 'permissions', 'farm_subscription_seat_addons', 'farm_role_limits', 'v2_audit_log', 'farm_modules', 'subscriptions'] as $table) {
         deleteFarmRows($pdo, $table, $farmId);
     }
     $pdo->prepare('DELETE ur FROM user_roles ur INNER JOIN users u ON u.id = ur.user_id WHERE u.farm_id = ?')->execute([$farmId]);
@@ -116,14 +116,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $name = trim($_POST['name'] ?? ''); $slug = strtolower(trim($_POST['slug'] ?? '')); $color = trim($_POST['primary_color'] ?? '#198754');
     $submittedModules = farm_entitlement_normalize_modules($_POST['modules'] ?? []);
-    $roleLimits = normalize_role_limits_for_entitlements($_POST['role_limits'] ?? [], $submittedModules);
+    $seatAddOns = subscription_seat_normalize_addons(is_array($_POST['seat_addons'] ?? null) ? $_POST['seat_addons'] : []);
     $username = trim($_POST['owner_username'] ?? ''); $password = $_POST['owner_password'] ?? ''; $email = trim($_POST['owner_email'] ?? '');
     $startDate = trim($_POST['subscription_starts_at'] ?? ''); $endDate = trim($_POST['subscription_ends_at'] ?? '');
-    $plan = $_POST['plan'] ?? 'starter'; $status = $_POST['status'] ?? 'trial';
+    $plan = strtolower(trim((string)($_POST['plan'] ?? 'starter'))); $status = $_POST['status'] ?? 'trial';
+    $roleLimits = subscription_plan_is_valid($plan)
+        ? subscription_plan_effective_role_limits($plan, $submittedModules, $seatAddOns)
+        : normalize_role_limits_for_entitlements($_POST['role_limits'] ?? [], $submittedModules);
     $repairOwnerNeeded = isset($_POST['update_farm']) && $farmId > 0 && findFarmAdminId($pdo, $farmId) === 0;
     if ($name === '' || !preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) || $slug === PLATFORM_WORKSPACE_SLUG || !preg_match('/^#[0-9a-fA-F]{6}$/', $color) || $username === '') {
         $error = 'Enter the Farm Admin details and use a unique lowercase Farm Workspace ID.';
-    } elseif (!$submittedModules) $error = 'Select at least one subscribed module (Poultry, Ruminant, or Sales) so the farm workspace has an active service entitlement.';
+    } elseif (!$submittedModules) $error = 'Select Poultry, Ruminant, or both so the farm workspace has an active service entitlement.';
     elseif ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) $error = 'Enter a valid owner email address.';
     elseif (!in_array($plan, ['starter', 'growth', 'pro'], true) || !in_array($status, ['trial', 'active', 'past_due', 'suspended'], true)) $error = 'Select a valid subscription plan and status.';
     elseif (($startDate !== '' && !validSubscriptionDate($startDate)) || ($endDate !== '' && !validSubscriptionDate($endDate))) $error = 'Subscription dates must be valid dates.';
@@ -132,6 +135,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif ($repairOwnerNeeded && strlen($password) < FARM_OWNER_MIN_PASSWORD_LENGTH) $error = 'This incomplete farm has no admin account. Enter a password of at least ' . FARM_OWNER_MIN_PASSWORD_LENGTH . ' characters to create its admin account while saving.';
     elseif (isset($_POST['update_farm']) && $password !== '' && strlen($password) < FARM_OWNER_MIN_PASSWORD_LENGTH) $error = 'A replacement password must be at least ' . FARM_OWNER_MIN_PASSWORD_LENGTH . ' characters.';
     else try {
+        if (isset($_POST['update_farm'])) {
+            subscription_seat_assert_capacity($pdo, $farmId, $plan, $submittedModules, $seatAddOns);
+        }
         $logoExtension = detectFarmLogoExtension($_FILES['logo'] ?? null);
         $createdFarmId = 0;
         $newLogoPath = null;
@@ -147,6 +153,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             sync_farm_entitlements($pdo, $farmId, $submittedModules);
             assign_protected_farm_admin_role($pdo, $farmId, $ownerId);
             saveRoleLimits($pdo, $farmId, $roleLimits);
+            subscription_seat_save_addons($pdo, $farmId, $seatAddOns);
             $message = "Created {$name}.";
         } elseif (isset($_POST['update_farm'])) {
             $farm = editableFarm($pdo, $farmId); if (!$farm) throw new RuntimeException('That farm cannot be edited.');
@@ -162,6 +169,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             sync_farm_entitlements($pdo, $farmId, $submittedModules);
             assign_protected_farm_admin_role($pdo, $farmId, $ownerId);
             saveRoleLimits($pdo, $farmId, $roleLimits);
+            subscription_seat_save_addons($pdo, $farmId, $seatAddOns);
             $message = "Updated {$name}.";
         } else throw new RuntimeException('Unknown farm action.');
         $pdo->commit(); $_SESSION['success'] = $message; redirectFarms();
