@@ -105,7 +105,8 @@ ob_start(static function (string $html) use (
     }
 
     if (!$canViewSales) {
-        $html = dashboard_action_remove_card_containing($html, 'Recent Sales');
+        // Anchor inside the rendered card, not on the preceding <!-- Recent Sales --> comment.
+        $html = dashboard_action_remove_card_containing($html, '<i class="bi bi-graph-up text-success"></i>');
     }
 
     if (!$canViewInventory) {
@@ -118,7 +119,8 @@ ob_start(static function (string $html) use (
         $html = dashboard_action_remove_card_containing($html, 'Smart Stock Control');
         $html = dashboard_action_remove_card_containing($html, 'Today\'s Transactions');
         $html = dashboard_action_remove_card_containing($html, 'Critical Inventory Snapshot');
-        $html = dashboard_action_remove_card_containing($html, 'Low Stock Alerts');
+        // Anchor inside the rendered card, not on the preceding <!-- Low Stock Alerts --> comment.
+        $html = dashboard_action_remove_card_containing($html, '<i class="bi bi-exclamation-triangle"></i>');
 
         // Non-Sales specialist dashboards have native Quick Actions; do not leave an
         // Inventory shortcut visible when Inventory View itself is denied.
