@@ -15,7 +15,8 @@ if (!in_array($farmType, ['poultry', 'ruminant', 'both'], true)) {
     exit;
 }
 
-if (!(isPlatformOwner() || hasRole('farm_admin'))) {
+$isOwnerOrAdmin = isPlatformOwner() || hasRole('farm_admin');
+if (!$isOwnerOrAdmin) {
     if ($farmType === 'both') {
         $accessibleTypes = array_values(array_intersect(accessibleFarmTypes(), ['poultry', 'ruminant']));
         if (count($accessibleTypes) === 1) {
@@ -32,24 +33,33 @@ if (!(isPlatformOwner() || hasRole('farm_admin'))) {
     }
 }
 
+$canViewLayerDaily = $isOwnerOrAdmin || hasPermission(getUserType(), 'poultry_daily_layer');
+$canViewBroilerDaily = $isOwnerOrAdmin || hasPermission(getUserType(), 'poultry_daily_broiler');
+$canViewRuminantDaily = $isOwnerOrAdmin || hasPermission(getUserType(), 'ruminant_daily');
+$canViewInventory = $isOwnerOrAdmin || hasPermission(getUserType(), 'inventory');
+
 $pendingTasks = 0;
 
-// Check for missing daily records
+// Check only the daily-record areas this user is actually allowed to view.
 if ($farmType === 'poultry' || $farmType === 'both') {
-    $layerCheck = $pdo->prepare("SELECT COUNT(*) FROM layer_daily_records WHERE record_date = ? AND farm_id = ?");
-    $layerCheck->execute([$date, $tenantFarmId]);
-    if ($layerCheck->fetchColumn() == 0) {
-        $pendingTasks++;
+    if ($canViewLayerDaily) {
+        $layerCheck = $pdo->prepare("SELECT COUNT(*) FROM layer_daily_records WHERE record_date = ? AND farm_id = ?");
+        $layerCheck->execute([$date, $tenantFarmId]);
+        if ($layerCheck->fetchColumn() == 0) {
+            $pendingTasks++;
+        }
     }
-    
-    $broilerCheck = $pdo->prepare("SELECT COUNT(*) FROM broiler_daily_records WHERE record_date = ? AND farm_id = ?");
-    $broilerCheck->execute([$date, $tenantFarmId]);
-    if ($broilerCheck->fetchColumn() == 0) {
-        $pendingTasks++;
+
+    if ($canViewBroilerDaily) {
+        $broilerCheck = $pdo->prepare("SELECT COUNT(*) FROM broiler_daily_records WHERE record_date = ? AND farm_id = ?");
+        $broilerCheck->execute([$date, $tenantFarmId]);
+        if ($broilerCheck->fetchColumn() == 0) {
+            $pendingTasks++;
+        }
     }
 }
 
-if ($farmType === 'ruminant' || $farmType === 'both') {
+if (($farmType === 'ruminant' || $farmType === 'both') && $canViewRuminantDaily) {
     $ruminantCheck = $pdo->prepare("SELECT COUNT(*) FROM ruminant_daily_records WHERE record_date = ? AND farm_id = ?");
     $ruminantCheck->execute([$date, $tenantFarmId]);
     if ($ruminantCheck->fetchColumn() == 0) {
@@ -57,19 +67,22 @@ if ($farmType === 'ruminant' || $farmType === 'both') {
     }
 }
 
-// Check for low stock items
-if ($farmType === 'both') {
-    $lowStockCheck = $pdo->prepare("SELECT COUNT(*) FROM stock_items
-                               WHERE farm_id = ? AND farm_type IN ('poultry', 'ruminant', 'both')
-                               AND current_stock <= min_stock_level");
-    $lowStockCheck->execute([$tenantFarmId]);
-} else {
-    $lowStockCheck = $pdo->prepare("SELECT COUNT(*) FROM stock_items
-                               WHERE farm_id = ? AND farm_type IN (?, 'both')
-                               AND current_stock <= min_stock_level");
-    $lowStockCheck->execute([$tenantFarmId, $farmType]);
+// Low-stock status is Inventory data and must follow Inventory — View.
+$lowStockCount = 0;
+if ($canViewInventory) {
+    if ($farmType === 'both') {
+        $lowStockCheck = $pdo->prepare("SELECT COUNT(*) FROM stock_items
+                                   WHERE farm_id = ? AND farm_type IN ('poultry', 'ruminant', 'both')
+                                   AND current_stock <= min_stock_level");
+        $lowStockCheck->execute([$tenantFarmId]);
+    } else {
+        $lowStockCheck = $pdo->prepare("SELECT COUNT(*) FROM stock_items
+                                   WHERE farm_id = ? AND farm_type IN (?, 'both')
+                                   AND current_stock <= min_stock_level");
+        $lowStockCheck->execute([$tenantFarmId, $farmType]);
+    }
+    $lowStockCount = (int)$lowStockCheck->fetchColumn();
 }
-$lowStockCount = $lowStockCheck->fetchColumn();
 
 echo json_encode([
     'pending_tasks' => $pendingTasks,
