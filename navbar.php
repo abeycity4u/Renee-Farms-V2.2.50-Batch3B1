@@ -33,20 +33,28 @@ $poultryEntitled = isPlatformOwner() || user_can_access_entitled_module('poultry
 $ruminantEntitled = isPlatformOwner() || user_can_access_entitled_module('ruminant');
 $salesEntitled = isPlatformOwner() || user_can_access_entitled_module('sales');
 
+// A Sales Representative does not become a Poultry/Ruminant operational manager,
+// but Farm Admin may delegate the expense record surfaces within a subscribed farm
+// module. Keep this exception narrow to expense navigation only.
+$poultryExpenseEntitled = $poultryEntitled
+    || (hasRole('sales_rep') && current_farm_has_entitlement('poultry'));
+$ruminantExpenseEntitled = $ruminantEntitled
+    || (hasRole('sales_rep') && current_farm_has_entitlement('ruminant'));
+
 $canViewInventory = $navHas('inventory');
 
 $canViewLayerDaily = $poultryEntitled && $navHas('poultry_daily_layer');
 $canViewBroilerDaily = $poultryEntitled && $navHas('poultry_daily_broiler');
 $canViewPoultryFeeds = $poultryEntitled && $navHas('poultry_feeds');
 $canViewPoultryHealth = $poultryEntitled && $navHas('poultry_health');
-$canViewLayerExpenses = $poultryEntitled && $navHas('poultry_layer_expenses');
-$canViewBroilerExpenses = $poultryEntitled && $navHas('poultry_broiler_expenses');
+$canViewLayerExpenses = $poultryExpenseEntitled && $navHas('poultry_layer_expenses');
+$canViewBroilerExpenses = $poultryExpenseEntitled && $navHas('poultry_broiler_expenses');
 $showPoultryMenu = $canViewLayerDaily || $canViewBroilerDaily || $canViewPoultryFeeds || $canViewPoultryHealth || $canViewLayerExpenses || $canViewBroilerExpenses;
 
 $canViewRuminantDaily = $ruminantEntitled && $navHas('ruminant_daily');
 $canViewRuminantAnimals = $ruminantEntitled && $navHas('ruminant_animals');
 $canViewRuminantFeeds = $ruminantEntitled && $navHas('ruminant_feeds');
-$canViewRuminantExpenses = $ruminantEntitled && $navHas('ruminant_expenses');
+$canViewRuminantExpenses = $ruminantExpenseEntitled && $navHas('ruminant_expenses');
 $showRuminantMenu = $canViewRuminantDaily || $canViewRuminantAnimals || $canViewRuminantFeeds || $canViewRuminantExpenses;
 
 $canViewSales = $salesEntitled && $navHas('sales');
