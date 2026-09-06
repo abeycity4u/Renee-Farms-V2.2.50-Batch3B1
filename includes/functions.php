@@ -191,6 +191,16 @@ function hasPermission($role, $module) {
         }
     }
 
+    // Animal Profile still carries the old Ruminant Daily Records page check.
+    // On this route only, resolve that stale check to the canonical parent
+    // Ruminant Animal Registry — View permission already used by the route map.
+    if ($module === 'ruminant_daily') {
+        $path = '/' . ltrim(str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? '')), '/');
+        if ($path === '/ruminant/animal_view.php' || str_ends_with($path, '/ruminant/animal_view.php')) {
+            return hasPermission($role, 'ruminant_animals');
+        }
+    }
+
     // Read current roles from the database on every request. This makes role and
     // permission changes effective as soon as the affected user refreshes/navigates.
     $roles = function_exists('currentUserRoles') ? currentUserRoles() : [$role];
