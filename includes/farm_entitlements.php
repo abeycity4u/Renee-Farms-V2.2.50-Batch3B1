@@ -80,6 +80,25 @@ if (!function_exists('farm_entitlement_sales_available')) {
     }
 }
 
+/**
+ * Specialist roles commercially available for a tenant.
+ *
+ * Keep role visibility and permission-saving code on the same entitlement source
+ * of truth. Sales Representative is available whenever shared Sales is available;
+ * it does not require a legacy standalone farm_modules.sales row.
+ */
+if (!function_exists('farm_entitlement_available_specialist_roles')) {
+    function farm_entitlement_available_specialist_roles(PDO $pdo, int $farmId): array
+    {
+        $enabled = farm_entitlement_modules($pdo, $farmId);
+        $roles = [];
+        if (in_array('poultry', $enabled, true)) $roles[] = 'poultry_manager';
+        if (in_array('ruminant', $enabled, true)) $roles[] = 'ruminant_manager';
+        if (farm_entitlement_sales_available($pdo, $farmId)) $roles[] = 'sales_rep';
+        return $roles;
+    }
+}
+
 if (!function_exists('current_farm_entitlement_modules')) {
     function current_farm_entitlement_modules(): array
     {
