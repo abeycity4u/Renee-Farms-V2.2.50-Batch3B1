@@ -65,10 +65,12 @@ $productionTypeFilter = strtolower(trim((string)($_GET['production_type'] ?? 'al
 $reportProductionOptions = $farmType === 'all' ? [] : attribution_production_types($farmType);
 if ($productionTypeFilter !== 'all' && !isset($reportProductionOptions[$productionTypeFilter])) $productionTypeFilter='all';
 $showActions = isPlatformOwner() || hasRole('farm_admin') || hasPermission(getUserType(), 'sales_edit') || hasPermission(getUserType(), 'sales_delete');
-// Sales entitlement enables a separate Sales Representative account; farm admins
-// retain operational entry rights in their own workspace. Viewers are read-only.
-$canRecordSales = isPlatformOwner() || hasRole('farm_admin') || (farmHasModule('sales') && hasRole('sales_rep'));
-$canManageLedger = isPlatformOwner() || hasRole('farm_admin');
+$privilegedSalesActions = isPlatformOwner() || hasRole('farm_admin');
+$canAddSales = $privilegedSalesActions || hasPermission(getUserType(), 'sales_add');
+$canRecordPayments = $privilegedSalesActions || hasPermission(getUserType(), 'sales_payment');
+$canEditLedger = $privilegedSalesActions || hasPermission(getUserType(), 'sales_receivables_edit');
+$canDeleteLedger = $privilegedSalesActions || hasPermission(getUserType(), 'sales_receivables_delete');
+$canManageLedger = $canEditLedger || $canDeleteLedger;
 $saleFarmTypes = allowedSalesFarmTypes();
 $allCyclesStmt = $pdo->prepare("SELECT id, cycle_code, farm_type, production_type, status FROM production_cycles WHERE farm_id=? ORDER BY start_date DESC,id DESC");
 $allCyclesStmt->execute([$tenantFarmId]);
@@ -215,7 +217,7 @@ if ($debtFeatureEnabled && $selectedCustomer !== '') {
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['add_sale'])) {
-        if (!$canRecordSales) { http_response_code(403); exit('Sales entry access required.'); }
+        if (!$canAddSales) { http_response_code(403); exit('You do not have permission to add sales.'); }
         $quantity = (float)($_POST['quantity'] ?? 0);
         $unitPrice = (float)($_POST['unit_price'] ?? 0);
         $totalAmount = $quantity * $unitPrice;
@@ -341,7 +343,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         header("Location: sales_records.php?report_mode={$reportMode}&month={$month}&year={$year}&farm_type={$farmType}");
         exit();
     } elseif (isset($_POST['record_payment']) && $debtFeatureEnabled) {
-        if (!$canRecordSales) { http_response_code(403); exit('Sales entry access required.'); }
+        if (!$canRecordPayments) { http_response_code(403); exit('You do not have permission to record customer payments.'); }
         $customerName = trim((string)($_POST['payment_customer_name'] ?? ''));
         $paymentDate = $_POST['payment_date'] ?? date('Y-m-d');
         $paymentAmount = (float)($_POST['payment_amount'] ?? 0);
@@ -452,7 +454,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         header("Location: sales_records.php?report_mode={$reportMode}&month={$month}&year={$year}&farm_type={$farmType}&customer=" . urlencode($customerName));
         exit();
     } elseif (isset($_POST['update_ledger_entry'])) {
-        if (!$canManageLedger) {
+        if (!$canEditLedger) {
             $_SESSION['error'] = "You do not have permission to edit debt ledger entries.";
             header("Location: sales_records.php?report_mode={$reportMode}&month={$month}&year={$year}&farm_type={$farmType}&customer=" . urlencode($selectedCustomer));
             exit();
@@ -479,7 +481,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         header("Location: sales_records.php?report_mode={$reportMode}&month={$month}&year={$year}&farm_type={$farmType}&customer=" . urlencode($customerName));
         exit();
     } elseif (isset($_POST['delete_ledger_entry'])) {
-        if (!$canManageLedger) {
+        if (!$canDeleteLedger) {
             $_SESSION['error'] = "You do not have permission to delete debt ledger entries.";
             header("Location: sales_records.php?report_mode={$reportMode}&month={$month}&year={$year}&farm_type={$farmType}&customer=" . urlencode($selectedCustomer));
             exit();
@@ -645,9 +647,11 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                             </select>
                             <a class="btn btn-primary" id="printMonthlyBtn" <?php echo $reportMode === 'yearly' ? 'style="display:none;"' : ''; ?> href="<?php echo htmlspecialchars($pdfReportUrl); ?>" target="_blank"><i class="bi bi-file-earmark-pdf"></i> PDF Monthly</a>
                             <a class="btn btn-primary" id="printYearlyBtn" <?php echo $reportMode === 'monthly' ? 'style="display:none;"' : ''; ?> href="<?php echo htmlspecialchars($pdfReportUrl); ?>" target="_blank"><i class="bi bi-file-earmark-pdf"></i> PDF Yearly</a>
+                            <?php if ($canAddSales): ?>
                             <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addSaleModal">
                                 <i class="bi bi-plus-circle"></i> Add Sale
                             </button>
+                            <?php endif; ?>
                         </div>
                     </div>
                     
@@ -753,9 +757,11 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                         <i class="bi bi-file-earmark-pdf me-1"></i>PDF Debt History
                                     </button>
                                     <?php endif; ?>
+                                    <?php if ($canRecordPayments): ?>
                                     <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addPaymentModal">
                                         <i class="bi bi-cash-coin me-1"></i>Record Payment
                                     </button>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                             <div class="card-body">
@@ -830,6 +836,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                                             <td><?php echo htmlspecialchars($entry['recorded_by'] ?? '--'); ?></td>
                                                             <?php if ($canManageLedger): ?>
                                                             <td class="no-print">
+                                                                <?php if ($canEditLedger): ?>
                                                                 <button type="button"
                                                                         class="btn btn-sm btn-outline-primary edit-ledger-btn"
                                                                         data-id="<?php echo (int)$entry['id']; ?>"
@@ -839,12 +846,15 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                                                         data-notes="<?php echo htmlspecialchars($entry['notes'] ?? '', ENT_QUOTES); ?>">
                                                                     <i class="bi bi-pencil"></i>
                                                                 </button>
+                                                                <?php endif; ?>
+                                                                <?php if ($canDeleteLedger): ?>
                                                                 <form method="POST" class="d-inline" data-confirm="Delete this ledger entry? This action cannot be undone." data-confirm-title="Delete ledger entry?" data-confirm-button="Delete">
                                                                     <input type="hidden" name="ledger_id" value="<?php echo (int)$entry['id']; ?>">
                                                                     <button type="submit" name="delete_ledger_entry" class="btn btn-sm btn-outline-danger">
                                                                         <i class="bi bi-trash"></i>
                                                                     </button>
                                                                 </form>
+                                                                <?php endif; ?>
                                                             </td>
                                                             <?php endif; ?>
                                                         </tr>
