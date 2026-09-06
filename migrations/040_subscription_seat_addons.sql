@@ -57,3 +57,9 @@ FROM farm_role_limits frl
 INNER JOIN farms f ON f.id = frl.farm_id
 WHERE frl.role_code IN ('poultry_manager', 'ruminant_manager', 'sales_rep', 'viewer')
 ON DUPLICATE KEY UPDATE extra_seats = VALUES(extra_seats);
+
+-- This migration may be applied directly during the pre-billing closure so the
+-- full historical migration runner never needs to be invoked just to install it.
+INSERT INTO schema_migrations (filename)
+VALUES ('040_subscription_seat_addons.sql')
+ON DUPLICATE KEY UPDATE filename = VALUES(filename);
