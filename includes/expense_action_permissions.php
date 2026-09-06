@@ -1,11 +1,16 @@
 <?php
 /**
- * Granular visibility bridge for legacy operational expense pages.
+ * Granular visibility and scope bridge for legacy expense pages.
  *
  * The Layer, Broiler and Ruminant expense pages still render Edit/Delete from a
  * broad legacy management flag. The expense APIs already enforce the exact
  * row-scoped permission. This bridge prevents restricted controls from being
  * painted while those large pages are migrated gradually.
+ *
+ * A dedicated Sales Representative may optionally receive the general Expense &
+ * Cost Report permissions, but that must never expose livestock operating costs.
+ * Force that role's report/PDF scope to General before the legacy pages resolve
+ * their filters.
  */
 
 require_once __DIR__ . '/functions.php';
@@ -15,6 +20,23 @@ if (!isset($_SESSION['user_id'])) return;
 $path = '/' . ltrim(str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? '')), '/');
 $method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 if ($method !== 'GET') return;
+
+$privileged = isPlatformOwner() || hasRole('farm_admin');
+$dedicatedSalesRep = hasRole('sales_rep')
+    && !$privileged
+    && !hasRole('poultry_manager')
+    && !hasRole('ruminant_manager');
+
+$isGeneralExpenseReport = $path === '/management/expenses.php'
+    || str_ends_with($path, '/management/expenses.php')
+    || $path === '/management/expense_report_pdf.php'
+    || str_ends_with($path, '/management/expense_report_pdf.php');
+
+if ($dedicatedSalesRep && $isGeneralExpenseReport) {
+    // Sales Representatives can be granted General/commercial expense reporting
+    // without gaining visibility into Layer, Broiler or Ruminant operating costs.
+    $_GET['farm_type'] = 'general';
+}
 
 $permissionPair = null;
 if ($path === '/poultry/layer_expenses.php' || str_ends_with($path, '/poultry/layer_expenses.php')) {
@@ -27,7 +49,6 @@ if ($path === '/poultry/layer_expenses.php' || str_ends_with($path, '/poultry/la
 
 if ($permissionPair === null) return;
 
-$privileged = isPlatformOwner() || hasRole('farm_admin');
 $canEdit = $privileged || hasPermission(getUserType(), $permissionPair[0]);
 $canDelete = $privileged || hasPermission(getUserType(), $permissionPair[1]);
 
