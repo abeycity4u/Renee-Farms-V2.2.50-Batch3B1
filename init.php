@@ -93,14 +93,9 @@ require_once __DIR__ . '/includes/expense_action_permissions.php';
 // permissions without reconstructing dashboard.php during the hardening pass.
 require_once __DIR__ . '/includes/dashboard_overview_permissions.php';
 
-// Keep Dashboard Farm Intelligence content and stock quick-actions aligned with
-// their delegated permissions while backend routes/APIs remain authoritative.
+// Keep Dashboard Farm Intelligence, Inventory/Sales summary visibility and stock
+// quick-actions aligned with delegated permissions while backend routes/APIs remain authoritative.
 require_once __DIR__ . '/includes/dashboard_action_permissions.php';
-
-// Shape a dedicated Sales Representative dashboard around Sales/Receivables and
-// hide unrelated farm-wide dashboard surfaces unless their own View permission is
-// granted. Multi-role specialists continue to use the normal dashboard assembly.
-require_once __DIR__ . '/includes/dashboard_sales_workspace.php';
 
 // Hide permission-controlled controls before first paint so read-only users never
 // see restricted buttons or links flash briefly while client cleanup runs.
