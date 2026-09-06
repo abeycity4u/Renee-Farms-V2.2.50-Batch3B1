@@ -117,12 +117,16 @@ if (!preg_match('/^#[0-9a-fA-F]{6}$/', $tenantPrimaryColor)) $tenantPrimaryColor
     top: 72px;
     left: 50%;
     transform: translateX(-50%);
-    width: min(1120px, calc(100% - 32px));
+    width: min(620px, calc(100% - 24px));
+    max-height: calc(100dvh - 88px);
     z-index: 20000;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
     pointer-events: none;
+    overflow: hidden;
+    contain: layout paint;
+    overscroll-behavior: contain;
 }
 .app-notification {
     --notify-accent: #dc3545;
@@ -130,44 +134,44 @@ if (!preg_match('/^#[0-9a-fA-F]{6}$/', $tenantPrimaryColor)) $tenantPrimaryColor
     --notify-border: #ffb4bb;
     --notify-title: #b4232f;
     display: grid;
-    grid-template-columns: 64px minmax(0, 1fr) minmax(230px, 0.42fr) 36px;
+    grid-template-columns: 40px minmax(0, 1fr) 28px;
     align-items: center;
-    gap: 18px;
-    padding: 14px 18px;
+    gap: 10px;
+    padding: 10px 12px;
     border: 1px solid var(--notify-border);
-    border-left: 6px solid var(--notify-accent);
-    border-radius: 16px;
-    background: linear-gradient(105deg, var(--notify-bg), #fff 72%);
-    box-shadow: 0 12px 34px rgba(15, 23, 42, .14);
+    border-left: 4px solid var(--notify-accent);
+    border-radius: 12px;
+    background: linear-gradient(105deg, var(--notify-bg), #fff 78%);
+    box-shadow: 0 8px 22px rgba(15, 23, 42, .12);
     color: #172033;
     pointer-events: auto;
-    animation: appNotifyIn .22s ease-out;
+    animation: appNotifyIn .16s ease-out;
+    will-change: opacity, transform;
 }
 .app-notification-success { --notify-accent:#198754; --notify-bg:#effaf3; --notify-border:#a9dfbd; --notify-title:#137443; }
 .app-notification-warning { --notify-accent:#f59e0b; --notify-bg:#fff8e8; --notify-border:#ffd58a; --notify-title:#a86600; }
 .app-notification-info { --notify-accent:#0d6efd; --notify-bg:#eef6ff; --notify-border:#9fc5ff; --notify-title:#0759bb; }
 .app-notification-error { --notify-accent:#dc3545; --notify-bg:#fff1f2; --notify-border:#ffb4bb; --notify-title:#b4232f; }
 .app-notification-icon {
-    width: 56px; height: 56px; border-radius: 50%; display:flex; align-items:center; justify-content:center;
+    width: 36px; height: 36px; border-radius: 50%; display:flex; align-items:center; justify-content:center;
     background: color-mix(in srgb, var(--notify-accent) 13%, white);
-    color: var(--notify-accent); font-size: 25px;
+    color: var(--notify-accent); font-size: 17px;
 }
-.app-notification-title { color: var(--notify-title); font-weight: 800; font-size: 1rem; margin-bottom: 3px; }
-.app-notification-message { font-size: .96rem; line-height: 1.45; color:#263247; overflow-wrap:anywhere; }
-.app-notification-tip { border-left: 1px solid rgba(0,0,0,.10); padding-left: 18px; font-size: .84rem; line-height:1.35; color:#4b5565; }
-.app-notification-tip-label { color: var(--notify-title); font-weight:800; font-size:.9rem; margin-bottom:3px; }
-.app-notification-close { border:0; background:transparent; color:var(--notify-title); font-size:1.05rem; width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+.app-notification-title { color: var(--notify-title); font-weight: 800; font-size: .92rem; line-height:1.2; margin-bottom: 2px; }
+.app-notification-message { font-size: .82rem; line-height: 1.32; color:#263247; overflow-wrap:anywhere; }
+.app-notification-tip { display:none; }
+.app-notification-close { border:0; background:transparent; color:var(--notify-title); font-size:.9rem; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; padding:0; }
 .app-notification-close:hover { background: rgba(0,0,0,.06); }
-.app-notification.is-closing { animation: appNotifyOut .18s ease-in forwards; }
-@keyframes appNotifyIn { from { opacity:0; transform:translateY(-10px) scale(.985); } to { opacity:1; transform:none; } }
-@keyframes appNotifyOut { to { opacity:0; transform:translateY(-8px) scale(.985); } }
+.app-notification.is-closing { animation: appNotifyOut .14s ease-in forwards; }
+@keyframes appNotifyIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
+@keyframes appNotifyOut { to { opacity:0; transform:translateY(-3px); } }
 @media (max-width: 760px) {
-    .app-notifications { width:calc(100% - 20px); top:10px; }
-    .app-notification { grid-template-columns:44px minmax(0,1fr) 34px; gap:11px; padding:12px; }
-    .app-notification-icon { width:42px; height:42px; font-size:19px; }
-    .app-notification-tip { display:none; }
-    .app-notification-title { font-size:.92rem; }
-    .app-notification-message { font-size:.86rem; }
+    .app-notifications { width:calc(100% - 12px); top:8px; max-height:calc(100dvh - 16px); gap:6px; }
+    .app-notification { grid-template-columns:34px minmax(0,1fr) 26px; gap:8px; padding:9px 10px; border-radius:10px; }
+    .app-notification-icon { width:32px; height:32px; font-size:15px; }
+    .app-notification-title { font-size:.88rem; }
+    .app-notification-message { font-size:.8rem; }
+    .app-notification-close { width:26px; height:26px; }
 }
 @media (prefers-reduced-motion: reduce) {
     .app-notification { animation:none; }
@@ -182,8 +186,17 @@ window.AppNotify = window.AppNotify || (function () {
         danger: { cls:'app-notification-error', icon:'bi-exclamation-triangle-fill', title:'Action could not be completed', tip:'Please check the information entered and try again.' },
         error: { cls:'app-notification-error', icon:'bi-exclamation-triangle-fill', title:'Action could not be completed', tip:'Please check the information entered and try again.' }
     };
-    const close = (el) => { if (!el) return; el.classList.add('is-closing'); setTimeout(() => el.remove(), 190); };
-    const add = (type, message, title, tip) => {
+    const maxStack = 3;
+    const close = (el) => { if (!el) return; el.classList.add('is-closing'); setTimeout(() => el.remove(), 150); };
+    const enforceStackLimit = (wrap) => {
+        if (!wrap) return;
+        const items = Array.from(wrap.querySelectorAll('.app-notification'));
+        while (items.length > maxStack) {
+            const oldest = items.shift();
+            if (oldest) oldest.remove();
+        }
+    };
+    const add = (type, message, title, tip, duration = null) => {
         const m = meta[type] || meta.info;
         const wrap = document.getElementById('appNotifications');
         if (!wrap) return;
@@ -206,7 +219,9 @@ window.AppNotify = window.AppNotify || (function () {
         el.querySelector('.app-notification-tip-label').textContent = type === 'success' ? 'Done' : (type === 'warning' || type === 'info' ? 'Action' : 'Tip');
         el.querySelector('.app-notification-tip-text').textContent = tip || m.tip;
         wrap.appendChild(el);
-        const timeout = type === 'success' ? 2500 : (type === 'info' ? 4500 : (type === 'warning' ? 5000 : 0));
+        enforceStackLimit(wrap);
+        const defaultTimeout = type === 'success' ? 2500 : (type === 'info' ? 4500 : (type === 'warning' ? 5000 : 0));
+        const timeout = Number.isFinite(Number(duration)) && Number(duration) >= 0 ? Number(duration) : defaultTimeout;
         if (timeout > 0) setTimeout(() => close(el), timeout);
         return el;
     };
@@ -215,12 +230,20 @@ window.AppNotify = window.AppNotify || (function () {
         if (btn) close(btn.closest('.app-notification'));
     });
     document.addEventListener('DOMContentLoaded', () => {
+        const wrap = document.getElementById('appNotifications');
+        enforceStackLimit(wrap);
         document.querySelectorAll('.app-notification-auto').forEach(el => {
             const timeout = el.classList.contains('app-notification-success') ? 2500 : (el.classList.contains('app-notification-info') ? 4500 : 5000);
             setTimeout(() => close(el), timeout);
         });
     });
-    return { show:add, success:(m,t,tip)=>add('success',m,t,tip), error:(m,t,tip)=>add('error',m,t,tip), warning:(m,t,tip)=>add('warning',m,t,tip), info:(m,t,tip)=>add('info',m,t,tip) };
+    return {
+        show:add,
+        success:(m,t,tip,d)=>add('success',m,t,tip,d),
+        error:(m,t,tip,d)=>add('error',m,t,tip,d),
+        warning:(m,t,tip,d)=>add('warning',m,t,tip,d),
+        info:(m,t,tip,d)=>add('info',m,t,tip,d)
+    };
 })();
 </script>
 
