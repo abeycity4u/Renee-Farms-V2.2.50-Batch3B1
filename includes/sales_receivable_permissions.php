@@ -2,18 +2,14 @@
 /**
  * V2.3 compatibility bridge for Customer Debt Management actions and visibility.
  *
- * The legacy Sales Records page still handles debt-ledger Edit/Delete as
- * Farm-Admin-only POST branches. Intercept only those two delegated actions
- * here, enforce their exact permissions, preserve tenant scoping and then exit.
+ * The legacy Sales Records page still carries older role checks around debt
+ * mutations and does not render CSRF tokens itself. Keep this bridge small and
+ * explicit: hide the debt workspace when Sales Receivables View is OFF, inject
+ * CSRF tokens into Sales-page POST forms, and enforce CSRF plus the exact
+ * receivables/action permission before delegated debt mutations proceed.
  *
- * The same legacy page also renders Customer Debt Management behind a database
- * feature probe rather than the granular Sales Receivables View permission.
- * For delegated GET requests, remove that debt workspace before the response is
- * sent when Sales Receivables View is OFF. This also suppresses the legacy
- * "run migrations" fallback, which is a schema-status message and must not be
- * shown merely because the user lacks receivables permission.
- *
- * Platform Owner/Farm Admin continue through the legacy page unchanged.
+ * Platform Owner/Farm Admin retain their intended permission bypass, but their
+ * debt mutations are still protected by CSRF.
  */
 
 $receivablePath = '/' . ltrim(str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? '')), '/');
@@ -29,15 +25,31 @@ $receivablePrivileged = isPlatformOwner() || hasRole('farm_admin');
 
 if ($receivableMethod === 'GET') {
     $canViewReceivables = $receivablePrivileged || hasPermission(getUserType(), 'sales_receivables');
-    if ($canViewReceivables) {
-        return;
+    if (!$canViewReceivables) {
+        // Do not allow an unauthorized customer query-string selection to drive
+        // customer-specific ledger branches later in the legacy Sales page.
+        $_GET['customer'] = '';
     }
 
-    // Do not allow an unauthorized customer query-string selection to drive the
-    // customer-specific ledger branches later in the legacy Sales page.
-    $_GET['customer'] = '';
+    $csrfMarkup = '<input type="hidden" name="csrf_token" value="'
+        . htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8')
+        . '">';
 
-    ob_start(static function (string $html): string {
+    ob_start(static function (string $html) use ($canViewReceivables, $csrfMarkup): string {
+        // Add a CSRF token to each Sales-page POST form. This is server-rendered,
+        // so protection does not depend on JavaScript being available.
+        $html = preg_replace_callback(
+            '#<form\b([^>]*)method\s*=\s*(["\'])POST\2([^>]*)>#i',
+            static function (array $match) use ($csrfMarkup): string {
+                return $match[0] . $csrfMarkup;
+            },
+            $html
+        ) ?? $html;
+
+        if ($canViewReceivables) {
+            return $html;
+        }
+
         $salesTableMarker = '<!-- Sales Table -->';
         $debtHeading = 'Customer Debt Management';
         $cardStartNeedle = '<div class="card border-secondary mb-4">';
@@ -69,12 +81,10 @@ if ($receivableMethod !== 'POST') {
     return;
 }
 
-if ($receivablePrivileged) {
-    return;
-}
-
 $receivableAction = null;
-if (isset($_POST['update_ledger_entry'])) {
+if (isset($_POST['record_payment'])) {
+    $receivableAction = 'payment';
+} elseif (isset($_POST['update_ledger_entry'])) {
     $receivableAction = 'edit';
 } elseif (isset($_POST['delete_ledger_entry'])) {
     $receivableAction = 'delete';
@@ -83,14 +93,31 @@ if ($receivableAction === null) {
     return;
 }
 
-$requiredPermission = $receivableAction === 'edit'
-    ? 'sales_receivables_edit'
-    : 'sales_receivables_delete';
-if (!hasPermission(getUserType(), $requiredPermission)) {
-    return; // Legacy page will reject the action with its existing message.
+require_valid_csrf_post();
+
+if (!$receivablePrivileged) {
+    if (!hasPermission(getUserType(), 'sales_receivables')) {
+        http_response_code(403);
+        exit('Sales receivables view access required.');
+    }
+
+    $requiredPermission = match ($receivableAction) {
+        'payment' => 'sales_payment',
+        'edit' => 'sales_receivables_edit',
+        'delete' => 'sales_receivables_delete',
+    };
+    if (!hasPermission(getUserType(), $requiredPermission)) {
+        http_response_code(403);
+        exit('You do not have permission to perform this receivables action.');
+    }
 }
 
-require_valid_csrf_post();
+// Payment recording already has correct tenant/customer/sale scoping in the
+// legacy Sales page. After authorization + CSRF, let that proven branch execute.
+if ($receivableAction === 'payment' || $receivablePrivileged) {
+    return;
+}
+
 $tenantFarmId = requireCurrentFarmId();
 $reportMode = (string)($_GET['report_mode'] ?? 'monthly');
 $month = (string)($_GET['month'] ?? date('Y-m'));
