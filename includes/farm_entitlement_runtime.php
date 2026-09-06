@@ -50,6 +50,15 @@ if (!function_exists('farm_entitlement_runtime_remove_nav_dropdown')) {
     }
 }
 
+if (!function_exists('farm_entitlement_runtime_delegated_expense_access')) {
+    function farm_entitlement_runtime_delegated_expense_access(string $module, string $permission): bool
+    {
+        if (!hasRole('sales_rep')) return false;
+        if (!function_exists('current_farm_has_entitlement') || !current_farm_has_entitlement($module)) return false;
+        return hasPermission(getUserType(), $permission);
+    }
+}
+
 $path = farm_entitlement_runtime_path();
 $routeModules = [
     '/poultry/layers_daily_record.php' => 'poultry',
@@ -67,18 +76,36 @@ $routeModules = [
     '/management/sales_records.php' => 'sales',
 ];
 
+$delegatedExpenseRoutes = [
+    '/poultry/layer_expenses.php' => ['module' => 'poultry', 'permission' => 'poultry_layer_expenses'],
+    '/poultry/broiler_expenses.php' => ['module' => 'poultry', 'permission' => 'poultry_broiler_expenses'],
+    '/ruminant/ruminant_expenses.php' => ['module' => 'ruminant', 'permission' => 'ruminant_expenses'],
+];
+
 foreach ($routeModules as $suffix => $module) {
-    if (farm_entitlement_runtime_ends_with($path, $suffix) && !user_can_access_entitled_module($module)) {
-        farm_entitlement_runtime_deny($module);
+    if (!farm_entitlement_runtime_ends_with($path, $suffix)) continue;
+    if (user_can_access_entitled_module($module)) continue;
+
+    $delegated = $delegatedExpenseRoutes[$suffix] ?? null;
+    if ($delegated
+        && farm_entitlement_runtime_delegated_expense_access($delegated['module'], $delegated['permission'])) {
+        continue;
     }
+
+    farm_entitlement_runtime_deny($module);
 }
 
-// Keep navigation presentation aligned with the same authoritative entitlement
-// boundary. Basic Sales is intentionally not stripped here: the canonical helper
-// makes Sales available whenever the farm has an operational subscription.
 if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'GET') {
     $allowPoultry = user_can_access_entitled_module('poultry');
     $allowRuminant = user_can_access_entitled_module('ruminant');
+
+    if (!$allowPoultry) {
+        $allowPoultry = farm_entitlement_runtime_delegated_expense_access('poultry', 'poultry_layer_expenses')
+            || farm_entitlement_runtime_delegated_expense_access('poultry', 'poultry_broiler_expenses');
+    }
+    if (!$allowRuminant) {
+        $allowRuminant = farm_entitlement_runtime_delegated_expense_access('ruminant', 'ruminant_expenses');
+    }
 
     if (!$allowPoultry || !$allowRuminant) {
         ob_start(static function (string $html) use ($allowPoultry, $allowRuminant): string {
