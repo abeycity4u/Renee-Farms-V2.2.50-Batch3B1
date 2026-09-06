@@ -99,6 +99,22 @@ if (!function_exists('farm_entitlement_available_specialist_roles')) {
     }
 }
 
+/**
+ * Shared Sales is an operational capability, not a standalone specialist module.
+ * Farm Admin, livestock managers and the dedicated Sales Representative may use it
+ * when the tenant entitlement and granular Sales permission allow the action.
+ */
+if (!function_exists('user_has_shared_sales_role')) {
+    function user_has_shared_sales_role(): bool
+    {
+        if (!function_exists('hasRole')) return false;
+        return hasRole('farm_admin')
+            || hasRole('poultry_manager')
+            || hasRole('ruminant_manager')
+            || hasRole('sales_rep');
+    }
+}
+
 if (!function_exists('current_farm_entitlement_modules')) {
     function current_farm_entitlement_modules(): array
     {
@@ -142,8 +158,8 @@ if (!function_exists('effective_user_modules')) {
         $effective = [];
         if (hasRole('poultry_manager') && in_array('poultry', $enabled, true)) $effective[] = 'poultry';
         if (hasRole('ruminant_manager') && in_array('ruminant', $enabled, true)) $effective[] = 'ruminant';
-        if (hasRole('sales_rep') && $salesAvailable) $effective[] = 'sales';
-        return $effective;
+        if ($salesAvailable && user_has_shared_sales_role()) $effective[] = 'sales';
+        return array_values(array_unique($effective));
     }
 }
 
