@@ -24,12 +24,7 @@ $receivableMethod = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 $receivablePrivileged = isPlatformOwner() || hasRole('farm_admin');
 
 if ($receivableMethod === 'GET') {
-    $canViewSales = $receivablePrivileged || hasPermission(getUserType(), 'sales');
-    $canAddSale = $canViewSales && ($receivablePrivileged || hasPermission(getUserType(), 'sales_add'));
     $canViewReceivables = $receivablePrivileged || hasPermission(getUserType(), 'sales_receivables');
-    $canRecordPayment = $canViewReceivables && ($receivablePrivileged || hasPermission(getUserType(), 'sales_payment'));
-    $dashboardAction = trim((string)($_GET['dashboard_action'] ?? ''));
-
     if (!$canViewReceivables) {
         // Do not allow an unauthorized customer query-string selection to drive
         // customer-specific ledger branches later in the legacy Sales page.
@@ -40,13 +35,7 @@ if ($receivableMethod === 'GET') {
         . htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8')
         . '">';
 
-    ob_start(static function (string $html) use (
-        $canViewReceivables,
-        $canAddSale,
-        $canRecordPayment,
-        $dashboardAction,
-        $csrfMarkup
-    ): string {
+    ob_start(static function (string $html) use ($canViewReceivables, $csrfMarkup): string {
         // Add a CSRF token to each Sales-page POST form. This is server-rendered,
         // so protection does not depend on JavaScript being available.
         $html = preg_replace_callback(
@@ -58,58 +47,29 @@ if ($receivableMethod === 'GET') {
         ) ?? $html;
 
         if ($canViewReceivables) {
-            // Stable anchor for dashboard links without duplicating the debt UI.
-            $html = str_replace(
-                '<div class="card border-secondary mb-4">',
-                '<div class="card border-secondary mb-4" id="customer-debt-management">',
-                $html
-            );
-        } else {
-            $salesTableMarker = '<!-- Sales Table -->';
-            $debtHeading = 'Customer Debt Management';
-            $cardStartNeedle = '<div class="card border-secondary mb-4">';
+            return $html;
+        }
 
-            $headingPos = strpos($html, $debtHeading);
-            $salesTablePos = strpos($html, $salesTableMarker);
-            if ($headingPos !== false && $salesTablePos !== false && $headingPos < $salesTablePos) {
-                $cardStart = strrpos(substr($html, 0, $headingPos), $cardStartNeedle);
-                if ($cardStart !== false) {
-                    $html = substr($html, 0, $cardStart) . substr($html, $salesTablePos);
-                }
+        $salesTableMarker = '<!-- Sales Table -->';
+        $debtHeading = 'Customer Debt Management';
+        $cardStartNeedle = '<div class="card border-secondary mb-4">';
+
+        $headingPos = strpos($html, $debtHeading);
+        $salesTablePos = strpos($html, $salesTableMarker);
+        if ($headingPos !== false && $salesTablePos !== false && $headingPos < $salesTablePos) {
+            $cardStart = strrpos(substr($html, 0, $headingPos), $cardStartNeedle);
+            if ($cardStart !== false) {
+                $html = substr($html, 0, $cardStart) . substr($html, $salesTablePos);
             }
-
-            // If the database feature probe rendered its legacy fallback instead of
-            // the debt card, hide that fallback from users who simply lack permission.
-            $html = preg_replace(
-                '#<div class="alert alert-warning">\s*Debt management tables are not available yet\.\s*Run migrations to enable customer credit tracking\.\s*</div>#i',
-                '',
-                $html
-            ) ?? $html;
         }
 
-        // Dashboard shortcuts reuse the existing Sales modals. They never create a
-        // second sale/payment workflow, and each shortcut is emitted only when the
-        // corresponding permission is currently effective.
-        $modalId = null;
-        if ($dashboardAction === 'add_sale' && $canAddSale) {
-            $modalId = 'addSaleModal';
-        } elseif ($dashboardAction === 'record_payment' && $canRecordPayment) {
-            $modalId = 'addPaymentModal';
-        }
-
-        if ($modalId !== null && stripos($html, '</body>') !== false) {
-            $modalIdJson = json_encode($modalId, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
-            $script = <<<HTML
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const modalElement = document.getElementById({$modalIdJson});
-    if (!modalElement || !window.bootstrap || !window.bootstrap.Modal) return;
-    window.bootstrap.Modal.getOrCreateInstance(modalElement).show();
-});
-</script>
-HTML;
-            $html = preg_replace('/<\/body>/i', $script . '</body>', $html, 1) ?? $html;
-        }
+        // If the database feature probe rendered its legacy fallback instead of
+        // the debt card, hide that fallback from users who simply lack permission.
+        $html = preg_replace(
+            '#<div class="alert alert-warning">\s*Debt management tables are not available yet\.\s*Run migrations to enable customer credit tracking\.\s*</div>#i',
+            '',
+            $html
+        ) ?? $html;
 
         return $html;
     });
