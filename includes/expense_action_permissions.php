@@ -7,10 +7,10 @@
  * row-scoped permission. This bridge prevents restricted controls from being
  * painted while those large pages are migrated gradually.
  *
- * A dedicated Sales Representative may optionally receive the general Expense &
- * Cost Report permissions, but that must never expose livestock operating costs.
- * Force that role's report/PDF scope to General before the legacy pages resolve
- * their filters.
+ * A dedicated Sales Representative may optionally receive General Expense Report
+ * permissions, but that must never expose livestock operating costs. Force that
+ * role's report/PDF scope to General before the legacy pages resolve their filters,
+ * and present the same fixed scope in the browser UI.
  */
 
 require_once __DIR__ . '/functions.php';
@@ -27,15 +27,42 @@ $dedicatedSalesRep = hasRole('sales_rep')
     && !hasRole('poultry_manager')
     && !hasRole('ruminant_manager');
 
-$isGeneralExpenseReport = $path === '/management/expenses.php'
-    || str_ends_with($path, '/management/expenses.php')
-    || $path === '/management/expense_report_pdf.php'
+$isExpenseReportPage = $path === '/management/expenses.php'
+    || str_ends_with($path, '/management/expenses.php');
+$isExpenseReportPdf = $path === '/management/expense_report_pdf.php'
     || str_ends_with($path, '/management/expense_report_pdf.php');
+$isGeneralExpenseReport = $isExpenseReportPage || $isExpenseReportPdf;
 
 if ($dedicatedSalesRep && $isGeneralExpenseReport) {
     // Sales Representatives can be granted General/commercial expense reporting
     // without gaining visibility into Layer, Broiler or Ruminant operating costs.
     $_GET['farm_type'] = 'general';
+    $_GET['production_type'] = 'all';
+
+    if ($isExpenseReportPage) {
+        // The legacy report previously offered livestock scopes that were then
+        // rejected server-side. Keep the control IDs for its existing JavaScript,
+        // but render the only scope this role can actually use.
+        ob_start(static function (string $html): string {
+            $generalFarmSelect = '<select class="form-select" id="farmTypeFilter" style="width: 150px;" disabled aria-label="General expenses only"><option value="general" selected>General</option></select>';
+            $html = preg_replace(
+                '~<select class="form-select" id="farmTypeFilter"[^>]*>.*?</select>~s',
+                $generalFarmSelect,
+                $html,
+                1
+            ) ?? $html;
+
+            $generalProductionSelect = '<select class="form-select" id="productionTypeFilter" style="width: 190px;" disabled aria-label="General expenses only"><option value="all" selected>General expenses only</option></select>';
+            $html = preg_replace(
+                '~<select class="form-select" id="productionTypeFilter"[^>]*>.*?</select>~s',
+                $generalProductionSelect,
+                $html,
+                1
+            ) ?? $html;
+
+            return $html;
+        });
+    }
 }
 
 $permissionPair = null;
