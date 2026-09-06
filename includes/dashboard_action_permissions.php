@@ -77,6 +77,32 @@ $dedicatedSalesRep = hasRole('sales_rep')
     && !$privileged
     && !hasRole('poultry_manager')
     && !hasRole('ruminant_manager');
+$canViewReceivables = $canViewSales
+    && ($privileged || hasPermission(getUserType(), 'sales_receivables'));
+
+$receivablesOutstanding = 0.0;
+$receivablesCustomerCount = 0;
+if ($dedicatedSalesRep && $canViewReceivables) {
+    try {
+        $receivableSummaryStmt = $pdo->prepare(
+            'SELECT customer_name, SUM(amount) AS balance
+             FROM customer_ledger_entries
+             WHERE farm_id = ?
+             GROUP BY customer_name'
+        );
+        $receivableSummaryStmt->execute([requireCurrentFarmId()]);
+        foreach ($receivableSummaryStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $balance = (float)($row['balance'] ?? 0);
+            if ($balance > 0) {
+                $receivablesOutstanding += $balance;
+                $receivablesCustomerCount++;
+            }
+        }
+    } catch (Throwable $e) {
+        // Keep Dashboard available if the receivables feature is unavailable.
+        $canViewReceivables = false;
+    }
+}
 
 ob_start(static function (string $html) use (
     $canViewInventory,
@@ -85,7 +111,10 @@ ob_start(static function (string $html) use (
     $canViewProfitability,
     $canViewIntelligence,
     $canUpdateStock,
-    $dedicatedSalesRep
+    $dedicatedSalesRep,
+    $canViewReceivables,
+    $receivablesOutstanding,
+    $receivablesCustomerCount
 ): string {
     if (!$canViewExpenses) {
         $html = dashboard_action_remove_div_containing($html, '<span>Total Operating Cost</span>', 'col-');
@@ -132,8 +161,8 @@ ob_start(static function (string $html) use (
 
         // A dedicated Sales Representative has no native Quick Actions. Once the
         // stock card is removed, the left 8-column region is intentionally empty.
-        // Remove that empty layout column and let the native Recent Sales panel use
-        // the available width instead of inventing a second Sales workspace.
+        // Remove that empty layout column and let the native Sales monitoring panels
+        // use the available width instead of inventing a second action workspace.
         if ($dedicatedSalesRep) {
             $html = dashboard_action_remove_div_containing($html, '<!-- Current Stock Levels -->', 'col-xl-8');
             $html = preg_replace(
@@ -143,6 +172,39 @@ ob_start(static function (string $html) use (
                 1
             ) ?? $html;
         }
+    }
+
+    if ($dedicatedSalesRep && $canViewReceivables) {
+        $outstanding = htmlspecialchars(number_format($receivablesOutstanding, 2), ENT_QUOTES, 'UTF-8');
+        $customerCount = (int)$receivablesCustomerCount;
+        $customerLabel = $customerCount === 1 ? 'customer owing' : 'customers owing';
+        $receivableCard = <<<HTML
+                <div class="card dashboard-card ops-card side-panel-card mb-4" id="salesReceivablesSummary">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="section-eyebrow">Receivables</span>
+                            <h5 class="mb-0"><i class="bi bi-wallet2 text-warning"></i> Customer Balances</h5>
+                        </div>
+                        <span class="badge bg-warning-subtle text-warning">{$customerCount} {$customerLabel}</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-end gap-3 flex-wrap">
+                            <div>
+                                <div class="text-muted small">Outstanding customer balance</div>
+                                <div class="fs-4 fw-bold">₦{$outstanding}</div>
+                            </div>
+                            <div class="text-muted small">Read-only dashboard summary</div>
+                        </div>
+                    </div>
+                </div>
+
+HTML;
+        $html = preg_replace(
+            '~(\s*<!-- Recent Sales -->)~',
+            "\n" . $receivableCard . '$1',
+            $html,
+            1
+        ) ?? $html;
     }
 
     // Stock mutation controls are meaningful only when Inventory itself is visible.
