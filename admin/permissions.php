@@ -45,13 +45,10 @@ $permissionGroupClasses = [
     'Cycles, Reports & Team' => 'permission-group-cycles',
 ];
 
-$enabledRoleStmt=$pdo->prepare('SELECT module_code FROM farm_modules WHERE farm_id=? AND is_enabled=1');
-$enabledRoleStmt->execute([$permissionFarmId]);
-$enabledModules=$enabledRoleStmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
-$roles=[];
-if(in_array('poultry',$enabledModules,true)) $roles[]='poultry_manager';
-if(in_array('ruminant',$enabledModules,true)) $roles[]='ruminant_manager';
-if(in_array('sales',$enabledModules,true)) $roles[]='sales_rep';
+// Specialist role availability comes from the canonical farm entitlement layer.
+// In particular, Sales Representative follows shared Sales availability and does
+// not require a legacy standalone farm_modules.sales row.
+$roles = farm_entitlement_available_specialist_roles($pdo, $permissionFarmId);
 
 $roleLabels = [
     'poultry_manager' => 'Poultry Manager',
