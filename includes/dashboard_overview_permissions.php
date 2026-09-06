@@ -101,16 +101,15 @@ function dashboard_overview_filter_ticker(string $html, bool $allowPoultry, bool
 if (!function_exists('dashboard_overview_filter_operational_surfaces')) {
 function dashboard_overview_filter_operational_surfaces(string $html, bool $allowPoultry, bool $allowRuminant): string
 {
+    // Livestock Overview governs production overview surfaces only. Inventory
+    // rows and stock filters are governed separately by Inventory View and by
+    // the user's actual livestock role/farm scope in dashboard.php.
     if (!$allowPoultry) {
         $html = preg_replace('~\s*<a href="poultry/(?:layers_daily_record|broiler_daily_record)\.php" class="smart-action-card[^>]*>.*?</a>~s', '', $html) ?? $html;
-        $html = preg_replace('~\s*<li><a class="dropdown-item" href="#" data-stock-filter="poultry">.*?</a></li>~s', '', $html) ?? $html;
-        $html = preg_replace('~\s*<tr data-farm-type="poultry".*?</tr>~s', '', $html) ?? $html;
     }
 
     if (!$allowRuminant) {
         $html = preg_replace('~\s*<a href="ruminant/ruminant_daily_record\.php" class="smart-action-card[^>]*>.*?</a>~s', '', $html) ?? $html;
-        $html = preg_replace('~\s*<li><a class="dropdown-item" href="#" data-stock-filter="ruminant">.*?</a></li>~s', '', $html) ?? $html;
-        $html = preg_replace('~\s*<tr data-farm-type="ruminant".*?</tr>~s', '', $html) ?? $html;
     }
 
     return $html;
