@@ -3,6 +3,8 @@
 if (!function_exists('permission_catalog')) {
 function permission_catalog(): array
 {
+    $sharedSalesRoles = ['poultry_manager','ruminant_manager','sales_rep'];
+
     return [
         'Poultry Operations' => [
             'poultry_overview' => ['label' => 'Poultry Overview', 'action' => 'View', 'description' => 'View the Poultry dashboard and overall summary.', 'roles' => ['poultry_manager']],
@@ -29,7 +31,7 @@ function permission_catalog(): array
             'poultry_broiler_expenses' => ['label' => 'Broiler Expenses', 'action' => 'View', 'description' => 'View Broiler expense records.', 'roles' => ['poultry_manager','sales_rep']],
             'poultry_broiler_expenses_add' => ['label' => 'Broiler Expenses', 'action' => 'Add', 'description' => 'Record new Broiler non-stock expenses.', 'roles' => ['poultry_manager','sales_rep']],
             'poultry_broiler_expenses_edit' => ['label' => 'Broiler Expenses', 'action' => 'Edit', 'description' => 'Modify existing Broiler expense records.', 'roles' => ['poultry_manager','sales_rep']],
-            'poultry_broiler_expenses_delete' => ['label' => 'Broiler Expenses', 'action' => 'Delete', 'description' => 'Delete Broiler expense records.', 'roles' => ['poultry_manager','sales_rep']],
+            'poultry_broiler_expenses_delete' => ['label' => 'Broiler Expenses', 'action' => 'Delete', 'description' => 'Delete Layer expense records.', 'roles' => ['poultry_manager','sales_rep']],
         ],
         'Ruminant Operations' => [
             'ruminant_overview' => ['label' => 'Ruminant Overview', 'action' => 'View', 'description' => 'View the Ruminant dashboard and overall summary.', 'roles' => ['ruminant_manager']],
@@ -54,14 +56,14 @@ function permission_catalog(): array
             'update_stock' => ['label' => 'Inventory', 'action' => 'Update Stock', 'description' => 'Post received/used stock quantities and adjustments.', 'roles' => ['poultry_manager','ruminant_manager']],
         ],
         'Sales & General Expenses' => [
-            'sales' => ['label' => 'Sales Records', 'action' => 'View', 'description' => 'View sales records and receivable history.', 'roles' => ['sales_rep']],
-            'sales_add' => ['label' => 'Sales Records', 'action' => 'Add Sale', 'description' => 'Record a new sale.', 'roles' => ['sales_rep']],
-            'sales_edit' => ['label' => 'Sales Records', 'action' => 'Edit', 'description' => 'Modify existing sales records, including linked receivable and allocation synchronization.', 'roles' => ['sales_rep']],
-            'sales_delete' => ['label' => 'Sales Records', 'action' => 'Delete', 'description' => 'Delete sales records using the existing receivable, allocation and lifecycle safety checks.', 'roles' => ['sales_rep']],
-            'sales_receivables' => ['label' => 'Sales Receivables', 'action' => 'View', 'description' => 'View customer debt balances, credit sales and payment history.', 'roles' => ['sales_rep']],
-            'sales_payment' => ['label' => 'Sales Receivables', 'action' => 'Record Payment', 'description' => 'Record payments against outstanding customer debt.', 'roles' => ['sales_rep']],
-            'sales_receivables_edit' => ['label' => 'Sales Receivables', 'action' => 'Edit', 'description' => 'Modify eligible sales receivable and payment records.', 'roles' => ['sales_rep']],
-            'sales_receivables_delete' => ['label' => 'Sales Receivables', 'action' => 'Delete', 'description' => 'Delete eligible sales receivable and payment records.', 'roles' => ['sales_rep']],
+            'sales' => ['label' => 'Sales Records', 'action' => 'View', 'description' => 'View sales records and receivable history.', 'roles' => $sharedSalesRoles],
+            'sales_add' => ['label' => 'Sales Records', 'action' => 'Add Sale', 'description' => 'Record a new sale.', 'roles' => $sharedSalesRoles],
+            'sales_edit' => ['label' => 'Sales Records', 'action' => 'Edit', 'description' => 'Modify existing sales records, including linked receivable and allocation synchronization.', 'roles' => $sharedSalesRoles],
+            'sales_delete' => ['label' => 'Sales Records', 'action' => 'Delete', 'description' => 'Delete sales records using the existing receivable, allocation and lifecycle safety checks.', 'roles' => $sharedSalesRoles],
+            'sales_receivables' => ['label' => 'Sales Receivables', 'action' => 'View', 'description' => 'View customer debt balances, credit sales and payment history.', 'roles' => $sharedSalesRoles],
+            'sales_payment' => ['label' => 'Sales Receivables', 'action' => 'Record Payment', 'description' => 'Record payments against outstanding customer debt.', 'roles' => $sharedSalesRoles],
+            'sales_receivables_edit' => ['label' => 'Sales Receivables', 'action' => 'Edit', 'description' => 'Modify eligible sales receivable and payment records.', 'roles' => $sharedSalesRoles],
+            'sales_receivables_delete' => ['label' => 'Sales Receivables', 'action' => 'Delete', 'description' => 'Delete eligible sales receivable and payment records.', 'roles' => $sharedSalesRoles],
             'expenses' => ['label' => 'Expense & Cost Report', 'action' => 'View', 'description' => 'View entire farm expense and cost records.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
             'expenses_edit' => ['label' => 'Expense & Cost Report', 'action' => 'Edit', 'description' => 'Modify eligible expense records from the Expense & Cost Report page.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
             'expenses_delete' => ['label' => 'Expense & Cost Report', 'action' => 'Delete', 'description' => 'Delete eligible expense records from the Expense & Cost Report page.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
