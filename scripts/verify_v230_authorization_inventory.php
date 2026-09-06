@@ -295,12 +295,31 @@ auth_inv_check('Inventory legacy POSTs are centrally CSRF-gated',
 auth_inv_check('Sales legacy POSTs are centrally CSRF-gated',
     str_contains($closure, "'/management/sales_records.php'") && str_contains($closure, 'require_valid_csrf_post()'));
 
-// This verifier itself must remain static/read-only.
+// This verifier itself must remain static/read-only. Inspect PHP tokens rather
+// than searching source text, so security keywords inside this check do not
+// create false positives.
 $self = file_get_contents(__FILE__) ?: '';
+$hasBootstrapInclude = false;
+$hasPdoConstruction = false;
+$afterNew = false;
+foreach (token_get_all($self) as $token) {
+    if (!is_array($token)) continue;
+    [$tokenId, $tokenText] = $token;
+    if (in_array($tokenId, [T_REQUIRE, T_REQUIRE_ONCE, T_INCLUDE, T_INCLUDE_ONCE], true)) {
+        $hasBootstrapInclude = true;
+    }
+    if ($tokenId === T_NEW) {
+        $afterNew = true;
+        continue;
+    }
+    if ($afterNew && $tokenId === T_WHITESPACE) continue;
+    if ($afterNew) {
+        if ($tokenId === T_STRING && strcasecmp($tokenText, 'PDO') === 0) $hasPdoConstruction = true;
+        $afterNew = false;
+    }
+}
 auth_inv_check('authorization verifier contains no database bootstrap',
-    !str_contains($self, "require 'config.php'")
-    && !str_contains($self, 'require_once')
-    && !str_contains($self, 'new PDO'));
+    !$hasBootstrapInclude && !$hasPdoConstruction);
 
 echo "\n" . count($checks) . " checks, $failures failure(s).\n";
 if ($failures === 0) {
