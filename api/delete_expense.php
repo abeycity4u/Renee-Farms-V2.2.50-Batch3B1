@@ -15,7 +15,8 @@ try {
  $find->execute([(int)$id,$farmId]); $row=$find->fetch(PDO::FETCH_ASSOC);
  if(!$row) { $pdo->rollBack(); send_json(['success'=>false,'error'=>'Record not found.'],404); }
  $requiredPermission=permission_catalog_expense_action_code($row,'delete');
- if (!isPlatformOwner() && !hasRole('farm_admin') && (!$requiredPermission || !hasPermission(getUserType(), $requiredPermission))) {
+ $viewPermission=$requiredPermission ? preg_replace('/_delete$/','',$requiredPermission) : null;
+ if (!isPlatformOwner() && !hasRole('farm_admin') && (!$requiredPermission || !$viewPermission || !hasPermission(getUserType(), $viewPermission) || !hasPermission(getUserType(), $requiredPermission))) {
   $pdo->rollBack(); send_json(['success'=>false,'error'=>'You do not have permission to delete this expense record.'],403);
  }
  audit_log_event('delete','expense',$id,['before'=>$row]);
