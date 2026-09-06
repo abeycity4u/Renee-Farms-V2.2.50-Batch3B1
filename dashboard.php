@@ -1462,12 +1462,14 @@ $pageTitle = "Dashboard";
     <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/main.js'); ?>"></script>
     
     <script>
+    let dashboardLowStockCount = <?php echo (int)$lowStockCount; ?>;
+
     // Initialize dashboard
     $(document).ready(function() {
         // Initialize tooltips
         $('[title]').tooltip();
         
-        // Auto-refresh stock every 30 seconds
+        // Auto-refresh stock every 30 seconds without reloading or moving the page.
         setInterval(refreshStockData, 30000);
         
         // Check for new notifications
@@ -1613,24 +1615,22 @@ $pageTitle = "Dashboard";
         });
     });
     
-    // Refresh stock data
+    // Refresh low-stock status in the background without changing scroll position.
     function refreshStockData() {
         fetch(`api/get_stock_summary.php?farm_type=<?php echo $farmAccess; ?>`)
             .then(response => response.json())
             .then(data => {
                 if (data && data.updated) {
-                    // Update stock counters if changed significantly
-                    const lowStockCount = data.low_stock_count || 0;
-                    const currentLowCount = <?php echo $lowStockCount; ?>;
-                    
-                    if (Math.abs(lowStockCount - currentLowCount) > 0) {
-                        // Show notification
-                        if (lowStockCount > currentLowCount) {
-                            showAlert('warning', `${lowStockCount - currentLowCount} new items are now low on stock!`);
+                    const lowStockCount = Number(data.low_stock_count || 0);
+                    const previousLowStockCount = dashboardLowStockCount;
+
+                    if (lowStockCount !== previousLowStockCount) {
+                        updateNotificationBadge(lowStockCount);
+                        if (lowStockCount > previousLowStockCount) {
+                            const added = lowStockCount - previousLowStockCount;
+                            showAlert('warning', `${added} new item${added > 1 ? 's are' : ' is'} now low on stock!`);
                         }
-                        
-                        // Reload the page to show updated data
-                        location.reload();
+                        dashboardLowStockCount = lowStockCount;
                     }
                 }
             });
@@ -1694,7 +1694,7 @@ $pageTitle = "Dashboard";
     function showAlert(type, message, duration = 5000) {
         const mapped = type === 'danger' ? 'error' : type;
         if (window.AppNotify) {
-            return AppNotify.show(mapped, message);
+            return AppNotify.show(mapped, message, null, null, duration);
         }
     }
     
