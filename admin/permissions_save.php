@@ -26,13 +26,9 @@ if (isPlatformOwner()) {
     }
 }
 
-$enabledRoleStmt=$pdo->prepare('SELECT module_code FROM farm_modules WHERE farm_id=? AND is_enabled=1');
-$enabledRoleStmt->execute([$permissionFarmId]);
-$enabledModules=$enabledRoleStmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
-$roles=[];
-if(in_array('poultry',$enabledModules,true)) $roles[]='poultry_manager';
-if(in_array('ruminant',$enabledModules,true)) $roles[]='ruminant_manager';
-if(in_array('sales',$enabledModules,true)) $roles[]='sales_rep';
+// Use the same canonical entitlement helper as the permission matrix display so
+// a role can never be visible but silently skipped on save (or vice versa).
+$roles = farm_entitlement_available_specialist_roles($pdo, $permissionFarmId);
 
 $modules = permission_catalog_codes();
 $incoming = isset($_POST['perm']) && is_array($_POST['perm']) ? $_POST['perm'] : [];
