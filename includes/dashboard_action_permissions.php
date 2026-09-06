@@ -80,8 +80,32 @@ $dedicatedSalesRep = hasRole('sales_rep')
 $canViewReceivables = $canViewSales
     && ($privileged || hasPermission(getUserType(), 'sales_receivables'));
 
+$salesMonthTotal = 0.0;
+$salesMonthCount = 0;
 $receivablesOutstanding = 0.0;
 $receivablesCustomerCount = 0;
+$receivableCustomers = [];
+
+if ($dedicatedSalesRep && $canViewSales) {
+    try {
+        $salesSummaryStmt = $pdo->prepare(
+            'SELECT COALESCE(SUM(total_amount), 0) AS total_sales, COUNT(*) AS transaction_count
+             FROM sales_records
+             WHERE farm_id = ? AND sale_date BETWEEN ? AND ?'
+        );
+        $salesSummaryStmt->execute([
+            requireCurrentFarmId(),
+            date('Y-m-01'),
+            date('Y-m-t'),
+        ]);
+        $salesSummary = $salesSummaryStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $salesMonthTotal = (float)($salesSummary['total_sales'] ?? 0);
+        $salesMonthCount = (int)($salesSummary['transaction_count'] ?? 0);
+    } catch (Throwable $e) {
+        // Keep Dashboard available if a summary query cannot run.
+    }
+}
+
 if ($dedicatedSalesRep && $canViewReceivables) {
     try {
         $receivableSummaryStmt = $pdo->prepare(
@@ -93,14 +117,22 @@ if ($dedicatedSalesRep && $canViewReceivables) {
         $receivableSummaryStmt->execute([requireCurrentFarmId()]);
         foreach ($receivableSummaryStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $balance = (float)($row['balance'] ?? 0);
-            if ($balance > 0) {
-                $receivablesOutstanding += $balance;
-                $receivablesCustomerCount++;
-            }
+            if ($balance <= 0) continue;
+            $receivablesOutstanding += $balance;
+            $receivablesCustomerCount++;
+            $receivableCustomers[] = [
+                'customer_name' => (string)($row['customer_name'] ?? 'Customer'),
+                'balance' => $balance,
+            ];
         }
+        usort($receivableCustomers, static fn(array $a, array $b): int => $b['balance'] <=> $a['balance']);
+        $receivableCustomers = array_slice($receivableCustomers, 0, 5);
     } catch (Throwable $e) {
         // Keep Dashboard available if the receivables feature is unavailable.
         $canViewReceivables = false;
+        $receivablesOutstanding = 0.0;
+        $receivablesCustomerCount = 0;
+        $receivableCustomers = [];
     }
 }
 
@@ -113,18 +145,29 @@ ob_start(static function (string $html) use (
     $canUpdateStock,
     $dedicatedSalesRep,
     $canViewReceivables,
+    $salesMonthTotal,
+    $salesMonthCount,
     $receivablesOutstanding,
-    $receivablesCustomerCount
+    $receivablesCustomerCount,
+    $receivableCustomers
 ): string {
-    if (!$canViewExpenses) {
+    // A dedicated Sales Representative dashboard stays Sales/Receivables-only.
+    // Optional Expense/Profitability permissions affect their destination pages,
+    // not the dashboard composition.
+    $showExpenseDashboard = !$dedicatedSalesRep && $canViewExpenses;
+    $showProfitabilityDashboard = !$dedicatedSalesRep && $canViewProfitability;
+    $showIntelligenceDashboard = !$dedicatedSalesRep && $canViewIntelligence;
+    $showInventoryDashboard = !$dedicatedSalesRep && $canViewInventory;
+
+    if (!$showExpenseDashboard) {
         $html = dashboard_action_remove_div_containing($html, '<span>Total Operating Cost</span>', 'col-');
     }
 
-    if (!$canViewProfitability) {
+    if (!$showProfitabilityDashboard) {
         $html = dashboard_action_remove_div_containing($html, '<span>Net Profit (This Month)</span>', 'col-');
     }
 
-    if (!$canViewIntelligence) {
+    if (!$showIntelligenceDashboard) {
         $html = preg_replace(
             '~\s*<!-- Management Intelligence -->.*?(?=\s*<!-- Main Content Area -->)~s',
             "\n        <!-- Management Intelligence hidden by permission -->\n        ",
@@ -138,39 +181,117 @@ ob_start(static function (string $html) use (
         $html = dashboard_action_remove_card_containing($html, '<i class="bi bi-graph-up text-success"></i>');
     }
 
-    if (!$canViewInventory) {
-        // Inventory summary figures belong to Inventory View.
+    if (!$showInventoryDashboard) {
         $html = dashboard_action_remove_div_containing($html, '<span>Items in Stock</span>', 'col-');
         $html = dashboard_action_remove_div_containing($html, '<span>Today\'s Activities</span>', 'col-');
         $html = dashboard_action_remove_div_containing($html, '<span>Inventory Coverage</span>', 'col-');
 
-        // Inventory monitoring surfaces on the dashboard.
         $html = dashboard_action_remove_card_containing($html, 'Smart Stock Control');
-        $html = dashboard_action_remove_card_containing($html, 'Today\'s Transactions');
-        $html = dashboard_action_remove_card_containing($html, 'Critical Inventory Snapshot');
-        // Anchor inside the rendered card, not on the preceding <!-- Low Stock Alerts --> comment.
+        // Use an inner-card icon so the preceding <!-- Today\'s Transactions --> comment cannot become the anchor.
+        $html = dashboard_action_remove_card_containing($html, '<i class="bi bi-clock-history text-info"></i>');
+        $html = dashboard_action_remove_card_containing($html, '<i class="bi bi-speedometer2 text-danger"></i>');
         $html = dashboard_action_remove_card_containing($html, '<i class="bi bi-exclamation-triangle"></i>');
 
-        // Non-Sales specialist dashboards have native Quick Actions; do not leave an
-        // Inventory shortcut visible when Inventory View itself is denied.
         $html = preg_replace(
             '~\s*<a href="inventory\.php" class="smart-action-card[^>]*>.*?</a>~s',
             '',
             $html
         ) ?? $html;
 
-        // A dedicated Sales Representative has no native Quick Actions. Once the
-        // stock card is removed, the left 8-column region is intentionally empty.
-        // Remove that empty layout column and let the native Sales monitoring panels
-        // use the available width instead of inventing a second action workspace.
         if ($dedicatedSalesRep) {
             $html = dashboard_action_remove_div_containing($html, '<!-- Current Stock Levels -->', 'col-xl-8');
             $html = preg_replace(
                 '~(<!-- Right Column: Recent Activity & Alerts -->\s*)<div class="col-xl-4">~',
-                '$1<div class="col-12">',
+                '$1<div class="col-12 sales-rep-monitoring-column">',
                 $html,
                 1
             ) ?? $html;
+        }
+    }
+
+    if ($dedicatedSalesRep && $canViewSales) {
+        $monthLabel = htmlspecialchars(date('F Y'), ENT_QUOTES, 'UTF-8');
+        $salesTotal = htmlspecialchars(number_format($salesMonthTotal, 2), ENT_QUOTES, 'UTF-8');
+        $salesCount = number_format($salesMonthCount);
+        $summaryCards = <<<HTML
+        <div class="row g-3 mb-4 sales-rep-summary-grid">
+            <div class="col-md-6 col-xl-3">
+                <div class="card dashboard-card sales-summary-card h-100">
+                    <div class="card-body">
+                        <span class="sales-summary-icon text-success"><i class="bi bi-cash-stack"></i></span>
+                        <div class="sales-summary-label">Sales this month</div>
+                        <div class="sales-summary-value">₦{$salesTotal}</div>
+                        <div class="sales-summary-subtext">{$monthLabel}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-xl-3">
+                <div class="card dashboard-card sales-summary-card h-100">
+                    <div class="card-body">
+                        <span class="sales-summary-icon text-info"><i class="bi bi-receipt"></i></span>
+                        <div class="sales-summary-label">Sales transactions</div>
+                        <div class="sales-summary-value">{$salesCount}</div>
+                        <div class="sales-summary-subtext">Recorded this month</div>
+                    </div>
+                </div>
+            </div>
+HTML;
+
+        if ($canViewReceivables) {
+            $outstanding = htmlspecialchars(number_format($receivablesOutstanding, 2), ENT_QUOTES, 'UTF-8');
+            $customerCount = number_format($receivablesCustomerCount);
+            $summaryCards .= <<<HTML
+            <div class="col-md-6 col-xl-3">
+                <div class="card dashboard-card sales-summary-card h-100">
+                    <div class="card-body">
+                        <span class="sales-summary-icon text-warning"><i class="bi bi-wallet2"></i></span>
+                        <div class="sales-summary-label">Outstanding receivables</div>
+                        <div class="sales-summary-value">₦{$outstanding}</div>
+                        <div class="sales-summary-subtext">Customer debt balance</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-xl-3">
+                <div class="card dashboard-card sales-summary-card h-100">
+                    <div class="card-body">
+                        <span class="sales-summary-icon text-warning"><i class="bi bi-people"></i></span>
+                        <div class="sales-summary-label">Customers owing</div>
+                        <div class="sales-summary-value">{$customerCount}</div>
+                        <div class="sales-summary-subtext">With outstanding balances</div>
+                    </div>
+                </div>
+            </div>
+HTML;
+        }
+
+        $summaryCards .= "        </div>\n";
+        $html = preg_replace(
+            '~(\s*<!-- Dashboard Statistics -->)~',
+            "\n" . $summaryCards . '$1',
+            $html,
+            1
+        ) ?? $html;
+
+        $salesCss = <<<'HTML'
+<style id="sales-rep-dashboard-polish">
+body.dashboard-role-sales_rep .dashboard-hero .card-body{padding:1.15rem 1.25rem;}
+body.dashboard-role-sales_rep .dashboard-container{max-width:1680px;margin-left:auto;margin-right:auto;}
+body.dashboard-role-sales_rep .sales-rep-summary-grid{margin-top:-.35rem;}
+body.dashboard-role-sales_rep .sales-summary-card{border:1px solid rgba(148,163,184,.16);box-shadow:0 10px 28px rgba(2,8,23,.12);}
+body.dashboard-role-sales_rep .sales-summary-card .card-body{position:relative;padding:1rem 1.05rem;min-height:128px;}
+body.dashboard-role-sales_rep .sales-summary-icon{position:absolute;right:1rem;top:1rem;width:38px;height:38px;border-radius:12px;background:rgba(148,163,184,.10);display:grid;place-items:center;font-size:1.05rem;}
+body.dashboard-role-sales_rep .sales-summary-label{font-size:.76rem;text-transform:uppercase;letter-spacing:.045em;color:#94a3b8;margin-bottom:.45rem;padding-right:48px;}
+body.dashboard-role-sales_rep .sales-summary-value{font-size:1.45rem;font-weight:750;line-height:1.15;}
+body.dashboard-role-sales_rep .sales-summary-subtext{font-size:.78rem;color:#94a3b8;margin-top:.45rem;}
+body.dashboard-role-sales_rep #salesReceivablesSummary .receivable-total{font-size:1.55rem;font-weight:750;}
+body.dashboard-role-sales_rep #salesReceivablesSummary .receivable-row{display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.7rem 0;border-top:1px solid rgba(148,163,184,.14);}
+body.dashboard-role-sales_rep #salesReceivablesSummary .receivable-row:first-of-type{border-top:0;}
+body.dashboard-role-sales_rep .sales-rep-monitoring-column>.dashboard-card{margin-bottom:1rem!important;}
+@media(max-width:767.98px){body.dashboard-role-sales_rep .sales-summary-card .card-body{min-height:112px;}body.dashboard-role-sales_rep .sales-summary-value{font-size:1.25rem;}}
+</style>
+HTML;
+        if (stripos($html, '</head>') !== false) {
+            $html = preg_replace('/<\/head>/i', $salesCss . '</head>', $html, 1) ?? $html;
         }
     }
 
@@ -178,9 +299,19 @@ ob_start(static function (string $html) use (
         $outstanding = htmlspecialchars(number_format($receivablesOutstanding, 2), ENT_QUOTES, 'UTF-8');
         $customerCount = (int)$receivablesCustomerCount;
         $customerLabel = $customerCount === 1 ? 'customer owing' : 'customers owing';
+        $rows = '';
+        foreach ($receivableCustomers as $customer) {
+            $name = htmlspecialchars($customer['customer_name'], ENT_QUOTES, 'UTF-8');
+            $balance = htmlspecialchars(number_format((float)$customer['balance'], 2), ENT_QUOTES, 'UTF-8');
+            $rows .= '<div class="receivable-row"><span class="fw-semibold">' . $name . '</span><span class="fw-bold text-warning">₦' . $balance . '</span></div>';
+        }
+        if ($rows === '') {
+            $rows = '<div class="text-muted small py-2">No outstanding customer balances.</div>';
+        }
+
         $receivableCard = <<<HTML
                 <div class="card dashboard-card ops-card side-panel-card mb-4" id="salesReceivablesSummary">
-                    <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <div>
                             <span class="section-eyebrow">Receivables</span>
                             <h5 class="mb-0"><i class="bi bi-wallet2 text-warning"></i> Customer Balances</h5>
@@ -188,13 +319,14 @@ ob_start(static function (string $html) use (
                         <span class="badge bg-warning-subtle text-warning">{$customerCount} {$customerLabel}</span>
                     </div>
                     <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-end gap-3 flex-wrap">
+                        <div class="d-flex justify-content-between align-items-end gap-3 flex-wrap mb-3">
                             <div>
                                 <div class="text-muted small">Outstanding customer balance</div>
-                                <div class="fs-4 fw-bold">₦{$outstanding}</div>
+                                <div class="receivable-total">₦{$outstanding}</div>
                             </div>
-                            <div class="text-muted small">Read-only dashboard summary</div>
+                            <div class="text-muted small">Top outstanding customers</div>
                         </div>
+                        {$rows}
                     </div>
                 </div>
 
@@ -208,7 +340,7 @@ HTML;
     }
 
     // Stock mutation controls are meaningful only when Inventory itself is visible.
-    if ($canViewInventory && !$canUpdateStock) {
+    if ($showInventoryDashboard && !$canUpdateStock) {
         $style = '<style id="dashboard-stock-update-prepaint">#stockTable button[onclick^="quickStockUpdate("]{display:none!important}</style>';
         if (stripos($html, '</head>') !== false) {
             $html = preg_replace('/<\/head>/i', $style . '</head>', $html, 1) ?? $html;
@@ -233,10 +365,7 @@ HTML;
         if (stripos($html, '</body>') !== false) {
             $html = preg_replace('/<\/body>/i', $script . '</body>', $html, 1) ?? $html;
         }
-    } elseif ($canViewInventory && $canUpdateStock) {
-        // Keep the Dashboard deliberately lighter than Inventory: it records only
-        // operational consumption. Receiving stock and economic basis belong to
-        // the full Inventory workflow.
+    } elseif ($showInventoryDashboard && $canUpdateStock) {
         $html = str_replace(
             '<h5 class="modal-title">Quick Stock Update</h5>',
             '<h5 class="modal-title">Quick Stock Use</h5>',
@@ -264,10 +393,6 @@ HTML;
             $html
         );
 
-        // The legacy Dashboard submits JSON without the X-CSRF-Token required by
-        // api/update_stock.php and reads only data.message even though API failures
-        // use data.error. Intercept only this Dashboard form and leave the API as the
-        // authoritative permission/tenant/validation boundary.
         $script = <<<'HTML'
 <script>
 document.addEventListener('DOMContentLoaded',function(){
