@@ -64,17 +64,17 @@ function permission_catalog(): array
             'sales_payment' => ['label' => 'Sales Receivables', 'action' => 'Record Payment', 'description' => 'Record payments against outstanding customer debt.', 'roles' => $sharedSalesRoles],
             'sales_receivables_edit' => ['label' => 'Sales Receivables', 'action' => 'Edit', 'description' => 'Modify eligible sales receivable and payment records.', 'roles' => $sharedSalesRoles],
             'sales_receivables_delete' => ['label' => 'Sales Receivables', 'action' => 'Delete', 'description' => 'Delete eligible sales receivable and payment records.', 'roles' => $sharedSalesRoles],
-            'expenses' => ['label' => 'Expense & Cost Report', 'action' => 'View', 'description' => 'View general farm expense and cost records. Dedicated Sales Representatives are limited to General expenses.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
-            'expenses_edit' => ['label' => 'Expense & Cost Report', 'action' => 'Edit', 'description' => 'Modify eligible General expense records for a dedicated Sales Representative; managers retain their normal scoped expense access.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
-            'expenses_delete' => ['label' => 'Expense & Cost Report', 'action' => 'Delete', 'description' => 'Delete eligible General expense records for a dedicated Sales Representative; managers retain their normal scoped expense access.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
+            'expenses' => ['label' => 'General Expense Report', 'action' => 'View', 'description' => 'View General/commercial expense records. Dedicated Sales Representatives never receive Poultry or Ruminant operating expenses.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
+            'expenses_edit' => ['label' => 'General Expense Report', 'action' => 'Edit', 'description' => 'Modify eligible General/commercial expense records. Dedicated Sales Representatives remain limited to General expenses.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
+            'expenses_delete' => ['label' => 'General Expense Report', 'action' => 'Delete', 'description' => 'Delete eligible General/commercial expense records. Dedicated Sales Representatives remain limited to General expenses.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
         ],
         'Management Insights' => [
-            'profitability' => ['label' => 'Profitability', 'action' => 'View', 'description' => 'View farm profitability, revenue, cost and profit/loss analysis available to the role.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
-            'farm_intelligence' => ['label' => 'Farm Intelligence', 'action' => 'View', 'description' => 'View management signals and explainable farm intelligence.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
+            'profitability' => ['label' => 'Profitability', 'action' => 'View', 'description' => 'View farm profitability, revenue, cost and profit/loss analysis available to the role.', 'roles' => ['poultry_manager','ruminant_manager']],
+            'farm_intelligence' => ['label' => 'Farm Intelligence', 'action' => 'View', 'description' => 'View management signals and explainable farm intelligence.', 'roles' => ['poultry_manager','ruminant_manager']],
         ],
         'Cycles, Reports & Team' => [
             'production_cycles' => ['label' => 'Production Cycles', 'action' => 'View', 'description' => 'View production cycles. Creation and lifecycle management remain Farm Admin controlled during this audit.', 'roles' => ['poultry_manager','ruminant_manager']],
-            'reports' => ['label' => 'Operational Reports', 'action' => 'View / Export', 'description' => 'View and generate Poultry and Ruminant operational reports available to the role.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
+            'reports' => ['label' => 'Operational Reports', 'action' => 'View / Export', 'description' => 'View and generate Poultry and Ruminant operational reports available to the role.', 'roles' => ['poultry_manager','ruminant_manager']],
         ],
     ];
 }
