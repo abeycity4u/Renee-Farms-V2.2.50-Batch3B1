@@ -31,7 +31,7 @@ function permission_catalog(): array
             'poultry_broiler_expenses' => ['label' => 'Broiler Expenses', 'action' => 'View', 'description' => 'View Broiler expense records.', 'roles' => ['poultry_manager','sales_rep']],
             'poultry_broiler_expenses_add' => ['label' => 'Broiler Expenses', 'action' => 'Add', 'description' => 'Record new Broiler non-stock expenses.', 'roles' => ['poultry_manager','sales_rep']],
             'poultry_broiler_expenses_edit' => ['label' => 'Broiler Expenses', 'action' => 'Edit', 'description' => 'Modify existing Broiler expense records.', 'roles' => ['poultry_manager','sales_rep']],
-            'poultry_broiler_expenses_delete' => ['label' => 'Broiler Expenses', 'action' => 'Delete', 'description' => 'Delete Layer expense records.', 'roles' => ['poultry_manager','sales_rep']],
+            'poultry_broiler_expenses_delete' => ['label' => 'Broiler Expenses', 'action' => 'Delete', 'description' => 'Delete Broiler expense records.', 'roles' => ['poultry_manager','sales_rep']],
         ],
         'Ruminant Operations' => [
             'ruminant_overview' => ['label' => 'Ruminant Overview', 'action' => 'View', 'description' => 'View the Ruminant dashboard and overall summary.', 'roles' => ['ruminant_manager']],
