@@ -110,7 +110,24 @@ $check(stripos($composer, 'paystack') === false
 $check(strpos($init, "includes/billing_payment_foundation.php") === false,
     'Stage 1 billing service is not globally loaded into application runtime yet');
 
-$check(!preg_match($protectedWritePattern, $migration . "\n" . $runner),
+// Protected-write scans must ignore documentation comments but still inspect
+// executable SQL strings in PHP. The original check treated the migration comment
+// "update farms/..." as real DML and produced a false positive.
+$migrationExecutable = preg_replace('/^\s*--.*$/m', '', $migration) ?? $migration;
+$stripPhpComments = static function (string $php): string {
+    $out = '';
+    foreach (token_get_all($php) as $token) {
+        if (is_array($token)) {
+            if (in_array($token[0], [T_COMMENT, T_DOC_COMMENT], true)) continue;
+            $out .= $token[1];
+        } else {
+            $out .= $token;
+        }
+    }
+    return $out;
+};
+$runnerExecutable = $stripPhpComments($runner);
+$check(!preg_match($protectedWritePattern, $migrationExecutable . "\n" . $runnerExecutable),
     'migration/installer also contain no entitlement or subscription-history DML');
 
 echo "\n{$checks} checks, {$failures} failure(s).\n";
