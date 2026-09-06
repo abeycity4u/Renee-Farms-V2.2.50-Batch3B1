@@ -90,16 +90,26 @@ if (($path === '/management/production_cycles.php' || str_ends_with($path, '/man
     $rules[] = 'form[method="post"],form[method="POST"]{display:none!important;}';
 }
 
-// Subscription entitlement is the outer navigation boundary. Platform Owner
-// remains exempt because it uses the dedicated owner workspace plus explicit
-// tenant-view context rather than customer farm_modules rows. Use direct menu-ID
-// selectors as a prepaint fallback; the runtime helper removes the full dropdown
-// server-side from the final response.
+// Subscription entitlement is the outer navigation boundary. Reuse the runtime
+// delegated-expense helper so a Sales Representative with an exact expense View
+// permission can see the corresponding Poultry/Ruminant menu without gaining the
+// underlying operational manager role.
 if (!isPlatformOwner()) {
-    if (!user_can_access_entitled_module('poultry')) {
+    $allowPoultryMenu = user_can_access_entitled_module('poultry');
+    $allowRuminantMenu = user_can_access_entitled_module('ruminant');
+
+    if (!$allowPoultryMenu && function_exists('farm_entitlement_runtime_delegated_expense_access')) {
+        $allowPoultryMenu = farm_entitlement_runtime_delegated_expense_access('poultry', 'poultry_layer_expenses')
+            || farm_entitlement_runtime_delegated_expense_access('poultry', 'poultry_broiler_expenses');
+    }
+    if (!$allowRuminantMenu && function_exists('farm_entitlement_runtime_delegated_expense_access')) {
+        $allowRuminantMenu = farm_entitlement_runtime_delegated_expense_access('ruminant', 'ruminant_expenses');
+    }
+
+    if (!$allowPoultryMenu) {
         $rules[] = '#poultryMenu,#poultryMenu + .dropdown-menu{display:none!important;}';
     }
-    if (!user_can_access_entitled_module('ruminant')) {
+    if (!$allowRuminantMenu) {
         $rules[] = '#ruminantMenu,#ruminantMenu + .dropdown-menu{display:none!important;}';
     }
 }
@@ -110,6 +120,7 @@ $navLinks = [
     '/poultry/layer_expenses.php' => 'poultry_layer_expenses',
     '/poultry/broiler_expenses.php' => 'poultry_broiler_expenses',
     '/ruminant/animal_registry.php' => 'ruminant_animals',
+    '/ruminant/ruminant_expenses.php' => 'ruminant_expenses',
     '/management/sales_records.php' => 'sales',
     '/management/expenses.php' => 'expenses',
     '/management/poultry_ruminant_report.php' => 'reports',
