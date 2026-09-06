@@ -82,6 +82,11 @@ require_once __DIR__ . '/includes/inventory_permission_hardening.php';
 // consistent while those individual pages are migrated gradually.
 require_once __DIR__ . '/includes/permission_runtime.php';
 
+// Final V2.3 closure for the few remaining legacy browser routes whose own page
+// code predates the granular permission/CSRF model. Keep this after the runtime
+// permission bridge because it reuses that canonical authorization decision.
+require_once __DIR__ . '/includes/legacy_authorization_closure.php';
+
 // Legacy read APIs historically stopped at module-role checks. Align those data
 // endpoints with the same explicit View permissions used by their browser pages.
 require_once __DIR__ . '/includes/legacy_api_view_permissions.php';
