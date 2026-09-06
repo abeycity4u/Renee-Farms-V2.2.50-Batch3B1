@@ -174,17 +174,20 @@ function hasPermission($role, $module) {
     }
 
     // Compatibility bridge for the legacy Layer/Broiler expense pages. Those pages
-    // still use `poultry_expenses` only to decide whether to render the Actions
-    // column. Treat that legacy rendering flag as enabled when the current page has
-    // either exact Edit or Delete permission; the action APIs still enforce the
-    // granular permission and the visibility layer hides the other action.
+    // still use `poultry_expenses` for their broad page/action-column check. Treat
+    // it as enabled when the current page has its exact View, Edit or Delete
+    // permission; Add remains independently enforced by permission_runtime.php.
     if ($module === 'poultry_expenses') {
         $path = '/' . ltrim(str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? '')), '/');
         if ($path === '/poultry/layer_expenses.php' || str_ends_with($path, '/poultry/layer_expenses.php')) {
-            return hasPermission($role, 'poultry_layer_expenses_edit') || hasPermission($role, 'poultry_layer_expenses_delete');
+            return hasPermission($role, 'poultry_layer_expenses')
+                || hasPermission($role, 'poultry_layer_expenses_edit')
+                || hasPermission($role, 'poultry_layer_expenses_delete');
         }
         if ($path === '/poultry/broiler_expenses.php' || str_ends_with($path, '/poultry/broiler_expenses.php')) {
-            return hasPermission($role, 'poultry_broiler_expenses_edit') || hasPermission($role, 'poultry_broiler_expenses_delete');
+            return hasPermission($role, 'poultry_broiler_expenses')
+                || hasPermission($role, 'poultry_broiler_expenses_edit')
+                || hasPermission($role, 'poultry_broiler_expenses_delete');
         }
     }
 
