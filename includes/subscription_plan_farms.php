@@ -30,9 +30,10 @@ $seatAddOnsForBrowser = function_exists('subscription_seat_normalize_addons')
 
 // On create/update, derive effective role limits from the selected plan plus only
 // explicitly submitted non-negative seat add-ons. Do not trust browser-supplied
-// role_limits totals. Sales is shared with any active livestock subscription, so
-// only Poultry/Ruminant are persisted as commercial module selections here. Saving
-// an older farm therefore retires any legacy standalone Sales entitlement row.
+// role_limits totals. If an older/stale client omits seat_addons during an update,
+// preserve the tenant's existing durable extras instead of silently resetting them.
+// Sales is shared with any active livestock subscription, so only Poultry/Ruminant
+// are persisted as commercial module selections here.
 if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST'
     && (isset($_POST['create_farm']) || isset($_POST['update_farm']))) {
     $planCode = strtolower(trim((string)($_POST['plan'] ?? 'starter')));
@@ -43,7 +44,31 @@ if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST'
     ));
     $_POST['modules'] = $livestockModules;
 
-    $submittedAddOns = is_array($_POST['seat_addons'] ?? null) ? $_POST['seat_addons'] : [];
+    $submittedAddOns = is_array($_POST['seat_addons'] ?? null) ? $_POST['seat_addons'] : null;
+    if ($submittedAddOns === null
+        && isset($_POST['update_farm'])
+        && function_exists('subscription_seat_load_addons')
+        && isset($pdo) && $pdo instanceof PDO) {
+        $existingFarmId = filter_var($_POST['farm_id'] ?? 0, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: 0;
+        if ($existingFarmId > 0) {
+            $existingFarmStmt = $pdo->prepare("SELECT subscription_plan FROM farms WHERE id = ? AND slug <> 'owner' LIMIT 1");
+            $existingFarmStmt->execute([$existingFarmId]);
+            $existingPlan = $existingFarmStmt->fetchColumn();
+            if ($existingPlan !== false) {
+                $existingModules = function_exists('farm_entitlement_modules')
+                    ? farm_entitlement_modules($pdo, $existingFarmId)
+                    : [];
+                $submittedAddOns = subscription_seat_load_addons(
+                    $pdo,
+                    $existingFarmId,
+                    (string)$existingPlan,
+                    $existingModules
+                );
+            }
+        }
+    }
+    if (!is_array($submittedAddOns)) $submittedAddOns = [];
+
     if (function_exists('subscription_seat_normalize_addons')) {
         $seatAddOns = subscription_seat_normalize_addons($submittedAddOns);
     } else {
