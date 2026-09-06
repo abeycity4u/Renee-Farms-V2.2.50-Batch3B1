@@ -61,6 +61,10 @@ require_once __DIR__ . '/includes/platform_owner_tenant_drilldown.php';
 require_once __DIR__ . '/includes/platform_owner_tenant_commercial_drilldown.php';
 require_once __DIR__ . '/includes/platform_owner_tenant_expense_drilldown.php';
 
+// Show the append-only commercial subscription timeline inside the same selected-
+// tenant read-only support workspace. This adds no subscription mutation controls.
+require_once __DIR__ . '/includes/platform_owner_subscription_history.php';
+
 // Enforce the subscription boundary before legacy role/permission runtime guards
 // so Farm Admin bypasses cannot expose a module the tenant no longer subscribes to.
 require_once __DIR__ . '/includes/farm_entitlement_runtime.php';
