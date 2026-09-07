@@ -104,7 +104,7 @@ $pass('return verifies provider server-side before applying subscription',
     str_contains($return, 'billing_provider_verify_payment($provider, $providerReference)')
     && str_contains($return, 'billing_subscription_apply_paid_attempt($pdo, (int)$locked[\'id\'])'));
 $pass('return promotes recovery actor only after paid state',
-    str_contains($return, "if ($status === 'paid')")
+    str_contains($return, 'if ($status === \'paid\')')
     && str_contains($return, 'subscription_recovery_promote_to_login($pdo)'));
 $pass('verified paid application restores farm to active',
     str_contains($billingApplication, "subscription_status = 'active'"));
