@@ -1,11 +1,12 @@
 <?php
 /**
- * V2.3 Billing Stage 2F provider webhook route.
+ * V2.3 Billing Stage 2H provider webhook route.
  *
- * Provider-authenticated, session-independent and audit-only. Even an authentic
- * webhook never activates subscription/entitlement state here. A linked attempt
- * is updated only after a fresh provider verification confirms the frozen
- * reference, amount and currency.
+ * Provider-authenticated and session-independent. An authentic webhook never
+ * becomes payment authority by itself: the route performs a fresh provider
+ * verification against the frozen attempt, then applies a verified paid attempt
+ * through the proven exactly-once Stage 2G bridge in the same transaction as
+ * the audit update and provider-event processing marker.
  */
 
 require_once dirname(__DIR__) . '/config.php';
@@ -16,6 +17,7 @@ require_once dirname(__DIR__) . '/includes/billing_provider_selection.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_adapters.php';
 require_once dirname(__DIR__) . '/includes/billing_route_request.php';
 require_once dirname(__DIR__) . '/includes/billing_payment_audit_state.php';
+require_once dirname(__DIR__) . '/includes/billing_subscription_application.php';
 
 if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'POST') {
     http_response_code(405);
@@ -87,7 +89,10 @@ try {
         if (!$locked || (int)$locked['id'] !== (int)$attempt['id']) {
             throw new RuntimeException('Billing payment attempt changed during webhook processing.');
         }
-        billing_audit_apply_verification($pdo, (int)$locked['id'], $verification);
+        $updated = billing_audit_apply_verification($pdo, (int)$locked['id'], $verification);
+        if ((string)($updated['status'] ?? '') === 'paid') {
+            billing_subscription_apply_paid_attempt($pdo, (int)$locked['id']);
+        }
         billing_audit_event_mark($pdo, $registeredEventId, 'processed');
         $pdo->commit();
     } catch (Throwable $e) {
@@ -97,7 +102,7 @@ try {
                 $pdo,
                 $registeredEventId,
                 'failed',
-                'Verified provider fact could not be applied safely.'
+                'Verified provider fact or subscription application could not be applied safely.'
             );
         } catch (Throwable $ignored) {
         }
