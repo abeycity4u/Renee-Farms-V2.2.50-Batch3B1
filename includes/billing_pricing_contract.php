@@ -1,30 +1,33 @@
 <?php
 /**
- * V2.3 Billing Stage 2A server-authoritative pricing contract.
+ * V2.3 server-authoritative billing pricing contract.
  *
  * Product contract:
  * - subscription_plan_catalog.php owns included seat/capacity policy, not money;
  * - Poultry/Ruminant/both is a separate purchased module bundle;
  * - shared basic Sales is never a pricing dimension;
  * - checkout callers never supply amount or currency;
- * - a versioned server-side price book resolves the exact amount/currency;
+ * - the versioned server-side NGN price book resolves exact amount/currency;
  * - Stage 2C launch-currency policy is enforced when loaded;
- * - until a deliberate commercial price book is configured, pricing fails closed.
+ * - changing live prices requires a new price-book version.
  *
- * No prices or payment-provider choice are introduced in this file.
+ * Provider choice remains outside this file.
  */
 
 if (!function_exists('billing_pricing_price_book')) {
     function billing_pricing_price_book(): array
     {
-        // Intentionally unconfigured. Populate only after the commercial pricing
-        // decision is approved. Changing live prices must also change version.
-        return [
-            'version' => '',
-            'currency' => '',
-            'packages' => [],
-            'seat_unit_prices' => [],
-        ];
+        if (!function_exists('billing_price_book_ngn')) {
+            $priceBookPath = __DIR__ . '/billing_price_book_ngn.php';
+            if (!is_file($priceBookPath)) {
+                throw new RuntimeException('The approved NGN billing price book is not installed.');
+            }
+            require_once $priceBookPath;
+        }
+        if (!function_exists('billing_price_book_ngn')) {
+            throw new RuntimeException('The approved NGN billing price book could not be loaded.');
+        }
+        return billing_price_book_ngn();
     }
 }
 
