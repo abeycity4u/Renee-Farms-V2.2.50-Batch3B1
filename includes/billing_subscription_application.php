@@ -35,6 +35,36 @@ if (!function_exists('billing_subscription_application_table_exists')) {
     }
 }
 
+if (!function_exists('billing_subscription_application_table_engine')) {
+    function billing_subscription_application_table_engine(PDO $pdo, string $table): ?string
+    {
+        $stmt = $pdo->prepare(
+            'SELECT engine FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1'
+        );
+        $stmt->execute([$table]);
+        $engine = $stmt->fetchColumn();
+        return $engine === false ? null : (string)$engine;
+    }
+}
+
+if (!function_exists('billing_subscription_application_transactional')) {
+    function billing_subscription_application_transactional(PDO $pdo): bool
+    {
+        foreach ([
+            'farms',
+            'farm_modules',
+            'farm_role_limits',
+            'farm_subscription_seat_addons',
+            'subscriptions',
+            'billing_payment_attempts',
+        ] as $table) {
+            $engine = billing_subscription_application_table_engine($pdo, $table);
+            if (!is_string($engine) || strcasecmp($engine, 'InnoDB') !== 0) return false;
+        }
+        return true;
+    }
+}
+
 if (!function_exists('billing_subscription_application_ready')) {
     function billing_subscription_application_ready(PDO $pdo): bool
     {
@@ -43,7 +73,7 @@ if (!function_exists('billing_subscription_application_ready')) {
         foreach (['farms', 'farm_modules', 'farm_role_limits'] as $table) {
             if (!billing_subscription_application_table_exists($pdo, $table)) return false;
         }
-        return true;
+        return billing_subscription_application_transactional($pdo);
     }
 }
 
