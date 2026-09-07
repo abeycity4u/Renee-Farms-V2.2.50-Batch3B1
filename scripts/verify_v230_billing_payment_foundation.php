@@ -111,8 +111,8 @@ $check(strpos($service, 'Provider reference already belongs to a different billi
 $check(strpos($service, 'Provider event id was reused with a different payload.') !== false,
     'provider-event replay with a different payload is rejected');
 $check(strpos($service, 'billing_payment_foundation_transactional') !== false
-    && strpos($service, "strcasecmp($attemptEngine, 'InnoDB')") !== false
-    && strpos($service, "strcasecmp($eventEngine, 'InnoDB')") !== false,
+    && strpos($service, "strcasecmp(\$attemptEngine, 'InnoDB')") !== false
+    && strpos($service, "strcasecmp(\$eventEngine, 'InnoDB')") !== false,
     'billing service explicitly requires transactional InnoDB storage');
 $check(strpos($service, 'billing_payment_foreign_keys_ready') !== false
     && strpos($service, 'fk_billing_attempt_farm') !== false
@@ -139,10 +139,10 @@ $check(strpos($runner43, '$beforeAttempts') !== false && strpos($runner43, '$aft
     && strpos($runner43, '$beforeEvents') !== false && strpos($runner43, '$afterEvents') !== false,
     'targeted 043 runner proves billing row counts are preserved');
 $check(strpos($runner43, "['farms', 'subscriptions']") !== false
-    && strpos($runner43, "strcasecmp($engines[$parentTable], 'InnoDB')") !== false,
+    && strpos($runner43, "strcasecmp(\$engines[\$parentTable], 'InnoDB')") !== false,
     'targeted 043 runner requires existing parent tables to remain InnoDB');
 
-$check(strpos($cleanup, "$provider = 'qa-stage1';") !== false,
+$check(strpos($cleanup, "\$provider = 'qa-stage1';") !== false,
     'cleanup utility is hard-scoped to the reserved qa-stage1 provider');
 $eventDeletePos = strpos($cleanup, 'DELETE FROM billing_provider_events WHERE provider = ?');
 $attemptDeletePos = strpos($cleanup, 'DELETE FROM billing_payment_attempts WHERE provider = ?');
