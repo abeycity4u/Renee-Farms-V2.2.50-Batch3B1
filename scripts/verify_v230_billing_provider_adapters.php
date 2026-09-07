@@ -379,7 +379,7 @@ $check(strpos($source['transport'], '1024 * 1024') !== false,
     'real transport bounds provider response bodies to one MiB');
 $check(strpos($source['paystack'], "hash_hmac('sha512'") !== false,
     'Paystack webhook authenticity uses raw-body HMAC-SHA512');
-$check(strpos($source['flutterwave'], "billing_adapter_header($headers, 'verif-hash')") !== false,
+$check(strpos($source['flutterwave'], 'billing_adapter_header($headers, \'verif-hash\')') !== false,
     'Flutterwave webhook authenticity uses the configured V3 verification hash header');
 $check(strpos($source['init'], 'includes/billing_provider_adapters.php') === false
     && strpos($source['init'], 'includes/billing_provider_paystack.php') === false
@@ -387,7 +387,7 @@ $check(strpos($source['init'], 'includes/billing_provider_adapters.php') === fal
     'Stage 2E concrete adapters remain unwired from global application runtime');
 $check(strpos($source['adapters'], 'billing_provider_register_configured_adapters(?string $onlyProvider = null)') !== false,
     'future routes can register one explicitly selected provider without requiring the other');
-$check(strpos($source['adapters'], "billing_provider_selection_assert_configured($requested, true)") !== false,
+$check(strpos($source['adapters'], 'billing_provider_selection_assert_configured($requested, true)') !== false,
     'explicit provider registration requires checkout and webhook credentials before use');
 
 $secretPattern = '/\b(?:sk_live_|sk_test_|FLWSECK-|Bearer\s+[A-Za-z0-9_-]{20,})/';
