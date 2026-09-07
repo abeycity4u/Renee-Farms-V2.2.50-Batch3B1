@@ -2,9 +2,10 @@
 /**
  * V2.3 tenant Billing & Subscription workspace.
  *
- * Read-only account information comes from the centralized billing account read
- * model. The only mutation offered here is delegation to the canonical checkout
- * route, which recalculates price server-side and owns payment-attempt creation.
+ * Account information comes from the centralized billing account read model.
+ * The only local mutation is the tenant-pinned billing/contact email update;
+ * subscription payment still delegates to the canonical checkout route, which
+ * recalculates price server-side and owns payment-attempt creation.
  */
 
 require_once dirname(__DIR__) . '/init.php';
@@ -12,9 +13,47 @@ require_once dirname(__DIR__) . '/includes/billing_tenant_actor.php';
 require_once dirname(__DIR__) . '/includes/billing_account_overview.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_selection.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_readiness.php';
+require_once dirname(__DIR__) . '/includes/farm_contact_email.php';
 
 $actor = billing_require_farm_admin_actor($pdo, false);
 $farmId = (int)$actor['farm_id'];
+$emailFormError = null;
+$emailFormValue = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_valid_csrf_post();
+
+    $allowedEmailKeys = ['csrf_token', 'contact_email', 'save_contact_email'];
+    foreach (array_keys($_POST) as $key) {
+        if (!in_array((string)$key, $allowedEmailKeys, true)) {
+            http_response_code(422);
+            exit('Invalid billing contact update request.');
+        }
+    }
+    if (!isset($_POST['save_contact_email'])) {
+        http_response_code(422);
+        exit('Invalid billing contact update request.');
+    }
+
+    $emailFormValue = trim((string)($_POST['contact_email'] ?? ''));
+    try {
+        $updated = farm_contact_email_update(
+            $pdo,
+            $farmId,
+            (int)$actor['user_id'],
+            $emailFormValue
+        );
+        $_SESSION['success'] = 'Billing contact email updated to ' . $updated['contact_email'] . '.';
+        header('Location: ' . BASE_URL . '/billing/account.php', true, 303);
+        exit();
+    } catch (InvalidArgumentException $e) {
+        $emailFormError = $e->getMessage();
+    } catch (Throwable $e) {
+        error_log('Farm billing contact email update failed for farm ' . $farmId . ': ' . $e->getMessage());
+        $emailFormError = 'Unable to update the billing contact email right now. Please try again.';
+    }
+}
+
 $pageError = null;
 $overview = null;
 $providers = [];
@@ -44,7 +83,9 @@ $pricing = $overview['pricing'] ?? null;
 $modules = $overview['modules'] ?? [];
 $moduleLabel = $modules ? implode(' + ', array_map(static fn(string $m): string => ucfirst($m), $modules)) : '—';
 $subscriptionEndsAt = $farm['subscription_ends_at'] ?? null;
-$contactEmail = strtolower(trim((string)($farm['contact_email'] ?? '')));
+$contactEmail = $emailFormValue !== null
+    ? strtolower(trim($emailFormValue))
+    : strtolower(trim((string)($farm['contact_email'] ?? '')));
 $checkoutReady = $overview !== null
     && ($overview['payment_foundation_ready'] ?? false) === true
     && !empty($providers)
@@ -89,7 +130,7 @@ $decodeModules = static function ($json): string {
     <title>Billing &amp; Subscription | <?= htmlspecialchars($farmName, ENT_QUOTES, 'UTF-8') ?></title>
     <style>
         .billing-shell{max-width:1180px;margin:0 auto;padding:1.5rem 1rem 3rem}.billing-hero{border:0;border-radius:1rem;background:linear-gradient(120deg,#185c43,#2d8a63);color:#fff;box-shadow:0 1rem 2rem rgba(24,92,67,.18)}
-        .billing-card{border:1px solid rgba(25,80,60,.1);border-radius:1rem;box-shadow:0 .45rem 1.2rem rgba(22,66,50,.06)}.metric-label{font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;color:#6c837a;font-weight:700}.metric-value{font-size:1.08rem;font-weight:750;color:#153d2e}.provider-option{display:flex;align-items:center;gap:.7rem;border:1px solid #d9e6df;border-radius:.8rem;padding:.8rem 1rem;margin:.55rem 0}.provider-primary{margin-left:auto}.table td,.table th{vertical-align:middle}.seat-meter{min-width:6.5rem}.billing-note{background:#f4faf7;border:1px solid #dcece4;border-radius:.8rem;padding:.9rem 1rem;color:#456459}.empty-state{color:#73867e;text-align:center;padding:1.5rem}
+        .billing-card{border:1px solid rgba(25,80,60,.1);border-radius:1rem;box-shadow:0 .45rem 1.2rem rgba(22,66,50,.06)}.metric-label{font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;color:#6c837a;font-weight:700}.metric-value{font-size:1.08rem;font-weight:750;color:#153d2e}.provider-option{display:flex;align-items:center;gap:.7rem;border:1px solid #d9e6df;border-radius:.8rem;padding:.8rem 1rem;margin:.55rem 0}.provider-primary{margin-left:auto}.table td,.table th{vertical-align:middle}.seat-meter{min-width:6.5rem}.billing-note{background:#f4faf7;border:1px solid #dcece4;border-radius:.8rem;padding:.9rem 1rem;color:#456459}.empty-state{color:#73867e;text-align:center;padding:1.5rem}.billing-email-box{border:1px solid #dce8e2;border-radius:.8rem;padding:.85rem;background:#f8fbf9}
     </style>
 </head>
 <body>
@@ -137,8 +178,34 @@ $decodeModules = static function ($json): string {
                 <div class="card billing-card h-100">
                     <div class="card-header bg-transparent border-0 pt-3 px-3"><h2 class="h5 mb-0">Renew securely</h2></div>
                     <div class="card-body pt-2">
+                        <div class="billing-email-box mb-3">
+                            <form method="post" action="<?= htmlspecialchars(BASE_URL . '/billing/account.php', ENT_QUOTES, 'UTF-8') ?>">
+                                <?= csrf_field() ?>
+                                <label class="form-label fw-semibold" for="billingContactEmail">Billing contact email</label>
+                                <div class="input-group">
+                                    <input
+                                        id="billingContactEmail"
+                                        class="form-control"
+                                        type="email"
+                                        name="contact_email"
+                                        maxlength="254"
+                                        autocomplete="email"
+                                        value="<?= htmlspecialchars($contactEmail, ENT_QUOTES, 'UTF-8') ?>"
+                                        placeholder="owner@example.com"
+                                        required
+                                    >
+                                    <button class="btn btn-outline-success fw-semibold" type="submit" name="save_contact_email" value="1">Save email</button>
+                                </div>
+                                <div class="form-text">Used for secure checkout and billing notices. Saving here also updates the farm contact email visible to the Platform Owner.</div>
+                            </form>
+                        </div>
+
+                        <?php if ($emailFormError !== null): ?>
+                            <div class="alert alert-danger"><?= htmlspecialchars($emailFormError, ENT_QUOTES, 'UTF-8') ?></div>
+                        <?php endif; ?>
+
                         <?php if (!filter_var($contactEmail, FILTER_VALIDATE_EMAIL)): ?>
-                            <div class="alert alert-warning mb-0">A valid farm contact email is required before checkout. Please contact support to update the farm profile.</div>
+                            <div class="alert alert-warning mb-0">Save a valid billing contact email above to enable subscription checkout.</div>
                         <?php elseif (!$overview['payment_foundation_ready']): ?>
                             <div class="alert alert-warning mb-0">Billing payment storage is temporarily unavailable. Please try again later.</div>
                         <?php elseif (!$providers): ?>
