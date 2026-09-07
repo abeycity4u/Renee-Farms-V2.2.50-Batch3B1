@@ -1,10 +1,12 @@
 <?php
 /**
- * V2.3 Billing Stage 2A pricing/provider contract verifier.
+ * V2.3 Billing Stage 2 architecture regression verifier.
+ * Read-only, database-free and network-free.
  *
- * Read-only and database-free. It proves that pricing/provider architecture is
- * server-authoritative and fail-closed while commercial prices and the concrete
- * payment provider are still deliberately unconfigured.
+ * Stage 2D now supplies an approved NGN price book. This verifier continues to
+ * protect the original Stage 2A invariants: server-authoritative pricing,
+ * provider-neutral adapter boundaries, no browser-controlled amount/currency,
+ * no entitlement writes, and no network/provider SDK coupling.
  */
 
 $root = dirname(__DIR__);
@@ -53,22 +55,19 @@ require_once $paths['pricing'];
 require_once $paths['provider'];
 
 $book = billing_pricing_price_book();
-$check(($book['version'] ?? null) === ''
-    && ($book['currency'] ?? null) === ''
-    && ($book['packages'] ?? null) === []
-    && ($book['seat_unit_prices'] ?? null) === [],
-    'Stage 2A ships with no invented price, currency or price-book version');
-$check(billing_pricing_is_configured() === false,
-    'pricing fails closed while the commercial price book is unconfigured');
+$check(($book['version'] ?? '') !== ''
+    && ($book['currency'] ?? null) === 'NGN'
+    && !empty($book['packages'])
+    && !empty($book['seat_unit_prices']),
+    'approved versioned NGN commercial price book is installed');
+$check(billing_pricing_is_configured() === true,
+    'server pricing reports configured after Stage 2D approval');
 
-$pricingRejected = false;
-try {
-    billing_pricing_resolve('starter', 'monthly', ['poultry'], []);
-} catch (RuntimeException $e) {
-    $pricingRejected = str_contains($e->getMessage(), 'Billing pricing is not configured');
-}
-$check($pricingRejected,
-    'price resolution is rejected before commercial pricing is configured');
+$starter = billing_pricing_resolve('starter', 'monthly', ['poultry'], []);
+$check(($starter['currency'] ?? null) === 'NGN'
+    && ($starter['pricing_version'] ?? '') !== ''
+    && preg_match('/^\d+\.\d{2}$/', (string)($starter['amount'] ?? '')) === 1,
+    'price resolution returns canonical server-derived NGN pricing');
 
 $check(billing_pricing_bundle_key(['poultry']) === 'poultry'
     && billing_pricing_bundle_key(['ruminant']) === 'ruminant'
@@ -84,9 +83,9 @@ try {
 $check($salesRejected,
     'shared Sales cannot become a separately priced module');
 
-$check(strpos($pricing, "'packages' => []") !== false
-    && strpos($pricing, "'seat_unit_prices' => []") !== false,
-    'pricing source contains empty package and extra-seat price surfaces only');
+$check(strpos($pricing, 'billing_price_book_ngn.php') !== false
+    && strpos($pricing, 'billing_price_book_ngn()') !== false,
+    'pricing contract loads the dedicated approved price book rather than embedding browser pricing');
 $check(strpos($pricing, 'billing_pricing_price_book_hash') !== false
     && strpos($pricing, "hash('sha256'") !== false,
     'price book has deterministic SHA-256 identity');
@@ -120,7 +119,7 @@ $check(method_exists('BillingProviderAdapterInterface', 'initializeCheckout')
     && method_exists('BillingProviderAdapterInterface', 'verifyWebhook'),
     'adapter surface is checkout, payment verification and webhook verification only');
 $check(billing_provider_registered_codes() === [],
-    'no concrete payment provider is registered');
+    'no concrete network provider adapter is registered by the neutral contract');
 
 $providerRejected = false;
 try {
@@ -129,7 +128,7 @@ try {
     $providerRejected = str_contains($e->getMessage(), 'not configured');
 }
 $check($providerRejected,
-    'provider operations fail closed when no adapter is configured');
+    'provider operations fail closed when an adapter is not configured');
 
 $paidWithoutVerificationRejected = false;
 try {
@@ -185,11 +184,11 @@ $check(strpos($provider, "['pending', 'paid', 'failed', 'cancelled', 'refunded']
 
 $protectedWritePattern = '/\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+(?:farms|farm_modules|farm_role_limits|farm_subscription_seat_addons|subscriptions)\b/i';
 $check(!preg_match($protectedWritePattern, $pricing . "\n" . $provider),
-    'Stage 2A contracts contain no entitlement or subscription-history DML');
+    'pricing/provider contracts contain no entitlement or subscription-history DML');
 $check(!preg_match('/\b(?:curl_init|curl_exec|fsockopen|stream_socket_client)\s*\(/i', $pricing . "\n" . $provider),
-    'Stage 2A contracts make no network call');
+    'pricing/provider contracts make no network call');
 $check(!preg_match('/\b(?:paystack|flutterwave|stripe)\b/i', $pricing . "\n" . $provider),
-    'Stage 2A contracts contain no provider selection');
+    'provider-neutral contract remains free of provider selection');
 $check(stripos($composer, 'paystack') === false
     && stripos($composer, 'flutterwave') === false
     && stripos($composer, 'stripe') === false,
@@ -198,16 +197,16 @@ $check(!preg_match('/[\'\"](?:price|monthly_price|annual_price|amount|currency)[
     'seat/capacity plan catalog still contains no billing prices');
 $check(strpos($init, 'includes/billing_pricing_contract.php') === false
     && strpos($init, 'includes/billing_provider_contract.php') === false,
-    'Stage 2A contracts are not globally loaded into runtime');
+    'billing pricing/provider contracts are not globally loaded into runtime yet');
 $check(strpos($provider, 'subscription_record_capture(') === false
     && strpos($provider, 'farm_entitlement_set') === false,
     'provider adapter layer cannot directly apply subscription or entitlement state');
 
 echo "\n{$checks} checks, {$failures} failure(s).\n";
 if ($failures > 0) {
-    fwrite(STDERR, "FAIL: V2.3 Billing Stage 2A pricing/provider contract is not closed.\n");
+    fwrite(STDERR, "FAIL: V2.3 Billing Stage 2 architecture regression detected.\n");
     exit(1);
 }
 
-echo "PASS: V2.3 Billing Stage 2A is server-price-authoritative, provider-neutral and fail-closed.\n";
-echo "NOTE: commercial prices and the concrete payment provider remain intentionally unconfigured.\n";
+echo "PASS: V2.3 Billing Stage 2 remains server-price-authoritative, provider-neutral and fail-closed.\n";
+echo "NOTE: NGN prices are approved; concrete network adapters and checkout routes remain unwired.\n";
