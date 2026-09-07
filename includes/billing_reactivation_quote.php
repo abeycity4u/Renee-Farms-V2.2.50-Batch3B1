@@ -8,6 +8,7 @@
  * again before creating a provider attempt.
  */
 
+require_once __DIR__ . '/subscription_plan_catalog.php';
 require_once __DIR__ . '/billing_payment_foundation.php';
 require_once __DIR__ . '/billing_pricing_contract.php';
 require_once __DIR__ . '/subscription_record.php';
