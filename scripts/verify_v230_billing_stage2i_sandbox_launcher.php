@@ -1,6 +1,6 @@
 <?php
 /**
- * Offline verifier for the V2.3 Billing Stage 2I-B sandbox launcher.
+ * Offline verifier for the V2.3 Billing Stage 2I provider sandbox launcher.
  * No database connection, provider credential, or network call is required.
  */
 
@@ -51,13 +51,31 @@ $check(
     'launcher refuses a logged-in tenant that does not match the designated QA farm'
 );
 $check(
-    str_contains($launcher, "billing_provider_readiness_status('paystack', true)"),
-    'launcher requires full Paystack test readiness including webhook configuration'
+    str_contains($launcher, "billing_provider_readiness_env_value('BILLING_SANDBOX_QA_PROVIDER')"),
+    'launcher requires an explicit deployment-selected sandbox provider'
+);
+$check(
+    str_contains($launcher, 'in_array($provider, billing_provider_selection_codes(), true)'),
+    'launcher accepts only providers from the canonical provider-selection catalog'
+);
+$check(
+    str_contains($launcher, 'billing_provider_selection_definition($provider)'),
+    'launcher derives the provider display label from the canonical provider definition'
+);
+$check(
+    str_contains($launcher, 'billing_provider_readiness_status($provider, true)'),
+    'launcher requires full selected-provider test readiness including webhook configuration'
 );
 $check(
     str_contains($launcher, "(\$readiness['mode'] ?? null) !== 'test'")
         && str_contains($launcher, "(\$readiness['ready'] ?? false) !== true"),
-    'launcher fails closed unless Paystack readiness is green in test mode'
+    'launcher fails closed unless selected-provider readiness is green in test mode'
+);
+$check(
+    !str_contains($launcher, "\$_GET['provider']")
+        && !str_contains($launcher, "\$_POST['provider']")
+        && !preg_match('/<select[^>]+name=["\']provider["\']/i', $launcher),
+    'sandbox provider cannot be selected or overridden by the browser'
 );
 $check(
     str_contains($launcher, 'filter_var($customerEmail, FILTER_VALIDATE_EMAIL)'),
@@ -95,12 +113,17 @@ $check(
     'launcher delegates payment initiation to the hardened checkout route'
 );
 $check(
-    str_contains($launcher, 'name="provider" value="paystack"'),
-    'launcher is explicitly Paystack-only for the first provider sandbox test'
+    str_contains($launcher, 'name="provider" value="<?= $providerHtml ?>"'),
+    'launcher submits exactly the deployment-selected canonical provider to checkout'
+);
+$check(
+    !str_contains($launcher, 'name="provider" value="paystack"')
+        && !str_contains($launcher, 'name="provider" value="flutterwave"'),
+    'launcher contains no hard-coded provider submission and can drive either approved sandbox provider'
 );
 $check(
     str_contains($launcher, 'name="billing_interval" value="monthly"'),
-    'launcher fixes the first provider sandbox purchase to a monthly term'
+    'launcher fixes provider sandbox purchases to a monthly term'
 );
 $check(
     !preg_match("~name=[\"'](?:amount|currency|farm_id|user_id|status|subscription_status)[\"']~i", $launcher),
@@ -118,19 +141,20 @@ $check(
 );
 $check(
     !str_contains($launcher, 'PAYSTACK_LIVE_SECRET_KEY')
+        && !str_contains($launcher, 'FLUTTERWAVE_LIVE_SECRET_KEY')
         && !str_contains($launcher, 'BILLING_LIVE_PAYMENTS_ENABLED'),
-    'launcher does not reference live Paystack credentials or live-payment opt-in'
+    'launcher does not reference live provider credentials or live-payment opt-in'
 );
 $check(
-    str_contains($launcher, 'Disable the sandbox launcher environment flag after Stage 2I-B QA.'),
-    'launcher explicitly reminds operators to disable the temporary sandbox gate after QA'
+    str_contains($launcher, 'Disable the sandbox launcher environment flags after Stage 2I provider QA.'),
+    'launcher explicitly reminds operators to disable temporary sandbox gates after provider QA'
 );
 
 echo PHP_EOL . $checks . ' checks, ' . $failures . ' failure(s).' . PHP_EOL;
 if ($failures === 0) {
-    echo 'PASS: V2.3 Billing Stage 2I-B sandbox launcher is test-only, tenant-pinned, capacity-safe and checkout-delegating.' . PHP_EOL;
+    echo 'PASS: V2.3 Billing Stage 2I sandbox launcher is test-only, tenant-pinned, provider-pinned, capacity-safe and checkout-delegating.' . PHP_EOL;
     exit(0);
 }
 
-echo 'FAIL: V2.3 Billing Stage 2I-B sandbox launcher contract is not closed.' . PHP_EOL;
+echo 'FAIL: V2.3 Billing Stage 2I sandbox launcher contract is not closed.' . PHP_EOL;
 exit(1);
