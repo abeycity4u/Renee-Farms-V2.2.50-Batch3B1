@@ -1,12 +1,13 @@
 <?php
 /**
- * V2.3 Billing Stage 2H provider return route.
+ * V2.3 provider return route.
  *
  * Browser query status/amount/currency values are never trusted. The route uses
- * only the selected provider/reference to locate the current tenant's existing
- * attempt, performs a fresh server-to-server provider verification, and applies
- * a verified paid attempt through the proven exactly-once Stage 2G bridge in
- * the same database transaction.
+ * only the selected provider/reference to locate the tenant's existing attempt,
+ * performs a fresh server-to-server provider verification, and applies a paid
+ * attempt through the exactly-once subscription bridge in one DB transaction.
+ * Restricted recovery auth is promoted to a normal login only after active state
+ * has been established by that verified payment application.
  */
 
 require_once dirname(__DIR__) . '/init.php';
@@ -16,18 +17,18 @@ require_once dirname(__DIR__) . '/includes/billing_provider_selection.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_adapters.php';
 require_once dirname(__DIR__) . '/includes/billing_payment_audit_state.php';
 require_once dirname(__DIR__) . '/includes/billing_subscription_application.php';
+require_once dirname(__DIR__) . '/includes/billing_tenant_actor.php';
 
 if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'GET') {
     http_response_code(405);
     exit('Method not allowed.');
 }
 
-requireLogin();
-$farmId = requireCurrentFarmId();
-if (isPlatformOwner() || !hasRole('farm_admin')) {
-    http_response_code(403);
-    exit('Farm Admin access is required to verify subscription payment.');
-}
+// Active is allowed here only for a still-valid recovery context. That covers the
+// race where an authenticated webhook applies the same attempt before the browser
+// returns; exactly-once application remains authoritative.
+$actor = billing_require_farm_admin_actor($pdo, true, ['suspended', 'cancelled', 'active']);
+$farmId = (int)$actor['farm_id'];
 
 try {
     $provider = billing_provider_selection_normalize((string)($_GET['provider'] ?? ''));
@@ -47,17 +48,26 @@ try {
         http_response_code(404);
         exit('Billing payment attempt could not be found.');
     }
+    if (billing_tenant_actor_is_recovery($actor)
+        && (int)($attempt['initiated_by_user_id'] ?? 0) !== (int)$actor['user_id']) {
+        http_response_code(404);
+        exit('Billing payment attempt could not be found.');
+    }
 
     $verification = billing_provider_verify_payment($provider, $providerReference);
 
     $application = null;
     $pdo->beginTransaction();
     try {
-        // Re-read under a row lock and tenant scope before applying the provider fact.
         $locked = billing_audit_attempt_by_reference($pdo, $provider, $providerReference, $farmId, true);
         if (!$locked || (int)$locked['id'] !== (int)$attempt['id']) {
             throw new RuntimeException('Billing payment attempt changed during verification.');
         }
+        if (billing_tenant_actor_is_recovery($actor)
+            && (int)($locked['initiated_by_user_id'] ?? 0) !== (int)$actor['user_id']) {
+            throw new RuntimeException('Recovery payment ownership changed during verification.');
+        }
+
         $updated = billing_audit_apply_verification($pdo, (int)$locked['id'], $verification);
         if ((string)($updated['status'] ?? '') === 'paid') {
             $application = billing_subscription_apply_paid_attempt($pdo, (int)$locked['id']);
@@ -69,7 +79,14 @@ try {
     }
 
     $status = (string)($updated['status'] ?? 'pending');
+    $recoveryMode = billing_tenant_actor_is_recovery($actor);
+    $target = $recoveryMode ? '/billing/recover.php' : '/dashboard.php';
+
     if ($status === 'paid') {
+        if ($recoveryMode) {
+            subscription_recovery_promote_to_login($pdo);
+            $target = '/dashboard.php';
+        }
         $_SESSION['success'] = 'Payment verified and subscription activated successfully.';
     } elseif ($status === 'refunded') {
         $_SESSION['error'] = 'This payment has been recorded as refunded.';
@@ -79,7 +96,7 @@ try {
         $_SESSION['success'] = 'Payment verification is still pending. No subscription change has been applied.';
     }
 
-    header('Location: ' . BASE_URL . '/dashboard.php', true, 303);
+    header('Location: ' . BASE_URL . $target, true, 303);
     exit();
 } catch (InvalidArgumentException $e) {
     http_response_code(400);

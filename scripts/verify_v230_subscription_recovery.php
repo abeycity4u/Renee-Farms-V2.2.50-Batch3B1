@@ -1,0 +1,66 @@
+<?php
+/** Static contract verifier for V2.3 restricted subscription recovery. */
+$root = dirname(__DIR__);
+$failures = 0;
+$checks = 0;
+
+function verify_recovery(bool $ok, string $message): void {
+    global $failures, $checks;
+    $checks++;
+    if ($ok) {
+        echo "PASS: {$message}\n";
+    } else {
+        $failures++;
+        echo "FAIL: {$message}\n";
+    }
+}
+
+function recovery_source(string $path): string {
+    global $root;
+    $source = @file_get_contents($root . '/' . $path);
+    return is_string($source) ? $source : '';
+}
+
+$login = recovery_source('login.php');
+$recovery = recovery_source('includes/subscription_recovery.php');
+$actor = recovery_source('includes/billing_tenant_actor.php');
+$quote = recovery_source('includes/billing_reactivation_quote.php');
+$page = recovery_source('billing/recover.php');
+$checkout = recovery_source('billing/checkout.php');
+$return = recovery_source('billing/return.php');
+$config = recovery_source('config.php');
+
+verify_recovery($login !== '' && $recovery !== '' && $actor !== '' && $quote !== '' && $page !== '', 'recovery source files are present');
+verify_recovery(str_contains($login, "require __DIR__ . '/sign.php';"), 'normal sign-in remains delegated to the existing sign.php flow');
+verify_recovery(str_contains($login, "require_rate_limit('subscription_recovery_attempt'"), 'recovery credential verification has an independent rate limit');
+verify_recovery(str_contains($login, 'subscription_recovery_status_is_target'), 'login interception is limited to explicit recovery statuses');
+verify_recovery(str_contains($login, 'subscription_recovery_is_farm_admin'), 'only the protected Farm Admin can enter recovery');
+verify_recovery(str_contains($recovery, "return ['suspended', 'cancelled'];"), 'recovery target statuses are centralized and exclude normal active access');
+verify_recovery(str_contains($recovery, 'return 1800;'), 'recovery authentication is short-lived');
+verify_recovery(str_contains($recovery, 'subscription_recovery_clear_normal_identity'), 'restricted recovery clears normal application identity');
+verify_recovery(str_contains($recovery, 'session_regenerate_id(true)'), 'recovery authentication regenerates the session id');
+verify_recovery(str_contains($recovery, 'subscription_recovery_promote_to_login') && str_contains($recovery, "['active']"), 'normal login promotion requires active commercial state');
+verify_recovery(str_contains($config, 'function requireLogin()') && str_contains($config, "['suspended', 'cancelled']"), 'global requireLogin subscription boundary remains intact');
+verify_recovery(!str_contains($page, 'requireLogin();'), 'recovery page does not weaken or invoke the normal operational login gate');
+verify_recovery(str_contains($page, 'subscription_recovery_require'), 'recovery page uses the dedicated restricted authentication gate');
+verify_recovery(!str_contains($page, 'name="farm_id"') && !str_contains($page, 'name="amount"') && !str_contains($page, 'name="currency"'), 'recovery browser form cannot control tenant, amount or currency');
+verify_recovery(str_contains($page, 'billing_provider_selection_codes()') && str_contains($page, 'billing_provider_readiness_status'), 'recovery provider choices come from canonical provider readiness');
+verify_recovery(str_contains($quote, 'billing_pricing_build_payment_quote'), 'reactivation price comes from the server-authoritative price book');
+verify_recovery(str_contains($quote, 'billing_reactivation_assert_selection'), 'recovery has one centralized same-product selection assertion');
+verify_recovery(str_contains($checkout, "billing_require_farm_admin_actor(\$pdo, true, ['suspended', 'cancelled'])"), 'checkout explicitly opts into restricted recovery actors');
+verify_recovery(str_contains($checkout, 'billing_reactivation_assert_selection'), 'recovery checkout rejects plan/module/seat tampering');
+verify_recovery(str_contains($checkout, "(int)\$actor['user_id']"), 'billing attempts record the authenticated actor rather than browser identity');
+verify_recovery(!str_contains($checkout, 'requireLogin();'), 'checkout authorization is centralized in the billing actor helper');
+verify_recovery(str_contains($actor, 'requireLogin();'), 'normal billing actors still pass through canonical requireLogin');
+verify_recovery(str_contains($return, "['suspended', 'cancelled', 'active']"), 'return permits the webhook-before-browser active race only inside recovery context');
+verify_recovery(str_contains($return, 'initiated_by_user_id') && str_contains($return, "actor['user_id']"), 'recovery return pins the attempt to the authenticated recovery admin');
+verify_recovery(str_contains($return, 'billing_provider_verify_payment'), 'return still performs fresh server-to-server provider verification');
+verify_recovery(str_contains($return, 'billing_subscription_apply_paid_attempt'), 'return still uses the centralized exactly-once subscription application');
+$applyPos = strpos($return, 'billing_subscription_apply_paid_attempt');
+$promotePos = strpos($return, 'subscription_recovery_promote_to_login');
+verify_recovery($applyPos !== false && $promotePos !== false && $promotePos > $applyPos, 'recovery identity is promoted only after paid subscription application');
+verify_recovery(!str_contains($page, 'UPDATE farms') && !str_contains($page, 'INSERT INTO subscriptions'), 'recovery UI performs no direct commercial-state DML');
+
+echo "\n{$checks} checks, {$failures} failure(s).\n";
+if ($failures > 0) exit(1);
+echo "PASS: V2.3 subscription recovery is restricted, tenant-pinned, same-product and billing-delegating.\n";

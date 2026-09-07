@@ -1,10 +1,11 @@
 <?php
 /**
- * V2.3 Billing Stage 2F/2I controlled checkout route.
+ * V2.3 controlled checkout route.
  *
- * Creates/updates billing_payment_attempts, then redirects to the selected
- * provider. Subscription/entitlement application is not performed here.
- * New provider checkout is additionally fail-closed by Stage 2I deployment mode.
+ * Creates/updates billing_payment_attempts, then redirects to the explicitly
+ * selected provider. Subscription/entitlement application is never performed
+ * here. Normal Farm Admin sessions and the restricted subscription-recovery
+ * actor share the same centralized billing path.
  */
 
 require_once dirname(__DIR__) . '/init.php';
@@ -17,13 +18,11 @@ require_once dirname(__DIR__) . '/includes/billing_provider_adapters.php';
 require_once dirname(__DIR__) . '/includes/billing_route_request.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_readiness.php';
 require_once dirname(__DIR__) . '/includes/billing_payment_audit_state.php';
+require_once dirname(__DIR__) . '/includes/billing_tenant_actor.php';
+require_once dirname(__DIR__) . '/includes/billing_reactivation_quote.php';
 
-requireLogin();
-$farmId = requireCurrentFarmId();
-if (isPlatformOwner() || !hasRole('farm_admin')) {
-    http_response_code(403);
-    exit('Farm Admin access is required for subscription checkout.');
-}
+$actor = billing_require_farm_admin_actor($pdo, true, ['suspended', 'cancelled']);
+$farmId = (int)$actor['farm_id'];
 require_valid_csrf_post();
 
 if (!$pdo instanceof PDO || !billing_payment_foundation_ready($pdo)) {
@@ -34,17 +33,18 @@ if (!$pdo instanceof PDO || !billing_payment_foundation_ready($pdo)) {
 try {
     $selection = billing_route_normalize_checkout_input($_POST);
 
-    // Credentials alone never enable an outbound payment session. Deployment
-    // must explicitly opt into test/live checkout before provider resolution,
-    // billing-attempt creation, or provider network activity can occur.
-    billing_provider_assert_new_checkout_allowed();
+    // Recovery is a same-product renewal only. The browser may carry the fields
+    // needed by checkout, but it cannot use recovery auth to switch the tenant's
+    // plan, interval, modules or purchased seats.
+    if (billing_tenant_actor_is_recovery($actor)) {
+        billing_reactivation_assert_selection($pdo, $farmId, $selection);
+    }
 
+    billing_provider_assert_new_checkout_allowed();
     $provider = billing_provider_readiness_resolve_checkout($selection['provider']);
-    // A checkout route registers only its explicitly selected provider; there is
-    // never a silent retry through the secondary provider.
     billing_provider_register_configured_adapters($provider);
 
-    $farm = currentFarm();
+    $farm = billing_tenant_actor_farm($pdo, $actor);
     if (!$farm || (int)($farm['id'] ?? 0) !== $farmId) {
         throw new RuntimeException('Current tenant farm could not be resolved for billing.');
     }
@@ -53,8 +53,6 @@ try {
         throw new RuntimeException('A valid farm contact email is required before subscription checkout.');
     }
 
-    // Resolve the deployment callback URL before any billing row is written. A
-    // missing/malformed BILLING_PUBLIC_BASE_URL therefore fails with zero DB writes.
     $returnUrl = billing_route_public_url('/billing/return.php', ['provider' => $provider]);
     $context = [
         'customer_email' => $customerEmail,
@@ -71,9 +69,6 @@ try {
     );
     $pricing = $pricedQuote['pricing'];
 
-    // Never take payment for a plan/seat combination that cannot contain the
-    // tenant's current users. The Stage 2G bridge repeats this check at apply
-    // time, but checkout must fail before attempt creation/provider activity.
     subscription_seat_assert_capacity(
         $pdo,
         $farmId,
@@ -97,7 +92,7 @@ try {
             $pricing['currency'],
             $pricing['modules'],
             $pricing['seat_addons'],
-            (int)($_SESSION['user_id'] ?? 0)
+            (int)$actor['user_id']
         );
         $pdo->commit();
     } catch (Throwable $e) {
