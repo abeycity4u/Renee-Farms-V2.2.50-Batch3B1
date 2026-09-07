@@ -24,6 +24,10 @@ $check = static function (bool $ok, string $label) use (&$checks, &$failures): v
 $check(is_string($launcher) && $launcher !== '', 'sandbox checkout launcher source is present');
 if (!is_string($launcher)) $launcher = '';
 
+$check(
+    str_contains($launcher, "'/includes/billing_payment_foundation.php'"),
+    'launcher explicitly loads the billing payment foundation before building its priced quote'
+);
 $check(str_contains($launcher, 'requireLogin();'), 'launcher requires an authenticated session');
 $check(str_contains($launcher, '$farmId = requireCurrentFarmId();'), 'launcher resolves the current tenant farm from the session');
 $check(
