@@ -57,8 +57,15 @@ $assert(str_contains($farms, 'The farm was created, but the credential email cou
 $assert(str_contains($onboarding, "'password'") === false || !preg_match('/error_log\s*\([^;]*password/is', $onboarding), 'onboarding service never logs the password.');
 $assert(str_contains($onboarding, "billing_route_public_url('/login.php')"), 'onboarding login URL uses configured canonical public base URL.');
 $assert(str_contains($mailer, "return 'no-reply@reneefarms.com';"), 'mailer has a deterministic Renee Farms sender fallback.');
-$assert(str_contains($mailer, 'mail($to, $subject, $body'), 'outbound mail uses one centralized transport call.');
+$assert(str_contains($mailer, "PLATFORM_MAIL_TRANSPORT"), 'mailer transport selection is centralized.');
+$assert(str_contains($mailer, "PLATFORM_SMTP_HOST") && str_contains($mailer, "PLATFORM_SMTP_PORT"), 'SMTP endpoint is configuration-driven.');
+$assert(str_contains($mailer, "PLATFORM_SMTP_USERNAME") && str_contains($mailer, "PLATFORM_SMTP_PASSWORD"), 'SMTP authentication is externalized from source code.');
+$assert(str_contains($mailer, "PLATFORM_SMTP_ENCRYPTION"), 'SMTP encryption is configuration-driven.');
+$assert(str_contains($mailer, "AUTH LOGIN"), 'SMTP transport performs authenticated login.');
+$assert(str_contains($mailer, "STARTTLS") && str_contains($mailer, "ssl://"), 'SMTP transport supports TLS and implicit SSL.');
+$assert(str_contains($mailer, 'platform_smtp_send(') && str_contains($mailer, 'platform_php_mail_send('), 'all outbound transport choices stay behind one mailer service.');
 $assert(!preg_match('/error_log\s*\([^;]*\$body/is', $mailer), 'mail transport never logs message body.');
+$assert(!preg_match('/error_log\s*\([^;]*password/is', $mailer), 'mail transport never logs SMTP password.');
 
 echo 'Checks: ' . $checks . PHP_EOL;
 echo 'Failures: ' . $failures . PHP_EOL;
