@@ -3,8 +3,8 @@
  * V2.3 tenant subscription recovery workspace.
  *
  * This page accepts only the short-lived recovery session created after the
- * protected Farm Admin re-enters valid credentials for a suspended/cancelled
- * tenant. It never opens operational records.
+ * protected Farm Admin re-enters valid credentials for a suspended/cancelled/
+ * past-due tenant. It never opens operational records.
  */
 
 require_once dirname(__DIR__) . '/init.php';
@@ -14,7 +14,7 @@ require_once dirname(__DIR__) . '/includes/billing_reactivation_quote.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_selection.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_readiness.php';
 
-$recovery = subscription_recovery_require($pdo, ['suspended', 'cancelled', 'active']);
+$recovery = subscription_recovery_require($pdo, ['suspended', 'cancelled', 'past_due', 'active']);
 if (strtolower((string)$recovery['subscription_status']) === 'active') {
     subscription_recovery_promote_to_login($pdo);
     $_SESSION['success'] = 'Subscription active. Welcome back to your farm workspace.';
@@ -87,7 +87,7 @@ $moduleLabels = $pricing ? array_map(static fn(string $m): string => ucfirst($m)
         <h1>Restore <?= $farmName ?> access</h1>
         <p>Your Farm Admin credentials were verified. Operational records remain locked while the subscription is <?= htmlspecialchars(strtolower($statusLabel), ENT_QUOTES, 'UTF-8') ?>. This recovery workspace can only renew the current subscription.</p>
 
-        <div class="notice">No farm records are deleted during suspension. Successful verified payment restores the current plan, livestock bundle and purchased seat allowance.</div>
+        <div class="notice">No farm records are deleted during suspension or past-due recovery. Successful verified payment restores the current plan, livestock bundle and purchased seat allowance.</div>
 
         <?php if ($error !== null): ?>
             <div class="notice error"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div>
