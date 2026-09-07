@@ -51,16 +51,16 @@ $check(
     'launcher requires full Paystack test readiness including webhook configuration'
 );
 $check(
-    str_contains($launcher, "($readiness['mode'] ?? null) !== 'test'")
-        && str_contains($launcher, "($readiness['ready'] ?? false) !== true"),
+    str_contains($launcher, "(\$readiness['mode'] ?? null) !== 'test'")
+        && str_contains($launcher, "(\$readiness['ready'] ?? false) !== true"),
     'launcher fails closed unless Paystack readiness is green in test mode'
 );
 $check(
-    str_contains($launcher, "filter_var($customerEmail, FILTER_VALIDATE_EMAIL)"),
+    str_contains($launcher, 'filter_var($customerEmail, FILTER_VALIDATE_EMAIL)'),
     'launcher requires the same valid farm contact email needed by checkout'
 );
 $check(
-    str_contains($launcher, "array_intersect(['poultry', 'ruminant'], farm_entitlement_modules($pdo, $farmId))"),
+    str_contains($launcher, "array_intersect(['poultry', 'ruminant'], farm_entitlement_modules(\$pdo, \$farmId))"),
     'launcher preserves the current tenant Poultry/Ruminant entitlement bundle'
 );
 $check(
@@ -82,7 +82,7 @@ $check(
     'launcher adds only the seat shortfall if even Pro requires more capacity'
 );
 $check(
-    str_contains($launcher, "billing_pricing_build_payment_quote($selectedPlan, $billingInterval, $modules, $seatAddOns)"),
+    str_contains($launcher, 'billing_pricing_build_payment_quote($selectedPlan, $billingInterval, $modules, $seatAddOns)'),
     'launcher displays a server-authoritative price-book quote'
 );
 $check(str_contains($launcher, '<?= csrf_field() ?>'), 'launcher uses the canonical CSRF token field');
@@ -99,7 +99,7 @@ $check(
     'launcher fixes the first provider sandbox purchase to a monthly term'
 );
 $check(
-    !preg_match('/name=["\'](?:amount|currency|farm_id|user_id|status|subscription_status)["\']/i', $launcher),
+    !preg_match("~name=[\"'](?:amount|currency|farm_id|user_id|status|subscription_status)[\"']~i", $launcher),
     'launcher does not submit billing-sensitive amount, currency, farm, user or status fields'
 );
 $check(
