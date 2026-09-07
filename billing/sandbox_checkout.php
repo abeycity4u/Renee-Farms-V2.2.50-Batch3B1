@@ -8,6 +8,7 @@
  */
 
 require_once dirname(__DIR__) . '/init.php';
+require_once dirname(__DIR__) . '/includes/billing_payment_foundation.php';
 require_once dirname(__DIR__) . '/includes/billing_pricing_contract.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_readiness.php';
 require_once dirname(__DIR__) . '/includes/farm_entitlements.php';
