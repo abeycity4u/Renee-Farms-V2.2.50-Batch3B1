@@ -50,7 +50,7 @@ $pass('ordinary non-expired requests avoid row lock transaction',
 $pass('expired candidate is rechecked under row lock',
     str_contains($lifecycle, 'FOR UPDATE'));
 $pass('expiry transition is immutable-history captured',
-    str_contains($lifecycle, "subscription_record_capture($pdo, $farmId, 'subscription_expired', null)"));
+    str_contains($lifecycle, 'subscription_record_capture($pdo, $farmId, \'subscription_expired\', null)'));
 $pass('past_due extends existing recovery target contract',
     str_contains($lifecycle, "return ['suspended', 'cancelled', 'past_due'];"));
 $pass('Farm Admin past_due uses restricted recovery session',
@@ -59,7 +59,7 @@ $pass('Farm Admin past_due uses restricted recovery session',
 $pass('non-admin past_due clears normal identity',
     str_contains($lifecycle, 'subscription_recovery_clear_normal_identity()'));
 $pass('login request refreshes tenant lifecycle before authentication continues',
-    str_contains($lifecycle, "in_array($script, ['sign.php', 'login.php'], true)")
+    str_contains($lifecycle, 'in_array($script, [\'sign.php\', \'login.php\'], true)')
     && str_contains($lifecycle, 'subscription_lifecycle_refresh_slug'));
 $pass('runtime entitlement boundary invokes lifecycle guard',
     str_contains($runtime, "require_once __DIR__ . '/subscription_lifecycle.php';")
