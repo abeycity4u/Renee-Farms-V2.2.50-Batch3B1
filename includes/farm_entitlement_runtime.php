@@ -7,6 +7,11 @@
  * tenant-view context rather than the owner workspace's farm_modules rows.
  */
 
+require_once __DIR__ . '/subscription_lifecycle.php';
+if (isset($pdo) && $pdo instanceof PDO) {
+    subscription_lifecycle_request_guard($pdo);
+}
+
 require_once __DIR__ . '/functions.php';
 
 if (!isset($_SESSION['user_id']) || !function_exists('user_can_access_entitled_module')) {
