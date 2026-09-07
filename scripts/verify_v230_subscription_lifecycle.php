@@ -69,6 +69,17 @@ $pass('recovery page explicitly accepts past_due',
 $pass('recovery page still promotes only active subscription',
     str_contains($recoverPage, "=== 'active'")
     && str_contains($recoverPage, 'subscription_recovery_promote_to_login($pdo)'));
+$pass('recovery UI renders human-readable Past due',
+    str_contains($recoverPage, "'past_due' => 'Past due'"));
+$pass('recovery UI explains that farm data is safe',
+    str_contains($recoverPage, 'Your farm data is safe')
+    && str_contains($recoverPage, 'Your farm records remain safe and unchanged.'));
+$pass('recovery UI does not display provider Primary badge',
+    !str_contains($recoverPage, '>Primary<')
+    && !str_contains($recoverPage, 'class="primary"'));
+$pass('recovery provider choice remains server-defined',
+    str_contains($recoverPage, 'billing_provider_selection_codes()')
+    && str_contains($recoverPage, 'billing_provider_readiness_status($provider, false)'));
 $pass('verified paid application restores farm to active',
     str_contains($billingApplication, "subscription_status = 'active'"));
 $pass('billing application remains paid-attempt gated',
