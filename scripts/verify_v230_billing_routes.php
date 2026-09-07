@@ -184,9 +184,9 @@ $check(strpos($checkout, 'billing_pricing_build_payment_quote(') !== false
     && strpos($checkout, "\$pricing['amount']") !== false
     && strpos($checkout, "\$pricing['currency']") !== false,
     'attempt amount/currency come from the server-authoritative priced quote');
-$check(strpos($checkout, 'billing_provider_selection_resolve_checkout(') !== false
+$check(strpos($checkout, 'billing_provider_readiness_resolve_checkout(') !== false
     && strpos($checkout, 'billing_provider_register_configured_adapters($provider)') !== false,
-    'checkout resolves and registers exactly the selected configured provider');
+    'checkout resolves and registers exactly the selected mode-ready provider');
 
 $callbackPos = strpos($checkout, 'billing_route_public_url(');
 $createPos = strpos($checkout, 'billing_payment_attempt_create(');
@@ -283,5 +283,5 @@ if ($failures > 0) {
     exit(1);
 }
 
-echo "PASS: V2.3 Billing route security remains tenant-bound, server-price-authoritative, provider-verified and idempotent under Stage 2H activation wiring.\n";
-echo "NOTE: Stage 2H delegates verified paid return/webhook activation to Stage 2G; live provider credentials and public billing URL remain separately controlled.\n";
+echo "PASS: V2.3 Billing route security remains tenant-bound, server-price-authoritative, provider-verified and idempotent under Stage 2H/2I wiring.\n";
+echo "NOTE: Stage 2I additionally fail-closes new checkout behind mode-specific deployment readiness.\n";
