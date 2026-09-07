@@ -194,7 +194,7 @@ $decodeModules = static function ($json): string {
                                         placeholder="owner@example.com"
                                         required
                                     >
-                                    <button class="btn btn-outline-success fw-semibold" type="submit" name="save_contact_email" value="1">Save email</button>
+                                    <button class="btn btn-success fw-semibold" type="submit" name="save_contact_email" value="1">Save email</button>
                                 </div>
                                 <div class="form-text">Used for secure checkout and billing notices. Saving here also updates the farm contact email visible to the Platform Owner.</div>
                             </form>
