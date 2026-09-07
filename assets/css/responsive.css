@@ -447,3 +447,101 @@ svg {
         max-width: 100%;
     }
 }
+
+/* ================================================================
+ * V2.3 centralized compact typography / density architecture
+ *
+ * This is intentionally loaded last through navbar_head.php. It gives the
+ * authenticated platform a modestly denser visual scale without browser zoom,
+ * transforms, or per-page typography overrides. Standalone billing recovery
+ * remains independently tuned and is not affected because it does not load the
+ * authenticated navbar_head asset stack.
+ * ================================================================ */
+:root {
+    --app-type-scale: 0.9375;
+    --app-font-size-base: 15px;
+    --app-font-size-control: .92rem;
+    --app-font-size-table: .92rem;
+    --app-font-size-nav: .93rem;
+}
+
+/* Desktop/tablet authenticated shell: reduce the rem baseline from 16px to 15px.
+   Most Bootstrap spacing and typography then scales naturally and consistently. */
+@media (min-width: 768px) {
+    html {
+        font-size: var(--app-font-size-base);
+    }
+}
+
+/* Keep controls and dense data surfaces visually balanced with the new baseline. */
+#appNavbar .nav-link,
+#appNavbar .dropdown-item {
+    font-size: var(--app-font-size-nav);
+}
+
+.table,
+.dataTable,
+.table-responsive {
+    font-size: var(--app-font-size-table);
+}
+
+.form-control,
+.form-select,
+.input-group-text,
+.btn {
+    font-size: var(--app-font-size-control);
+}
+
+.card-header,
+.modal-header,
+.offcanvas-header {
+    font-size: .95rem;
+}
+
+/* Preserve a clear hierarchy while avoiding oversized page titles. */
+h1, .h1 { font-size: 2rem; }
+h2, .h2 { font-size: 1.65rem; }
+h3, .h3 { font-size: 1.4rem; }
+h4, .h4 { font-size: 1.18rem; }
+h5, .h5 { font-size: 1.02rem; }
+h6, .h6 { font-size: .95rem; }
+
+/* Small text stays readable; do not scale accessibility-critical helper text below
+   the platform's existing semantic small-text floor. */
+small,
+.small,
+.form-text,
+.metric-label,
+.section-eyebrow {
+    font-size: max(.78rem, 12px);
+}
+
+/* Provider priority is an internal selection concern, not customer-facing copy.
+   Hide the legacy badge wherever older billing templates still render it. */
+.provider-primary {
+    display: none !important;
+}
+
+/* Phones keep the browser/Bootstrap baseline for readability and touch comfort. */
+@media (max-width: 767.98px) {
+    html {
+        font-size: 16px;
+    }
+
+    .table,
+    .dataTable,
+    .table-responsive {
+        font-size: .9rem;
+    }
+
+    .form-control,
+    .form-select,
+    .input-group-text,
+    .btn {
+        font-size: .94rem;
+    }
+
+    h1, .h1 { font-size: 1.75rem; }
+    h2, .h2 { font-size: 1.45rem; }
+    h3, .h3 { font-size: 1.25rem; }
+}
