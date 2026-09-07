@@ -19,6 +19,8 @@ function billing_account_source(string $path): string {
 
 $helper = billing_account_source('includes/billing_account_overview.php');
 $page = billing_account_source('billing/account.php');
+$navBridge = billing_account_source('includes/platform_owner_nav_discoverability.php');
+$init = billing_account_source('init.php');
 
 verify_billing_account($helper !== '' && $page !== '', 'billing account helper and page are present');
 verify_billing_account(str_contains($helper, "require_once __DIR__ . '/billing_payment_foundation.php';"), 'account read model loads billing payment foundation explicitly');
@@ -42,6 +44,9 @@ verify_billing_account(!str_contains($page, "\$_GET['farm_id']") && !str_contain
 verify_billing_account(!str_contains($helper, 'UPDATE farms') && !str_contains($helper, 'INSERT INTO subscriptions') && !str_contains($helper, 'DELETE FROM'), 'account read model performs no commercial-state DML');
 verify_billing_account(!str_contains($page, 'UPDATE farms') && !str_contains($page, 'INSERT INTO subscriptions') && !str_contains($page, 'billing_payment_attempt_create'), 'billing UI performs no direct commercial or payment-attempt DML');
 verify_billing_account(str_contains($page, 'subscription_history') && str_contains($page, 'payment_attempts') && str_contains($page, 'seat_summary'), 'billing UI exposes subscription, payment and seat summaries from the read model');
+verify_billing_account($navBridge !== '' && str_contains($init, "require_once __DIR__ . '/includes/platform_owner_nav_discoverability.php';"), 'shared navigation discoverability bridge is loaded centrally');
+verify_billing_account(str_contains($navBridge, '$showBillingAccount = !$showPlatformTenantView') && str_contains($navBridge, "hasRole('farm_admin')"), 'Billing & Subscription navigation is limited to non-owner Farm Admin sessions');
+verify_billing_account(str_contains($navBridge, '/billing/account.php') && str_contains($navBridge, 'Billing &amp; Subscription'), 'Farm Admin Account menu exposes the canonical billing workspace');
 
 echo "\n{$checks} checks, {$failures} failure(s).\n";
 if ($failures > 0) exit(1);
