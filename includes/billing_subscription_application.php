@@ -125,7 +125,7 @@ if (!function_exists('billing_subscription_attempt_contract')) {
         }
 
         $provider = billing_payment_normalize_provider((string)($attempt['provider'] ?? ''));
-        if (!in_array($provider, billing_provider_selection_supported_codes(), true)) {
+        if (!in_array($provider, billing_provider_selection_codes(), true)) {
             throw new RuntimeException('Paid billing attempt uses an unsupported provider.');
         }
         $providerReference = billing_payment_normalize_reference((string)($attempt['provider_reference'] ?? ''));
