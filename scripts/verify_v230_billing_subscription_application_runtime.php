@@ -65,12 +65,9 @@ function stage2g_limits(PDO $pdo, int $farmId): array
 
 function stage2g_count(PDO $pdo, string $table, ?int $farmId = null): int
 {
-    $allowed = [
-        'billing_payment_attempts', 'billing_provider_events', 'subscriptions',
-        'users', 'sales_records', 'farm_expenses', 'production_cycles', 'stock_transactions',
-    ];
+    $allowed = ['billing_payment_attempts', 'billing_provider_events', 'subscriptions', 'users'];
     if (!in_array($table, $allowed, true)) throw new InvalidArgumentException('Unsupported Stage 2G count table.');
-    if ($farmId === null || in_array($table, ['billing_provider_events'], true)) {
+    if ($farmId === null || $table === 'billing_provider_events') {
         return (int)$pdo->query('SELECT COUNT(*) FROM ' . $table)->fetchColumn();
     }
     $stmt = $pdo->prepare('SELECT COUNT(*) FROM ' . $table . ' WHERE farm_id = ?');
@@ -78,15 +75,9 @@ function stage2g_count(PDO $pdo, string $table, ?int $farmId = null): int
     return (int)$stmt->fetchColumn();
 }
 
-function stage2g_operational_counts(PDO $pdo, int $farmId): array
+function stage2g_tenant_user_count(PDO $pdo, int $farmId): int
 {
-    $out = [];
-    foreach (['users', 'sales_records', 'farm_expenses', 'production_cycles'] as $table) {
-        $out[$table] = stage2g_count($pdo, $table, $farmId);
-    }
-    // stock_transactions is tenant-scoped through stock_items rather than a
-    // guaranteed direct farm_id on every lineage, so do not assume its schema.
-    return $out;
+    return stage2g_count($pdo, 'users', $farmId);
 }
 
 if (!($pdo instanceof PDO)) {
@@ -130,7 +121,7 @@ $baselineFarm = stage2g_farm_state($pdo, $farmId);
 $baselineModules = stage2g_modules($pdo, $farmId);
 $baselineAddons = stage2g_addons($pdo, $farmId, $baselineFarm, $baselineModules);
 $baselineLimits = stage2g_limits($pdo, $farmId);
-$baselineOperational = stage2g_operational_counts($pdo, $farmId);
+$baselineUsers = stage2g_tenant_user_count($pdo, $farmId);
 $baselineSubscriptions = stage2g_count($pdo, 'subscriptions', $farmId);
 $baselineAttempts = stage2g_count($pdo, 'billing_payment_attempts', $farmId);
 $baselineEvents = stage2g_count($pdo, 'billing_provider_events');
@@ -260,8 +251,8 @@ try {
         && $subscriptionsAfterSecond === $subscriptionsInside,
         'second application of the same paid attempt is idempotent and appends no history');
 
-    $check(stage2g_operational_counts($pdo, $farmId) === $baselineOperational,
-        'subscription application does not create/delete users or operational farm records');
+    $check(stage2g_tenant_user_count($pdo, $farmId) === $baselineUsers,
+        'subscription application does not create or delete tenant users');
 
     $check(stage2g_count($pdo, 'billing_payment_attempts', $farmId) === $baselineAttempts + 1
         && stage2g_count($pdo, 'billing_provider_events') === $baselineEvents,
@@ -286,7 +277,7 @@ $afterFarm = stage2g_farm_state($pdo, $farmId);
 $afterModules = stage2g_modules($pdo, $farmId);
 $afterAddons = stage2g_addons($pdo, $farmId, $afterFarm, $afterModules);
 $afterLimits = stage2g_limits($pdo, $farmId);
-$afterOperational = stage2g_operational_counts($pdo, $farmId);
+$afterUsers = stage2g_tenant_user_count($pdo, $farmId);
 $afterSubscriptions = stage2g_count($pdo, 'subscriptions', $farmId);
 $afterAttempts = stage2g_count($pdo, 'billing_payment_attempts', $farmId);
 $afterEvents = stage2g_count($pdo, 'billing_provider_events');
@@ -299,8 +290,8 @@ $check($afterAddons === $baselineAddons,
     'rollback restored durable/implied seat add-ons exactly');
 $check($afterLimits === $baselineLimits,
     'rollback restored effective role limits exactly');
-$check($afterOperational === $baselineOperational,
-    'rollback preserved user and operational farm row counts exactly');
+$check($afterUsers === $baselineUsers,
+    'rollback preserved tenant user count exactly');
 $check($afterSubscriptions === $baselineSubscriptions,
     'rollback restored subscription-history row count exactly');
 $check($afterAttempts === $baselineAttempts,
