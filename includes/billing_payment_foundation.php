@@ -7,7 +7,8 @@
  * - payment attempts are idempotent by (provider, provider_reference);
  * - provider events are idempotent by (provider, provider_event_id);
  * - only a SHA-256 payload hash is persisted for provider events;
- * - recording an attempt/event NEVER grants or changes tenant entitlement.
+ * - recording an attempt/event NEVER grants or changes tenant entitlement;
+ * - billing audit storage must be transactional and enforce its foreign keys.
  *
  * This file intentionally contains no writes to farms, farm_modules,
  * farm_role_limits, farm_subscription_seat_addons, or subscriptions. A later,
@@ -65,11 +66,64 @@ if (!function_exists('billing_payment_table_ready')) {
     }
 }
 
+if (!function_exists('billing_payment_table_engine')) {
+    function billing_payment_table_engine(PDO $pdo, string $table): ?string
+    {
+        if (!array_key_exists($table, billing_payment_required_columns())) return null;
+        $stmt = $pdo->prepare(
+            'SELECT engine FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1'
+        );
+        $stmt->execute([$table]);
+        $engine = $stmt->fetchColumn();
+        return $engine === false ? null : (string)$engine;
+    }
+}
+
+if (!function_exists('billing_payment_foundation_transactional')) {
+    function billing_payment_foundation_transactional(PDO $pdo): bool
+    {
+        $attemptEngine = billing_payment_table_engine($pdo, 'billing_payment_attempts');
+        $eventEngine = billing_payment_table_engine($pdo, 'billing_provider_events');
+        return is_string($attemptEngine)
+            && is_string($eventEngine)
+            && strcasecmp($attemptEngine, 'InnoDB') === 0
+            && strcasecmp($eventEngine, 'InnoDB') === 0;
+    }
+}
+
+if (!function_exists('billing_payment_foreign_keys_ready')) {
+    function billing_payment_foreign_keys_ready(PDO $pdo): bool
+    {
+        $expected = [
+            'fk_billing_attempt_farm' => ['billing_payment_attempts', 'farms'],
+            'fk_billing_attempt_subscription_record' => ['billing_payment_attempts', 'subscriptions'],
+            'fk_billing_event_attempt' => ['billing_provider_events', 'billing_payment_attempts'],
+        ];
+        $stmt = $pdo->prepare(
+            "SELECT table_name, referenced_table_name
+             FROM information_schema.referential_constraints
+             WHERE constraint_schema = DATABASE() AND constraint_name = ? LIMIT 1"
+        );
+        foreach ($expected as $constraint => [$table, $parent]) {
+            $stmt->execute([$constraint]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+            if (!$row
+                || (string)$row['table_name'] !== $table
+                || (string)$row['referenced_table_name'] !== $parent) {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
 if (!function_exists('billing_payment_foundation_ready')) {
     function billing_payment_foundation_ready(PDO $pdo): bool
     {
         return billing_payment_table_ready($pdo, 'billing_payment_attempts')
-            && billing_payment_table_ready($pdo, 'billing_provider_events');
+            && billing_payment_table_ready($pdo, 'billing_provider_events')
+            && billing_payment_foundation_transactional($pdo)
+            && billing_payment_foreign_keys_ready($pdo);
     }
 }
 
@@ -243,7 +297,7 @@ if (!function_exists('billing_payment_attempt_create')) {
         ?int $initiatedByUserId = null
     ): array {
         if (!billing_payment_foundation_ready($pdo)) {
-            throw new RuntimeException('Billing payment storage is not installed. Apply migration 042_billing_payment_foundation.sql first.');
+            throw new RuntimeException('Billing payment storage is not transactionally ready. Apply migrations 042 and 043 first.');
         }
         if ($farmId < 1) throw new InvalidArgumentException('A valid tenant farm is required.');
 
@@ -316,7 +370,7 @@ if (!function_exists('billing_provider_event_register')) {
         ?int $paymentAttemptId = null
     ): array {
         if (!billing_payment_foundation_ready($pdo)) {
-            throw new RuntimeException('Billing payment storage is not installed. Apply migration 042_billing_payment_foundation.sql first.');
+            throw new RuntimeException('Billing payment storage is not transactionally ready. Apply migrations 042 and 043 first.');
         }
 
         $provider = billing_payment_normalize_provider($provider);
