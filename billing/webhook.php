@@ -9,6 +9,25 @@
  * the audit update and provider-event processing marker.
  */
 
+// Temporary Stage 2I-B ingress diagnostic. Disabled by default and intentionally
+// records no payload, signature value, secret, reference, amount, email, IP or
+// customer data. Enable only while diagnosing provider webhook delivery.
+$billingWebhookIngressDiagnostic = getenv('BILLING_WEBHOOK_INGRESS_DIAGNOSTIC') === '1';
+if ($billingWebhookIngressDiagnostic) {
+    $diagnosticProvider = strtolower(trim((string)($_GET['provider'] ?? '')));
+    $diagnosticProvider = $diagnosticProvider === 'paystack' ? 'paystack' : 'other';
+    $diagnosticMethod = strtoupper(trim((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')));
+    $diagnosticMethod = in_array($diagnosticMethod, ['GET', 'POST'], true) ? $diagnosticMethod : 'OTHER';
+    $signaturePresent = isset($_SERVER['HTTP_X_PAYSTACK_SIGNATURE'])
+        && trim((string)$_SERVER['HTTP_X_PAYSTACK_SIGNATURE']) !== '';
+    error_log(sprintf(
+        'BILLING_WEBHOOK_INGRESS provider=%s method=%s paystack_signature=%s',
+        $diagnosticProvider,
+        $diagnosticMethod,
+        $signaturePresent ? 'present' : 'absent'
+    ));
+}
+
 require_once dirname(__DIR__) . '/config.php';
 require_once dirname(__DIR__) . '/includes/subscription_plan_catalog.php';
 require_once dirname(__DIR__) . '/includes/billing_payment_foundation.php';
@@ -38,6 +57,12 @@ try {
 
     // Signature/hash verification happens before any provider event is persisted.
     $eventFact = billing_provider_verify_webhook($provider, $rawPayload, $headers);
+    if ($billingWebhookIngressDiagnostic) {
+        error_log(
+            'BILLING_WEBHOOK_AUTH provider=' . ($provider === 'paystack' ? 'paystack' : 'other')
+            . ' signature_verified=yes'
+        );
+    }
     $providerReference = trim((string)($eventFact['provider_reference'] ?? ''));
 
     $attempt = null;
