@@ -1,10 +1,10 @@
 <?php
 /**
- * V2.3 Billing Stage 2F controlled checkout route.
+ * V2.3 Billing Stage 2F/2I controlled checkout route.
  *
- * Audit-only: creates/updates billing_payment_attempts, then redirects to the
- * selected provider. Subscription/entitlement application is intentionally not
- * performed here.
+ * Creates/updates billing_payment_attempts, then redirects to the selected
+ * provider. Subscription/entitlement application is not performed here.
+ * New provider checkout is additionally fail-closed by Stage 2I deployment mode.
  */
 
 require_once dirname(__DIR__) . '/init.php';
@@ -15,6 +15,7 @@ require_once dirname(__DIR__) . '/includes/billing_provider_contract.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_selection.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_adapters.php';
 require_once dirname(__DIR__) . '/includes/billing_route_request.php';
+require_once dirname(__DIR__) . '/includes/billing_provider_readiness.php';
 require_once dirname(__DIR__) . '/includes/billing_payment_audit_state.php';
 
 requireLogin();
@@ -32,6 +33,12 @@ if (!$pdo instanceof PDO || !billing_payment_foundation_ready($pdo)) {
 
 try {
     $selection = billing_route_normalize_checkout_input($_POST);
+
+    // Credentials alone never enable an outbound payment session. Deployment
+    // must explicitly opt into test/live checkout before provider resolution,
+    // billing-attempt creation, or provider network activity can occur.
+    billing_provider_assert_new_checkout_allowed();
+
     $provider = billing_provider_selection_resolve_checkout($selection['provider']);
     // A checkout route registers only its explicitly selected provider; there is
     // never a silent retry through the secondary provider.
