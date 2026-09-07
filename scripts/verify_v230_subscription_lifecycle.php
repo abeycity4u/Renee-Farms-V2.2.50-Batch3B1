@@ -10,6 +10,8 @@ $files = [
     'runtime' => $root . '/includes/farm_entitlement_runtime.php',
     'recovery' => $root . '/includes/subscription_recovery.php',
     'recover_page' => $root . '/billing/recover.php',
+    'checkout' => $root . '/billing/checkout.php',
+    'return' => $root . '/billing/return.php',
     'billing_application' => $root . '/includes/billing_subscription_application.php',
 ];
 
@@ -29,7 +31,10 @@ foreach ($files as $key => $path) {
 
 $lifecycle = $content['lifecycle'];
 $runtime = $content['runtime'];
+$recovery = $content['recovery'];
 $recoverPage = $content['recover_page'];
+$checkout = $content['checkout'];
+$return = $content['return'];
 $billingApplication = $content['billing_application'];
 
 $pass('only trial/active are automatic expiry sources',
@@ -51,8 +56,14 @@ $pass('expired candidate is rechecked under row lock',
     str_contains($lifecycle, 'FOR UPDATE'));
 $pass('expiry transition is immutable-history captured',
     str_contains($lifecycle, 'subscription_record_capture($pdo, $farmId, \'subscription_expired\', null)'));
-$pass('past_due extends existing recovery target contract',
-    str_contains($lifecycle, "return ['suspended', 'cancelled', 'past_due'];"));
+$pass('recovery target contract centrally includes past_due',
+    str_contains($recovery, "return ['suspended', 'cancelled', 'past_due'];"));
+$pass('lifecycle reuses centralized recovery contract',
+    str_contains($lifecycle, "require_once __DIR__ . '/subscription_recovery.php';")
+    && !str_contains($lifecycle, "function subscription_recovery_target_statuses"));
+$pass('recovery current defaults to centralized target statuses',
+    str_contains($recovery, 'function subscription_recovery_current(PDO $pdo, array $allowedStatuses = [])')
+    && str_contains($recovery, 'if (!$allowedStatuses) $allowedStatuses = subscription_recovery_target_statuses();'));
 $pass('Farm Admin past_due uses restricted recovery session',
     str_contains($lifecycle, 'subscription_recovery_start($account)')
     && str_contains($lifecycle, "subscription_lifecycle_redirect('/billing/recover.php')"));
@@ -80,6 +91,21 @@ $pass('recovery UI does not display provider Primary badge',
 $pass('recovery provider choice remains server-defined',
     str_contains($recoverPage, 'billing_provider_selection_codes()')
     && str_contains($recoverPage, 'billing_provider_readiness_status($provider, false)'));
+$pass('past_due checkout uses centralized recovery target statuses',
+    str_contains($checkout, 'billing_require_farm_admin_actor($pdo, true, subscription_recovery_target_statuses())'));
+$pass('recovery checkout remains same-product asserted',
+    str_contains($checkout, 'billing_reactivation_assert_selection($pdo, $farmId, $selection)'));
+$pass('checkout does not apply subscription state directly',
+    !str_contains($checkout, 'billing_subscription_apply_paid_attempt'));
+$pass('return flow includes centralized recovery statuses plus active race state',
+    str_contains($return, 'subscription_recovery_target_statuses()')
+    && str_contains($return, "['active']"));
+$pass('return verifies provider server-side before applying subscription',
+    str_contains($return, 'billing_provider_verify_payment($provider, $providerReference)')
+    && str_contains($return, 'billing_subscription_apply_paid_attempt($pdo, (int)$locked[\'id\'])'));
+$pass('return promotes recovery actor only after paid state',
+    str_contains($return, "if ($status === 'paid')")
+    && str_contains($return, 'subscription_recovery_promote_to_login($pdo)'));
 $pass('verified paid application restores farm to active',
     str_contains($billingApplication, "subscription_status = 'active'"));
 $pass('billing application remains paid-attempt gated',
@@ -98,6 +124,8 @@ if (is_file($files['lifecycle'])) {
     $pass('future active remains active', !subscription_lifecycle_is_expired('active', '2026-09-07 12:00:01', $now));
     $pass('past_due is idempotent/non-expirable', !subscription_lifecycle_is_expired('past_due', '2026-09-01 00:00:00', $now));
     $pass('suspended is never auto-transitioned', !subscription_lifecycle_is_expired('suspended', '2026-09-01 00:00:00', $now));
+    $pass('central recovery status helper includes past_due at runtime',
+        in_array('past_due', subscription_recovery_target_statuses(), true));
 }
 
 foreach ($checks as [$label, $ok]) {
