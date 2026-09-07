@@ -80,8 +80,8 @@ $check(strpos($selection, "'secret' =>") === false
     && strpos($selection, "'secret_key' =>") === false
     && strpos($selection, "'webhook_hash' =>") === false,
     'provider catalog contains no embedded secret values');
-$check(strpos($selection, "'missing_env' => $missing") !== false
-    && strpos($selection, "'configured' => $missing === []") !== false,
+$check(strpos($selection, '\'missing_env\' => $missing') !== false
+    && strpos($selection, '\'configured\' => $missing === []') !== false,
     'configuration status exposes readiness/missing names rather than credentials');
 
 $protectedWritePattern = '/\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+(?:farms|farm_modules|farm_role_limits|farm_subscription_seat_addons|subscriptions|billing_payment_attempts|billing_provider_events)\b/i';
