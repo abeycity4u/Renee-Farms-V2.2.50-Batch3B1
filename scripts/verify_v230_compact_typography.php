@@ -89,7 +89,7 @@ $pass('billing account still uses server-defined provider ordering',
 
 $pass('Primary badge removal does not alter payment provider values',
     str_contains($billingAccount, 'name="provider"')
-    && str_contains($billingAccount, "$provider['code']"));
+    && str_contains($billingAccount, '$provider[\'code\']'));
 
 $pass('standalone recovery page is not double-scaled by navbar_head',
     !str_contains($recovery, 'navbar_head.php'));
