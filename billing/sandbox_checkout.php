@@ -1,6 +1,6 @@
 <?php
 /**
- * V2.3 Billing Stage 2I-B temporary Paystack sandbox checkout launcher.
+ * V2.3 Billing Stage 2I temporary provider sandbox checkout launcher.
  *
  * This page is intentionally not a general subscription purchase UI. It exists
  * only to drive one controlled provider test through the already-hardened
@@ -37,10 +37,20 @@ if ($qaFarmId === false || (int)$qaFarmId !== $farmId) {
     exit('This tenant is not the designated sandbox billing QA farm.');
 }
 
-$readiness = billing_provider_readiness_status('paystack', true);
+$providerRaw = billing_provider_readiness_env_value('BILLING_SANDBOX_QA_PROVIDER');
+$provider = strtolower(trim((string)$providerRaw));
+if (!in_array($provider, billing_provider_selection_codes(), true)) {
+    http_response_code(503);
+    exit('A supported sandbox billing QA provider must be explicitly selected.');
+}
+$providerDefinition = billing_provider_selection_definition($provider);
+$providerLabel = trim((string)($providerDefinition['label'] ?? ucfirst($provider)));
+if ($providerLabel === '') $providerLabel = ucfirst($provider);
+
+$readiness = billing_provider_readiness_status($provider, true);
 if (($readiness['mode'] ?? null) !== 'test' || ($readiness['ready'] ?? false) !== true) {
     http_response_code(503);
-    exit('Paystack test billing is not ready for sandbox checkout.');
+    exit($providerLabel . ' test billing is not ready for sandbox checkout.');
 }
 
 $farm = currentFarm();
@@ -102,6 +112,8 @@ $moduleLabels = array_map(static fn(string $module): string => ucfirst($module),
 $amount = number_format((float)$pricing['amount'], 2);
 $currency = htmlspecialchars((string)$pricing['currency'], ENT_QUOTES, 'UTF-8');
 $farmName = htmlspecialchars(trim((string)($farm['name'] ?? '')) ?: 'QA Farm', ENT_QUOTES, 'UTF-8');
+$providerLabelHtml = htmlspecialchars($providerLabel, ENT_QUOTES, 'UTF-8');
+$providerHtml = htmlspecialchars($provider, ENT_QUOTES, 'UTF-8');
 ?>
 <!doctype html>
 <html lang="en">
@@ -124,13 +136,13 @@ $farmName = htmlspecialchars(trim((string)($farm['name'] ?? '')) ?: 'QA Farm', E
 </head>
 <body>
 <div class="card">
-    <span class="badge">PAYSTACK TEST MODE</span>
+    <span class="badge"><?= strtoupper($providerLabelHtml) ?> TEST MODE</span>
     <h1>Sandbox Billing QA</h1>
-    <p>This launcher is restricted to the designated QA tenant. Paystack test mode does not use real funds.</p>
+    <p>This launcher is restricted to the designated QA tenant. <?= $providerLabelHtml ?> test mode does not use real funds.</p>
 
     <div class="grid">
         <div class="item"><span class="label">Farm</span><?= $farmName ?></div>
-        <div class="item"><span class="label">Provider</span>Paystack</div>
+        <div class="item"><span class="label">Provider</span><?= $providerLabelHtml ?></div>
         <div class="item"><span class="label">Plan</span><?= htmlspecialchars($planLabel, ENT_QUOTES, 'UTF-8') ?></div>
         <div class="item"><span class="label">Billing interval</span>Monthly</div>
         <div class="item"><span class="label">Modules preserved</span><?= htmlspecialchars(implode(' + ', $moduleLabels), ENT_QUOTES, 'UTF-8') ?></div>
@@ -151,11 +163,11 @@ $farmName = htmlspecialchars(trim((string)($farm['name'] ?? '')) ?: 'QA Farm', E
         <?php foreach ($seatAddOns as $role => $count): ?>
             <input type="hidden" name="seat_addons[<?= htmlspecialchars($role, ENT_QUOTES, 'UTF-8') ?>]" value="<?= (int)$count ?>">
         <?php endforeach; ?>
-        <input type="hidden" name="provider" value="paystack">
-        <button type="submit">Start Paystack Test Checkout</button>
+        <input type="hidden" name="provider" value="<?= $providerHtml ?>">
+        <button type="submit">Start <?= $providerLabelHtml ?> Test Checkout</button>
     </form>
 
-    <p style="margin-top:18px;font-size:13px;color:#6c7786;">Do not use this launcher for production billing. Disable the sandbox launcher environment flag after Stage 2I-B QA.</p>
+    <p style="margin-top:18px;font-size:13px;color:#6c7786;">Do not use this launcher for production billing. Disable the sandbox launcher environment flags after Stage 2I provider QA.</p>
 </div>
 </body>
 </html>
