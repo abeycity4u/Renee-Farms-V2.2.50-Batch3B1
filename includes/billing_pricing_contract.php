@@ -224,6 +224,16 @@ if (!function_exists('billing_pricing_resolve')) {
         $bundleKey = billing_pricing_bundle_key($modules);
         $seatAddOns = billing_pricing_normalize_seat_addons($seatAddOns);
 
+        // Never charge for a livestock-specialist seat that cannot be used by
+        // the purchased module bundle. Sales Representative and Viewer remain
+        // valid whenever either commercial livestock module is present.
+        if ((int)($seatAddOns['poultry_manager'] ?? 0) > 0 && !in_array('poultry', $modules, true)) {
+            throw new InvalidArgumentException('Extra Poultry Manager seats require a Poultry subscription.');
+        }
+        if ((int)($seatAddOns['ruminant_manager'] ?? 0) > 0 && !in_array('ruminant', $modules, true)) {
+            throw new InvalidArgumentException('Extra Ruminant Manager seats require a Ruminant subscription.');
+        }
+
         $packageRaw = $book['packages'][$planCode][$bundleKey][$billingInterval] ?? null;
         if ($packageRaw === null) {
             throw new RuntimeException('No commercial package price is configured for the selected plan, module bundle and interval.');
