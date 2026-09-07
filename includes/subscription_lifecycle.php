@@ -97,10 +97,26 @@ if (!function_exists('subscription_lifecycle_refresh_farm')) {
     ): ?array {
         if ($farmId < 1) return null;
 
+        // Hot path: ordinary active/trial requests do one non-locking read and
+        // return immediately. Only a genuinely expired candidate enters a write
+        // transaction and row lock, which keeps the runtime guard cheap at scale.
+        $farm = subscription_lifecycle_farm($pdo, $farmId, false);
+        if (!$farm) return null;
+        if (!subscription_lifecycle_is_expired(
+            (string)($farm['subscription_status'] ?? ''),
+            $farm['subscription_ends_at'] ?? null,
+            $now
+        )) {
+            $farm['lifecycle_transitioned'] = false;
+            return $farm;
+        }
+
         $startedTransaction = !$pdo->inTransaction();
         if ($startedTransaction) $pdo->beginTransaction();
 
         try {
+            // Re-read under lock because another request may already have moved
+            // this farm to past_due while we were entering the transaction.
             $farm = subscription_lifecycle_farm($pdo, $farmId, true);
             if (!$farm) {
                 if ($startedTransaction) $pdo->commit();
