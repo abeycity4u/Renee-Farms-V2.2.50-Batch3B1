@@ -63,6 +63,18 @@ try {
         $selection['seat_addons']
     );
     $pricing = $pricedQuote['pricing'];
+
+    // Never take payment for a plan/seat combination that cannot contain the
+    // tenant's current users. The Stage 2G bridge repeats this check at apply
+    // time, but checkout must fail before attempt creation/provider activity.
+    subscription_seat_assert_capacity(
+        $pdo,
+        $farmId,
+        $pricing['plan_code'],
+        $pricing['modules'],
+        $pricing['seat_addons']
+    );
+
     $providerReference = billing_route_provider_reference($farmId, $provider);
 
     $pdo->beginTransaction();
