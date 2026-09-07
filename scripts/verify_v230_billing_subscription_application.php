@@ -224,7 +224,7 @@ $check(strpos($app, "strtolower(trim((string)(\$attempt['status'] ?? ''))) !== '
 $check(strpos($app, "\$attempt['verified_at']") !== false
     && strpos($app, "\$attempt['paid_at']") !== false,
     'application source requires provider verification and paid timestamps');
-$check(strpos($app, 'billing_provider_selection_supported_codes()') !== false,
+$check(strpos($app, 'billing_provider_selection_codes()') !== false,
     'application source restricts paid attempts to selected providers');
 $check(strpos($app, 'hash_equals($storedHash, (string)$rebuilt[\'quote_hash\'])') !== false,
     'application source revalidates the frozen quote hash');
