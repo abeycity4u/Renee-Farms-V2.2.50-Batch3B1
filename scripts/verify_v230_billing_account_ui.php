@@ -17,21 +17,25 @@ function billing_account_source(string $path): string {
     return is_string($source) ? $source : '';
 }
 
+$currentProduct = billing_account_source('includes/billing_current_product.php');
 $helper = billing_account_source('includes/billing_account_overview.php');
 $page = billing_account_source('billing/account.php');
+$checkout = billing_account_source('billing/checkout.php');
 $navBridge = billing_account_source('includes/platform_owner_nav_discoverability.php');
 $init = billing_account_source('init.php');
 
-verify_billing_account($helper !== '' && $page !== '', 'billing account helper and page are present');
+verify_billing_account($currentProduct !== '' && $helper !== '' && $page !== '', 'current-product helper, billing account helper and page are present');
+verify_billing_account(str_contains($currentProduct, "return ['trial', 'active', 'past_due'];"), 'normal self-service billing statuses are centralized');
+verify_billing_account(str_contains($currentProduct, 'billing_tenant_actor_farm'), 'current-product contract resolves the tenant through the centralized billing farm helper');
+verify_billing_account(str_contains($currentProduct, 'subscription_record_commercial_modules') && str_contains($currentProduct, 'subscription_record_latest'), 'current-product contract uses canonical commercial module and latest-subscription helpers');
+verify_billing_account(str_contains($currentProduct, 'subscription_seat_load_addons') && str_contains($currentProduct, 'subscription_seat_assert_capacity'), 'current-product contract uses canonical purchased-seat and capacity policy');
+verify_billing_account(str_contains($currentProduct, 'billing_pricing_build_payment_quote'), 'current-product price comes from server-authoritative pricing');
+verify_billing_account(str_contains($currentProduct, 'billing_current_product_assert_selection'), 'current-product contract centralizes browser selection assertions');
 verify_billing_account(str_contains($helper, "require_once __DIR__ . '/billing_payment_foundation.php';"), 'account read model loads billing payment foundation explicitly');
-verify_billing_account(str_contains($helper, "require_once __DIR__ . '/billing_pricing_contract.php';"), 'account read model loads canonical pricing contract explicitly');
-verify_billing_account(str_contains($helper, "require_once __DIR__ . '/subscription_record.php';"), 'account read model loads commercial subscription history service explicitly');
-verify_billing_account(str_contains($helper, "require_once __DIR__ . '/subscription_seat_policy.php';"), 'account read model loads canonical seat policy explicitly');
-verify_billing_account(str_contains($helper, 'billing_tenant_actor_farm'), 'account read model resolves the tenant through the centralized billing farm helper');
-verify_billing_account(str_contains($helper, 'subscription_record_commercial_modules'), 'account read model uses canonical commercial module resolution');
-verify_billing_account(str_contains($helper, 'subscription_record_latest') && str_contains($helper, 'subscription_record_history'), 'account read model uses canonical subscription latest/history helpers');
-verify_billing_account(str_contains($helper, 'subscription_seat_load_addons') && str_contains($helper, 'subscription_seat_load_effective_limits') && str_contains($helper, 'subscription_seat_used_role_counts'), 'account read model uses canonical seat add-on, limit and usage helpers');
-verify_billing_account(str_contains($helper, 'billing_pricing_build_payment_quote'), 'current renewal price comes from server-authoritative pricing');
+verify_billing_account(str_contains($helper, "require_once __DIR__ . '/billing_current_product.php';"), 'account read model loads the shared current-product contract explicitly');
+verify_billing_account(str_contains($helper, 'billing_current_product(') && str_contains($helper, 'billing_current_product_normal_statuses()'), 'account read model delegates product resolution to the shared contract');
+verify_billing_account(str_contains($helper, 'subscription_record_history'), 'account read model uses canonical subscription history helper');
+verify_billing_account(str_contains($helper, 'subscription_seat_load_effective_limits') && str_contains($helper, 'subscription_seat_used_role_counts'), 'account read model uses canonical effective-limit and seat-usage helpers');
 verify_billing_account(str_contains($helper, 'WHERE farm_id = ?'), 'payment attempt history is tenant-pinned');
 verify_billing_account(!str_contains($helper, 'provider_reference') && !str_contains($helper, 'provider_transaction_id'), 'tenant payment history excludes provider references and transaction identifiers');
 verify_billing_account(str_contains($page, 'billing_require_farm_admin_actor($pdo, false)'), 'billing account requires a normal Farm Admin billing actor');
@@ -41,6 +45,9 @@ verify_billing_account(str_contains($page, "BASE_URL . '/billing/checkout.php'")
 verify_billing_account(str_contains($page, 'csrf_field()'), 'renewal checkout form includes centralized CSRF protection');
 verify_billing_account(!str_contains($page, 'name="farm_id"') && !str_contains($page, 'name="amount"') && !str_contains($page, 'name="currency"'), 'browser checkout form cannot control tenant, amount or currency');
 verify_billing_account(!str_contains($page, "\$_GET['farm_id']") && !str_contains($page, "\$_POST['farm_id']"), 'billing page has no browser-selected tenant scope');
+verify_billing_account(str_contains($checkout, 'billing_current_product_assert_selection') && str_contains($checkout, 'billing_current_product_normal_statuses()'), 'normal Farm Admin checkout rejects plan, interval, module and seat tampering');
+verify_billing_account(str_contains($checkout, "\$pricedQuote = \$currentProduct['payment_quote'];"), 'checkout uses the canonical current-product payment quote after validation');
+verify_billing_account(!str_contains($checkout, 'billing_pricing_build_payment_quote('), 'checkout does not rebuild a browser-selected product after current-product validation');
 verify_billing_account(!str_contains($helper, 'UPDATE farms') && !str_contains($helper, 'INSERT INTO subscriptions') && !str_contains($helper, 'DELETE FROM'), 'account read model performs no commercial-state DML');
 verify_billing_account(!str_contains($page, 'UPDATE farms') && !str_contains($page, 'INSERT INTO subscriptions') && !str_contains($page, 'billing_payment_attempt_create'), 'billing UI performs no direct commercial or payment-attempt DML');
 verify_billing_account(str_contains($page, 'subscription_history') && str_contains($page, 'payment_attempts') && str_contains($page, 'seat_summary'), 'billing UI exposes subscription, payment and seat summaries from the read model');
@@ -50,5 +57,5 @@ verify_billing_account(str_contains($navBridge, '/billing/account.php') && str_c
 
 echo "\n{$checks} checks, {$failures} failure(s).\n";
 if ($failures > 0) exit(1);
-echo "PASS: V2.3 tenant Billing & Subscription UI is tenant-pinned, read-model driven and checkout-delegating.\n";
+echo "PASS: V2.3 tenant Billing & Subscription UI is tenant-pinned, same-product enforced, read-model driven and checkout-delegating.\n";
 ?>

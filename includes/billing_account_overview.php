@@ -7,17 +7,14 @@
  * - farms remains the current subscription snapshot;
  * - subscriptions remains the append-only commercial history;
  * - billing_payment_attempts remains the provider-neutral payment audit history;
- * - current renewal pricing always comes from the server-authoritative price book;
+ * - current product/pricing comes from the shared current-product contract;
  * - seat usage/allowance always comes from the canonical subscription seat policy.
  */
 
 require_once __DIR__ . '/billing_payment_foundation.php';
-require_once __DIR__ . '/billing_pricing_contract.php';
-require_once __DIR__ . '/billing_tenant_actor.php';
-require_once __DIR__ . '/subscription_plan_catalog.php';
+require_once __DIR__ . '/billing_current_product.php';
 require_once __DIR__ . '/subscription_record.php';
 require_once __DIR__ . '/subscription_seat_policy.php';
-require_once __DIR__ . '/farm_entitlements.php';
 
 if (!function_exists('billing_account_payment_attempts')) {
     function billing_account_payment_attempts(PDO $pdo, int $farmId, int $limit = 20): array
@@ -41,7 +38,6 @@ if (!function_exists('billing_account_seat_summary')) {
     function billing_account_seat_summary(
         PDO $pdo,
         int $farmId,
-        string $planCode,
         array $modules,
         array $seatAddOns
     ): array {
@@ -66,44 +62,24 @@ if (!function_exists('billing_account_seat_summary')) {
 if (!function_exists('billing_account_overview')) {
     function billing_account_overview(PDO $pdo, int $farmId): array
     {
-        if ($farmId < 1) throw new InvalidArgumentException('A valid tenant is required for billing account access.');
-
-        $farm = billing_tenant_actor_farm($pdo, ['farm_id' => $farmId]);
-        if (!$farm || (int)($farm['id'] ?? 0) !== $farmId) {
-            throw new RuntimeException('Tenant farm could not be found for billing account access.');
-        }
-
-        $planCode = strtolower(trim((string)($farm['subscription_plan'] ?? '')));
-        if (!subscription_plan_is_valid($planCode)) {
-            throw new RuntimeException('The current subscription plan needs administrator review.');
-        }
-
-        $modules = subscription_record_commercial_modules($pdo, $farmId);
-        if (!$modules) {
-            throw new RuntimeException('The current livestock subscription bundle needs administrator review.');
-        }
-
-        $latest = subscription_record_latest($pdo, $farmId);
-        $billingInterval = strtolower(trim((string)($latest['billing_interval'] ?? 'monthly')));
-        if (!in_array($billingInterval, ['monthly', 'annual'], true)) $billingInterval = 'monthly';
-
-        $seatAddOns = subscription_seat_load_addons($pdo, $farmId, $planCode, $modules);
-        $seatAddOns = subscription_seat_normalize_addons($seatAddOns);
-        $pricedQuote = billing_pricing_build_payment_quote(
-            $planCode,
-            $billingInterval,
-            $modules,
-            $seatAddOns
+        $current = billing_current_product(
+            $pdo,
+            $farmId,
+            billing_current_product_normal_statuses()
         );
+        $farm = $current['farm'];
+        $planCode = (string)$current['plan_code'];
+        $modules = $current['modules'];
+        $seatAddOns = $current['seat_addons'];
 
         return [
             'farm' => $farm,
-            'latest_subscription' => $latest,
+            'latest_subscription' => $current['latest_subscription'],
             'plan_label' => subscription_plan_label($planCode),
             'modules' => $modules,
             'seat_addons' => $seatAddOns,
-            'seat_summary' => billing_account_seat_summary($pdo, $farmId, $planCode, $modules, $seatAddOns),
-            'pricing' => $pricedQuote['pricing'],
+            'seat_summary' => billing_account_seat_summary($pdo, $farmId, $modules, $seatAddOns),
+            'pricing' => $current['pricing'],
             'subscription_history' => subscription_record_history($pdo, $farmId, 12),
             'payment_attempts' => billing_account_payment_attempts($pdo, $farmId, 20),
             'payment_foundation_ready' => billing_payment_foundation_ready($pdo),

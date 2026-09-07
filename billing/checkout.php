@@ -19,6 +19,7 @@ require_once dirname(__DIR__) . '/includes/billing_route_request.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_readiness.php';
 require_once dirname(__DIR__) . '/includes/billing_payment_audit_state.php';
 require_once dirname(__DIR__) . '/includes/billing_tenant_actor.php';
+require_once dirname(__DIR__) . '/includes/billing_current_product.php';
 require_once dirname(__DIR__) . '/includes/billing_reactivation_quote.php';
 
 $actor = billing_require_farm_admin_actor($pdo, true, ['suspended', 'cancelled']);
@@ -33,18 +34,25 @@ if (!$pdo instanceof PDO || !billing_payment_foundation_ready($pdo)) {
 try {
     $selection = billing_route_normalize_checkout_input($_POST);
 
-    // Recovery is a same-product renewal only. The browser may carry the fields
-    // needed by checkout, but it cannot use recovery auth to switch the tenant's
-    // plan, interval, modules or purchased seats.
+    // Every customer-facing checkout is a same-product renewal until a dedicated
+    // server-authorized product-change workflow exists. Browser plan/interval/
+    // module/seat fields are assertions only and cannot change commercial state.
     if (billing_tenant_actor_is_recovery($actor)) {
-        billing_reactivation_assert_selection($pdo, $farmId, $selection);
+        $currentProduct = billing_reactivation_assert_selection($pdo, $farmId, $selection);
+    } else {
+        $currentProduct = billing_current_product_assert_selection(
+            $pdo,
+            $farmId,
+            $selection,
+            billing_current_product_normal_statuses()
+        );
     }
 
     billing_provider_assert_new_checkout_allowed();
     $provider = billing_provider_readiness_resolve_checkout($selection['provider']);
     billing_provider_register_configured_adapters($provider);
 
-    $farm = billing_tenant_actor_farm($pdo, $actor);
+    $farm = $currentProduct['farm'];
     if (!$farm || (int)($farm['id'] ?? 0) !== $farmId) {
         throw new RuntimeException('Current tenant farm could not be resolved for billing.');
     }
@@ -61,22 +69,8 @@ try {
         'redirect_url' => $returnUrl,
     ];
 
-    $pricedQuote = billing_pricing_build_payment_quote(
-        $selection['plan_code'],
-        $selection['billing_interval'],
-        $selection['modules'],
-        $selection['seat_addons']
-    );
-    $pricing = $pricedQuote['pricing'];
-
-    subscription_seat_assert_capacity(
-        $pdo,
-        $farmId,
-        $pricing['plan_code'],
-        $pricing['modules'],
-        $pricing['seat_addons']
-    );
-
+    $pricedQuote = $currentProduct['payment_quote'];
+    $pricing = $currentProduct['pricing'];
     $providerReference = billing_route_provider_reference($farmId, $provider);
 
     $pdo->beginTransaction();

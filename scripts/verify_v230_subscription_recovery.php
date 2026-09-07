@@ -24,13 +24,14 @@ function recovery_source(string $path): string {
 $login = recovery_source('login.php');
 $recovery = recovery_source('includes/subscription_recovery.php');
 $actor = recovery_source('includes/billing_tenant_actor.php');
+$currentProduct = recovery_source('includes/billing_current_product.php');
 $quote = recovery_source('includes/billing_reactivation_quote.php');
 $page = recovery_source('billing/recover.php');
 $checkout = recovery_source('billing/checkout.php');
 $return = recovery_source('billing/return.php');
 $config = recovery_source('config.php');
 
-verify_recovery($login !== '' && $recovery !== '' && $actor !== '' && $quote !== '' && $page !== '', 'recovery source files are present');
+verify_recovery($login !== '' && $recovery !== '' && $actor !== '' && $currentProduct !== '' && $quote !== '' && $page !== '', 'recovery and shared current-product source files are present');
 verify_recovery(str_contains($login, "require __DIR__ . '/sign.php';"), 'normal sign-in remains delegated to the existing sign.php flow');
 verify_recovery(str_contains($login, "require_rate_limit('subscription_recovery_attempt'"), 'recovery credential verification has an independent rate limit');
 verify_recovery(str_contains($login, 'subscription_recovery_status_is_target'), 'login interception is limited to explicit recovery statuses');
@@ -45,9 +46,10 @@ verify_recovery(!str_contains($page, 'requireLogin();'), 'recovery page does not
 verify_recovery(str_contains($page, 'subscription_recovery_require'), 'recovery page uses the dedicated restricted authentication gate');
 verify_recovery(!str_contains($page, 'name="farm_id"') && !str_contains($page, 'name="amount"') && !str_contains($page, 'name="currency"'), 'recovery browser form cannot control tenant, amount or currency');
 verify_recovery(str_contains($page, 'billing_provider_selection_codes()') && str_contains($page, 'billing_provider_readiness_status'), 'recovery provider choices come from canonical provider readiness');
-verify_recovery(str_contains($quote, "require_once __DIR__ . '/subscription_plan_catalog.php';"), 'reactivation helper explicitly loads the canonical plan catalog dependency');
-verify_recovery(str_contains($quote, 'billing_pricing_build_payment_quote'), 'reactivation price comes from the server-authoritative price book');
-verify_recovery(str_contains($quote, 'billing_reactivation_assert_selection'), 'recovery has one centralized same-product selection assertion');
+verify_recovery(str_contains($quote, "require_once __DIR__ . '/billing_current_product.php';"), 'reactivation wrapper explicitly loads the shared current-product contract');
+verify_recovery(str_contains($currentProduct, "require_once __DIR__ . '/subscription_plan_catalog.php';"), 'shared current-product helper explicitly loads the canonical plan catalog dependency');
+verify_recovery(str_contains($currentProduct, 'billing_pricing_build_payment_quote'), 'reactivation price comes from the shared server-authoritative current-product contract');
+verify_recovery(str_contains($quote, 'billing_reactivation_assert_selection') && str_contains($quote, 'billing_current_product_assert_selection'), 'recovery keeps one centralized same-product assertion through the shared contract');
 verify_recovery(str_contains($checkout, "billing_require_farm_admin_actor(\$pdo, true, ['suspended', 'cancelled'])"), 'checkout explicitly opts into restricted recovery actors');
 verify_recovery(str_contains($checkout, 'billing_reactivation_assert_selection'), 'recovery checkout rejects plan/module/seat tampering');
 verify_recovery(str_contains($checkout, "(int)\$actor['user_id']"), 'billing attempts record the authenticated actor rather than browser identity');
