@@ -46,6 +46,16 @@ try {
         throw new RuntimeException('A valid farm contact email is required before subscription checkout.');
     }
 
+    // Resolve the deployment callback URL before any billing row is written. A
+    // missing/malformed BILLING_PUBLIC_BASE_URL therefore fails with zero DB writes.
+    $returnUrl = billing_route_public_url('/billing/return.php', ['provider' => $provider]);
+    $context = [
+        'customer_email' => $customerEmail,
+        'customer_name' => trim((string)($farm['name'] ?? '')) ?: 'Farm Customer',
+        'callback_url' => $returnUrl,
+        'redirect_url' => $returnUrl,
+    ];
+
     $pricedQuote = billing_pricing_build_payment_quote(
         $selection['plan_code'],
         $selection['billing_interval'],
@@ -77,13 +87,6 @@ try {
     }
 
     $attemptId = (int)$created['id'];
-    $returnUrl = billing_route_public_url('/billing/return.php', ['provider' => $provider]);
-    $context = [
-        'customer_email' => $customerEmail,
-        'customer_name' => trim((string)($farm['name'] ?? '')) ?: 'Farm Customer',
-        'callback_url' => $returnUrl,
-        'redirect_url' => $returnUrl,
-    ];
 
     try {
         $checkout = billing_provider_initialize_checkout(
