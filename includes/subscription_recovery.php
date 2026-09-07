@@ -4,14 +4,14 @@
  *
  * A recovery session is deliberately NOT a normal application login. It carries
  * only enough server-side identity to let the protected Farm Admin recover a
- * suspended/cancelled tenant through billing. Operational routes continue to use
- * requireLogin() and never accept this context.
+ * suspended/cancelled/past-due tenant through billing. Operational routes continue
+ * to use requireLogin() and never accept this context.
  */
 
 if (!function_exists('subscription_recovery_target_statuses')) {
     function subscription_recovery_target_statuses(): array
     {
-        return ['suspended', 'cancelled'];
+        return ['suspended', 'cancelled', 'past_due'];
     }
 }
 
@@ -184,7 +184,7 @@ if (!function_exists('subscription_recovery_clear')) {
 }
 
 if (!function_exists('subscription_recovery_current')) {
-    function subscription_recovery_current(PDO $pdo, array $allowedStatuses = ['suspended', 'cancelled']): ?array
+    function subscription_recovery_current(PDO $pdo, array $allowedStatuses = []): ?array
     {
         $stored = $_SESSION[subscription_recovery_session_key()] ?? null;
         if (!is_array($stored)) return null;
@@ -203,6 +203,7 @@ if (!function_exists('subscription_recovery_current')) {
             return null;
         }
 
+        if (!$allowedStatuses) $allowedStatuses = subscription_recovery_target_statuses();
         $allowedStatuses = array_values(array_unique(array_map(
             static fn($status): string => strtolower(trim((string)$status)),
             $allowedStatuses
@@ -224,7 +225,7 @@ if (!function_exists('subscription_recovery_current')) {
 }
 
 if (!function_exists('subscription_recovery_require')) {
-    function subscription_recovery_require(PDO $pdo, array $allowedStatuses = ['suspended', 'cancelled']): array
+    function subscription_recovery_require(PDO $pdo, array $allowedStatuses = []): array
     {
         $account = subscription_recovery_current($pdo, $allowedStatuses);
         if ($account) return $account;
