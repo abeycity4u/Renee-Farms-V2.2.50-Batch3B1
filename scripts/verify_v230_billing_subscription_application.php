@@ -284,8 +284,10 @@ $check(strpos($pricingSource, 'Extra Poultry Manager seats require a Poultry sub
 $check(strpos($source['record'], "'inserted' => false") !== false
     && strpos($source['record'], 'hash_equals((string)($latest[\'snapshot_hash\'] ?? \'\'), $hash)') !== false,
     'ordinary subscription-record no-op suppression remains unchanged for non-payment captures');
-$check(strpos($combinedRoutes, 'billing_subscription_apply_paid_attempt(') === false,
-    'Stage 2G application remains deliberately unwired from checkout/return/webhook while independently verified');
+$check(strpos($source['checkout'], 'billing_subscription_apply_paid_attempt(') === false
+    && substr_count($source['return'], 'billing_subscription_apply_paid_attempt(') === 1
+    && substr_count($source['webhook'], 'billing_subscription_apply_paid_attempt(') === 1,
+    'Stage 2G application is invoked only by Stage 2H verified return/webhook paths, never checkout initialization');
 $check(strpos($source['init'], 'billing_subscription_application.php') === false,
     'Stage 2G application is not globally loaded through init.php');
 
@@ -295,5 +297,5 @@ if ($failures > 0) {
     exit(1);
 }
 
-echo "PASS: V2.3 Billing Stage 2G application is paid-only, quote-bound, transactional, exactly-once and independently unwired.\n";
-echo "NOTE: monthly/annual paid terms are non-recurring; live provider routes still do not invoke entitlement application.\n";
+echo "PASS: V2.3 Billing Stage 2G application remains paid-only, quote-bound, transactional and exactly-once under Stage 2H wiring.\n";
+echo "NOTE: monthly/annual paid terms remain non-recurring; verified return/webhook routes now invoke the application bridge.\n";
