@@ -45,6 +45,7 @@ verify_recovery(!str_contains($page, 'requireLogin();'), 'recovery page does not
 verify_recovery(str_contains($page, 'subscription_recovery_require'), 'recovery page uses the dedicated restricted authentication gate');
 verify_recovery(!str_contains($page, 'name="farm_id"') && !str_contains($page, 'name="amount"') && !str_contains($page, 'name="currency"'), 'recovery browser form cannot control tenant, amount or currency');
 verify_recovery(str_contains($page, 'billing_provider_selection_codes()') && str_contains($page, 'billing_provider_readiness_status'), 'recovery provider choices come from canonical provider readiness');
+verify_recovery(str_contains($quote, "require_once __DIR__ . '/subscription_plan_catalog.php';"), 'reactivation helper explicitly loads the canonical plan catalog dependency');
 verify_recovery(str_contains($quote, 'billing_pricing_build_payment_quote'), 'reactivation price comes from the server-authoritative price book');
 verify_recovery(str_contains($quote, 'billing_reactivation_assert_selection'), 'recovery has one centralized same-product selection assertion');
 verify_recovery(str_contains($checkout, "billing_require_farm_admin_actor(\$pdo, true, ['suspended', 'cancelled'])"), 'checkout explicitly opts into restricted recovery actors');
