@@ -4,6 +4,8 @@
 -- This migration does NOT charge a customer, alter subscription entitlements,
 -- update farms/farm_modules/role limits, or write subscription history rows.
 -- Migration 041_commercial_subscription_records.sql must already be installed.
+-- Explicit InnoDB is required so billing audit rows participate in transactions
+-- and the declared foreign keys are actually enforced on every installation.
 
 CREATE TABLE IF NOT EXISTS billing_payment_attempts (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -34,7 +36,7 @@ CREATE TABLE IF NOT EXISTS billing_payment_attempts (
     INDEX idx_billing_attempt_quote_hash (quote_hash),
     CONSTRAINT fk_billing_attempt_farm FOREIGN KEY (farm_id) REFERENCES farms(id) ON DELETE CASCADE,
     CONSTRAINT fk_billing_attempt_subscription_record FOREIGN KEY (applied_subscription_record_id) REFERENCES subscriptions(id) ON DELETE SET NULL
-);
+) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS billing_provider_events (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -50,4 +52,4 @@ CREATE TABLE IF NOT EXISTS billing_provider_events (
     UNIQUE KEY uniq_billing_provider_event (provider, provider_event_id),
     INDEX idx_billing_event_attempt (payment_attempt_id),
     CONSTRAINT fk_billing_event_attempt FOREIGN KEY (payment_attempt_id) REFERENCES billing_payment_attempts(id) ON DELETE SET NULL
-);
+) ENGINE=InnoDB;
