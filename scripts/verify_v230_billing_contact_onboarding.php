@@ -48,6 +48,7 @@ $assert(str_contains($billing, "\$allowedEmailKeys = ['csrf_token', 'contact_ema
 $assert(!str_contains($billing, "\$_POST['farm_id']"), 'billing contact edit never accepts browser farm id.');
 $assert(str_contains($billing, 'farm_contact_email_update('), 'billing workspace delegates email mutation to central service.');
 $assert(str_contains($billing, 'Save a valid billing contact email above to enable subscription checkout.'), 'missing email is recoverable by Farm Admin on billing page.');
+$assert(str_contains($billing, 'btn btn-success fw-semibold') && str_contains($billing, '>Save email</button>'), 'billing contact save button keeps solid theme-safe contrast.');
 $assert(str_contains($farms, 'farm_contact_email_pair($rawOwnerEmail, $rawContactEmail)'), 'Platform Owner create/edit uses the same email-pair contract.');
 $assert(str_contains($farms, "'contact_email' => \$contactEmail"), 'farm creation prepares canonical contact email for onboarding.');
 $assert(str_contains($farms, 'farm_onboarding_send_credentials($onboardingPayload)'), 'farm creation delegates credential email to onboarding service.');
