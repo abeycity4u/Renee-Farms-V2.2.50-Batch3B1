@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS farm_subscription_seat_addons (
     INDEX idx_farm_subscription_seat_addons_farm (farm_id),
     CONSTRAINT fk_farm_subscription_seat_addons_farm
         FOREIGN KEY (farm_id) REFERENCES farms(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB;
 
 -- Preserve any pre-existing implied extras from the old effective-limit model.
 -- Disabled specialist roles normally have max_users=0, so they safely backfill 0.
