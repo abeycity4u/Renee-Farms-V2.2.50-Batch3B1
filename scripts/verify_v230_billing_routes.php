@@ -265,17 +265,17 @@ $check(strpos($audit, 'FOR UPDATE') !== false,
 $combinedStage2F = $request . "\n" . $audit . "\n" . $checkout . "\n" . $return . "\n" . $webhook;
 $protectedDml = '/\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+(?:farms|farm_modules|farm_role_limits|farm_subscription_seat_addons|subscriptions)\b/i';
 $check(!preg_match($protectedDml, $combinedStage2F),
-    'Stage 2F contains no subscription or entitlement DML');
+    'route/audit layer still contains no direct subscription or entitlement DML');
 $check(strpos($combinedStage2F, 'subscription_record_capture(') === false
     && strpos($combinedStage2F, 'farm_entitlement_set') === false,
-    'Stage 2F has no payment-to-entitlement application bridge');
+    'route layer does not bypass the centralized Stage 2G subscription application service');
 $check(strpos($audit, 'UPDATE billing_payment_attempts') !== false
     && strpos($audit, 'UPDATE billing_provider_events') !== false,
-    'Stage 2F state mutation is limited to the billing audit tables');
+    'Stage 2F audit helper state mutation remains limited to the billing audit tables');
 $check(strpos($init, 'billing/checkout.php') === false
     && strpos($init, 'billing/webhook.php') === false
     && strpos($init, 'billing_payment_audit_state.php') === false,
-    'Stage 2F routes/state are not globally executed through init.php');
+    'billing routes/state are not globally executed through init.php');
 
 echo "\n{$checks} checks, {$failures} failure(s).\n";
 if ($failures > 0) {
@@ -283,5 +283,5 @@ if ($failures > 0) {
     exit(1);
 }
 
-echo "PASS: V2.3 Billing Stage 2F routes are tenant-bound, server-price-authoritative, provider-verified, idempotent and entitlement-inert.\n";
-echo "NOTE: routes are implemented but live provider credentials, public billing URL and payment-to-entitlement activation remain separately controlled.\n";
+echo "PASS: V2.3 Billing route security remains tenant-bound, server-price-authoritative, provider-verified and idempotent under Stage 2H activation wiring.\n";
+echo "NOTE: Stage 2H delegates verified paid return/webhook activation to Stage 2G; live provider credentials and public billing URL remain separately controlled.\n";
