@@ -8,6 +8,7 @@
  * - shared basic Sales is never a pricing dimension;
  * - checkout callers never supply amount or currency;
  * - a versioned server-side price book resolves the exact amount/currency;
+ * - Stage 2C launch-currency policy is enforced when loaded;
  * - until a deliberate commercial price book is configured, pricing fails closed.
  *
  * No prices or payment-provider choice are introduced in this file.
@@ -163,6 +164,9 @@ if (!function_exists('billing_pricing_validate_price_book')) {
         }
         if (!preg_match('/^[A-Z]{3}$/', $currency)) {
             throw new RuntimeException('Billing pricing is not configured with a valid currency.');
+        }
+        if (function_exists('billing_currency_policy_normalize')) {
+            $currency = billing_currency_policy_normalize($currency);
         }
         if (!is_array($packages) || !$packages) {
             throw new RuntimeException('Billing pricing is not configured with package prices.');
