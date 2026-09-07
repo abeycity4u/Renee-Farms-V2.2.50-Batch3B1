@@ -39,7 +39,7 @@ try {
     // billing-attempt creation, or provider network activity can occur.
     billing_provider_assert_new_checkout_allowed();
 
-    $provider = billing_provider_selection_resolve_checkout($selection['provider']);
+    $provider = billing_provider_readiness_resolve_checkout($selection['provider']);
     // A checkout route registers only its explicitly selected provider; there is
     // never a silent retry through the secondary provider.
     billing_provider_register_configured_adapters($provider);
