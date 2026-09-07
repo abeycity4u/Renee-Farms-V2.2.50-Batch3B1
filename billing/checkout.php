@@ -22,7 +22,7 @@ require_once dirname(__DIR__) . '/includes/billing_tenant_actor.php';
 require_once dirname(__DIR__) . '/includes/billing_current_product.php';
 require_once dirname(__DIR__) . '/includes/billing_reactivation_quote.php';
 
-$actor = billing_require_farm_admin_actor($pdo, true, ['suspended', 'cancelled']);
+$actor = billing_require_farm_admin_actor($pdo, true, subscription_recovery_target_statuses());
 $farmId = (int)$actor['farm_id'];
 require_valid_csrf_post();
 
