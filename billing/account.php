@@ -38,7 +38,7 @@ try {
 
 $farm = $overview['farm'] ?? currentFarm();
 $farmName = (string)($farm['name'] ?? farmBrandName());
-$status = strtolower(trim((string)($farm['subscription_status'] ?? 'unknown'));
+$status = strtolower(trim((string)($farm['subscription_status'] ?? 'unknown')));
 $statusLabel = ucwords(str_replace('_', ' ', $status));
 $pricing = $overview['pricing'] ?? null;
 $modules = $overview['modules'] ?? [];
