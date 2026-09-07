@@ -71,12 +71,12 @@ $check(strpos($m044, 'ALTER TABLE farms') === false
     && strpos($m044, 'ALTER TABLE billing_payment_attempts') === false,
     'migration 044 leaves already-transactional parent/audit tables untouched');
 
-$check(strpos($runner, "$migrationName = '044_commercial_application_transactional_integrity.sql';") !== false,
+$check(strpos($runner, '$migrationName = \'044_commercial_application_transactional_integrity.sql\';') !== false,
     'targeted runner names migration 044 explicitly');
 $check(strpos($runner, 'migration 003') !== false
     && strpos($runner, 'migrations/003') === false,
     'targeted runner documents but never loads migration 003');
-$check(strpos($runner, "LEFT JOIN farms f ON f.id = child.farm_id") !== false,
+$check(strpos($runner, 'LEFT JOIN farms f ON f.id = child.farm_id') !== false,
     'targeted runner refuses orphan tenant rows before conversion');
 $check(strpos($runner, '$beforeRoleLimits') !== false
     && strpos($runner, '$beforeSeatAddons') !== false
@@ -101,7 +101,7 @@ $check(strpos($runner, 'curl_') === false,
     'transactional repair makes no provider or network call');
 $check(strpos($app, "'farm_role_limits',") !== false
     && strpos($app, "'farm_subscription_seat_addons',") !== false
-    && strpos($app, "strcasecmp($engine, 'InnoDB')") !== false,
+    && strpos($app, 'strcasecmp($engine, \'InnoDB\')') !== false,
     'Stage 2G application continues to fail closed unless repaired tables are transactional');
 
 echo "\n{$checks} checks, {$failures} failure(s).\n";
