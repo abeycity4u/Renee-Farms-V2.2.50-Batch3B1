@@ -27,7 +27,11 @@ if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'GET') {
 // Active is allowed here only for a still-valid recovery context. That covers the
 // race where an authenticated webhook applies the same attempt before the browser
 // returns; exactly-once application remains authoritative.
-$actor = billing_require_farm_admin_actor($pdo, true, ['suspended', 'cancelled', 'active']);
+$recoveryReturnStatuses = array_values(array_unique(array_merge(
+    subscription_recovery_target_statuses(),
+    ['active']
+)));
+$actor = billing_require_farm_admin_actor($pdo, true, $recoveryReturnStatuses);
 $farmId = (int)$actor['farm_id'];
 
 try {
