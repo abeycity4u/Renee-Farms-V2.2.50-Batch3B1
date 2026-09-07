@@ -13,17 +13,6 @@
  */
 
 require_once __DIR__ . '/subscription_record.php';
-
-// Define the recovery target contract before loading the recovery helper. The
-// helper deliberately guards its definition with function_exists(), allowing the
-// lifecycle layer to extend the existing suspended/cancelled recovery model with
-// past_due without duplicating authentication/session code.
-if (!function_exists('subscription_recovery_target_statuses')) {
-    function subscription_recovery_target_statuses(): array
-    {
-        return ['suspended', 'cancelled', 'past_due'];
-    }
-}
 require_once __DIR__ . '/subscription_recovery.php';
 
 if (!function_exists('subscription_lifecycle_expirable_statuses')) {
