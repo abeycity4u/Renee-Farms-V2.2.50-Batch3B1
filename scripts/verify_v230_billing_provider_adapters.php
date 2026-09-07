@@ -386,9 +386,9 @@ $check(strpos($source['init'], 'includes/billing_provider_adapters.php') === fal
     && strpos($source['init'], 'includes/billing_provider_flutterwave.php') === false,
     'Stage 2E concrete adapters remain unwired from global application runtime');
 $check(strpos($source['adapters'], 'billing_provider_register_configured_adapters(?string $onlyProvider = null)') !== false,
-    'future routes can register one explicitly selected provider without requiring the other');
-$check(strpos($source['adapters'], 'billing_provider_selection_assert_configured($requested, true)') !== false,
-    'explicit provider registration requires checkout and webhook credentials before use');
+    'routes can register one explicitly selected provider without requiring the other');
+$check(strpos($source['adapters'], 'billing_provider_runtime_credentials($provider, true)') !== false,
+    'explicit provider registration requires current mode checkout/webhook credentials before use');
 
 $secretPattern = '/\b(?:sk_live_|sk_test_|FLWSECK-|Bearer\s+[A-Za-z0-9_-]{20,})/';
 $check(!preg_match($secretPattern, $source['paystack'] . "\n" . $source['flutterwave'] . "\n" . $source['adapters']),
@@ -400,5 +400,5 @@ if ($failures > 0) {
     exit(1);
 }
 
-echo "PASS: V2.3 Billing Stage 2E adapters are provider-authenticated, server-price-bound, offline-verifiable and entitlement-inert.\n";
-echo "NOTE: concrete adapters are implemented but checkout/webhook routes and live credentials remain intentionally unwired.\n";
+echo "PASS: V2.3 Billing Stage 2E adapters remain provider-authenticated, server-price-bound, offline-verifiable and entitlement-inert under Stage 2I credential separation.\n";
+echo "NOTE: provider HTTP behavior is unchanged; Stage 2I controls which deployment credential slot can instantiate an adapter.\n";
