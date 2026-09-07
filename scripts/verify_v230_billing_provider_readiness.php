@@ -128,7 +128,8 @@ try {
     $set('BILLING_PUBLIC_BASE_URL', 'http://billing.example.test');
     $publicBad = billing_provider_public_url_status();
     $check(($publicBad['configured'] ?? null) === false
-        && ($publicBad['url'] ?? 'x') === null,
+        && array_key_exists('url', $publicBad)
+        && $publicBad['url'] === null,
         'non-HTTPS public billing URL is reported not ready');
     $set('BILLING_PUBLIC_BASE_URL', 'https://billing.example.test');
 
