@@ -41,6 +41,7 @@ $check = static function (bool $ok, string $message) use (&$checks, &$failures):
 
 $return = $source['return'];
 $webhook = $source['webhook'];
+$checkout = $source['checkout'];
 $audit = $source['audit'];
 $app = $source['application'];
 
@@ -48,10 +49,20 @@ $check(strpos($return, "billing_subscription_application.php") !== false,
     'return route loads the proven Stage 2G application service explicitly');
 $check(strpos($webhook, "billing_subscription_application.php") !== false,
     'webhook route loads the proven Stage 2G application service explicitly');
-$check(strpos($source['checkout'], 'billing_subscription_apply_paid_attempt(') === false,
+$check(strpos($checkout, 'billing_subscription_apply_paid_attempt(') === false,
     'checkout initialization still cannot activate a subscription');
 $check(strpos($source['init'], 'billing_subscription_application.php') === false,
     'subscription application is not globally loaded through init.php');
+
+$checkoutCapacity = strpos($checkout, 'subscription_seat_assert_capacity(');
+$checkoutAttemptCreate = strpos($checkout, 'billing_payment_attempt_create(');
+$checkoutProviderInit = strpos($checkout, 'billing_provider_initialize_checkout(');
+$check($checkoutCapacity !== false
+    && $checkoutAttemptCreate !== false
+    && $checkoutProviderInit !== false
+    && $checkoutCapacity < $checkoutAttemptCreate
+    && $checkoutCapacity < $checkoutProviderInit,
+    'checkout rejects under-capacity plan/seat selections before attempt creation or provider initialization');
 
 $returnVerify = strpos($return, 'billing_provider_verify_payment(');
 $returnBegin = strpos($return, 'beginTransaction()');
