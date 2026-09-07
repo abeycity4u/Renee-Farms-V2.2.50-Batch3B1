@@ -1,10 +1,12 @@
 <?php
 /**
- * V2.3 Billing Stage 2F provider return route.
+ * V2.3 Billing Stage 2H provider return route.
  *
  * Browser query status/amount/currency values are never trusted. The route uses
  * only the selected provider/reference to locate the current tenant's existing
- * attempt, then performs a fresh server-to-server provider verification.
+ * attempt, performs a fresh server-to-server provider verification, and applies
+ * a verified paid attempt through the proven exactly-once Stage 2G bridge in
+ * the same database transaction.
  */
 
 require_once dirname(__DIR__) . '/init.php';
@@ -13,6 +15,7 @@ require_once dirname(__DIR__) . '/includes/billing_provider_contract.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_selection.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_adapters.php';
 require_once dirname(__DIR__) . '/includes/billing_payment_audit_state.php';
+require_once dirname(__DIR__) . '/includes/billing_subscription_application.php';
 
 if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'GET') {
     http_response_code(405);
@@ -47,6 +50,7 @@ try {
 
     $verification = billing_provider_verify_payment($provider, $providerReference);
 
+    $application = null;
     $pdo->beginTransaction();
     try {
         // Re-read under a row lock and tenant scope before applying the provider fact.
@@ -55,6 +59,9 @@ try {
             throw new RuntimeException('Billing payment attempt changed during verification.');
         }
         $updated = billing_audit_apply_verification($pdo, (int)$locked['id'], $verification);
+        if ((string)($updated['status'] ?? '') === 'paid') {
+            $application = billing_subscription_apply_paid_attempt($pdo, (int)$locked['id']);
+        }
         $pdo->commit();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
@@ -63,7 +70,7 @@ try {
 
     $status = (string)($updated['status'] ?? 'pending');
     if ($status === 'paid') {
-        $_SESSION['success'] = 'Payment verified and recorded. Subscription activation is pending final billing application.';
+        $_SESSION['success'] = 'Payment verified and subscription activated successfully.';
     } elseif ($status === 'refunded') {
         $_SESSION['error'] = 'This payment has been recorded as refunded.';
     } elseif (in_array($status, ['failed', 'cancelled'], true)) {
@@ -79,5 +86,5 @@ try {
     exit('Invalid billing return request.');
 } catch (Throwable $e) {
     http_response_code(502);
-    exit('Payment could not be verified right now. Please try again later.');
+    exit('Payment could not be verified and applied right now. Please try again later.');
 }
