@@ -44,12 +44,12 @@ $assert(str_contains($contact, "WHERE id = ? AND slug <> 'owner'"), 'contact ema
 $assert(str_contains($contact, 'WHERE id = ? AND farm_id = ?'), 'Farm Admin user backfill is tenant-pinned.');
 $assert(str_contains($billing, 'billing_require_farm_admin_actor($pdo, false)'), 'billing contact edit requires canonical Farm Admin actor.');
 $assert(str_contains($billing, 'require_valid_csrf_post()'), 'billing contact edit requires CSRF.');
-$assert(str_contains($billing, "$allowedEmailKeys = ['csrf_token', 'contact_email', 'save_contact_email']"), 'billing contact edit accepts only narrow form keys.');
-$assert(!str_contains($billing, "$_POST['farm_id']"), 'billing contact edit never accepts browser farm id.');
+$assert(str_contains($billing, "\$allowedEmailKeys = ['csrf_token', 'contact_email', 'save_contact_email']"), 'billing contact edit accepts only narrow form keys.');
+$assert(!str_contains($billing, "\$_POST['farm_id']"), 'billing contact edit never accepts browser farm id.');
 $assert(str_contains($billing, 'farm_contact_email_update('), 'billing workspace delegates email mutation to central service.');
 $assert(str_contains($billing, 'Save a valid billing contact email above to enable subscription checkout.'), 'missing email is recoverable by Farm Admin on billing page.');
 $assert(str_contains($farms, 'farm_contact_email_pair($rawOwnerEmail, $rawContactEmail)'), 'Platform Owner create/edit uses the same email-pair contract.');
-$assert(str_contains($farms, "'contact_email' => $contactEmail"), 'farm creation prepares canonical contact email for onboarding.');
+$assert(str_contains($farms, "'contact_email' => \$contactEmail"), 'farm creation prepares canonical contact email for onboarding.');
 $assert(str_contains($farms, 'farm_onboarding_send_credentials($onboardingPayload)'), 'farm creation delegates credential email to onboarding service.');
 $assert(str_contains($farms, '$pdo->commit();') && strpos($farms, 'farm_onboarding_send_credentials($onboardingPayload)') > strpos($farms, '$pdo->commit();'), 'onboarding email is attempted only after farm transaction commit.');
 $assert(str_contains($farms, 'The farm was created, but the credential email could not be sent.'), 'mail failure does not roll back a successfully created farm.');
@@ -57,7 +57,7 @@ $assert(str_contains($onboarding, "'password'") === false || !preg_match('/error
 $assert(str_contains($onboarding, "billing_route_public_url('/login.php')"), 'onboarding login URL uses configured canonical public base URL.');
 $assert(str_contains($mailer, "return 'no-reply@reneefarms.com';"), 'mailer has a deterministic Renee Farms sender fallback.');
 $assert(str_contains($mailer, 'mail($to, $subject, $body'), 'outbound mail uses one centralized transport call.');
-$assert(!preg_match('/error_log\s*\([^;]*$body/is', $mailer), 'mail transport never logs message body.');
+$assert(!preg_match('/error_log\s*\([^;]*\$body/is', $mailer), 'mail transport never logs message body.');
 
 echo 'Checks: ' . $checks . PHP_EOL;
 echo 'Failures: ' . $failures . PHP_EOL;
