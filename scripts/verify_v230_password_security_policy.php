@@ -1,5 +1,6 @@
 <?php
 $root = dirname(__DIR__);
+$init = @file_get_contents($root . '/init.php') ?: '';
 $policy = @file_get_contents($root . '/includes/password_security.php') ?: '';
 $guard = @file_get_contents($root . '/includes/user_management_tenant_guard.php') ?: '';
 $farms = @file_get_contents($root . '/management/farms.php') ?: '';
@@ -18,6 +19,7 @@ $add('Central minimum password length is 8', str_contains($policy, 'return 8;'))
 $add('Central password validator exists', str_contains($policy, 'function password_security_validate'));
 $add('Central password hasher uses PASSWORD_DEFAULT', str_contains($policy, 'password_hash($password, PASSWORD_DEFAULT)'));
 $add('Central verifier rejects non-hash stored values', str_contains($policy, "password_get_info(\$storedHash)['algo'] === 0"));
+$add('Bootstrap explicitly loads central password policy', str_contains($init, "require_once __DIR__ . '/includes/password_security.php'"));
 $add('Team User guard loads central password policy', str_contains($guard, "require_once __DIR__ . '/password_security.php'"));
 $add('Team User add password is server-side validated', str_contains($guard, "\$isAdd = isset(\$_POST['add_user'])") && str_contains($guard, 'password_security_validate($password)'));
 $add('Team User replacement password is server-side validated', str_contains($guard, "\$isEdit = isset(\$_POST['edit_user'])") && str_contains($guard, "if (\$isEdit && \$password === '') return;"));
