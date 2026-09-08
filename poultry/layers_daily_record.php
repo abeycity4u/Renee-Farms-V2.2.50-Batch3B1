@@ -704,7 +704,7 @@ $_SESSION['success'] = "Daily record saved successfully!";
                             <div class="col-md-6 mb-3">
                                 <label>Date</label>
                                 <input type="date" class="form-control" id="selectedDate"
-                                       onchange="checkExistingRecord()" required>
+                                       data-check-existing-record required>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label>Birds Age (days)</label>

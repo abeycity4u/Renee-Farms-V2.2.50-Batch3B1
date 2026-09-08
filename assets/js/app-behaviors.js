@@ -8,19 +8,27 @@
     'use strict';
 
     document.addEventListener('change', function (event) {
-        const target = event.target.closest('[data-auto-submit]');
-        if (!target) {
+        const autoSubmitTarget = event.target.closest('[data-auto-submit]');
+        if (autoSubmitTarget) {
+            const form = autoSubmitTarget.form || autoSubmitTarget.closest('form');
+            if (form) {
+                // Preserve the behavior of the former:
+                // onchange="this.form.submit()"
+                form.submit();
+            }
             return;
         }
 
-        const form = target.form || target.closest('form');
-        if (!form) {
+        const recordCheckTarget = event.target.closest('[data-check-existing-record]');
+        if (!recordCheckTarget) {
             return;
         }
 
-        // Preserve the behavior of the former:
-        // onchange="this.form.submit()"
-        form.submit();
+        if (typeof window.checkExistingRecord !== 'function') {
+            return;
+        }
+
+        window.checkExistingRecord();
     });
 
     document.addEventListener('click', function (event) {
