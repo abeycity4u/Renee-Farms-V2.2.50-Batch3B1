@@ -1,12 +1,18 @@
 <?php require_once(dirname(__DIR__) . '/init.php'); ?>
 <?php
 require_once(__DIR__ . '/../config.php');
+require_once(__DIR__ . '/../includes/readonly_session.php');
 requireLogin();
 
 header('Content-Type: application/json');
 
 $farmType = strtolower(trim((string)($_GET['farm_type'] ?? 'both')));
 $tenantFarmId = requireCurrentFarmId();
+
+// This endpoint is read-only. Release PHP's exclusive session lock as soon as
+// identity/farm context is resolved so dashboard refresh traffic cannot block
+// a user-initiated page request from the same authenticated browser session.
+release_readonly_session_lock();
 
 if (!in_array($farmType, ['poultry', 'ruminant', 'both'], true)) {
     http_response_code(400);
