@@ -72,6 +72,11 @@ require_once __DIR__ . '/includes/farm_entitlement_runtime.php';
 // Central browser-form CSRF rendering and POST enforcement helpers.
 require_once __DIR__ . '/includes/csrf.php';
 
+// Canonical password policy/storage/verification contract. Load it explicitly at
+// bootstrap so every route can reuse one minimum-length, hash and hash-only verify
+// implementation without depending on an indirect include chain.
+require_once __DIR__ . '/includes/password_security.php';
+
 // Keep Inventory View as the parent gate for all Inventory reads/mutations,
 // preserve manager module scope, and bridge granular Add Item / Update Stock
 // permissions across the large legacy Inventory page and its read endpoints.
