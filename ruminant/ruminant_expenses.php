@@ -484,8 +484,8 @@ $pdfReportUrl = pdf_report_current_url();
         </div>
     </div>
     <script>
-    const ruminantExpenseCycles = <?php echo json_encode($expenseCycles, JSON_UNESCAPED_SLASHES); ?>;
-    const ruminantExpenseAnimals = <?php echo json_encode($ruminantAnimals, JSON_UNESCAPED_SLASHES); ?>;
+    const ruminantExpenseCycles = <?php echo app_json_script($expenseCycles); ?>;
+    const ruminantExpenseAnimals = <?php echo app_json_script($ruminantAnimals); ?>;
     function refreshRuminantExpenseCycles() {
         const p=document.getElementById('ruminantExpenseProduction');
         const c=document.getElementById('ruminantExpenseCycle');
@@ -516,7 +516,7 @@ $pdfReportUrl = pdf_report_current_url();
         const production=document.getElementById(prefix==='add'?'ruminantExpenseProduction':'editExpenseProduction');
         if(!modeEl||!panel||!production) return;
         const mode=modeEl.value;
-        if(mode==='herd'){panel.classList.add('d-none');panel.innerHTML='';return;}
+        if(mode==='herd'){panel.classList.add('d-none');panel.replaceChildren();return;}
         panel.classList.remove('d-none');
         const selectedMap={};
         (selectedRows||[]).forEach(r=>selectedMap[String(r.animal_id)] = r);
@@ -525,14 +525,80 @@ $pdfReportUrl = pdf_report_current_url();
         const existingAmounts={};
         panel.querySelectorAll('[data-animal-amount]').forEach(x=>existingAmounts[x.dataset.animalAmount]=x.value);
         const animals=ruminantExpenseAnimals.filter(a=>a.species===production.value);
-        if(!animals.length){panel.innerHTML='<div class="small text-muted">No registered animals match this production type.</div>';return;}
+
+        panel.replaceChildren();
+
+        if(!animals.length){
+            const empty=document.createElement('div');
+            empty.className='small text-muted';
+            empty.textContent='No registered animals match this production type.';
+            panel.appendChild(empty);
+            return;
+        }
+
         const total=expenseTotal(prefix);
-        panel.innerHTML='<div class="small fw-semibold mb-2">Select '+production.value.charAt(0).toUpperCase()+production.value.slice(1)+' animals</div>'+animals.map(a=>{
-            const id=String(a.id), checked=selectedMap[id]||existingChecked[id];
+
+        const heading=document.createElement('div');
+        heading.className='small fw-semibold mb-2';
+        heading.textContent='Select '+production.value.charAt(0).toUpperCase()+production.value.slice(1)+' animals';
+        panel.appendChild(heading);
+
+        animals.forEach(a=>{
+            const id=String(a.id);
+            const checked=!!(selectedMap[id]||existingChecked[id]);
             const old=selectedMap[id]?.allocated_amount ?? existingAmounts[id] ?? '';
-            const custom=mode==='custom'?`<input type="number" min="0" step="0.01" class="form-control form-control-sm ms-2" style="max-width:150px" name="animal_amounts[${id}]" data-animal-amount="${id}" value="${old}" placeholder="₦ allocation">`:'';
-            return `<div class="d-flex align-items-center mb-2"><input class="form-check-input me-2" type="checkbox" name="animal_ids[]" value="${id}" ${checked?'checked':''}><div class="flex-grow-1"><strong>${a.tag_no}</strong> <span class="text-muted small">${a.status}</span></div>${custom}</div>`;
-        }).join('') + (mode==='equal'?`<div class="small text-muted mt-2">Equal split will be calculated from the expense total of ₦${total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}.</div>`:'');
+
+            const row=document.createElement('div');
+            row.className='d-flex align-items-center mb-2';
+
+            const checkbox=document.createElement('input');
+            checkbox.className='form-check-input me-2';
+            checkbox.type='checkbox';
+            checkbox.name='animal_ids[]';
+            checkbox.value=id;
+            checkbox.checked=checked;
+            row.appendChild(checkbox);
+
+            const info=document.createElement('div');
+            info.className='flex-grow-1';
+
+            const tag=document.createElement('strong');
+            tag.textContent=String(a.tag_no ?? '');
+            info.appendChild(tag);
+            info.appendChild(document.createTextNode(' '));
+
+            const status=document.createElement('span');
+            status.className='text-muted small';
+            status.textContent=String(a.status ?? '');
+            info.appendChild(status);
+
+            row.appendChild(info);
+
+            if(mode==='custom'){
+                const amount=document.createElement('input');
+                amount.type='number';
+                amount.min='0';
+                amount.step='0.01';
+                amount.className='form-control form-control-sm ms-2';
+                amount.style.maxWidth='150px';
+                amount.name='animal_amounts['+id+']';
+                amount.dataset.animalAmount=id;
+                amount.value=String(old);
+                amount.placeholder='₦ allocation';
+                row.appendChild(amount);
+            }
+
+            panel.appendChild(row);
+        });
+
+        if(mode==='equal'){
+            const equal=document.createElement('div');
+            equal.className='small text-muted mt-2';
+            equal.textContent='Equal split will be calculated from the expense total of ₦'
+                + total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})
+                + '.';
+            panel.appendChild(equal);
+        }
     }
     function initAnimalAllocation(prefix){
         const mode=document.getElementById(prefix==='add'?'addAnimalAllocationMode':'editAnimalAllocationMode');

@@ -242,7 +242,7 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
         ruminant: {cattle:'Cattle', goat:'Goat', sheep:'Sheep', other:'Other', shared:'Shared / Unallocated Ruminant'},
         general: {general:'General / Other Farm Income'}
     };
-    const cycles = <?php echo json_encode($cycles, JSON_UNESCAPED_SLASHES); ?>;
+    const cycles = <?php echo app_json_script($cycles); ?>;
     const farmSelect = document.getElementById('profitFarmType');
     const productionSelect = document.getElementById('profitProductionType');
     const cycleSelect = document.getElementById('profitCycleId');
@@ -273,7 +273,7 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
 
     farmSelect.addEventListener('change', () => rebuildProduction('all', 0));
     productionSelect.addEventListener('change', () => rebuildCycles(0));
-    rebuildProduction(<?php echo json_encode($productionType); ?>, <?php echo (int)$cycleId; ?>);
+    rebuildProduction(<?php echo app_json_script($productionType); ?>, <?php echo (int)$cycleId; ?>);
 })();
 </script>
 </body></html>

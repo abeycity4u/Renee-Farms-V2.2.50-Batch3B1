@@ -1639,7 +1639,7 @@ $pageTitle = "Dashboard";
     // Check for notifications
     function checkNotifications() {
         // Check for low stock notifications
-        const lowStockItems = <?php echo json_encode($lowStockItems); ?>;
+        const lowStockItems = <?php echo app_json_script($lowStockItems); ?>;
         if (lowStockItems.length > 0) {
             const notificationCount = lowStockItems.length;
             if (notificationCount > 0) {

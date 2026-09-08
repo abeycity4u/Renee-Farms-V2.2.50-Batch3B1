@@ -931,7 +931,7 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!";
     }
 
     const selectedCycleId = <?php echo (int)$selectedCycleId; ?>;
-    const selectedCycleAnimalType = <?php echo json_encode($normalizeAnimalType($selectedCycle['production_type'] ?? '')); ?>;
+    const selectedCycleAnimalType = <?php echo app_json_script($normalizeAnimalType($selectedCycle['production_type'] ?? '')); ?>;
     const validRuminantTypes = ['cattle', 'goat', 'sheep', 'other'];
 
     function getSelectedCycleAnimalType() {

@@ -1418,7 +1418,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     });
     
     // Update item info when select changes
-    const inventoryActiveCycles = <?php echo json_encode($inventoryActiveCycles, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+    const inventoryActiveCycles = <?php echo app_json_script($inventoryActiveCycles); ?>;
 
     function updateTransactionCycleOptions() {
         const cycleWrap = document.getElementById('transactionCycleWrap');
@@ -1442,8 +1442,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             String(cycle.farm_type).toLowerCase() === farmType &&
             String(cycle.production_type).toLowerCase() === productionType
         );
-        cycleSelect.innerHTML = '<option value="">No specific cycle / pooled usage</option>' +
-            matches.map(cycle => `<option value="${cycle.id}">${cycle.cycle_code}</option>`).join('');
+        cycleSelect.replaceChildren(new Option('No specific cycle / pooled usage', ''));
+        matches.forEach(cycle => {
+            cycleSelect.add(new Option(String(cycle.cycle_code ?? ''), String(cycle.id ?? '')));
+        });
         cycleWrap.style.display = '';
     }
 
@@ -1467,7 +1469,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             : farmType === 'ruminant'
                 ? [['shared','Shared Ruminant'],['cattle','Cattle'],['goat','Goat'],['sheep','Sheep'],['other','Other']]
                 : [['shared','Shared / Farm-wide']];
-        select.innerHTML = options.map(([value,label]) => `<option value="${value}">${label}</option>`).join('');
+        select.replaceChildren();
+        options.forEach(([value,label]) => select.add(new Option(label, value)));
         select.value = options.some(([value]) => value === defaultProduction) ? defaultProduction : 'shared';
         select.onchange = updateTransactionCycleOptions;
         wrap.style.display = '';
@@ -1480,10 +1483,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             const currentStock = selectedOption.dataset.stock;
             const unit = selectedOption.dataset.unit;
             document.getElementById('updateItemId').value = itemId;
-            document.getElementById('itemInfo').innerHTML = `
-                Current stock: <strong>${currentStock} ${unit}</strong><br>
-                Selected item: <strong>${selectedOption.textContent.split(' (Current:')[0]}</strong>
-            `;
+
+            const itemInfo=document.getElementById('itemInfo');
+            itemInfo.replaceChildren();
+
+            itemInfo.appendChild(document.createTextNode('Current stock: '));
+
+            const stockStrong=document.createElement('strong');
+            stockStrong.textContent=String(currentStock ?? '')+' '+String(unit ?? '');
+            itemInfo.appendChild(stockStrong);
+
+            itemInfo.appendChild(document.createElement('br'));
+            itemInfo.appendChild(document.createTextNode('Selected item: '));
+
+            const itemStrong=document.createElement('strong');
+            itemStrong.textContent=selectedOption.textContent.split(' (Current:')[0].trim();
+            itemInfo.appendChild(itemStrong);
+
             updateTransactionProductionAttribution(selectedOption);
         }
     }
@@ -1584,7 +1600,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // General / Non-feed stock needs an owner chosen by the farmer.
         if (usage !== 'general') {
             wrap.style.display = 'none';
-            select.innerHTML = `<option value="${usage === 'layer' ? 'layer' : (usage === 'broiler' ? 'broiler' : 'shared')}">Automatic</option>`;
+            select.replaceChildren(
+                new Option(
+                    'Automatic',
+                    usage === 'layer' ? 'layer' : (usage === 'broiler' ? 'broiler' : 'shared')
+                )
+            );
             return;
         }
 
@@ -1595,7 +1616,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 ? [['shared','Shared Ruminant'],['cattle','Cattle'],['goat','Goat'],['sheep','Sheep'],['other','Other']]
                 : [['shared','Shared / Farm-wide']];
         const previous = select.value;
-        select.innerHTML = options.map(([value,label]) => `<option value="${value}">${label}</option>`).join('');
+        select.replaceChildren();
+        options.forEach(([value,label]) => select.add(new Option(label, value)));
         select.value = options.some(([value]) => value === previous) ? previous : options[0][0];
     }
 

@@ -25,6 +25,9 @@ $broilerFeeds = file_get_contents($root . '/poultry/broiler_feeds.php');
 $ruminantFeeds = file_get_contents($root . '/ruminant/ruminant_feeds_record.php');
 $inventory = file_get_contents($root . '/inventory.php');
 $dashboard = file_get_contents($root . '/dashboard.php');
+$profitability = file_get_contents($root . '/management/profitability.php');
+$reports = file_get_contents($root . '/management/reports.php');
+$ruminantDaily = file_get_contents($root . '/ruminant/ruminant_daily_record.php');
 
 $add('Central output-security helper exists', is_file($helperPath));
 $add('HTML text helper exists', str_contains($helper, 'function app_html('));
@@ -193,6 +196,88 @@ $add(
 $add(
     'Dashboard seller is HTML-escaped',
     str_contains($dashboard, "app_html(\$sale['seller'])")
+);
+
+$add(
+    'Sales script data uses central JSON encoding',
+    str_contains($sales, "app_json_script(array_keys(sales_unit_presets()))")
+    && str_contains($sales, "app_json_script(\$allSalesCycles)")
+    && str_contains($sales, "app_json_script(\$ruminantSaleAnimals)")
+    && str_contains($sales, "app_json_script(\$ruminantSaleAnimalAllocations)")
+    && str_contains($sales, "app_json_script(\$ruminantSaleExitEvents)")
+);
+
+$add(
+    'Profitability script data uses central JSON encoding',
+    str_contains($profitability, "app_json_script(\$cycles)")
+    && str_contains($profitability, "app_json_script(\$productionType)")
+);
+
+$add(
+    'Reports chart data uses central JSON encoding',
+    substr_count($reports, 'app_json_script(') >= 6
+);
+
+$add(
+    'Ruminant daily script data uses central JSON encoding',
+    str_contains(
+        $ruminantDaily,
+        "app_json_script(\$normalizeAnimalType(\$selectedCycle['production_type'] ?? ''))"
+    )
+);
+
+$add(
+    'Ruminant expense script data uses central JSON encoding',
+    str_contains($ruminantExpenses, "app_json_script(\$expenseCycles)")
+    && str_contains($ruminantExpenses, "app_json_script(\$ruminantAnimals)")
+);
+
+$add(
+    'Inventory cycle script data uses central JSON encoding',
+    str_contains($inventory, "app_json_script(\$inventoryActiveCycles)")
+);
+
+$add(
+    'Dashboard low-stock script data uses central JSON encoding',
+    str_contains($dashboard, "app_json_script(\$lowStockItems)")
+);
+
+$add(
+    'Ruminant expense allocation uses DOM-safe construction',
+    str_contains($ruminantExpenses, "panel.replaceChildren()")
+    && str_contains($ruminantExpenses, "tag.textContent=String(a.tag_no ?? '')")
+    && str_contains($ruminantExpenses, "status.textContent=String(a.status ?? '')")
+    && str_contains($ruminantExpenses, "amount.value=String(old)")
+);
+
+$add(
+    'Ruminant expense allocation no longer interpolates animal data into innerHTML',
+    !str_contains($ruminantExpenses, '<strong>${a.tag_no}</strong>')
+    && !str_contains($ruminantExpenses, '${a.status}')
+    && !str_contains($ruminantExpenses, 'panel.innerHTML=')
+);
+
+$add(
+    'Inventory cycle options use DOM-safe Option construction',
+    str_contains($inventory, "cycleSelect.replaceChildren(new Option('No specific cycle / pooled usage', ''))")
+    && str_contains($inventory, "cycleSelect.add(new Option(String(cycle.cycle_code ?? ''), String(cycle.id ?? '')))")
+);
+
+$add(
+    'Inventory item details use textContent',
+    str_contains($inventory, "stockStrong.textContent=String(currentStock ?? '')+' '+String(unit ?? '')")
+    && str_contains($inventory, "itemStrong.textContent=selectedOption.textContent.split(' (Current:')[0].trim()")
+);
+
+$add(
+    'Inventory dynamic production options use DOM-safe Option construction',
+    substr_count($inventory, "options.forEach(([value,label]) => select.add(new Option(label, value)))") >= 2
+);
+
+$add(
+    'Inventory no longer interpolates cycle/item data into innerHTML templates',
+    !str_contains($inventory, '${cycle.cycle_code}')
+    && !str_contains($inventory, 'Current stock: <strong>${currentStock} ${unit}</strong>')
 );
 
 require_once $helperPath;

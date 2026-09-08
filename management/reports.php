@@ -129,7 +129,7 @@ $pdfReportUrl = pdf_report_current_url();
 </head>
 <body>
     <?php include(__DIR__ . '/../navbar.php'); ?>
-    
+
     <div class="container-fluid mt-4">
         <div class="row">
             <div class="col-12">
@@ -160,7 +160,7 @@ $pdfReportUrl = pdf_report_current_url();
                             </button>
                         </div>
                     </div>
-                    
+
                     <div class="card-body">
                         <!-- Profit/Loss Chart -->
                         <div class="row mb-4">
@@ -188,7 +188,7 @@ $pdfReportUrl = pdf_report_current_url();
                                             'expenses' => 0,
                                             'profit' => 0
                                         ];
-                                        
+
                                         foreach ($profitData as $data) {
                                             $yearlyTotals['sales'] += $data['total_sales'];
                                             $yearlyTotals['expenses'] += $data['total_expenses'];
@@ -213,7 +213,7 @@ $pdfReportUrl = pdf_report_current_url();
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Detailed Profit/Loss Table -->
                         <div class="card mb-4">
                             <div class="card-header">
@@ -256,7 +256,7 @@ $pdfReportUrl = pdf_report_current_url();
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Additional Charts -->
                         <div class="row">
                             <div class="col-md-6">
@@ -301,11 +301,11 @@ $pdfReportUrl = pdf_report_current_url();
     document.getElementById('yearFilter').addEventListener('change', function() {
         updateReport();
     });
-    
+
     document.getElementById('farmTypeFilter').addEventListener('change', function() {
         updateReport();
     });
-    
+
     function updateReport() {
         const year = document.getElementById('yearFilter').value;
         const farmType = document.getElementById('farmTypeFilter').value;
@@ -316,7 +316,7 @@ function exportToExcel() {
         const farmType = document.getElementById('farmTypeFilter').value;
         window.location.href = `reports.php?year=${year}&farm_type=${farmType}&export=excel`;
     }
-    
+
     // Initialize charts when page loads
     document.addEventListener('DOMContentLoaded', function() {
         // Profit/Loss Chart
@@ -324,12 +324,12 @@ function exportToExcel() {
         const profitChart = new Chart(profitCtx, {
             type: 'line',
             data: {
-                labels: <?php echo json_encode(array_map(function($d) { 
-                    return date('M', strtotime($d['month'] . '-01')); 
+                labels: <?php echo app_json_script(array_map(function($d) {
+                    return date('M', strtotime($d['month'] . '-01'));
                 }, $profitData)); ?>,
                 datasets: [{
                     label: 'Net Profit (₦)',
-                    data: <?php echo json_encode(array_column($profitData, 'net_profit')); ?>,
+                    data: <?php echo app_json_script(array_column($profitData, 'net_profit')); ?>,
                     borderColor: 'rgb(75, 192, 192)',
                     backgroundColor: 'rgba(75, 192, 192, 0.2)',
                     fill: true,
@@ -355,16 +355,16 @@ function exportToExcel() {
                 }
             }
         });
-        
+
         // Top Products Chart
         const productsCtx = document.getElementById('productsChart').getContext('2d');
         const productsChart = new Chart(productsCtx, {
             type: 'bar',
             data: {
-                labels: <?php echo json_encode(array_column($topProducts, 'display_product')); ?>,
+                labels: <?php echo app_json_script(array_column($topProducts, 'display_product')); ?>,
                 datasets: [{
                     label: 'Revenue (₦)',
-                    data: <?php echo json_encode(array_column($topProducts, 'total_revenue')); ?>,
+                    data: <?php echo app_json_script(array_column($topProducts, 'total_revenue')); ?>,
                     backgroundColor: 'rgba(54, 162, 235, 0.7)',
                     borderColor: 'rgba(54, 162, 235, 1)',
                     borderWidth: 1
@@ -384,15 +384,15 @@ function exportToExcel() {
                 }
             }
         });
-        
+
         // Expenses Chart
         const expensesCtx = document.getElementById('expensesChart').getContext('2d');
         const expensesChart = new Chart(expensesCtx, {
             type: 'pie',
             data: {
-                labels: <?php echo json_encode(array_column($expenses, 'category')); ?>,
+                labels: <?php echo app_json_script(array_column($expenses, 'category')); ?>,
                 datasets: [{
-                    data: <?php echo json_encode(array_column($expenses, 'total_amount')); ?>,
+                    data: <?php echo app_json_script(array_column($expenses, 'total_amount')); ?>,
                     backgroundColor: [
                         'rgba(255, 99, 132, 0.7)',
                         'rgba(54, 162, 235, 0.7)',

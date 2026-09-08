@@ -1362,7 +1362,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
  <script src="<?php echo BASE_URL; ?>/assets/js/edit-modal.js"></script>
     <script>
 
-    const saleUnitPresets = <?php echo json_encode(array_keys(sales_unit_presets()), JSON_UNESCAPED_SLASHES); ?>;
+    const saleUnitPresets = <?php echo app_json_script(array_keys(sales_unit_presets())); ?>;
     function toggleCustomSaleUnit(selectSelector, customSelector) {
         const isCustom = $(selectSelector).val() === '__custom__';
         $(customSelector).toggle(isCustom).prop('required', isCustom);
@@ -1419,10 +1419,10 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
         ruminant: {cattle:'Cattle', goat:'Goat', sheep:'Sheep', other:'Other', shared:'Shared Ruminant / Other Ruminant'},
         general: {general:'General / Other Farm Income'}
     };
-    const salesCycles = <?php echo json_encode($allSalesCycles, JSON_UNESCAPED_SLASHES); ?>;
-    const ruminantSaleAnimals = <?php echo json_encode($ruminantSaleAnimals, JSON_UNESCAPED_SLASHES); ?>;
-    const ruminantSaleAllocationMap = <?php echo json_encode($ruminantSaleAnimalAllocations, JSON_UNESCAPED_SLASHES); ?>;
-    const ruminantSaleExitMap = <?php echo json_encode($ruminantSaleExitEvents, JSON_UNESCAPED_SLASHES); ?>;
+    const salesCycles = <?php echo app_json_script($allSalesCycles); ?>;
+    const ruminantSaleAnimals = <?php echo app_json_script($ruminantSaleAnimals); ?>;
+    const ruminantSaleAllocationMap = <?php echo app_json_script($ruminantSaleAnimalAllocations); ?>;
+    const ruminantSaleExitMap = <?php echo app_json_script($ruminantSaleExitEvents); ?>;
 
     function refreshSaleAttribution(prefix, selectedProduction = '', selectedCycle = 0) {
         // Add modal uses addFarmType; Edit modal uses editSaleFarmType.
