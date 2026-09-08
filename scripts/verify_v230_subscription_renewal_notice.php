@@ -6,6 +6,7 @@
 
 $root = dirname(__DIR__);
 $helper = $root . '/includes/subscription_renewal_notice.php';
+$navbar = $root . '/navbar.php';
 $checks = [];
 $failures = [];
 $pass = static function (string $label, bool $ok) use (&$checks, &$failures): void {
@@ -14,7 +15,10 @@ $pass = static function (string $label, bool $ok) use (&$checks, &$failures): vo
 };
 
 $pass('renewal notice helper exists', is_file($helper));
+$pass('navbar file exists', is_file($navbar));
 if (is_file($helper)) require_once $helper;
+
+$navbarSource = is_file($navbar) ? (string)file_get_contents($navbar) : '';
 
 $pass('notice window is centrally 14 days',
     function_exists('subscription_renewal_notice_window_days')
@@ -88,6 +92,23 @@ $expiredDateStillActive = subscription_renewal_notice([
     'subscription_ends_at' => '2026-09-07 23:59:59',
 ], $today);
 $pass('past end date is not rendered as renewal warning', $expiredDateStillActive === null);
+
+$pass('navbar loads centralized renewal notice helper',
+    str_contains($navbarSource, "require_once __DIR__ . '/includes/subscription_renewal_notice.php';"));
+$pass('navbar delegates notice calculation to centralized helper',
+    str_contains($navbarSource, 'subscription_renewal_notice(currentFarm())'));
+$pass('navbar keeps renewal notice Farm Admin scoped',
+    str_contains($navbarSource, "!isPlatformOwner() && hasRole('farm_admin')"));
+$pass('navbar renders centralized notice action target',
+    str_contains($navbarSource, "$subscriptionNotice['action_path']")
+    && str_contains($navbarSource, "$subscriptionNotice['action_label']"));
+$pass('navbar renders centralized severity',
+    str_contains($navbarSource, "$subscriptionNotice['severity']"));
+$pass('navbar no longer contains legacy contact-owner renewal wording',
+    !str_contains(strtolower($navbarSource), 'please contact the platform owner to renew'));
+$pass('navbar no longer recalculates expiry days locally',
+    !str_contains($navbarSource, '$daysLeft =')
+    && !str_contains($navbarSource, 'strtotime($farm[\'subscription_ends_at\'])'));
 
 foreach ($checks as [$label, $ok]) {
     echo ($ok ? 'PASS' : 'FAIL') . '  ' . $label . PHP_EOL;
