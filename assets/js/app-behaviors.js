@@ -116,6 +116,36 @@
             return;
         }
 
+        const inventoryActionTarget = event.target.closest('[data-inventory-action][data-inventory-item-id]');
+        if (inventoryActionTarget) {
+            const itemId = Number.parseInt(inventoryActionTarget.dataset.inventoryItemId, 10);
+            if (!Number.isInteger(itemId) || itemId <= 0) {
+                return;
+            }
+
+            const action = inventoryActionTarget.dataset.inventoryAction;
+
+            if (action === 'history') {
+                if (typeof window.viewHistory !== 'function') {
+                    return;
+                }
+
+                window.viewHistory(itemId);
+                return;
+            }
+
+            if (action === 'delete') {
+                if (typeof window.deleteItem !== 'function') {
+                    return;
+                }
+
+                window.deleteItem(itemId);
+                return;
+            }
+
+            return;
+        }
+
         const deleteExpenseTarget = event.target.closest('[data-delete-expense-id]');
         if (!deleteExpenseTarget) {
             return;
@@ -131,6 +161,27 @@
         }
 
         window.deleteExpense(expenseId);
+    });
+
+    document.addEventListener('change', function (event) {
+        const itemInfoTarget = event.target.closest('[data-inventory-update-item]');
+        if (itemInfoTarget) {
+            if (typeof window.updateItemInfo !== 'function') {
+                return;
+            }
+
+            window.updateItemInfo(itemInfoTarget.value);
+            return;
+        }
+
+        const quantityLabelTarget = event.target.closest('[data-inventory-quantity-label]');
+        if (quantityLabelTarget) {
+            if (typeof window.updateQuantityLabel !== 'function') {
+                return;
+            }
+
+            window.updateQuantityLabel();
+        }
     });
 
     document.addEventListener('error', function (event) {

@@ -1024,13 +1024,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                         <?php endif; ?>
 
                                         <button class="btn btn-sm btn-outline-info"
-                                            onclick="viewHistory(<?= (int)$item['id'] ?>)">
+                                            data-inventory-action="history" data-inventory-item-id="<?= (int)$item['id'] ?>">
                                             <i class="bi bi-clock-history"></i>
                                         </button>
 
                                         <?php if ($canManageInventory): ?>
                                             <button class="btn btn-sm btn-outline-danger"
-                                                onclick="deleteItem(<?= (int)$item['id'] ?>)">
+                                                data-inventory-action="delete" data-inventory-item-id="<?= (int)$item['id'] ?>">
                                                 <i class="bi bi-trash"></i>
                                             </button>
                                         <?php endif; ?>
@@ -1266,7 +1266,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             <div class="mb-3">
                                 <label>Item</label>
                                 <select class="form-select" id="updateItemSelect" required
-                                        onchange="updateItemInfo(this.value)">
+                                        data-inventory-update-item>
                                     <option value="">Select Item</option>
                                     <?php foreach ($inventoryItems as $item): ?>
                                     <option value="<?php echo $item['id']; ?>"
@@ -1287,7 +1287,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 <div class="col-md-6 mb-3">
                                     <label>Transaction Type</label>
                                     <select name="transaction_type" class="form-select" required
-                                            onchange="updateQuantityLabel()">
+                                            data-inventory-quantity-label>
                                         <option value="received">Received Stock (+)</option>
                                         <option value="used">Used Stock (-)</option>
                                     </select>
@@ -1567,7 +1567,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
     // Inventory deletion uses the same modern confirmation experience as the rest of the platform.
     async function deleteItem(itemId) {
-        const row = document.querySelector(`button[onclick="deleteItem(${itemId})"]`)?.closest('tr');
+        const row = document.querySelector(`[data-inventory-action="delete"][data-inventory-item-id="${itemId}"]`)?.closest('tr');
         const itemName = row?.querySelector('td strong')?.textContent?.trim() || 'this inventory item';
         const confirmed = await AppConfirm.ask(
             `Delete ${itemName}? Items with only setup/opening history are removed permanently. Items with real stock activity are archived so their audit history remains available.`,
