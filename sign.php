@@ -108,9 +108,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     <link rel="icon" href="assets/images/favicon.ico?v=2024.06.01" type="image/x-icon" sizes="any">
     <link rel="apple-touch-icon" href="assets/images/favicon.ico?v=2024.06.01">
-    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
-    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <style>
         :root {
