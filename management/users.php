@@ -351,7 +351,7 @@ foreach ($users as $existingUser) {
                     <?php if (isPlatformOwner()): ?><input type="hidden" name="target_farm_id" value="<?php echo (int)$farmId; ?>"><?php endif; ?>
                                                 <input type="hidden" name="user_id" value="<?php echo $user['id']; ?>">
                                                 <button type="button"
-                                                        class="btn btn-sm btn-outline-danger" data-user-delete data-username="<?php echo app_attr($user['username']); ?>""
+                                                        class="btn btn-sm btn-outline-danger" data-user-delete data-username="<?php echo app_attr($user['username']); ?>"
 >
                                                     <i class="bi bi-trash me-1"></i>Delete
                                                 </button>

@@ -123,6 +123,11 @@ $check(
 );
 
 $check(
+    !str_contains($users, 'data-username="<?php echo app_attr($user[\'username\']); ?>""'),
+    'Users delete data attribute has no duplicate closing quote'
+);
+
+$check(
     str_contains($users, 'function confirmUserDeletion(form, username)'),
     'Users retains page-owned deletion confirmation'
 );
