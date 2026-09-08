@@ -521,35 +521,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_transaction']) &
     <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
     <script src="https://cdn.datatables.net/responsive/2.2.9/js/dataTables.responsive.min.js"></script> -->
     <script src="https://cdn.datatables.net/responsive/2.2.9/js/responsive.bootstrap5.min.js"></script>
-    <script>
-        $(document).ready(function() {
-            const feedTable = $('#feedsTable').DataTable({
-            autoWidth: false,
-            pageLength: 25,
-            order: [[0, 'desc']],
-                responsive: true,
-                columnDefs: [
-                    { responsivePriority: 1, targets: 0 },
-                    { responsivePriority: 2, targets: -1 }
-                ]
-            });
-
-            $('#monthSelector').on('change', function() {
-                window.location.href = 'ruminant_feeds_record.php?month=' + $(this).val().substring(0, 7);
-            });
-
-            $('.edit-transaction').on('click', function() {
-                const button = $(this);
-                $('#editTransactionId').val(button.data('id'));
-                $('#editTransactionDate').val(button.data('date'));
-                $('#editFeedItem').val(button.data('item'));
-                $('#editTransactionType').val(button.data('type'));
-            $('#editCycleId').val(button.data('cycle') || 0);
-                $('#editQuantity').val(button.data('quantity'));
-                $('#editRemarks').val(button.data('remarks'));
-                bootstrap.Modal.getOrCreateInstance(document.getElementById('editTransactionModal')).show();
-            });
-        });
-    </script>
+    <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/ruminant-feeds-record.js'); ?>"></script>
 </body>
 </html>
