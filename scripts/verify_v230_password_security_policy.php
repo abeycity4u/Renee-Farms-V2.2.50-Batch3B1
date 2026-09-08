@@ -17,10 +17,10 @@ $add('Central password policy helper exists', str_contains($policy, 'function pa
 $add('Central minimum password length is 8', str_contains($policy, 'return 8;'));
 $add('Central password validator exists', str_contains($policy, 'function password_security_validate'));
 $add('Central password hasher uses PASSWORD_DEFAULT', str_contains($policy, 'password_hash($password, PASSWORD_DEFAULT)'));
-$add('Central verifier rejects non-hash stored values', str_contains($policy, "password_get_info($storedHash)['algo'] === 0"));
+$add('Central verifier rejects non-hash stored values', str_contains($policy, 'password_get_info($storedHash)[\'algo\'] === 0'));
 $add('Team User guard loads central password policy', str_contains($guard, "require_once __DIR__ . '/password_security.php'"));
 $add('Team User add password is server-side validated', str_contains($guard, '$isAdd = isset($_POST[\'add_user\'])') && str_contains($guard, 'password_security_validate($password)'));
-$add('Team User replacement password is server-side validated', str_contains($guard, '$isEdit = isset($_POST[\'edit_user\'])') && str_contains($guard, "if ($isEdit && $password === '') return;"));
+$add('Team User replacement password is server-side validated', str_contains($guard, '$isEdit = isset($_POST[\'edit_user\'])') && str_contains($guard, 'if ($isEdit && $password === \'\') return;'));
 $add('Team User page still hashes new passwords', str_contains($users, 'password_hash($_POST[\'password\'], PASSWORD_DEFAULT)'));
 $add('Farm Admin still enforces minimum length 8', str_contains($farms, 'const FARM_OWNER_MIN_PASSWORD_LENGTH = 8;'));
 $add('Farm Admin still hashes stored passwords', str_contains($farms, 'password_hash($password, PASSWORD_DEFAULT)'));
