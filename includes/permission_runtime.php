@@ -93,34 +93,45 @@ function permission_runtime_existing_daily_record(PDO $pdo, string $kind): bool
 if (!function_exists('permission_runtime_client_script')) {
 function permission_runtime_client_script(array $dailyCapability, array $navCapability, array $extraCapability = []): string
 {
-    $config = ['daily' => $dailyCapability, 'nav' => $navCapability, 'extra' => $extraCapability];
-    $json = json_encode($config, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-    if ($json === false) $json = '{}';
+    $config = [
+        'daily' => $dailyCapability,
+        'nav' => $navCapability,
+        'extra' => $extraCapability,
+    ];
 
-    return '<script>(function(){const cfg=' . $json . ';'
-        . 'function blockCalendar(btn){btn.classList.remove("add-record-btn","edit-record-btn");btn.classList.add("no-action");btn.style.cursor="default";btn.addEventListener("click",function(e){e.preventDefault();e.stopImmediatePropagation();},true);}'
-        . 'function stripActionColumn(){document.querySelectorAll("table").forEach(function(table){const headers=Array.from(table.querySelectorAll("thead th"));headers.forEach(function(th,index){if(th.textContent.trim().toLowerCase()==="actions"){table.querySelectorAll("tr").forEach(function(row){const cells=row.children;if(cells[index])cells[index].remove();});}});});}'
-        . 'document.addEventListener("DOMContentLoaded",function(){'
-        . 'const d=(cfg.daily&&Object.keys(cfg.daily).length)?cfg.daily:null;if(d){'
-        . 'if(!d.add){document.querySelectorAll("button[onclick*=\"openRecordModal\"]").forEach(function(el){el.remove();});}'
-        . 'document.querySelectorAll(".calendar-day").forEach(function(btn){const text=btn.textContent||"";const hasRecord=btn.classList.contains("has-record")||btn.hasAttribute("data-opening-stock")||/record\\(s\\)/i.test(text);if((hasRecord&&!d.edit)||(!hasRecord&&!d.add))blockCalendar(btn);});'
-        . 'if(!d.edit){document.querySelectorAll("table .edit-record-btn").forEach(function(el){el.remove();});}'
-        . 'if(!d.delete){document.querySelectorAll("table button.btn-outline-danger,table button[onclick*=\"deleteLayerDailyRecord\"],table button[onclick*=\"deleteBroilerDailyRecord\"]").forEach(function(el){el.remove();});}'
-        . 'if(!d.edit&&!d.delete)stripActionColumn();'
-        . '}'
-        . 'const x=cfg.extra||{};'
-        . 'if(x.expenseAdd===false){document.querySelectorAll("button[data-bs-target=\"#addExpenseModal\"]").forEach(function(el){el.remove();});}'
-        . 'if(x.feedAdd===false){document.querySelectorAll("button[data-bs-target=\"#addTransactionModal\"]").forEach(function(el){el.remove();});}'
-        . 'if(x.salesAdd===false){document.querySelectorAll("button[data-bs-target=\"#addSaleModal\"],button[onclick*=\"addSale\"]").forEach(function(el){el.remove();});}'
-        . 'if(x.salesPayment===false){document.querySelectorAll("button[data-bs-target*=\"payment\" i],button[onclick*=\"payment\" i],form button[name=\"record_payment\"]").forEach(function(el){el.remove();});}'
-        . 'if(x.salesEdit===false){document.querySelectorAll(".edit-sale-btn").forEach(function(el){el.remove();});}'
-        . 'if(x.salesDelete===false){document.querySelectorAll("button[onclick*=\"deleteSale\"]").forEach(function(el){el.remove();});}'
-        . 'if(x.animalAdd===false){document.querySelectorAll("button[onclick*=\"newAnimal\"]").forEach(function(el){el.remove();});}'
-        . 'if(x.animalEdit===false){document.querySelectorAll("button[onclick*=\"editAnimal\"]").forEach(function(el){el.remove();});}'
-        . 'if(x.animalExit===false){document.querySelectorAll("button[onclick*=\"exitAnimal\"]").forEach(function(el){el.remove();});}'
-        . 'const nav=cfg.nav||{};Object.keys(nav).forEach(function(suffix){if(nav[suffix])return;document.querySelectorAll("#appNavbar a[href]").forEach(function(a){try{const p=new URL(a.href,window.location.origin).pathname;if(p.endsWith(suffix))a.closest("li")?.remove();}catch(e){}});});'
-        . 'document.querySelectorAll("#appNavbar .dropdown").forEach(function(drop){if(drop.querySelector("#manageMenu")&&!drop.querySelector(".dropdown-item[href]"))drop.remove();});'
-        . '});})();</script>';
+    $json = json_encode(
+        $config,
+        JSON_UNESCAPED_SLASHES
+        | JSON_UNESCAPED_UNICODE
+        | JSON_HEX_TAG
+        | JSON_HEX_AMP
+        | JSON_HEX_APOS
+        | JSON_HEX_QUOT
+        | JSON_INVALID_UTF8_SUBSTITUTE
+    );
+
+    if ($json === false) {
+        $json = '{}';
+    }
+
+    $encodedConfig = htmlspecialchars(
+        $json,
+        ENT_QUOTES | ENT_SUBSTITUTE,
+        'UTF-8'
+    );
+
+    $asset = BASE_URL . '/assets/js/permission-runtime.js';
+
+    if (function_exists('versioned_asset')) {
+        $asset = BASE_URL . versioned_asset('/assets/js/permission-runtime.js');
+    }
+
+    return '<div id="permissionRuntimeConfig" hidden data-config="'
+        . $encodedConfig
+        . '"></div>'
+        . '<script src="'
+        . htmlspecialchars($asset, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+        . '"></script>';
 }
 }
 
