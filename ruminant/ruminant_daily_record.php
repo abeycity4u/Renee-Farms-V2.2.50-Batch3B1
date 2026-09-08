@@ -894,7 +894,8 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!";
         </div>
     </div>
 
-     <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/jquery/jquery.min.js'); ?>">
+     <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/jquery/jquery.min.js'); ?>"></script>
+    <script>
     const feedItemSelector = document.getElementById('feedItemId');
     if (feedItemSelector) {
         feedItemSelector.addEventListener('change', function () {
