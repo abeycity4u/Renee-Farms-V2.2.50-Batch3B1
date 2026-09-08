@@ -248,7 +248,7 @@ window.AppNotify = window.AppNotify || (function () {
 </script>
 
 <!-- Shared CSP-friendly application behaviors -->
-<script defer src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/app-behaviors.js'); ?>"></script>
+<script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/app-behaviors.js'); ?>"></script>
 
 <!-- Platform-wide confirmation system -->
 <link rel="stylesheet" href="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/css/confirmations.css'); ?>">

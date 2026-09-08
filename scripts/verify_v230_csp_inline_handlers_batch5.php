@@ -12,6 +12,17 @@ $check = function (bool $ok, string $label) use (&$failures, &$checks): void {
 };
 
 $behaviors = file_get_contents($root . '/assets/js/app-behaviors.js');
+$navbar = file_get_contents($root . '/navbar_head.php');
+
+$check(
+    str_contains($navbar, "versioned_asset('/assets/js/app-behaviors.js')"),
+    'Navbar centrally loads shared CSP behavior layer'
+);
+
+$check(
+    !preg_match('/<script\\b[^>]*\\bdefer\\b[^>]*app-behaviors\\.js/i', $navbar),
+    'Shared CSP behavior layer installs before parser-time resource failures'
+);
 
 $targets = [
     'dashboard.php',
