@@ -468,87 +468,13 @@ $pdfReportUrl = pdf_report_current_url();
     <!-- <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="<?php echo BASE_URL; ?>/assets/js/edit-modal.js"></script> -->
-    <script>
-    // Month selector
-    document.getElementById('monthSelector').addEventListener('change', function() {
-        window.location.href = 'layer_expenses.php?month=' + this.value.substring(0, 7);
-    });
-
-    <?php if ($canManageExpenses): ?>
-    attachEditModal({
-        buttonSelector: '.edit-expense-btn',
-        modalSelector: '#editExpenseModal',
-        fieldMap: {
-            id: '#editExpenseId',
-            date: '#editExpenseDate',
-            category: '#editCategory',
-            amount: '#editAmount',
-            unit: '#editUnit',
-            description: '#editDescription',
-            cycle: '#editExpenseCycle',
-            poultry: '#editPoultryCategory'
-        }
-    });
-
-    document.getElementById('editExpenseForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const formData = new FormData(this);
-        formData.append('csrf_token', '<?php echo csrf_token(); ?>');
-
-        try {
-            const response = await fetch('../api/update_expense.php', {
-                method: 'POST',
-                body: formData
-            });
-            const result = await parseJsonResponse(response);
-
-            if (result.success) {
-                location.reload();
-            } else {
-                AppNotify.error((result.error || result.message || 'Unable to update expense'));
-            }
-        } catch (error) {
-            AppNotify.error('Network error: ' + error.message);
-        }
-    });
-    <?php endif; ?>
-
-    async function parseJsonResponse(response) {
-        const contentType = response.headers.get('content-type') || '';
-
-        if (!contentType.includes('application/json')) {
-            const text = await response.text();
-            throw new Error(text || 'Unexpected non-JSON response');
-        }
-
-        return response.json();
-    }
-
-    async function deleteExpense(expenseId) {
-        const confirmed = await AppConfirm.ask('Are you sure you want to delete this expense record?', {title:'Delete expense record?', confirmText:'Delete'});
-        if (!confirmed) return;
-
-        try {
-            const params = new URLSearchParams({ id: expenseId, csrf_token: '<?php echo csrf_token(); ?>' });
-            const response = await fetch('../api/delete_expense.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: params.toString()
-            });
-            const data = await parseJsonResponse(response);
-
-            if (data.success) {
-                location.reload();
-            } else {
-                AppNotify.error(data.error || data.message || 'Unable to delete expense');
-            }
-        } catch (error) {
-            AppNotify.error('Network error: ' + error.message);
-        }
-    }
-
-    // Show messages
-    </script>
+    <div
+    class="d-none"
+    id="layerExpensesConfig"
+    data-csrf-token="<?php echo app_attr(csrf_token()); ?>"
+    data-can-manage="<?php echo $canManageExpenses ? '1' : '0'; ?>"
+></div>
+<script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/layer-expenses.js'); ?>"></script>
 </body>
 </html>
 <?php
