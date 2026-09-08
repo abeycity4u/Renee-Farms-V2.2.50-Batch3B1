@@ -75,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }));
         if (!$roles) { $_SESSION['error'] = 'Select at least one role enabled by the platform owner.'; header('Location: ' . $userManagerUrl); exit(); }
         try { enforceTenantRoleLimits($pdo,$farmId,$roles); } catch(RuntimeException $e) { $_SESSION['error']=$e->getMessage(); header('Location: ' . $userManagerUrl); exit(); }
-        $hashedPassword = password_hash($_POST['password'], PASSWORD_DEFAULT);
+        $hashedPassword = password_security_hash($_POST['password']);
         
         $stmt = $pdo->prepare("INSERT INTO users (farm_id, username, password, user_type, full_name)
                                VALUES (?, ?, ?, ?, ?)");
@@ -135,7 +135,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         if (!empty($_POST['password'])) {
             $updateQuery .= ", password = ?";
-            $params[] = password_hash($_POST['password'], PASSWORD_DEFAULT);
+            $params[] = password_security_hash($_POST['password']);
         }
 
         $updateQuery .= " WHERE id = ? AND farm_id = ?";
@@ -390,7 +390,7 @@ foreach ($users as $existingUser) {
                         </div>
                         <div class="mb-3">
                             <label>Password</label>
-                            <input type="password" name="password" class="form-control" required>
+                            <input type="password" name="password" class="form-control" minlength="<?php echo password_security_min_length(); ?>" required>
                         </div>
                         <div class="mb-3">
                             <label>Full Name</label>
@@ -439,7 +439,7 @@ foreach ($users as $existingUser) {
                         </div>
                         <div class="mb-3">
                             <label>New Password (leave blank to keep current)</label>
-                            <input type="password" name="password" class="form-control" autocomplete="new-password">
+                            <input type="password" name="password" class="form-control" minlength="<?php echo password_security_min_length(); ?>" autocomplete="new-password">
                         </div>
                     </div>
                     <div class="modal-footer">

@@ -23,7 +23,9 @@ $add('Bootstrap explicitly loads central password policy', str_contains($init, "
 $add('Team User guard loads central password policy', str_contains($guard, "require_once __DIR__ . '/password_security.php'"));
 $add('Team User add password is server-side validated', str_contains($guard, "\$isAdd = isset(\$_POST['add_user'])") && str_contains($guard, 'password_security_validate($password)'));
 $add('Team User replacement password is server-side validated', str_contains($guard, "\$isEdit = isset(\$_POST['edit_user'])") && str_contains($guard, "if (\$isEdit && \$password === '') return;"));
-$add('Team User page still hashes new passwords', str_contains($users, "password_hash(\$_POST['password'], PASSWORD_DEFAULT)"));
+$add('Team User password storage uses central hasher', substr_count($users, "password_security_hash(\$_POST['password'])") >= 2);
+$add('Team User page has no native password_hash call', !str_contains($users, 'password_hash('));
+$add('Team User password fields use central minimum length', substr_count($users, 'password_security_min_length()') >= 2);
 $add('Farm Admin duplicate password-length constant is removed', !str_contains($farms, 'FARM_OWNER_MIN_PASSWORD_LENGTH'));
 $add('Farm Admin create password uses central validator', str_contains($farms, "isset(\$_POST['create_farm'])") && str_contains($farms, 'password_security_validate($password)'));
 $add('Farm Admin repair password uses central validator', str_contains($farms, '$repairOwnerNeeded') && str_contains($farms, 'password_security_validate($password)'));
