@@ -13,16 +13,11 @@ if (!isLoggedIn()) {
 
 require_once __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/notifications.php';
+require_once __DIR__ . '/includes/subscription_renewal_notice.php';
 
 $subscriptionNotice = null;
 if (!isPlatformOwner() && hasRole('farm_admin')) {
-    $farm = currentFarm();
-    if (!empty($farm['subscription_ends_at'])) {
-        $daysLeft = (int) floor((strtotime($farm['subscription_ends_at']) - strtotime(date('Y-m-d'))) / 86400);
-        if ($daysLeft >= 0 && $daysLeft <= 14) {
-            $subscriptionNotice = 'Subscription ends in ' . $daysLeft . ' day' . ($daysLeft === 1 ? '' : 's') . '. Please contact the platform owner to renew.';
-        }
-    }
+    $subscriptionNotice = subscription_renewal_notice(currentFarm());
 }
 
 $navHas = static function (string $permission): bool {
@@ -72,7 +67,15 @@ $showManagementMenu = $canViewSales || $canViewExpenseReport || $canViewReports 
   <?php renderSessionNotifications(); ?>
 </div>
 
-<?php if ($subscriptionNotice): ?><div class="alert alert-warning rounded-0 mb-0 text-center no-print"><?php echo htmlspecialchars($subscriptionNotice); ?></div><?php endif; ?>
+<?php if ($subscriptionNotice): ?>
+<?php $subscriptionNoticeSeverity = ($subscriptionNotice['severity'] ?? 'warning') === 'danger' ? 'danger' : 'warning'; ?>
+<div class="alert alert-<?php echo $subscriptionNoticeSeverity; ?> rounded-0 mb-0 text-center no-print d-flex flex-wrap align-items-center justify-content-center gap-2" role="status">
+  <span><?php echo htmlspecialchars((string)$subscriptionNotice['message'], ENT_QUOTES, 'UTF-8'); ?></span>
+  <a class="btn btn-sm btn-dark fw-semibold" href="<?php echo htmlspecialchars(BASE_URL . (string)$subscriptionNotice['action_path'], ENT_QUOTES, 'UTF-8'); ?>">
+    <?php echo htmlspecialchars((string)$subscriptionNotice['action_label'], ENT_QUOTES, 'UTF-8'); ?>
+  </a>
+</div>
+<?php endif; ?>
 <nav id="appNavbar" class="navbar navbar-expand-lg navbar-dark bg-success shadow-sm no-print">
   <div class="container-fluid">
     <a class="navbar-brand farm-brand" href="<?php echo BASE_URL; ?>/dashboard.php">
@@ -357,7 +360,6 @@ document.addEventListener('DOMContentLoaded', function () {
         navbar.classList.remove('is-compact');
         return;
       }
-
       const currentlyCompact = navbar.classList.contains('is-compact');
       if (!currentlyCompact && window.scrollY > COMPACT_ENTER_Y) {
         navbar.classList.add('is-compact');
