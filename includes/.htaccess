@@ -1,0 +1,2 @@
+# V2.3 commercial hardening: internal includes are not public web endpoints
+Require all denied
