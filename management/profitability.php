@@ -234,46 +234,20 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
         <div class="col-lg-5"><div class="card"><div class="card-header fw-semibold">Reporting integrity</div><div class="card-body"><p class="mb-2">Daily and monthly views use the same calculation engine. Monthly is the sum of activity inside the selected month; Daily limits that engine to one date.</p><p class="mb-0 text-muted small">Reversed originals and restoration/reversal rows remain available in the audit ledger but are excluded from operational feed quantity and profitability calculations. Feed usage is valued from its transaction cost snapshot, so a later inventory price change does not rewrite historical profit. Production type and cycle attribution keep Layer, Broiler and ruminant species costs separated; pooled activity remains explicit instead of being guessed.</p></div></div></div>
     </div>
 </div>
-<script>
-(function () {
-    const productionTypes = {
-        all: {},
-        poultry: {layer:'Layer', broiler:'Broiler', shared:'Shared / Unallocated Poultry'},
-        ruminant: {cattle:'Cattle', goat:'Goat', sheep:'Sheep', other:'Other', shared:'Shared / Unallocated Ruminant'},
-        general: {general:'General / Other Farm Income'}
-    };
-    const cycles = <?php echo app_json_script($cycles); ?>;
-    const farmSelect = document.getElementById('profitFarmType');
-    const productionSelect = document.getElementById('profitProductionType');
-    const cycleSelect = document.getElementById('profitCycleId');
-    if (!farmSelect || !productionSelect || !cycleSelect) return;
-
-    function rebuildCycles(selectedCycle) {
-        const farm = farmSelect.value;
-        const production = productionSelect.value;
-        cycleSelect.innerHTML = '';
-        const allCycleLabel = production !== 'all' ? `All ${production.replace(/_/g,' ')} cycles` : 'All cycles';
-        cycleSelect.add(new Option(allCycleLabel, '0'));
-        cycles.filter(c => (farm === 'all' || c.farm_type === farm) &&
-                           (production === 'all' || c.production_type === production))
-              .forEach(c => cycleSelect.add(new Option(`${c.cycle_code} — ${c.production_type} (${c.status})`, String(c.id))));
-        const wanted = String(selectedCycle || '0');
-        cycleSelect.value = Array.from(cycleSelect.options).some(o => o.value === wanted) ? wanted : '0';
-    }
-
-    function rebuildProduction(selectedProduction, selectedCycle) {
-        const farm = farmSelect.value;
-        productionSelect.innerHTML = '';
-        productionSelect.add(new Option('All production types', 'all'));
-        Object.entries(productionTypes[farm] || {}).forEach(([value,label]) => productionSelect.add(new Option(label,value)));
-        const wanted = String(selectedProduction || 'all');
-        productionSelect.value = Array.from(productionSelect.options).some(o => o.value === wanted) ? wanted : 'all';
-        rebuildCycles(selectedCycle);
-    }
-
-    farmSelect.addEventListener('change', () => rebuildProduction('all', 0));
-    productionSelect.addEventListener('change', () => rebuildCycles(0));
-    rebuildProduction(<?php echo app_json_script($productionType); ?>, <?php echo (int)$cycleId; ?>);
-})();
-</script>
+<div
+    id="managementProfitabilityConfig"
+    hidden
+    data-cycles="<?php echo htmlspecialchars(
+        app_json_script($cycles),
+        ENT_QUOTES | ENT_SUBSTITUTE,
+        'UTF-8'
+    ); ?>"
+    data-production-type="<?php echo htmlspecialchars(
+        $productionType,
+        ENT_QUOTES | ENT_SUBSTITUTE,
+        'UTF-8'
+    ); ?>"
+    data-cycle-id="<?php echo (int)$cycleId; ?>"
+></div>
+<script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/management-profitability.js'); ?>"></script>
 </body></html>
