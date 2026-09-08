@@ -469,17 +469,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <p class="helper">Need access? Contact your administrator for account setup.</p>
         </section>
     </main>
-<script>
-function syncLoginType() {
-  const checked = document.querySelector('[data-login-type]:checked');
-  const isPlatform = checked && checked.value === 'platform';
-  const workspace = document.getElementById('farmWorkspaceField');
-  const input = document.getElementById('farm_slug');
-  workspace.style.display = isPlatform ? 'none' : '';
-  input.required = !isPlatform;
-}
-document.querySelectorAll('[data-login-type]').forEach((field) => field.addEventListener('change', syncLoginType));
-syncLoginType();
-</script>
+<script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/sign.js'); ?>"></script>
 </body>
 </html>
