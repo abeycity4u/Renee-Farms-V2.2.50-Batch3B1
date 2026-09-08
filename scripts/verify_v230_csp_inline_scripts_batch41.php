@@ -108,6 +108,23 @@ $check(
 );
 
 $check(
+    str_contains(
+        $js,
+        "'&ledger_view='"
+    )
+    && str_contains(
+        $js,
+        'encodeURIComponent(broilerFeedsConfig.ledgerView)'
+    )
+    && !str_contains(
+        $js,
+        "'&ledger_view=broilerFeedsConfig.ledgerView'"
+    ),
+    'Month selector inserts the actual encoded ledger view value'
+);
+
+
+$check(
     !str_contains($js, '<?php')
     && !str_contains($js, '<?='),
     'Broiler Feeds external asset contains no PHP'

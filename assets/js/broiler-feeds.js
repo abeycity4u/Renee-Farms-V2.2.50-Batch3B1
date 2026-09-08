@@ -25,7 +25,10 @@ $(document).ready(function() {
         
         // Month selector
         $('#monthSelector').change(function() {
-            window.location.href = 'broiler_feeds.php?month=' + this.value.substring(0, 7) + '&ledger_view=broilerFeedsConfig.ledgerView';
+            window.location.href = 'broiler_feeds.php?month='
+                + this.value.substring(0, 7)
+                + '&ledger_view='
+                + encodeURIComponent(broilerFeedsConfig.ledgerView);
         });
         
         // Show messages
