@@ -22,4 +22,17 @@
         // onchange="this.form.submit()"
         form.submit();
     });
+
+    document.addEventListener('click', function (event) {
+        const target = event.target.closest('[data-open-record-modal]');
+        if (!target) {
+            return;
+        }
+
+        if (typeof window.openRecordModal !== 'function') {
+            return;
+        }
+
+        window.openRecordModal();
+    });
 })();
