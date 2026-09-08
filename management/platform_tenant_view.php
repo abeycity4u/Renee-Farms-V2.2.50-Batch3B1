@@ -129,7 +129,7 @@ if ($tenantId > 0) {
             <div class="row g-2 align-items-end">
                 <div class="col-md-8 col-lg-6">
                     <label class="form-label fw-semibold" for="tenantFarmSelect">View tenant farm</label>
-                    <select class="form-select" id="tenantFarmSelect" name="farm_id" onchange="this.form.submit()">
+                    <select class="form-select" id="tenantFarmSelect" name="farm_id" data-auto-submit>
                         <?php foreach ($tenants as $farm): ?>
                             <option value="<?php echo (int)$farm['id']; ?>" <?php echo $tenantId === (int)$farm['id'] ? 'selected' : ''; ?>>
                                 <?php echo htmlspecialchars($farm['name']); ?> — <?php echo htmlspecialchars($farm['subscription_status']); ?>

@@ -246,7 +246,7 @@ foreach ($users as $existingUser) {
         <?php if (isPlatformOwner()): ?>
         <form method="get" class="card card-body border-0 shadow-sm mb-3">
             <label class="form-label fw-semibold" for="managedFarmSelect">Manage users for farm</label>
-            <select class="form-select" style="max-width:420px" id="managedFarmSelect" name="farm_id" onchange="this.form.submit()">
+            <select class="form-select" style="max-width:420px" id="managedFarmSelect" name="farm_id" data-auto-submit>
                 <?php foreach ($platformFarmOptions as $farmOption): ?>
                 <option value="<?php echo (int)$farmOption['id']; ?>" <?php echo (int)$farmOption['id'] === $farmId ? 'selected' : ''; ?>><?php echo htmlspecialchars($farmOption['name']); ?></option>
                 <?php endforeach; ?>

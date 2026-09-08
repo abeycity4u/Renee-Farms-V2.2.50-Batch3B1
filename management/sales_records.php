@@ -738,7 +738,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                         <input type="hidden" name="month" value="<?php echo htmlspecialchars($month); ?>">
                                         <input type="hidden" name="year" value="<?php echo htmlspecialchars($year); ?>">
                                         <input type="hidden" name="farm_type" value="<?php echo htmlspecialchars($farmType); ?>">
-                                        <select name="customer" class="form-select form-select-sm" style="min-width:220px;" onchange="this.form.submit()">
+                                        <select name="customer" class="form-select form-select-sm" style="min-width:220px;" data-auto-submit>
                                             <option value="">Select customer ledger...</option>
                                             <?php foreach ($customerBalances as $customerRow): ?>
                                             <option value="<?php echo htmlspecialchars($customerRow['customer_name']); ?>" <?php echo $selectedCustomer === $customerRow['customer_name'] ? 'selected' : ''; ?>>
