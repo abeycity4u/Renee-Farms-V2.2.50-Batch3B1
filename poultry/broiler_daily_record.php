@@ -600,7 +600,8 @@ $_SESSION['success'] = "Broiler daily record saved successfully!";
                                                         <button class="btn btn-sm btn-outline-danger ms-1"
                                                                 type="button"
                                                                 title="Delete Record"
-                                                                onclick="deleteBroilerDailyRecord(<?php echo (int)$record['id']; ?>)">
+                                                                data-poultry-daily-delete-type="broiler"
+                                                                data-poultry-daily-delete-id="<?php echo (int)$record['id']; ?>">
                                                             <i class="bi bi-trash"></i>
                                                         </button>
                                                         <?php endif; ?>

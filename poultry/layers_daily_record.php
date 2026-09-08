@@ -643,7 +643,8 @@ $_SESSION['success'] = "Daily record saved successfully!";
                                                       </button>
                                                       <?php if ($canDelete): ?>
                                                       <button class="btn btn-sm btn-outline-danger"
-                                                              onclick="deleteLayerDailyRecord(<?php echo $record['id']; ?>)"
+                                                              data-poultry-daily-delete-type="layer"
+                                                              data-poultry-daily-delete-id="<?php echo (int)$record['id']; ?>"
                                                               title="Delete Record">
                                                           <i class="bi bi-trash"></i>
                                                       </button>

@@ -82,6 +82,40 @@
             return;
         }
 
+        const poultryDailyDeleteTarget = event.target.closest('[data-poultry-daily-delete-id]');
+        if (poultryDailyDeleteTarget) {
+            const recordId = Number.parseInt(
+                poultryDailyDeleteTarget.dataset.poultryDailyDeleteId,
+                10
+            );
+
+            if (!Number.isInteger(recordId) || recordId <= 0) {
+                return;
+            }
+
+            const recordType = poultryDailyDeleteTarget.dataset.poultryDailyDeleteType;
+
+            if (recordType === 'layer') {
+                if (typeof window.deleteLayerDailyRecord !== 'function') {
+                    return;
+                }
+
+                window.deleteLayerDailyRecord(recordId);
+                return;
+            }
+
+            if (recordType === 'broiler') {
+                if (typeof window.deleteBroilerDailyRecord !== 'function') {
+                    return;
+                }
+
+                window.deleteBroilerDailyRecord(recordId);
+                return;
+            }
+
+            return;
+        }
+
         const deleteExpenseTarget = event.target.closest('[data-delete-expense-id]');
         if (!deleteExpenseTarget) {
             return;
