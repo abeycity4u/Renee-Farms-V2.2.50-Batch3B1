@@ -40,6 +40,33 @@
             return;
         }
 
+        const investigationTarget = event.target.closest('[data-investigation-followup]');
+        if (investigationTarget) {
+            const form = investigationTarget.form || investigationTarget.closest('form');
+            if (!form) {
+                return;
+            }
+
+            const mode = investigationTarget.dataset.investigationFollowup;
+
+            form.removeAttribute('data-confirm');
+            form.removeAttribute('data-confirm-title');
+            form.removeAttribute('data-confirm-button');
+            form.removeAttribute('data-confirm-tone');
+
+            if (mode === 'resolve') {
+                form.setAttribute(
+                    'data-confirm',
+                    'Resolve this investigation with the recorded management finding? Source records will not be changed.'
+                );
+                form.setAttribute('data-confirm-title', 'Resolve investigation?');
+                form.setAttribute('data-confirm-button', 'Resolve Investigation');
+                form.setAttribute('data-confirm-tone', 'primary');
+            }
+
+            return;
+        }
+
         const deleteExpenseTarget = event.target.closest('[data-delete-expense-id]');
         if (!deleteExpenseTarget) {
             return;
