@@ -27,6 +27,22 @@ function ensurePlatformOwnerWorkspace(PDO $pdo, array $user): array {
 
 $selectedAccountType = 'farm';
 
+// Consume failed-login flash state only on GET. This keeps the browser on a
+// refresh-safe GET after a failed POST and never places credentials in the URL.
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+    $flashError = $_SESSION['login_error'] ?? null;
+    if (is_string($flashError) && $flashError !== '') {
+        $error = $flashError;
+    }
+    unset($_SESSION['login_error']);
+
+    $flashAccountType = $_SESSION['login_account_type'] ?? null;
+    if (in_array($flashAccountType, ['farm', 'platform'], true)) {
+        $selectedAccountType = $flashAccountType;
+    }
+    unset($_SESSION['login_account_type']);
+}
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     require_rate_limit('login_attempt', 12, 300);
     $accountType = ($_POST['account_type'] ?? 'farm') === 'platform' ? 'platform' : 'farm';
@@ -75,7 +91,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 
     log_app_error('login_failed', ['account_type' => $accountType, 'farm_slug' => $farmSlug, 'username' => $username]);
-    $error = 'Invalid workspace, username, or password.';
+    $_SESSION['login_error'] = 'Invalid workspace, username, or password.';
+    $_SESSION['login_account_type'] = $accountType;
+    header('Location: ' . (defined('BASE_URL') ? BASE_URL : '') . '/sign.php', true, 303);
+    exit();
 }
 ?>
 <!DOCTYPE html>
