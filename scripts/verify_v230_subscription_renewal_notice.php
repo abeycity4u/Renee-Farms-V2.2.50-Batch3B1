@@ -100,10 +100,10 @@ $pass('navbar delegates notice calculation to centralized helper',
 $pass('navbar keeps renewal notice Farm Admin scoped',
     str_contains($navbarSource, "!isPlatformOwner() && hasRole('farm_admin')"));
 $pass('navbar renders centralized notice action target',
-    str_contains($navbarSource, "$subscriptionNotice['action_path']")
-    && str_contains($navbarSource, "$subscriptionNotice['action_label']"));
+    str_contains($navbarSource, '$subscriptionNotice[\'action_path\']')
+    && str_contains($navbarSource, '$subscriptionNotice[\'action_label\']'));
 $pass('navbar renders centralized severity',
-    str_contains($navbarSource, "$subscriptionNotice['severity']"));
+    str_contains($navbarSource, '$subscriptionNotice[\'severity\']'));
 $pass('navbar no longer contains legacy contact-owner renewal wording',
     !str_contains(strtolower($navbarSource), 'please contact the platform owner to renew'));
 $pass('navbar no longer recalculates expiry days locally',
