@@ -146,6 +146,51 @@
             return;
         }
 
+        const healthNewTarget = event.target.closest('[data-health-new-event]');
+        if (healthNewTarget) {
+            if (typeof window.newHealthEvent !== 'function') {
+                return;
+            }
+
+            window.newHealthEvent();
+            return;
+        }
+
+        const healthEditTarget = event.target.closest('[data-health-edit-event]');
+        if (healthEditTarget) {
+            if (typeof window.editHealthEvent !== 'function') {
+                return;
+            }
+
+            const encoded = healthEditTarget.dataset.healthEvent || '';
+            let eventData;
+
+            try {
+                eventData = JSON.parse(encoded);
+            } catch (error) {
+                console.error('Unable to parse health event data.', error);
+                return;
+            }
+
+            window.editHealthEvent(eventData);
+            return;
+        }
+
+        const healthDeleteTarget = event.target.closest('[data-health-delete-id]');
+        if (healthDeleteTarget) {
+            if (typeof window.confirmDeleteEvent !== 'function') {
+                return;
+            }
+
+            const eventId = Number.parseInt(healthDeleteTarget.dataset.healthDeleteId, 10);
+            if (!Number.isInteger(eventId) || eventId <= 0) {
+                return;
+            }
+
+            window.confirmDeleteEvent(eventId);
+            return;
+        }
+
         const deleteExpenseTarget = event.target.closest('[data-delete-expense-id]');
         if (!deleteExpenseTarget) {
             return;
@@ -164,6 +209,16 @@
     });
 
     document.addEventListener('change', function (event) {
+        const healthProductionTarget = event.target.closest('[data-health-filter-cycles]');
+        if (healthProductionTarget) {
+            if (typeof window.filterCycleOptions !== 'function') {
+                return;
+            }
+
+            window.filterCycleOptions();
+            return;
+        }
+
         const itemInfoTarget = event.target.closest('[data-inventory-update-item]');
         if (itemInfoTarget) {
             if (typeof window.updateItemInfo !== 'function') {

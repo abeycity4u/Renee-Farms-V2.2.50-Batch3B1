@@ -104,7 +104,7 @@ require_once(__DIR__ . '/../navbar.php');
       <h3 class="mb-1"><i class="bi bi-heart-pulse"></i> Poultry Health & Treatment</h3>
       <div class="text-muted">Structured flock health history for Layer and Broiler cycles. Daily Record medication notes remain available as quick notes.</div>
     </div>
-    <?php if ($canAddHealth): ?><button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#eventModal" onclick="newHealthEvent()"><i class="bi bi-plus-lg"></i> Record Health Event</button><?php endif; ?>
+    <?php if ($canAddHealth): ?><button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#eventModal" data-health-new-event><i class="bi bi-plus-lg"></i> Record Health Event</button><?php endif; ?>
   </div>
 
   <?php if (!empty($_SESSION['success'])): ?><div class="alert alert-success py-2"><?php echo htmlspecialchars($_SESSION['success']); unset($_SESSION['success']); ?></div><?php endif; ?>
@@ -134,8 +134,8 @@ require_once(__DIR__ . '/../navbar.php');
         <td><?php echo htmlspecialchars((string)($e['linked_item_name'] ?: '—')); ?></td>
         <td><?php echo htmlspecialchars((string)($e['recorded_by_name'] ?: '—')); ?></td>
         <?php if ($canEditHealth || $canDeleteHealth): ?><td class="text-end text-nowrap">
-          <?php if ($canEditHealth): ?><button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#eventModal" onclick='editHealthEvent(<?php echo json_encode($e, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE); ?>)'><i class="bi bi-pencil"></i></button><?php endif; ?>
-          <?php if ($canDeleteHealth): ?><button type="button" class="btn btn-sm btn-outline-danger" onclick="confirmDeleteEvent(<?php echo (int)$e['id']; ?>)"><i class="bi bi-trash"></i></button><?php endif; ?>
+          <?php if ($canEditHealth): ?><button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#eventModal" data-health-edit-event data-health-event="<?php echo app_attr(json_encode($e, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE)); ?>" ><i class="bi bi-pencil"></i></button><?php endif; ?>
+          <?php if ($canDeleteHealth): ?><button type="button" class="btn btn-sm btn-outline-danger" data-health-delete-id="<?php echo (int)$e['id']; ?>"><i class="bi bi-trash"></i></button><?php endif; ?>
         </td><?php endif; ?>
       </tr><?php endforeach; ?></tbody>
     </table></div>
@@ -150,7 +150,7 @@ require_once(__DIR__ . '/../navbar.php');
 <div class="modal-body">
 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token()); ?>"><input type="hidden" name="action" value="save_event"><input type="hidden" name="event_id" id="event_id" value="0">
 <div class="row g-3">
-  <div class="col-md-4"><label class="form-label">Production Type *</label><select name="production_type" id="production_type" class="form-select" required onchange="filterCycleOptions()"><option value="layer">Layer</option><option value="broiler">Broiler</option></select></div>
+  <div class="col-md-4"><label class="form-label">Production Type *</label><select name="production_type" id="production_type" class="form-select" required data-health-filter-cycles><option value="layer">Layer</option><option value="broiler">Broiler</option></select></div>
   <div class="col-md-8"><label class="form-label">Production Cycle *</label><select name="cycle_id" id="cycle_id" class="form-select" required><?php foreach ($cycles as $c): ?><option data-production-type="<?php echo htmlspecialchars($c['production_type']); ?>" value="<?php echo (int)$c['id']; ?>"><?php echo htmlspecialchars($c['cycle_code'].' · '.ucfirst($c['production_type']).' · '.$c['status']); ?></option><?php endforeach; ?></select></div>
   <div class="col-md-4"><label class="form-label">Event Date *</label><input type="date" name="event_date" id="event_date" class="form-control" value="<?php echo htmlspecialchars(function_exists('app_today') ? app_today() : date('Y-m-d')); ?>" required></div>
   <div class="col-md-4"><label class="form-label">Event Type *</label><select name="event_type" id="event_type" class="form-select" required><?php foreach ($eventTypes as $k=>$v): ?><option value="<?php echo htmlspecialchars($k); ?>"><?php echo htmlspecialchars($v); ?></option><?php endforeach; ?></select></div>
