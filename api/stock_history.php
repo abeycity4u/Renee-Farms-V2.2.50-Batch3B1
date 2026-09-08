@@ -50,15 +50,14 @@ $pageTitle = 'Stock History - ' . htmlspecialchars($item['item_name']);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo $pageTitle; ?></title>
     <?php include(dirname(__DIR__) . '/navbar_head.php'); ?>
-    <script>
-        function loadChartFallback() {
-            if (window.fmChartFallbackLoaded) return;
-            window.fmChartFallbackLoaded = true;
-            var fallbackScript = document.createElement('script');
-            fallbackScript.src = '<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/chart-fallback.js'); ?>';
-            document.head.appendChild(fallbackScript);
-        }
-    </script>
+    <script
+        src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/reports-chart-fallback.js'); ?>"
+        data-fallback-src="<?php echo htmlspecialchars(
+            BASE_URL . versioned_asset('/assets/js/chart-fallback.js'),
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        ); ?>"
+    ></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous" data-chart-fallback></script>
     <style>
         .summary-card {
@@ -163,128 +162,20 @@ $pageTitle = 'Stock History - ' . htmlspecialchars($item['item_name']);
 
 <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/jquery/jquery.min.js'); ?>"></script>
 <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/bootstrap5/js/bootstrap.bundle.min.js'); ?>"></script>
-<script>
-const itemId = <?php echo json_encode($itemId); ?>;
-let chartInstance = null;
-
-function formatDate(dateStr) {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' });
-}
-
-function renderChart(chartData) {
-    const ctx = document.getElementById('stockChart').getContext('2d');
-    if (chartInstance) {
-        chartInstance.destroy();
-    }
-    chartInstance = new Chart(ctx, {
-        type: 'line',
-        data: chartData,
-        options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true } }
-        }
-    });
-}
-
-function escapeHtml(value) {
-    return String(value ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-}
-
-function attributionText(tx) {
-    const farmType = String(tx.farm_type || '').toLowerCase();
-    const productionType = String(tx.production_type || '').toLowerCase();
-
-    if (farmType === 'poultry') {
-        if (productionType === 'layer') return 'Poultry · Layer';
-        if (productionType === 'broiler') return 'Poultry · Broiler';
-        return 'Poultry · Shared Poultry';
-    }
-    if (farmType === 'ruminant') {
-        const labels = { cattle: 'Cattle', goat: 'Goat', sheep: 'Sheep', other: 'Other' };
-        if (labels[productionType]) return 'Ruminant · ' + labels[productionType];
-        return 'Ruminant · Shared Ruminant';
-    }
-    if (farmType === 'general') return 'Farm-wide / General';
-
-    return farmType || productionType ? [farmType, productionType].filter(Boolean).join(' · ') : 'Unallocated';
-}
-
-function renderTable(transactions) {
-    const tbody = document.querySelector('#historyTable tbody');
-    tbody.innerHTML = '';
-
-    if (!transactions || transactions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted">No history available for the selected period.</td></tr>';
-        return;
-    }
-
-    transactions.forEach(tx => {
-        const row = document.createElement('tr');
-        const typeBadge = tx.transaction_type === 'received' ?
-            '<span class="badge bg-success">Received</span>' :
-            '<span class="badge bg-danger">Used</span>';
-
-        row.innerHTML = `
-            <td>${formatDate(tx.transaction_date)}</td>
-            <td>${typeBadge}</td>
-            <td class="text-end">${Number(tx.quantity).toLocaleString()}</td>
-            <td class="text-end">${Number(tx.previous_stock).toLocaleString()}</td>
-            <td class="text-end">${Number(tx.new_stock).toLocaleString()}</td>
-            <td>${escapeHtml(attributionText(tx))}</td>
-            <td>${tx.cycle_code ? '<strong>' + escapeHtml(tx.cycle_code) + '</strong>' : '<span class="text-muted">Shared / No specific cycle</span>'}</td>
-            <td>${tx.remarks ? escapeHtml(tx.remarks) : ''}</td>
-            <td>${tx.full_name ? escapeHtml(tx.full_name) : 'N/A'}</td>
-            <td>${Number(tx.is_reversed) === 1 ? '<span class="badge bg-secondary">Reversed</span>' : (tx.reversal_of_id ? '<span class="badge bg-info text-dark">Restoration</span>' : '<span class="badge bg-success">Active</span>')}</td>
-            <td>${tx.created_at ? new Date(tx.created_at.replace(' ', 'T') + 'Z').toLocaleString() : 'N/A'}</td>
-        `;
-        tbody.appendChild(row);
-    });
-}
-
-function updateSummary(summary, currentStock) {
-    document.getElementById('currentStock').textContent = Number(currentStock ?? 0).toLocaleString();
-    document.getElementById('totalReceived').textContent = Number(summary.total_received ?? 0).toLocaleString();
-    document.getElementById('totalUsed').textContent = Number(summary.total_used ?? 0).toLocaleString();
-    document.getElementById('transactionCount').textContent = summary.transaction_count ?? 0;
-    let integrity = document.getElementById('integrityStatus');
-    if (!integrity) {
-        const card = document.getElementById('currentStock').closest('.card');
-        integrity = document.createElement('div');
-        integrity.id = 'integrityStatus';
-        integrity.className = 'small mt-1';
-        card.appendChild(integrity);
-    }
-    integrity.innerHTML = summary.integrity_status === 'reconciled'
-        ? '<span class="text-success"><i class="bi bi-check-circle-fill"></i> Ledger reconciled</span>'
-        : '<span class="text-danger"><i class="bi bi-exclamation-triangle-fill"></i> Ledger mismatch: ' + Number(summary.stock_difference || 0).toLocaleString() + '</span>';
-}
-
-async function loadHistory(days = 30) {
-    const response = await fetch(`<?php echo BASE_URL; ?>/api/get_stock_history.php?item_id=${itemId}&days=${days}`);
-    const data = await response.json();
-
-    if (data.error) {
-        document.querySelector('#historyTable tbody').innerHTML = `<tr><td colspan="11" class="text-danger text-center">${escapeHtml(data.error)}</td></tr>`;
-        return;
-    }
-
-    renderChart(data.chart_data);
-    renderTable(data.transactions);
-    updateSummary(data.summary, data.current_stock);
-}
-
-document.getElementById('daysFilter').addEventListener('change', (event) => {
-    loadHistory(event.target.value);
-});
-
-loadHistory();
-</script>
+<div
+    id="stockHistoryConfig"
+    hidden
+    data-item-id="<?php echo htmlspecialchars(
+        (string)$itemId,
+        ENT_QUOTES | ENT_SUBSTITUTE,
+        'UTF-8'
+    ); ?>"
+    data-history-url="<?php echo htmlspecialchars(
+        BASE_URL . '/api/get_stock_history.php',
+        ENT_QUOTES | ENT_SUBSTITUTE,
+        'UTF-8'
+    ); ?>"
+></div>
+<script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/stock-history.js'); ?>"></script>
 </body>
 </html>
