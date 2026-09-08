@@ -219,22 +219,7 @@ $pdfReportUrl = pdf_report_current_url();
 <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/jquery/jquery.min.js'); ?>"></script>
 <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/bootstrap5/js/bootstrap.bundle.min.js'); ?>"></script>
 <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/main.js'); ?>"></script>
-<script>
-function applyFilters() {
-    const farmType = $('#farmTypeFilter').val();
-    const reportMode = $('#reportMode').val();
-    const monthValue = $('#monthFilter').val();
-    const month = monthValue ? monthValue.substring(0, 7) : '';
-    const year = $('#yearFilter').val();
-    window.location.href = `poultry_ruminant_report.php?report_mode=${reportMode}&month=${month}&year=${year}&farm_type=${farmType}`;
-}
-$('#farmTypeFilter, #reportMode, #monthFilter, #yearFilter').on('change', function() {
-    const mode = $('#reportMode').val();
-    $('#monthFilter').toggle(mode === 'monthly');
-    $('#yearFilter').toggle(mode === 'yearly');
-    applyFilters();
-});
-</script>
+<script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/poultry-ruminant-report.js'); ?>"></script>
 </body>
 </html>
 <?php
