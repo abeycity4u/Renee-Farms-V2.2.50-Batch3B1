@@ -5,17 +5,7 @@ require_once(__DIR__ . '/includes/functions.php');
 require_once(__DIR__ . '/api/api_helpers.php');
 
 function verifyLoginPassword(PDO $pdo, array $user, string $password): bool {
-    if (password_verify($password, $user['password'])) return true;
-
-    // Compatibility for manually created database users that were entered as plain text.
-    // On successful login we immediately upgrade the stored password to a secure hash.
-    if (password_get_info($user['password'])['algo'] === 0 && hash_equals((string) $user['password'], $password)) {
-        $stmt = $pdo->prepare('UPDATE users SET password = ? WHERE id = ?');
-        $stmt->execute([password_hash($password, PASSWORD_DEFAULT), $user['id']]);
-        return true;
-    }
-
-    return false;
+    return password_security_verify($password, (string)($user['password'] ?? ''));
 }
 
 function ensurePlatformOwnerWorkspace(PDO $pdo, array $user): array {
