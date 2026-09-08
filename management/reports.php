@@ -125,7 +125,7 @@ $pdfReportUrl = pdf_report_current_url();
             document.head.appendChild(fallbackScript);
         }
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous" onerror="loadChartFallback()"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous" data-chart-fallback></script>
 </head>
 <body>
     <?php include(__DIR__ . '/../navbar.php'); ?>

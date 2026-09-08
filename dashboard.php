@@ -281,7 +281,7 @@ $pageTitle = "Dashboard";
             document.head.appendChild(fallbackScript);
         }
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous" onerror="loadChartFallback()"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous" data-chart-fallback></script>
     
     <!-- Dashboard Specific CSS -->
     <style>

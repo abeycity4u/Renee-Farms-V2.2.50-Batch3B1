@@ -56,4 +56,21 @@
 
         window.deleteExpense(expenseId);
     });
+
+    document.addEventListener('error', function (event) {
+        const target = event.target;
+        if (!(target instanceof HTMLScriptElement)) {
+            return;
+        }
+
+        if (!target.matches('[data-chart-fallback]')) {
+            return;
+        }
+
+        if (typeof window.loadChartFallback !== 'function') {
+            return;
+        }
+
+        window.loadChartFallback();
+    }, true);
 })();
