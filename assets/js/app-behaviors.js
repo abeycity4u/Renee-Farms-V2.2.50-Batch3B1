@@ -280,6 +280,63 @@
             return;
         }
 
+        const reportExportTarget = event.target.closest('[data-report-export-excel]');
+        if (reportExportTarget) {
+            if (typeof window.exportToExcel !== 'function') {
+                return;
+            }
+
+            window.exportToExcel();
+            return;
+        }
+
+        const saleDeleteTarget = event.target.closest('[data-sale-delete-id]');
+        if (saleDeleteTarget) {
+            if (typeof window.deleteSale !== 'function') {
+                return;
+            }
+
+            const saleId = Number.parseInt(saleDeleteTarget.dataset.saleDeleteId, 10);
+            if (!Number.isInteger(saleId) || saleId <= 0) {
+                return;
+            }
+
+            window.deleteSale(saleId);
+            return;
+        }
+
+        const userDeleteTarget = event.target.closest('[data-user-delete]');
+        if (userDeleteTarget) {
+            if (typeof window.confirmUserDeletion !== 'function') {
+                return;
+            }
+
+            const form = userDeleteTarget.form || userDeleteTarget.closest('form');
+            if (!form) {
+                return;
+            }
+
+            const username = userDeleteTarget.dataset.username || 'this user';
+            window.confirmUserDeletion(form, username);
+            return;
+        }
+
+        const membershipCloseTarget = event.target.closest('[data-membership-close-id]');
+        if (membershipCloseTarget) {
+            if (typeof window.closeMembership !== 'function') {
+                return;
+            }
+
+            const membershipId = Number.parseInt(membershipCloseTarget.dataset.membershipCloseId, 10);
+            if (!Number.isInteger(membershipId) || membershipId <= 0) {
+                return;
+            }
+
+            const cycleCode = membershipCloseTarget.dataset.cycleCode || '';
+            window.closeMembership(membershipId, cycleCode);
+            return;
+        }
+
         const deleteExpenseTarget = event.target.closest('[data-delete-expense-id]');
         if (!deleteExpenseTarget) {
             return;

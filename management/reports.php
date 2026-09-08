@@ -155,7 +155,7 @@ $pdfReportUrl = pdf_report_current_url();
                             <a class="btn btn-primary" href="<?php echo htmlspecialchars($pdfReportUrl); ?>" target="_blank">
                                 <i class="bi bi-file-earmark-pdf"></i> PDF Report
                             </a>
-                            <button class="btn btn-success" onclick="exportToExcel()">
+                            <button class="btn btn-success" data-report-export-excel>
                                 <i class="bi bi-file-earmark-excel"></i> Export Excel
                             </button>
                         </div>

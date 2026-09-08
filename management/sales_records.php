@@ -1002,7 +1002,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                                     <i class="bi bi-pencil"></i>
                                                 </button>
                                                 <button class="btn btn-sm btn-outline-danger"
-                                                        onclick="deleteSale(<?php echo $sale['id']; ?>)">
+                                                        data-sale-delete-id="<?php echo (int)$sale['id']; ?>">
                                                     <i class="bi bi-trash"></i>
                                                 </button>
                                             </td>
