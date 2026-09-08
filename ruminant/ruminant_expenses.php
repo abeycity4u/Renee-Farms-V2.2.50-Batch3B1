@@ -312,7 +312,7 @@ $pdfReportUrl = pdf_report_current_url();
                                                     <i class="bi bi-pencil"></i>
                                                 </button>
                                                 <button class="btn btn-sm btn-outline-danger"
-                                                        onclick="deleteExpense(<?php echo $expense['id']; ?>)">
+                                                        data-delete-expense-id="<?php echo (int)$expense['id']; ?>">
                                                     <i class="bi bi-trash"></i>
                                                 </button>
                                             </td>

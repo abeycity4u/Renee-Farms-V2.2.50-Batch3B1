@@ -32,15 +32,28 @@
     });
 
     document.addEventListener('click', function (event) {
-        const target = event.target.closest('[data-open-record-modal]');
-        if (!target) {
+        const recordModalTarget = event.target.closest('[data-open-record-modal]');
+        if (recordModalTarget) {
+            if (typeof window.openRecordModal === 'function') {
+                window.openRecordModal();
+            }
             return;
         }
 
-        if (typeof window.openRecordModal !== 'function') {
+        const deleteExpenseTarget = event.target.closest('[data-delete-expense-id]');
+        if (!deleteExpenseTarget) {
             return;
         }
 
-        window.openRecordModal();
+        if (typeof window.deleteExpense !== 'function') {
+            return;
+        }
+
+        const expenseId = Number.parseInt(deleteExpenseTarget.dataset.deleteExpenseId, 10);
+        if (!Number.isInteger(expenseId) || expenseId <= 0) {
+            return;
+        }
+
+        window.deleteExpense(expenseId);
     });
 })();
