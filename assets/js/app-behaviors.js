@@ -249,6 +249,37 @@
             return;
         }
 
+        const farmActionTarget = event.target.closest('[data-farm-action]');
+        if (farmActionTarget) {
+            const form = farmActionTarget.form || farmActionTarget.closest('form');
+            if (!form) {
+                return;
+            }
+
+            const action = farmActionTarget.dataset.farmAction;
+
+            if (action === 'suspend') {
+                if (typeof window.confirmFarmSuspend !== 'function') {
+                    return;
+                }
+
+                window.confirmFarmSuspend(form);
+                return;
+            }
+
+            if (action === 'delete') {
+                if (typeof window.confirmFarmDeletion !== 'function') {
+                    return;
+                }
+
+                const farmName = farmActionTarget.dataset.farmName || 'this farm';
+                window.confirmFarmDeletion(form, farmName);
+                return;
+            }
+
+            return;
+        }
+
         const deleteExpenseTarget = event.target.closest('[data-delete-expense-id]');
         if (!deleteExpenseTarget) {
             return;
