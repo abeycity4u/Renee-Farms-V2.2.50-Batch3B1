@@ -349,6 +349,6 @@ $today = app_today();
 </div>
 <?php endif; ?>
 <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/bootstrap5/js/bootstrap.bundle.min.js'); ?>"></script>
-<script>function closeMembership(id,cycle){document.getElementById('close_membership_id').value=id;document.getElementById('close_membership_cycle').value=cycle;bootstrap.Modal.getOrCreateInstance(document.getElementById('closeMembershipModal')).show();}</script>
+
 </body>
 </html>

@@ -323,17 +323,23 @@
 
         const membershipCloseTarget = event.target.closest('[data-membership-close-id]');
         if (membershipCloseTarget) {
-            if (typeof window.closeMembership !== 'function') {
-                return;
-            }
-
             const membershipId = Number.parseInt(membershipCloseTarget.dataset.membershipCloseId, 10);
             if (!Number.isInteger(membershipId) || membershipId <= 0) {
                 return;
             }
 
-            const cycleCode = membershipCloseTarget.dataset.cycleCode || '';
-            window.closeMembership(membershipId, cycleCode);
+            const idInput = document.getElementById('close_membership_id');
+            const cycleInput = document.getElementById('close_membership_cycle');
+            const modalElement = document.getElementById('closeMembershipModal');
+
+            if (!idInput || !cycleInput || !modalElement || typeof bootstrap === 'undefined') {
+                return;
+            }
+
+            idInput.value = membershipId;
+            cycleInput.value = membershipCloseTarget.dataset.cycleCode || '';
+
+            bootstrap.Modal.getOrCreateInstance(modalElement).show();
             return;
         }
 
