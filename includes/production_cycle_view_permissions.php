@@ -28,28 +28,21 @@ function production_cycle_view_permissions_filter(string $html): string
     // This helper only buffers the two Production Cycle routes for a delegated
     // non-admin viewer, so hiding POST forms here is safely route-scoped.
     $style = '<style id="production-cycle-readonly-prepaint">form[method="post"],form[method="POST"]{display:none!important}</style>';
-    $script = <<<'HTML'
-<script>
-document.addEventListener('DOMContentLoaded',function(){
-  document.querySelectorAll('form[method="post"],form[method="POST"]').forEach(function(form){
-    const action=form.querySelector('input[name="action"]')?.value||'';
-    if(action==='create_cycle'||action==='close_cycle'){
-      const col=form.closest('.col-lg-6'); if(col) col.remove();
-    } else if(action==='update_bird_cost_basis'){
-      const card=form.closest('.card'); if(card) card.remove();
-    } else if(action==='record_poultry_acquisition'){
-      const col=form.closest('.col-lg-5'); if(col) col.remove();
+    $asset = BASE_URL . '/assets/js/production-cycle-view-permissions.js';
+
+    if (function_exists('versioned_asset')) {
+        $asset = BASE_URL . versioned_asset(
+            '/assets/js/production-cycle-view-permissions.js'
+        );
     }
-  });
-  document.querySelectorAll('a.btn').forEach(function(a){
-    const text=a.textContent.trim();
-    if(text==='Manage Cycle') a.textContent='View Cycle';
-    else if(text==='Manage acquisition records on Production Cycles') a.textContent='View acquisition records on Production Cycles';
-    else if(text==='Manage lifecycle on Production Cycles') a.textContent='View lifecycle on Production Cycles';
-  });
-});
-</script>
-HTML;
+
+    $script = '<script src="'
+        . htmlspecialchars(
+            $asset,
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        )
+        . '"></script>';
     if (stripos($html, '</head>') !== false) $html = preg_replace('/<\/head>/i', $style . '</head>', $html, 1) ?? $html;
     if (stripos($html, '</body>') !== false) $html = preg_replace('/<\/body>/i', $script . '</body>', $html, 1) ?? $html;
     return $html;
