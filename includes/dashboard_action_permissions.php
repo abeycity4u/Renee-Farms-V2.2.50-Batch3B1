@@ -346,22 +346,17 @@ HTML;
             $html = preg_replace('/<\/head>/i', $style . '</head>', $html, 1) ?? $html;
         }
 
-        $script = <<<'HTML'
-<script>
-document.addEventListener('DOMContentLoaded',function(){
-  const table=document.getElementById('stockTable');
-  if(!table)return;
-  table.querySelectorAll('button[onclick^="quickStockUpdate("]').forEach(function(btn){btn.remove();});
-  const headers=Array.from(table.querySelectorAll('thead th'));
-  const actionIndex=headers.findIndex(function(th){return th.textContent.trim().toLowerCase()==='actions';});
-  if(actionIndex<0)return;
-  table.querySelectorAll('tr').forEach(function(row){
-    const cells=row.children;
-    if(cells[actionIndex])cells[actionIndex].remove();
-  });
-});
-</script>
-HTML;
+        $asset = BASE_URL . '/assets/js/dashboard-stock-readonly.js';
+        if (function_exists('versioned_asset')) {
+            $asset = BASE_URL . versioned_asset('/assets/js/dashboard-stock-readonly.js');
+        }
+        $script = '<script src="'
+            . htmlspecialchars(
+                $asset,
+                ENT_QUOTES | ENT_SUBSTITUTE,
+                'UTF-8'
+            )
+            . '"></script>';
         if (stripos($html, '</body>') !== false) {
             $html = preg_replace('/<\/body>/i', $script . '</body>', $html, 1) ?? $html;
         }
@@ -393,61 +388,17 @@ HTML;
             $html
         );
 
-        $script = <<<'HTML'
-<script>
-document.addEventListener('DOMContentLoaded',function(){
-  const form=document.getElementById('quickStockForm');
-  if(!form)return;
-
-  document.querySelectorAll('#stockTable button[onclick^="quickStockUpdate("]').forEach(function(btn){
-    btn.title='Quick Stock Use';
-    btn.innerHTML='<i class="bi bi-dash-circle me-1"></i> Use Stock';
-  });
-
-  form.addEventListener('submit',async function(event){
-    event.preventDefault();
-    event.stopImmediatePropagation();
-
-    const submitBtn=form.querySelector('button[type="submit"]');
-    if(!submitBtn)return;
-    const originalText=submitBtn.innerHTML;
-    submitBtn.innerHTML='<span class="spinner-border spinner-border-sm"></span> Deducting...';
-    submitBtn.disabled=true;
-
-    try {
-      const csrf=document.querySelector('meta[name="csrf-token"]')?.content||'';
-      const transactionDate=document.querySelector('meta[name="app-today"]')?.content||'';
-      const payload={
-        item_id:document.getElementById('stockItemId')?.value||'',
-        type:'used',
-        quantity:document.getElementById('quantity')?.value||'',
-        remarks:document.getElementById('remarks')?.value||''
-      };
-      if(transactionDate)payload.transaction_date=transactionDate;
-
-      const response=await fetch('api/update_stock.php',{
-        method:'POST',
-        headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},
-        body:JSON.stringify(payload)
-      });
-      const data=await response.json();
-      if(response.ok&&data.success){
-        showAlert('success',data.message||'Stock deducted successfully!');
-        bootstrap.Modal.getInstance(document.getElementById('quickStockModal'))?.hide();
-        setTimeout(function(){location.reload();},1000);
-        return;
-      }
-      showAlert('danger','Error: '+(data.error||data.message||'Action could not be completed.'));
-    } catch(error) {
-      showAlert('danger','Network error: '+error.message);
-    }
-
-    submitBtn.innerHTML=originalText;
-    submitBtn.disabled=false;
-  },true);
-});
-</script>
-HTML;
+        $asset = BASE_URL . '/assets/js/dashboard-quick-stock.js';
+        if (function_exists('versioned_asset')) {
+            $asset = BASE_URL . versioned_asset('/assets/js/dashboard-quick-stock.js');
+        }
+        $script = '<script src="'
+            . htmlspecialchars(
+                $asset,
+                ENT_QUOTES | ENT_SUBSTITUTE,
+                'UTF-8'
+            )
+            . '"></script>';
         if (stripos($html, '</body>') !== false) {
             $html = preg_replace('/<\/body>/i', $script . '</body>', $html, 1) ?? $html;
         }
