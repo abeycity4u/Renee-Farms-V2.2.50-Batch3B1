@@ -8,6 +8,8 @@
  * to use requireLogin() and never accept this context.
  */
 
+require_once __DIR__ . '/password_security.php';
+
 if (!function_exists('subscription_recovery_target_statuses')) {
     function subscription_recovery_target_statuses(): array
     {
@@ -116,24 +118,7 @@ if (!function_exists('subscription_recovery_status_is_target')) {
 if (!function_exists('subscription_recovery_verify_password')) {
     function subscription_recovery_verify_password(PDO $pdo, array $account, string $password): bool
     {
-        $stored = (string)($account['password'] ?? '');
-        if ($stored === '' || $password === '') return false;
-        if (password_verify($password, $stored)) return true;
-
-        // Preserve the existing sign-in compatibility bridge. A plaintext legacy
-        // credential is upgraded immediately after a successful comparison.
-        if (password_get_info($stored)['algo'] === 0 && hash_equals($stored, $password)) {
-            $userId = (int)($account['user_id'] ?? 0);
-            if ($userId < 1) return false;
-            $stmt = $pdo->prepare('UPDATE users SET password = ? WHERE id = ? AND farm_id = ?');
-            $stmt->execute([
-                password_hash($password, PASSWORD_DEFAULT),
-                $userId,
-                (int)($account['farm_id'] ?? 0),
-            ]);
-            return true;
-        }
-        return false;
+        return password_security_verify($password, (string)($account['password'] ?? ''));
     }
 }
 
