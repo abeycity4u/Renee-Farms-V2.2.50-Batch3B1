@@ -191,6 +191,64 @@
             return;
         }
 
+        const ruminantAnimalNewTarget = event.target.closest('[data-ruminant-animal-new]');
+        if (ruminantAnimalNewTarget) {
+            if (typeof window.newAnimal !== 'function') {
+                return;
+            }
+
+            window.newAnimal();
+            return;
+        }
+
+        const ruminantAnimalEditTarget = event.target.closest('[data-ruminant-animal-edit]');
+        if (ruminantAnimalEditTarget) {
+            if (typeof window.editAnimal !== 'function') {
+                return;
+            }
+
+            const encoded = ruminantAnimalEditTarget.dataset.ruminantAnimal;
+            if (!encoded) {
+                return;
+            }
+
+            let animalData;
+
+            try {
+                animalData = JSON.parse(encoded);
+            } catch (error) {
+                console.error('Unable to parse ruminant animal data.', error);
+                return;
+            }
+
+            window.editAnimal(animalData);
+            return;
+        }
+
+        const ruminantAnimalExitTarget = event.target.closest('[data-ruminant-animal-exit]');
+        if (ruminantAnimalExitTarget) {
+            if (typeof window.exitAnimal !== 'function') {
+                return;
+            }
+
+            const encoded = ruminantAnimalExitTarget.dataset.ruminantAnimalExit;
+            if (!encoded) {
+                return;
+            }
+
+            let exitData;
+
+            try {
+                exitData = JSON.parse(encoded);
+            } catch (error) {
+                console.error('Unable to parse ruminant animal exit data.', error);
+                return;
+            }
+
+            window.exitAnimal(exitData);
+            return;
+        }
+
         const deleteExpenseTarget = event.target.closest('[data-delete-expense-id]');
         if (!deleteExpenseTarget) {
             return;
