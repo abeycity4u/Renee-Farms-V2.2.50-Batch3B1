@@ -116,15 +116,14 @@ $pdfReportUrl = pdf_report_current_url();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reports & Analytics - Farm Management System</title>
-    <script>
-        function loadChartFallback() {
-            if (window.fmChartFallbackLoaded) return;
-            window.fmChartFallbackLoaded = true;
-            var fallbackScript = document.createElement('script');
-            fallbackScript.src = '<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/chart-fallback.js'); ?>';
-            document.head.appendChild(fallbackScript);
-        }
-    </script>
+    <script
+        src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/reports-chart-fallback.js'); ?>"
+        data-fallback-src="<?php echo htmlspecialchars(
+            BASE_URL . versioned_asset('/assets/js/chart-fallback.js'),
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        ); ?>"
+    ></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous" data-chart-fallback></script>
 </head>
 <body>
@@ -296,136 +295,43 @@ $pdfReportUrl = pdf_report_current_url();
     <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/datatables-responsive/js/dataTables.responsive.min.js'); ?>"></script>
     <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/main.js'); ?>"></script>
  <script src="<?php echo BASE_URL; ?>/assets/js/edit-modal.js"></script>
-    <script>
-    // Filter change
-    document.getElementById('yearFilter').addEventListener('change', function() {
-        updateReport();
-    });
-
-    document.getElementById('farmTypeFilter').addEventListener('change', function() {
-        updateReport();
-    });
-
-    function updateReport() {
-        const year = document.getElementById('yearFilter').value;
-        const farmType = document.getElementById('farmTypeFilter').value;
-        window.location.href = `reports.php?year=${year}&farm_type=${farmType}`;
-    }
-function exportToExcel() {
-        const year = document.getElementById('yearFilter').value;
-        const farmType = document.getElementById('farmTypeFilter').value;
-        window.location.href = `reports.php?year=${year}&farm_type=${farmType}&export=excel`;
-    }
-
-    // Initialize charts when page loads
-    document.addEventListener('DOMContentLoaded', function() {
-        // Profit/Loss Chart
-        const profitCtx = document.getElementById('profitChart').getContext('2d');
-        const profitChart = new Chart(profitCtx, {
-            type: 'line',
-            data: {
-                labels: <?php echo app_json_script(array_map(function($d) {
-                    return date('M', strtotime($d['month'] . '-01'));
-                }, $profitData)); ?>,
-                datasets: [{
-                    label: 'Net Profit (₦)',
-                    data: <?php echo app_json_script(array_column($profitData, 'net_profit')); ?>,
-                    borderColor: 'rgb(75, 192, 192)',
-                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                    fill: true,
-                    tension: 0.4
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        position: 'top',
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            callback: function(value) {
-                                return '₦' + value.toLocaleString();
-                            }
-                        }
-                    }
-                }
-            }
-        });
-
-        // Top Products Chart
-        const productsCtx = document.getElementById('productsChart').getContext('2d');
-        const productsChart = new Chart(productsCtx, {
-            type: 'bar',
-            data: {
-                labels: <?php echo app_json_script(array_column($topProducts, 'display_product')); ?>,
-                datasets: [{
-                    label: 'Revenue (₦)',
-                    data: <?php echo app_json_script(array_column($topProducts, 'total_revenue')); ?>,
-                    backgroundColor: 'rgba(54, 162, 235, 0.7)',
-                    borderColor: 'rgba(54, 162, 235, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            callback: function(value) {
-                                return '₦' + value.toLocaleString();
-                            }
-                        }
-                    }
-                }
-            }
-        });
-
-        // Expenses Chart
-        const expensesCtx = document.getElementById('expensesChart').getContext('2d');
-        const expensesChart = new Chart(expensesCtx, {
-            type: 'pie',
-            data: {
-                labels: <?php echo app_json_script(array_column($expenses, 'category')); ?>,
-                datasets: [{
-                    data: <?php echo app_json_script(array_column($expenses, 'total_amount')); ?>,
-                    backgroundColor: [
-                        'rgba(255, 99, 132, 0.7)',
-                        'rgba(54, 162, 235, 0.7)',
-                        'rgba(255, 206, 86, 0.7)',
-                        'rgba(75, 192, 192, 0.7)',
-                        'rgba(153, 102, 255, 0.7)',
-                        'rgba(255, 159, 64, 0.7)'
-                    ]
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        position: 'right',
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                let label = context.label || '';
-                                if (label) {
-                                    label += ': ';
-                                }
-                                label += '₦' + context.parsed.toLocaleString();
-                                return label;
-                            }
-                        }
-                    }
-                }
-            }
-        });
-    });
-    </script>
+    <div
+        id="managementReportsConfig"
+        hidden
+        data-profit-labels="<?php echo htmlspecialchars(
+            app_json_script(array_map(function($d) {
+                return date('M', strtotime($d['month'] . '-01'));
+            }, $profitData)),
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        ); ?>"
+        data-profit-values="<?php echo htmlspecialchars(
+            app_json_script(array_column($profitData, 'net_profit')),
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        ); ?>"
+        data-product-labels="<?php echo htmlspecialchars(
+            app_json_script(array_column($topProducts, 'display_product')),
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        ); ?>"
+        data-product-values="<?php echo htmlspecialchars(
+            app_json_script(array_column($topProducts, 'total_revenue')),
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        ); ?>"
+        data-expense-labels="<?php echo htmlspecialchars(
+            app_json_script(array_column($expenses, 'category')),
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        ); ?>"
+        data-expense-values="<?php echo htmlspecialchars(
+            app_json_script(array_column($expenses, 'total_amount')),
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        ); ?>"
+    ></div>
+    <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/management-reports.js'); ?>"></script>
 </body>
 </html>
 <?php
