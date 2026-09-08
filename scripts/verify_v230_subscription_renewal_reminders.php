@@ -39,9 +39,12 @@ $pass('service reuses canonical farm contact email validation',
     && str_contains($serviceSource, 'farm_contact_email_normalize'));
 $pass('reminder cadence is explicit and bounded',
     str_contains($serviceSource, 'return [14, 7, 3, 1, 0];'));
+
+$sendFlagLiteral = '$send = in_array(\'--send\', $argv ?? [], true);';
+$modeLiteral = '($send ? \'SEND\' : \'DRY-RUN\')';
 $pass('worker is dry-run by default',
-    str_contains($workerSource, '$send = in_array(\'--send\', $argv ?? [], true);')
-    && str_contains($workerSource, "($send ? 'SEND' : 'DRY-RUN')"));
+    str_contains($workerSource, $sendFlagLiteral)
+    && str_contains($workerSource, $modeLiteral));
 
 $mailSendCall = 'platform_' . 'mail_' . 'send(';
 $pass('worker uses central mail transport',
