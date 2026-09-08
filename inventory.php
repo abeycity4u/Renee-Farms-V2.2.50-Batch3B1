@@ -1271,12 +1271,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                     <?php foreach ($inventoryItems as $item): ?>
                                     <option value="<?php echo $item['id']; ?>"
                                             data-stock="<?php echo $item['current_stock']; ?>"
-                                            data-unit="<?php echo $item['unit']; ?>"
+                                            data-unit="<?php echo app_attr($item['unit']); ?>"
                                             data-farm-type="<?php echo htmlspecialchars($item['farm_type'] ?? 'both'); ?>"
                                             data-feed-category="<?php echo htmlspecialchars($item['feed_category'] ?? 'general'); ?>"
                                             data-default-production-type="<?php echo htmlspecialchars($item['default_production_type'] ?? 'shared'); ?>">
                                         <?php echo htmlspecialchars($item['item_name']); ?>
-                                        (Current: <?php echo $item['current_stock']; ?> <?php echo $item['unit']; ?>)
+                                        (Current: <?php echo $item['current_stock']; ?> <?php echo app_html($item['unit']); ?>)
                                     </option>
                                     <?php endforeach; ?>
                                 </select>

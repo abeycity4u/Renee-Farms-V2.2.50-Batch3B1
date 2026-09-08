@@ -233,12 +233,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_transaction']) &
                             <div class="col-md-3 mb-3 d-flex">
                                 <div class="card stock-card <?php echo $cardClass; ?> h-100 w-100">
                                     <div class="card-body text-center">
-                                        <h6 class="card-title"><?php echo $item['item_name']; ?></h6>
+                                        <h6 class="card-title"><?php echo app_html($item['item_name']); ?></h6>
                                         <div class="mb-2">
                                             <span class="display-6 fw-bold <?php echo $item['current_stock'] <= $item['min_stock_level'] ? 'text-danger' : 'text-success'; ?>">
                                                 <?php echo $item['current_stock']; ?>
                                             </span>
-                                            <small class="text-muted d-block"><?php echo $item['unit']; ?></small>
+                                            <small class="text-muted d-block"><?php echo app_html($item['unit']); ?></small>
                                         </div>
                                         <div class="progress" style="height: 8px;">
                                             <div class="progress-bar <?php echo $item['current_stock'] <= $item['min_stock_level'] ? 'bg-danger' : 'bg-success'; ?>"
@@ -397,7 +397,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_transaction']) &
                             <select name="feed_item" class="form-select" required>
                                 <option value="">Select Feed</option>
                                 <?php foreach ($feedItems as $item): ?>
-                                    <option value="<?php echo $item['id']; ?>"><?php echo $item['item_name']; ?> (<?php echo $item['current_stock']; ?> <?php echo $item['unit']; ?> available)</option>
+                                    <option value="<?php echo $item['id']; ?>"><?php echo app_html($item['item_name']); ?> (<?php echo $item['current_stock']; ?> <?php echo app_html($item['unit']); ?> available)</option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -463,7 +463,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_transaction']) &
                             <select name="feed_item" id="editFeedItem" class="form-select" required>
                                 <option value="">Select Feed</option>
                                 <?php foreach ($feedItems as $item): ?>
-                                    <option value="<?php echo $item['id']; ?>"><?php echo $item['item_name']; ?> (<?php echo $item['current_stock']; ?> <?php echo $item['unit']; ?> available)</option>
+                                    <option value="<?php echo $item['id']; ?>"><?php echo app_html($item['item_name']); ?> (<?php echo $item['current_stock']; ?> <?php echo app_html($item['unit']); ?> available)</option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
