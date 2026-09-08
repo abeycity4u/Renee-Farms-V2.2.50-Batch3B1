@@ -270,13 +270,13 @@ $pdfReportUrl = pdf_report_current_url();
                                             </td>
                                             <td>
                                                 <?php if ($expense['description']): ?>
-                                                <small><?php echo $expense['description']; ?></small>
+                                                <small><?php echo app_html($expense['description']); ?></small>
                                                 <?php else: ?>
                                                 <span class="text-muted">--</span>
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <small><?php echo $expense['full_name']; ?></small>
+                                                <small><?php echo app_html($expense['full_name']); ?></small>
                                             </td>
                                             <?php if ($canManageExpenses): ?>
                                             <td class="no-print">

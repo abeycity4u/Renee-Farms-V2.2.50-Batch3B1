@@ -958,7 +958,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                             </td>
                                             <td>
                                                 <span class="badge bg-primary">
-                                                    <?php echo $sale['product_type']; ?>
+                                                    <?php echo app_html($sale['product_type']); ?>
                                                 </span>
                                             </td>
                                             <td><?php echo number_format((float)$sale['quantity'], 2); ?></td>
@@ -968,17 +968,17 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                                 ₦<?php echo number_format($sale['total_amount'], 2); ?>
                                             </td>
                                             <td>
-                                                <?php echo $sale['customer_name'] ?: '--'; ?>
+                                                <?php echo app_html($sale['customer_name'] ?: '--'); ?>
                                             </td>
                                             <td>
                                                 <?php if ($sale['remarks']): ?>
-                                                <small class="text-muted"><?php echo substr($sale['remarks'], 0, 20); ?>...</small>
+                                                <small class="text-muted"><?php echo app_html(substr($sale['remarks'], 0, 20)); ?>...</small>
                                                 <?php else: ?>
                                                 <span class="text-muted">--</span>
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <small><?php echo $sale['seller']; ?></small>
+                                                <small><?php echo app_html($sale['seller']); ?></small>
                                             </td>
                                             <?php if ($showActions): ?>
                                             <td>

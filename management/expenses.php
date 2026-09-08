@@ -305,10 +305,10 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                                 ₦<?php echo number_format($lineTotal, 2); ?>
                                             </td>
                                             <td>
-                                                <?php echo $expense['description'] ?: '--'; ?>
+                                                <?php echo app_html($expense['description'] ?: '--'); ?>
                                             </td>
                                             <td>
-                                                <small><?php echo $expense['full_name']; ?></small>
+                                                <small><?php echo app_html($expense['full_name']); ?></small>
                                             </td>
                                             <?php if ($canManageExpenses): ?>
                                             <td>

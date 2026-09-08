@@ -14,6 +14,12 @@ $add = static function (string $label, bool $ok) use (&$checks): void {
 $helper = is_file($helperPath) ? file_get_contents($helperPath) : '';
 $init = is_file($initPath) ? file_get_contents($initPath) : '';
 
+$sales = file_get_contents($root . '/management/sales_records.php');
+$expenses = file_get_contents($root . '/management/expenses.php');
+$layerExpenses = file_get_contents($root . '/poultry/layer_expenses.php');
+$broilerExpenses = file_get_contents($root . '/poultry/broiler_expenses.php');
+$ruminantExpenses = file_get_contents($root . '/ruminant/ruminant_expenses.php');
+
 $add('Central output-security helper exists', is_file($helperPath));
 $add('HTML text helper exists', str_contains($helper, 'function app_html('));
 $add('HTML attribute helper exists', str_contains($helper, 'function app_attr('));
@@ -64,6 +70,50 @@ $add(
         $init,
         "require_once __DIR__ . '/includes/output_security.php';"
     )
+);
+
+$add(
+    'Sales product type is HTML-escaped',
+    str_contains($sales, "app_html(\$sale['product_type'])")
+);
+
+$add(
+    'Sales customer name is HTML-escaped',
+    str_contains($sales, "app_html(\$sale['customer_name'] ?: '--')")
+);
+
+$add(
+    'Sales remarks preview is HTML-escaped',
+    str_contains($sales, "app_html(substr(\$sale['remarks'], 0, 20))")
+);
+
+$add(
+    'Sales seller is HTML-escaped',
+    str_contains($sales, "app_html(\$sale['seller'])")
+);
+
+$add(
+    'General expense text is HTML-escaped',
+    str_contains($expenses, "app_html(\$expense['description'] ?: '--')")
+    && str_contains($expenses, "app_html(\$expense['full_name'])")
+);
+
+$add(
+    'Layer expense text is HTML-escaped',
+    str_contains($layerExpenses, "app_html(\$expense['description'])")
+    && str_contains($layerExpenses, "app_html(\$expense['full_name'])")
+);
+
+$add(
+    'Broiler expense text is HTML-escaped',
+    str_contains($broilerExpenses, "app_html(\$expense['description'] ?: '--')")
+    && str_contains($broilerExpenses, "app_html(\$expense['full_name'])")
+);
+
+$add(
+    'Ruminant expense text is HTML-escaped',
+    str_contains($ruminantExpenses, "app_html(\$expense['description'] ?: '--')")
+    && str_contains($ruminantExpenses, "app_html(\$expense['full_name'])")
 );
 
 require_once $helperPath;

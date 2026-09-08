@@ -291,10 +291,10 @@ $pdfReportUrl = pdf_report_current_url();
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <?php echo $expense['description'] ?: '--'; ?>
+                                                <?php echo app_html($expense['description'] ?: '--'); ?>
                                             </td>
                                             <td>
-                                                <small><?php echo $expense['full_name']; ?></small>
+                                                <small><?php echo app_html($expense['full_name']); ?></small>
                                             </td>
                                             <?php if ($canManageExpenses): ?>
                                             <td class="no-print">

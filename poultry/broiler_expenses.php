@@ -244,8 +244,8 @@ $pdfReportUrl = pdf_report_current_url();
                                                 <div class="fw-semibold"><?php echo htmlspecialchars(attribution_production_label('poultry', ($expense['production_type'] ?? 'broiler'))); ?></div>
                                                 <div class="small text-muted"><?php echo htmlspecialchars(attribution_cycle_label('poultry', ($expense['production_type'] ?? 'broiler'), $expense['expense_cycle_code'] ?? null)); ?></div>
                                             </td>
-                                            <td><?php echo $expense['description'] ?: '--'; ?></td>
-                                            <td><small><?php echo $expense['full_name']; ?></small></td>
+                                            <td><?php echo app_html($expense['description'] ?: '--'); ?></td>
+                                            <td><small><?php echo app_html($expense['full_name']); ?></small></td>
                                             <?php if ($canManageExpenses): ?>
                                             <td class="no-print">
                                                 <button class="btn btn-sm btn-outline-primary edit-expense-btn"
