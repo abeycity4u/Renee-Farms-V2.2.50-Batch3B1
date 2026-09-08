@@ -164,33 +164,13 @@ require_once(__DIR__ . '/../navbar.php');
 </div></div></div>
 <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/bootstrap5/js/bootstrap.bundle.min.js'); ?>"></script>
 <?php if ($canDeleteHealth): ?><form method="post" id="deleteEventForm" class="d-none"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token()); ?>"><input type="hidden" name="action" value="delete_event"><input type="hidden" name="event_id" id="delete_event_id"></form><?php endif; ?>
-<script>
-function filterCycleOptions(){
-  const type=document.getElementById('production_type').value;
-  const select=document.getElementById('cycle_id');
-  let first=null;
-  [...select.options].forEach(o=>{ const show=o.dataset.productionType===type; o.hidden=!show; o.disabled=!show; if(show && first===null) first=o; });
-  if(select.selectedOptions.length===0 || select.selectedOptions[0].disabled){ if(first) first.selected=true; }
-}
-function newHealthEvent(){
-  document.getElementById('eventForm').reset(); document.getElementById('event_id').value='0'; document.getElementById('eventModalTitle').textContent='Record Poultry Health Event';
-  document.getElementById('event_date').value='<?php echo htmlspecialchars(function_exists('app_today') ? app_today() : date('Y-m-d')); ?>';
-  filterCycleOptions();
-}
-function editHealthEvent(e){
-  document.getElementById('eventModalTitle').textContent='Edit Poultry Health Event';
-  document.getElementById('event_id').value=e.id||0; document.getElementById('production_type').value=e.production_type||'layer'; filterCycleOptions();
-  document.getElementById('cycle_id').value=e.cycle_id||''; document.getElementById('event_date').value=e.event_date||''; document.getElementById('event_type').value=e.event_type||'other';
-  document.getElementById('product_name').value=e.product_name||''; document.getElementById('dosage').value=e.dosage||''; document.getElementById('reason_symptoms').value=e.reason_symptoms||''; document.getElementById('notes').value=e.notes||''; document.getElementById('stock_item_id').value=e.stock_item_id||'0';
-}
-<?php if ($canDeleteHealth): ?>
-async function confirmDeleteEvent(id){
-  const confirmed = await AppConfirm.ask('Delete this poultry health event? This removes the structured clinical/history record only; linked Inventory transactions are not changed.', {title:'Delete health event?', confirmText:'Delete', danger:true});
-  if(confirmed){ document.getElementById('delete_event_id').value=id; document.getElementById('deleteEventForm').submit(); }
-}
-<?php endif; ?>
-document.addEventListener('DOMContentLoaded',filterCycleOptions);
-</script>
+<div
+    class="d-none"
+    id="poultryHealthConfig"
+    data-default-date="<?php echo app_attr(function_exists('app_today') ? app_today() : date('Y-m-d')); ?>"
+    data-can-delete="<?php echo $canDeleteHealth ? '1' : '0'; ?>"
+></div>
+<script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/poultry-health.js'); ?>"></script>
 <?php endif; ?>
 </body>
 </html>
