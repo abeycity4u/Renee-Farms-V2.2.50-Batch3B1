@@ -460,30 +460,6 @@ foreach ($users as $existingUser) {
     <script src="<?php echo BASE_URL; ?>/assets/js/edit-modal.js"></script>
 
 
-    <script>
-    attachEditModal({
-        buttonSelector: '.edit-user-btn',
-        modalSelector: '#editUserModal',
-        fieldMap: {
-            userId: 'input[name="user_id"]',
-            username: 'input[name="username"]',
-            fullName: 'input[name="full_name"]'
-        },
-        onShow: ({ modalElement, data }) => {
-            const passwordField = modalElement.querySelector('input[name="password"]');
-            if (passwordField) passwordField.value = '';
-            const roles = (data.roles || '').split(',');
-            modalElement.querySelectorAll('input[name="roles[]"]').forEach((field) => { field.checked = roles.includes(field.value); });
-        }
-    });
-    </script>
-
-<script>
-function confirmUserDeletion(form, username) {
-    AppConfirm.ask('This removes ' + username + "'s login access immediately.", {title:'Delete user?',confirmText:'Delete user',danger:true}).then(function(confirmed){
-        if(!confirmed) return; const action=document.createElement('input'); action.type='hidden'; action.name='delete_user'; action.value='1'; form.appendChild(action); form.submit();
-    });
-}
-</script>
+    <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/users.js'); ?>"></script>
 </body>
 </html>
