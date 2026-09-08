@@ -24,8 +24,13 @@ $add('Team User guard loads central password policy', str_contains($guard, "requ
 $add('Team User add password is server-side validated', str_contains($guard, "\$isAdd = isset(\$_POST['add_user'])") && str_contains($guard, 'password_security_validate($password)'));
 $add('Team User replacement password is server-side validated', str_contains($guard, "\$isEdit = isset(\$_POST['edit_user'])") && str_contains($guard, "if (\$isEdit && \$password === '') return;"));
 $add('Team User page still hashes new passwords', str_contains($users, "password_hash(\$_POST['password'], PASSWORD_DEFAULT)"));
-$add('Farm Admin still enforces minimum length 8', str_contains($farms, 'const FARM_OWNER_MIN_PASSWORD_LENGTH = 8;'));
-$add('Farm Admin still hashes stored passwords', str_contains($farms, 'password_hash($password, PASSWORD_DEFAULT)'));
+$add('Farm Admin duplicate password-length constant is removed', !str_contains($farms, 'FARM_OWNER_MIN_PASSWORD_LENGTH'));
+$add('Farm Admin create password uses central validator', str_contains($farms, "isset(\$_POST['create_farm'])") && str_contains($farms, 'password_security_validate($password)'));
+$add('Farm Admin repair password uses central validator', str_contains($farms, '$repairOwnerNeeded') && str_contains($farms, 'password_security_validate($password)'));
+$add('Farm Admin replacement password uses central validator', str_contains($farms, "isset(\$_POST['update_farm'])") && str_contains($farms, 'password_security_validate($password)'));
+$add('Farm Admin password storage uses central hasher', substr_count($farms, 'password_security_hash($password)') >= 3);
+$add('Farm Admin page has no native password_hash call', !str_contains($farms, 'password_hash('));
+$add('Farm Admin password field uses central minimum length', str_contains($farms, 'password_security_min_length()'));
 $add('Normal login delegates to central hash-only verifier', str_contains($sign, "password_security_verify(\$password, (string)(\$user['password'] ?? ''))"));
 $add('Normal login no longer accepts plaintext compatibility credentials', !str_contains($sign, 'password_get_info(') && !str_contains($sign, "hash_equals((string) \$user['password']"));
 $add('Recovery login delegates to central hash-only verifier', str_contains($recovery, "password_security_verify(\$password, (string)(\$account['password'] ?? ''))"));
