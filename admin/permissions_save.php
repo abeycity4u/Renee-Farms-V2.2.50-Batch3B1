@@ -61,10 +61,10 @@ try {
 
     $logDir = __DIR__ . '/../logs';
     if (!is_dir($logDir)) {
-        @mkdir($logDir, 0777, true);
+        @mkdir($logDir, 0775, true);
     }
     $logEntry = sprintf("[%s] %s\n", date('Y-m-d H:i:s'), $message);
-    @file_put_contents($logDir . '/permissions_error.log', $logEntry, FILE_APPEND);
+    @file_put_contents($logDir . '/permissions_error.log', $logEntry, FILE_APPEND | LOCK_EX);
     header('Location: permissions.php?error=1&farm_id=' . $permissionFarmId);
     exit();
 }
