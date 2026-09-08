@@ -67,6 +67,21 @@
             return;
         }
 
+        const quickStockTarget = event.target.closest('[data-quick-stock-id]');
+        if (quickStockTarget) {
+            if (typeof window.quickStockUpdate !== 'function') {
+                return;
+            }
+
+            const itemId = Number.parseInt(quickStockTarget.dataset.quickStockId, 10);
+            if (!Number.isInteger(itemId) || itemId <= 0) {
+                return;
+            }
+
+            window.quickStockUpdate(itemId);
+            return;
+        }
+
         const deleteExpenseTarget = event.target.closest('[data-delete-expense-id]');
         if (!deleteExpenseTarget) {
             return;

@@ -1082,7 +1082,7 @@ $pageTitle = "Dashboard";
                                         </td>
                                         <td>
                                             <button class="btn btn-sm btn-primary rounded-pill px-3"
-                                                    onclick="quickStockUpdate(<?php echo $item['id']; ?>)"
+                                                    data-quick-stock-id="<?php echo (int)$item['id']; ?>"
                                                     title="Quick Update">
                                                 <i class="bi bi-arrow-up-down me-1"></i> Update
                                             </button>
@@ -1264,7 +1264,7 @@ $pageTitle = "Dashboard";
                                 </small>
                             </div>
                             <button class="btn btn-sm btn-outline-danger" 
-                                    onclick="quickStockUpdate(<?php echo $item['id']; ?>)">
+                                    data-quick-stock-id="<?php echo (int)$item['id']; ?>">
                                 Reorder
                             </button>
                         </div>
