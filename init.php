@@ -72,6 +72,10 @@ require_once __DIR__ . '/includes/farm_entitlement_runtime.php';
 // Central browser-form CSRF rendering and POST enforcement helpers.
 require_once __DIR__ . '/includes/csrf.php';
 
+// Canonical output-encoding contract for HTML text, HTML attributes and
+// PHP data embedded directly inside JavaScript.
+require_once __DIR__ . '/includes/output_security.php';
+
 // Canonical password policy/storage/verification contract. Load it explicitly at
 // bootstrap so every route can reuse one minimum-length, hash and hash-only verify
 // implementation without depending on an indirect include chain.
