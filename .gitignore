@@ -1,0 +1,14 @@
+# Runtime / server-generated logs
+error_log
+*.log
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
