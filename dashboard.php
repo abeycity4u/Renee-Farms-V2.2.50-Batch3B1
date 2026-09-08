@@ -861,7 +861,7 @@ $pageTitle = "Dashboard";
                                 <span class="hero-pill mb-2">
                                     <i class="bi bi-stars"></i> <?php echo $greetingText; ?>
                                 </span>
-                                <h2 class="mb-1 fw-bold">Welcome back, <?php echo $_SESSION['full_name']; ?> 👋</h2>
+                                <h2 class="mb-1 fw-bold">Welcome back, <?php echo app_html($_SESSION['full_name']); ?> 👋</h2>
                                 <p class="mb-0 opacity-75">
                                     <?php echo date('l, F j, Y'); ?> • 
                                     Last login: <?php echo htmlspecialchars($lastLoginDisplay); ?>
@@ -1057,7 +1057,7 @@ $pageTitle = "Dashboard";
                                     <tr data-farm-type="<?php echo $item['farm_type']; ?>" 
                                         data-stock-status="<?php echo $statusClass; ?>">
                                         <td>
-                                            <strong><?php echo $item['item_name']; ?></strong>
+                                            <strong><?php echo app_html($item['item_name']); ?></strong>
                                         </td>
                                         <td>
                                             <div class="fw-bold <?php echo "text-$statusClass"; ?>">
@@ -1196,14 +1196,14 @@ $pageTitle = "Dashboard";
                                     </div>
                                     <div class="flex-grow-1">
                                         <div class="d-flex justify-content-between">
-                                            <strong><?php echo $trans['item_name']; ?></strong>
+                                            <strong><?php echo app_html($trans['item_name']); ?></strong>
                                             <span class="fw-bold <?php echo $trans['transaction_type'] == 'received' ? 'text-success' : 'text-danger'; ?>">
                                                 <?php echo $trans['transaction_type'] == 'received' ? '+' : '-'; ?>
-                                                <?php echo $trans['quantity']; ?> <?php echo $trans['unit']; ?>
+                                                <?php echo $trans['quantity']; ?> <?php echo app_html($trans['unit']); ?>
                                             </span>
                                         </div>
                                         <small class="text-muted">
-                                            Stock: <?php echo $trans['new_stock']; ?> <?php echo $trans['unit']; ?>
+                                            Stock: <?php echo $trans['new_stock']; ?> <?php echo app_html($trans['unit']); ?>
                                         </small>
                                     </div>
                                 </div>
@@ -1257,10 +1257,10 @@ $pageTitle = "Dashboard";
                         <div class="alert alert-warning d-flex align-items-center mb-2" role="alert">
                             <i class="bi bi-exclamation-triangle-fill me-2"></i>
                             <div class="flex-grow-1">
-                                <strong><?php echo $item['item_name']; ?></strong><br>
+                                <strong><?php echo app_html($item['item_name']); ?></strong><br>
                                 <small>
-                                    Current: <?php echo $item['current_stock']; ?> <?php echo $item['unit']; ?> • 
-                                    Min: <?php echo $item['min_stock_level']; ?> <?php echo $item['unit']; ?>
+                                    Current: <?php echo $item['current_stock']; ?> <?php echo app_html($item['unit']); ?> •
+                                    Min: <?php echo $item['min_stock_level']; ?> <?php echo app_html($item['unit']); ?>
                                 </small>
                             </div>
                             <button class="btn btn-sm btn-outline-danger" 
@@ -1290,7 +1290,7 @@ $pageTitle = "Dashboard";
                         <?php foreach ($recentSales as $sale): ?>
                         <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom">
                             <div>
-                                <strong><?php echo $sale['product_type']; ?></strong>
+                                <strong><?php echo app_html($sale['product_type']); ?></strong>
                                 <div class="small text-muted">
                                     <?php echo date('M d', strtotime($sale['sale_date'])); ?> • 
                                     <?php echo $sale['quantity']; ?> units
@@ -1301,7 +1301,7 @@ $pageTitle = "Dashboard";
                                     ₦<?php echo number_format($sale['total_amount'], 2); ?>
                                 </span>
                                 <div class="small text-muted">
-                                    <?php echo $sale['seller']; ?>
+                                    <?php echo app_html($sale['seller']); ?>
                                 </div>
                             </div>
                         </div>

@@ -24,6 +24,7 @@ $layerFeeds = file_get_contents($root . '/poultry/layer_feeds.php');
 $broilerFeeds = file_get_contents($root . '/poultry/broiler_feeds.php');
 $ruminantFeeds = file_get_contents($root . '/ruminant/ruminant_feeds_record.php');
 $inventory = file_get_contents($root . '/inventory.php');
+$dashboard = file_get_contents($root . '/dashboard.php');
 
 $add('Central output-security helper exists', is_file($helperPath));
 $add('HTML text helper exists', str_contains($helper, 'function app_html('));
@@ -161,6 +162,37 @@ $add(
 $add(
     'Inventory visible unit uses HTML escaping',
     str_contains($inventory, "app_html(\$item['unit'])")
+);
+
+$add(
+    'Dashboard user full name is HTML-escaped',
+    str_contains($dashboard, "app_html(\$_SESSION['full_name'])")
+);
+
+$add(
+    'Dashboard inventory item names are HTML-escaped',
+    str_contains($dashboard, "app_html(\$item['item_name'])")
+);
+
+$add(
+    'Dashboard transaction item names are HTML-escaped',
+    str_contains($dashboard, "app_html(\$trans['item_name'])")
+);
+
+$add(
+    'Dashboard inventory units are HTML-escaped',
+    str_contains($dashboard, "app_html(\$item['unit'])")
+    && str_contains($dashboard, "app_html(\$trans['unit'])")
+);
+
+$add(
+    'Dashboard sales product type is HTML-escaped',
+    str_contains($dashboard, "app_html(\$sale['product_type'])")
+);
+
+$add(
+    'Dashboard seller is HTML-escaped',
+    str_contains($dashboard, "app_html(\$sale['seller'])")
 );
 
 require_once $helperPath;
