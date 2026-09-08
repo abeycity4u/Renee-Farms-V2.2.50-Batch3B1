@@ -24,8 +24,10 @@ $add('Team User replacement password is server-side validated', str_contains($gu
 $add('Team User page still hashes new passwords', str_contains($users, 'password_hash($_POST[\'password\'], PASSWORD_DEFAULT)'));
 $add('Farm Admin still enforces minimum length 8', str_contains($farms, 'const FARM_OWNER_MIN_PASSWORD_LENGTH = 8;'));
 $add('Farm Admin still hashes stored passwords', str_contains($farms, 'password_hash($password, PASSWORD_DEFAULT)'));
-$add('Normal login still uses password_verify for hashed credentials', str_contains($sign, 'password_verify($password, $user[\'password\'])'));
-$add('Recovery login still uses password_verify for hashed credentials', str_contains($recovery, 'password_verify($password, $stored)'));
+$add('Normal login delegates to central hash-only verifier', str_contains($sign, "password_security_verify($password, (string)($user['password'] ?? ''))"));
+$add('Normal login no longer accepts plaintext compatibility credentials', !str_contains($sign, 'password_get_info(') && !str_contains($sign, 'hash_equals((string) $user[\'password\']'));
+$add('Recovery login delegates to central hash-only verifier', str_contains($recovery, "password_security_verify($password, (string)($account['password'] ?? ''))"));
+$add('Recovery login no longer accepts plaintext compatibility credentials', !str_contains($recovery, 'password_get_info($stored)') && !str_contains($recovery, 'hash_equals($stored, $password)'));
 
 $failures = count(array_filter($checks, static fn(array $check): bool => !$check[1]));
 echo PHP_EOL . count($checks) . ' checks, ' . $failures . ' failure(s).' . PHP_EOL;
