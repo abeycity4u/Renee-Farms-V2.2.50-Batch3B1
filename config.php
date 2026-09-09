@@ -51,6 +51,24 @@ if (!headers_sent()) {
     header('X-Frame-Options: SAMEORIGIN');
     header('Referrer-Policy: strict-origin-when-cross-origin');
     header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
+
+    // V2.3 CSP readiness: observe violations before any enforcing policy.
+    // Keep this Report-Only until production browser evidence is clean.
+    header(
+        "Content-Security-Policy-Report-Only: "
+        . "default-src 'self'; "
+        . "base-uri 'self'; "
+        . "object-src 'none'; "
+        . "script-src 'self'; "
+        . "style-src 'self'; "
+        . "font-src 'self'; "
+        . "img-src 'self' data:; "
+        . "connect-src 'self'; "
+        . "frame-src 'none'; "
+        . "frame-ancestors 'self'; "
+        . "form-action 'self'"
+    );
+
     header('Cache-Control: private, no-store, max-age=0');
     if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
         header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
