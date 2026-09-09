@@ -272,24 +272,17 @@ HTML;
             1
         ) ?? $html;
 
-        $salesCss = <<<'HTML'
-<style id="sales-rep-dashboard-polish">
-body.dashboard-role-sales_rep .dashboard-hero .card-body{padding:1.15rem 1.25rem;}
-body.dashboard-role-sales_rep .dashboard-container{max-width:1680px;margin-left:auto;margin-right:auto;}
-body.dashboard-role-sales_rep .sales-rep-summary-grid{margin-top:-.35rem;}
-body.dashboard-role-sales_rep .sales-summary-card{border:1px solid rgba(148,163,184,.16);box-shadow:0 10px 28px rgba(2,8,23,.12);}
-body.dashboard-role-sales_rep .sales-summary-card .card-body{position:relative;padding:1rem 1.05rem;min-height:128px;}
-body.dashboard-role-sales_rep .sales-summary-icon{position:absolute;right:1rem;top:1rem;width:38px;height:38px;border-radius:12px;background:rgba(148,163,184,.10);display:grid;place-items:center;font-size:1.05rem;}
-body.dashboard-role-sales_rep .sales-summary-label{font-size:.76rem;text-transform:uppercase;letter-spacing:.045em;color:#94a3b8;margin-bottom:.45rem;padding-right:48px;}
-body.dashboard-role-sales_rep .sales-summary-value{font-size:1.45rem;font-weight:750;line-height:1.15;}
-body.dashboard-role-sales_rep .sales-summary-subtext{font-size:.78rem;color:#94a3b8;margin-top:.45rem;}
-body.dashboard-role-sales_rep #salesReceivablesSummary .receivable-total{font-size:1.55rem;font-weight:750;}
-body.dashboard-role-sales_rep #salesReceivablesSummary .receivable-row{display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.7rem 0;border-top:1px solid rgba(148,163,184,.14);}
-body.dashboard-role-sales_rep #salesReceivablesSummary .receivable-row:first-of-type{border-top:0;}
-body.dashboard-role-sales_rep .sales-rep-monitoring-column>.dashboard-card{margin-bottom:1rem!important;}
-@media(max-width:767.98px){body.dashboard-role-sales_rep .sales-summary-card .card-body{min-height:112px;}body.dashboard-role-sales_rep .sales-summary-value{font-size:1.25rem;}}
-</style>
-HTML;
+        $salesCssAsset = BASE_URL . '/assets/css/dashboard-sales-rep.css';
+        if (function_exists('versioned_asset')) {
+            $salesCssAsset = BASE_URL . versioned_asset('/assets/css/dashboard-sales-rep.css');
+        }
+        $salesCss = '<link rel="stylesheet" href="'
+            . htmlspecialchars(
+                $salesCssAsset,
+                ENT_QUOTES | ENT_SUBSTITUTE,
+                'UTF-8'
+            )
+            . '">';
         if (stripos($html, '</head>') !== false) {
             $html = preg_replace('/<\/head>/i', $salesCss . '</head>', $html, 1) ?? $html;
         }
