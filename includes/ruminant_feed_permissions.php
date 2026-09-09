@@ -24,7 +24,17 @@ if ($method === 'POST' && isset($_POST['add_transaction']) && !$canAddRuminantFe
 }
 
 if ($method === 'GET' && !$canAddRuminantFeed) {
-    $css = '<style id="ruminant-feed-permission-prepaint">button[data-bs-target="#addTransactionModal"]{display:none!important;}</style>';
+    $cssAsset = BASE_URL . '/assets/css/prepaint-ruminant-feed-readonly.css';
+    if (function_exists('versioned_asset')) {
+        $cssAsset = BASE_URL . versioned_asset('/assets/css/prepaint-ruminant-feed-readonly.css');
+    }
+    $css = '<link rel="stylesheet" href="'
+        . htmlspecialchars(
+            $cssAsset,
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        )
+        . '">';
     ob_start(static function (string $html) use ($css): string {
         if (stripos($html, '</head>') === false) return $html;
         return str_ireplace('</head>', $css . '</head>', $html);

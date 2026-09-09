@@ -84,16 +84,17 @@ if (legacy_authorization_closure_is($legacyAuthorizationPath, '/ruminant/animal_
         && function_exists('permission_runtime_has')
         && !permission_runtime_has('ruminant_animals_edit')) {
         ob_start(static function (string $html): string {
-            $style = '<style id="v230AnimalProfileReadOnly">'
-                . 'a[href*="animal_registry.php?edit="],'
-                . 'button[data-bs-target="#weightModal"],'
-                . 'button[data-bs-target="#healthModal"],'
-                . 'button[data-bs-target="#membershipModal"],'
-                . 'button[onclick^="closeMembership"],'
-                . '#cycle-membership form[method="post"],'
-                . '#weightModal,#healthModal,#membershipModal,#closeMembershipModal'
-                . '{display:none!important}'
-                . '</style>';
+            $styleAsset = BASE_URL . '/assets/css/prepaint-animal-profile-readonly.css';
+            if (function_exists('versioned_asset')) {
+                $styleAsset = BASE_URL . versioned_asset('/assets/css/prepaint-animal-profile-readonly.css');
+            }
+            $style = '<link rel="stylesheet" href="'
+                . htmlspecialchars(
+                    $styleAsset,
+                    ENT_QUOTES | ENT_SUBSTITUTE,
+                    'UTF-8'
+                )
+                . '">';
             return str_contains($html, '</head>') ? str_replace('</head>', $style . '</head>', $html) : $html;
         });
     }
@@ -119,7 +120,17 @@ if (legacy_authorization_closure_is($legacyAuthorizationPath, '/management/rumin
     }
     if ($legacyAuthorizationMethod === 'GET' && !$legacyAuthorizationPrivileged) {
         ob_start(static function (string $html): string {
-            $style = '<style id="v230MembershipRepairReadOnly">form[method="post"]{display:none!important}</style>';
+            $styleAsset = BASE_URL . '/assets/css/prepaint-membership-repair-readonly.css';
+            if (function_exists('versioned_asset')) {
+                $styleAsset = BASE_URL . versioned_asset('/assets/css/prepaint-membership-repair-readonly.css');
+            }
+            $style = '<link rel="stylesheet" href="'
+                . htmlspecialchars(
+                    $styleAsset,
+                    ENT_QUOTES | ENT_SUBSTITUTE,
+                    'UTF-8'
+                )
+                . '">';
             return str_contains($html, '</head>') ? str_replace('</head>', $style . '</head>', $html) : $html;
         });
     }

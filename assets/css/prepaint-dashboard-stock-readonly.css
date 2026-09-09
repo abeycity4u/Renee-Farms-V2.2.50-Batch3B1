@@ -1,0 +1,2 @@
+/* CSP-safe conditional permission prepaint. */
+#stockTable button[onclick^="quickStockUpdate("]{display:none!important}

@@ -1,0 +1,2 @@
+/* CSP-safe conditional permission prepaint. */
+form[method="post"],form[method="POST"]{display:none!important}

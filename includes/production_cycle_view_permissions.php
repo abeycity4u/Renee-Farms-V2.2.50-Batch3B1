@@ -27,7 +27,17 @@ function production_cycle_view_permissions_filter(string $html): string
 {
     // This helper only buffers the two Production Cycle routes for a delegated
     // non-admin viewer, so hiding POST forms here is safely route-scoped.
-    $style = '<style id="production-cycle-readonly-prepaint">form[method="post"],form[method="POST"]{display:none!important}</style>';
+    $styleAsset = BASE_URL . '/assets/css/prepaint-production-cycle-readonly.css';
+    if (function_exists('versioned_asset')) {
+        $styleAsset = BASE_URL . versioned_asset('/assets/css/prepaint-production-cycle-readonly.css');
+    }
+    $style = '<link rel="stylesheet" href="'
+        . htmlspecialchars(
+            $styleAsset,
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        )
+        . '">';
     $asset = BASE_URL . '/assets/js/production-cycle-view-permissions.js';
 
     if (function_exists('versioned_asset')) {

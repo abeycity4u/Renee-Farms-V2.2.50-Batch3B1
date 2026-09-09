@@ -1,0 +1,2 @@
+/* CSP-safe conditional permission prepaint. */
+button[data-bs-target="#addTransactionModal"]{display:none!important;}

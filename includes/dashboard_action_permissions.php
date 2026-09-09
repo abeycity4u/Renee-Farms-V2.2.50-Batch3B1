@@ -334,7 +334,17 @@ HTML;
 
     // Stock mutation controls are meaningful only when Inventory itself is visible.
     if ($showInventoryDashboard && !$canUpdateStock) {
-        $style = '<style id="dashboard-stock-update-prepaint">#stockTable button[onclick^="quickStockUpdate("]{display:none!important}</style>';
+        $styleAsset = BASE_URL . '/assets/css/prepaint-dashboard-stock-readonly.css';
+        if (function_exists('versioned_asset')) {
+            $styleAsset = BASE_URL . versioned_asset('/assets/css/prepaint-dashboard-stock-readonly.css');
+        }
+        $style = '<link rel="stylesheet" href="'
+            . htmlspecialchars(
+                $styleAsset,
+                ENT_QUOTES | ENT_SUBSTITUTE,
+                'UTF-8'
+            )
+            . '">';
         if (stripos($html, '</head>') !== false) {
             $html = preg_replace('/<\/head>/i', $style . '</head>', $html, 1) ?? $html;
         }

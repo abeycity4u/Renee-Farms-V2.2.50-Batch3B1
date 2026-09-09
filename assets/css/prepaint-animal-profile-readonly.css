@@ -1,0 +1,2 @@
+/* CSP-safe conditional permission prepaint. */
+a[href*="animal_registry.php?edit="],button[data-bs-target="#weightModal"],button[data-bs-target="#healthModal"],button[data-bs-target="#membershipModal"],button[onclick^="closeMembership"],#cycle-membership form[method="post"],#weightModal,#healthModal,#membershipModal,#closeMembershipModal{display:none!important}
