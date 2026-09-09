@@ -1,18 +1,40 @@
 <?php
 
 $root = dirname(__DIR__);
+
 $configPath = $root . '/config.php';
+$policyPath = $root . '/includes/csp_policy.php';
+$indexPath = $root . '/index.php';
 
-if (!is_file($configPath)) {
-    fwrite(STDERR, "FAIL: config.php not found\n");
-    exit(1);
+$files = [
+    'config.php' => $configPath,
+    'includes/csp_policy.php' => $policyPath,
+    'index.php' => $indexPath,
+];
+
+$sources = [];
+
+foreach ($files as $name => $path) {
+    if (!is_file($path)) {
+        fwrite(STDERR, "FAIL: {$name} not found\n");
+        exit(1);
+    }
+
+    $source = file_get_contents($path);
+
+    if ($source === false) {
+        fwrite(STDERR, "FAIL: unable to read {$name}\n");
+        exit(1);
+    }
+
+    $sources[$name] = $source;
 }
 
-$source = file_get_contents($configPath);
-if ($source === false) {
-    fwrite(STDERR, "FAIL: unable to read config.php\n");
-    exit(1);
-}
+$config = $sources['config.php'];
+$policy = $sources['includes/csp_policy.php'];
+$index = $sources['index.php'];
+
+$combined = implode("\n", $sources);
 
 $failures = [];
 
@@ -27,12 +49,18 @@ $check = static function (bool $ok, string $message) use (&$failures): void {
 };
 
 $check(
-    substr_count($source, 'Content-Security-Policy-Report-Only:') === 1,
-    'exactly one CSP Report-Only header is defined'
+    substr_count(
+        $policy,
+        'Content-Security-Policy-Report-Only:'
+    ) === 1,
+    'central policy defines exactly one CSP Report-Only header'
 );
 
 $check(
-    preg_match('/["\']Content-Security-Policy:\s*/i', $source) !== 1,
+    preg_match(
+        '/["\']Content-Security-Policy:\s*/i',
+        $combined
+    ) !== 1,
     'no enforcing Content-Security-Policy header is defined'
 );
 
@@ -52,24 +80,61 @@ $requiredDirectives = [
 
 foreach ($requiredDirectives as $directive) {
     $check(
-        str_contains($source, $directive),
+        strpos($policy, $directive) !== false,
         "policy contains {$directive}"
     );
 }
 
 $check(
-    !str_contains($source, "'unsafe-inline'"),
-    "policy does not allow unsafe-inline"
+    strpos($combined, "'unsafe-inline'") === false,
+    'policy does not allow unsafe-inline'
 );
 
 $check(
-    !str_contains($source, "'unsafe-eval'"),
-    "policy does not allow unsafe-eval"
+    strpos($combined, "'unsafe-eval'") === false,
+    'policy does not allow unsafe-eval'
 );
 
 $check(
-    str_contains($source, "if (!headers_sent())"),
-    'security headers remain guarded by headers_sent()'
+    strpos(
+        $config,
+        "require_once __DIR__ . '/includes/csp_policy.php';"
+    ) !== false,
+    'config.php loads centralized CSP policy'
+);
+
+$check(
+    substr_count(
+        $config,
+        'app_emit_csp_report_only_header();'
+    ) === 1,
+    'config.php emits centralized Report-Only policy exactly once'
+);
+
+$check(
+    strpos(
+        $index,
+        "require_once __DIR__ . '/includes/csp_policy.php';"
+    ) !== false,
+    'public homepage loads centralized CSP policy'
+);
+
+$check(
+    substr_count(
+        $index,
+        'app_emit_csp_report_only_header();'
+    ) === 1,
+    'public homepage emits Report-Only policy exactly once'
+);
+
+$check(
+    strpos($index, 'versioned_asset(') === false,
+    'standalone homepage does not depend on init.php asset helper'
+);
+
+$check(
+    strpos($index, 'BASE_URL') === false,
+    'standalone homepage does not depend on BASE_URL'
 );
 
 if ($failures) {

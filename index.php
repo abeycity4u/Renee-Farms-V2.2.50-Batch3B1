@@ -1,3 +1,12 @@
+<?php
+require_once __DIR__ . '/includes/csp_policy.php';
+app_emit_csp_report_only_header();
+
+$homepageSlideshowFile = __DIR__ . '/assets/js/homepage-slideshow.js';
+$homepageSlideshowVersion = is_file($homepageSlideshowFile)
+    ? (string) filemtime($homepageSlideshowFile)
+    : '2.3';
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -95,6 +104,6 @@
     <footer class="footer">
         <div class="container">&copy; 2026 Renee Farms Ltd. All rights reserved.</div>
     </footer>
-    <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/homepage-slideshow.js'); ?>"></script>
+    <script src="assets/js/homepage-slideshow.js?v=<?php echo rawurlencode($homepageSlideshowVersion); ?>"></script>
 </body>
 </html>

@@ -42,6 +42,8 @@ if (!defined('BASE_URL')) {
     define('BASE_URL', $relativePath === '/' ? '' : $relativePath);
 }
 
+require_once __DIR__ . '/includes/csp_policy.php';
+
 // V2 security baseline
 define('SESSION_TIMEOUT', 900);
 
@@ -54,20 +56,7 @@ if (!headers_sent()) {
 
     // V2.3 CSP readiness: observe violations before any enforcing policy.
     // Keep this Report-Only until production browser evidence is clean.
-    header(
-        "Content-Security-Policy-Report-Only: "
-        . "default-src 'self'; "
-        . "base-uri 'self'; "
-        . "object-src 'none'; "
-        . "script-src 'self'; "
-        . "style-src 'self'; "
-        . "font-src 'self'; "
-        . "img-src 'self' data:; "
-        . "connect-src 'self'; "
-        . "frame-src 'none'; "
-        . "frame-ancestors 'self'; "
-        . "form-action 'self'"
-    );
+    app_emit_csp_report_only_header();
 
     header('Cache-Control: private, no-store, max-age=0');
     if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
