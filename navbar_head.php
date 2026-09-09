@@ -91,10 +91,6 @@ if (($headPath === '/management/expenses.php' || str_ends_with($headPath, '/mana
     ); ?>"
 ></script>
 <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/theme-bootstrap.js'); ?>"></script>
-<?php
-$tenantPrimaryColor = currentFarm()['primary_color'] ?? '#198754';
-if (!preg_match('/^#[0-9a-fA-F]{6}$/', $tenantPrimaryColor)) $tenantPrimaryColor = '#198754';
-?>
 <!-- Bootstrap CSS (local fallback for offline environments) -->
 <link href="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/bootstrap5/css/bootstrap.min.css'); ?>" rel="stylesheet">
 
@@ -108,11 +104,7 @@ if (!preg_match('/^#[0-9a-fA-F]{6}$/', $tenantPrimaryColor)) $tenantPrimaryColor
 <link rel="stylesheet" href="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/css/responsive.css'); ?>">
 <script defer src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/navigation.js'); ?>"></script>
 
-<style>
-:root { --farm-primary: <?php echo htmlspecialchars($tenantPrimaryColor, ENT_QUOTES, 'UTF-8'); ?>; --bs-primary: var(--farm-primary); --bs-link-color: var(--farm-primary); --bs-link-hover-color: var(--farm-primary); }
-.btn-primary { --bs-btn-bg: var(--farm-primary); --bs-btn-border-color: var(--farm-primary); --bs-btn-hover-bg: var(--farm-primary); --bs-btn-hover-border-color: var(--farm-primary); --bs-btn-active-bg: var(--farm-primary); --bs-btn-active-border-color: var(--farm-primary); }
-.text-primary { color: var(--farm-primary) !important; }
-</style>
+<link rel="stylesheet" href="<?php echo BASE_URL; ?>/tenant_theme.css.php">
 
 
 
