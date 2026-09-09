@@ -95,7 +95,7 @@ if (($headPath === '/management/expenses.php' || str_ends_with($headPath, '/mana
 <link href="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/bootstrap5/css/bootstrap.min.css'); ?>" rel="stylesheet">
 
 <!-- Bootstrap Icons -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+<link rel="stylesheet" href="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/bootstrap-icons-1.11.3/font/bootstrap-icons.css'); ?>">
 
 <!-- Custom CSS -->
 <link rel="stylesheet" href="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/css/style.css'); ?>">
