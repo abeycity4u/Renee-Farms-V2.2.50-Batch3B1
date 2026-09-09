@@ -1,0 +1,2 @@
+/* CSP-safe expense action permission prepaint. */
+html body table button[onclick^="deleteExpense("],html body table button[onclick*="deleteExpense("]{display:none!important;}

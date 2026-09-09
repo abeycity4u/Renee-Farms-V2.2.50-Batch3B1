@@ -1,0 +1,2 @@
+/* CSP-safe expense action permission prepaint. */
+html body table .edit-expense-btn{display:none!important;}

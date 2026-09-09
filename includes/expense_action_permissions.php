@@ -37,16 +37,44 @@ if ($permissionPair === null) return;
 $canEdit = $privileged || hasPermission(getUserType(), $permissionPair[0]);
 $canDelete = $privileged || hasPermission(getUserType(), $permissionPair[1]);
 
-$rules = [];
-if (!$canEdit) {
-    $rules[] = 'html body table .edit-expense-btn{display:none!important;}';
-}
-if (!$canDelete) {
-    $rules[] = 'html body table button[onclick^="deleteExpense("],html body table button[onclick*="deleteExpense("]{display:none!important;}';
-}
-if (!$rules) return;
+$styles = [];
 
-$css = '<style id="expense-action-permission-prepaint">' . implode('', $rules) . '</style>';
+if (!$canEdit) {
+    $asset = BASE_URL . '/assets/css/prepaint-expense-edit-readonly.css';
+    if (function_exists('versioned_asset')) {
+        $asset = BASE_URL . versioned_asset(
+            '/assets/css/prepaint-expense-edit-readonly.css'
+        );
+    }
+    $styles[] = '<link rel="stylesheet" href="'
+        . htmlspecialchars(
+            $asset,
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        )
+        . '">';
+}
+
+if (!$canDelete) {
+    $asset = BASE_URL . '/assets/css/prepaint-expense-delete-readonly.css';
+    if (function_exists('versioned_asset')) {
+        $asset = BASE_URL . versioned_asset(
+            '/assets/css/prepaint-expense-delete-readonly.css'
+        );
+    }
+    $styles[] = '<link rel="stylesheet" href="'
+        . htmlspecialchars(
+            $asset,
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        )
+        . '">';
+}
+
+if (!$styles) return;
+
+$css = implode('', $styles);
+
 ob_start(static function (string $html) use ($css): string {
     if (stripos($html, '</head>') === false) return $html;
     return str_ireplace('</head>', $css . '</head>', $html);
