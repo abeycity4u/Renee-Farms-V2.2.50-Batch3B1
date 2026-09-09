@@ -121,18 +121,7 @@ $providerHtml = htmlspecialchars($provider, ENT_QUOTES, 'UTF-8');
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Sandbox Billing QA</title>
-    <style>
-        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:#f4f7fc; margin:0; padding:32px 16px; color:#172033; }
-        .card { max-width:680px; margin:0 auto; background:#fff; border-radius:16px; box-shadow:0 14px 35px rgba(20,35,80,.10); padding:28px; }
-        .badge { display:inline-block; padding:5px 9px; border-radius:999px; background:#fff3cd; color:#664d03; font-weight:700; font-size:12px; }
-        .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:20px 0; }
-        .item { background:#f7f9fd; border-radius:10px; padding:12px; }
-        .label { display:block; color:#6c7786; font-size:12px; margin-bottom:4px; }
-        .warning { background:#fff7e6; border:1px solid #ffe0a3; padding:12px; border-radius:10px; margin:18px 0; }
-        button { width:100%; border:0; border-radius:10px; padding:13px 18px; font-size:16px; font-weight:700; cursor:pointer; background:#0d6efd; color:#fff; }
-        a { color:#0d6efd; }
-        @media (max-width:600px){ .grid{grid-template-columns:1fr;} }
-    </style>
+    <link rel="stylesheet" href="<?= htmlspecialchars(BASE_URL . versioned_asset('/assets/css/sandbox-checkout-page.css'), ENT_QUOTES, 'UTF-8') ?>">
 </head>
 <body>
 <div class="card">
