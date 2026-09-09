@@ -1,0 +1,303 @@
+/*
+ * Renee Farms secure sign-in page presentation.
+ * Externalized from sign.php for CSP compatibility.
+ */
+:root {
+            --bg-1: #081c15;
+            --bg-2: #1b4332;
+            --bg-3: #2d6a4f;
+            --surface: rgba(255, 255, 255, 0.9);
+            --text: #0f172a;
+            --muted: #4f6d61;
+            --success: #2d6a4f;
+            --danger: #c62828;
+            --input-border: rgba(45, 106, 79, 0.2);
+            --ring: rgba(45, 106, 79, 0.22);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', system-ui, -apple-system, Segoe UI, sans-serif;
+            color: var(--text);
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at 10% 20%, rgba(183, 228, 199, 0.2), transparent 34%),
+                radial-gradient(circle at 90% 0%, rgba(64, 145, 108, 0.28), transparent 40%),
+                linear-gradient(140deg, var(--bg-1), var(--bg-2) 54%, var(--bg-3));
+            display: grid;
+            place-items: center;
+            padding: 1rem;
+        }
+
+        .auth-shell {
+            width: min(1080px, 100%);
+            min-height: min(640px, 92vh);
+            border-radius: 24px;
+            overflow: hidden;
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            box-shadow: 0 24px 55px rgba(0, 0, 0, 0.3);
+            display: grid;
+            grid-template-columns: 1.05fr 0.95fr;
+        }
+
+        .auth-hero {
+            padding: 2rem;
+            color: #f1fff5;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            background:
+                radial-gradient(circle at 0% 0%, rgba(116, 198, 157, 0.24), transparent 34%),
+                linear-gradient(160deg, rgba(14, 52, 36, 0.7), rgba(27, 67, 50, 0.5));
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.78rem;
+        }
+
+        .brand img {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+        }
+
+        .brand strong {
+            display: block;
+            letter-spacing: 0.5px;
+            font-size: 0.93rem;
+        }
+
+        .brand span {
+            color: rgba(234, 255, 241, 0.86);
+            font-size: 0.76rem;
+        }
+
+        .auth-hero h1 {
+            margin: 1.6rem 0 0.8rem;
+            font-size: clamp(2rem, 3vw, 2.6rem);
+            line-height: 1.08;
+            letter-spacing: -0.02em;
+        }
+
+        .auth-hero p {
+            margin: 0;
+            font-size: 1rem;
+            color: rgba(233, 255, 240, 0.9);
+            max-width: 36ch;
+        }
+
+        .points {
+            display: grid;
+            gap: 0.6rem;
+            margin-top: 1.3rem;
+        }
+
+        .points span {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.52rem;
+            font-size: 0.88rem;
+            color: rgba(241, 255, 246, 0.94);
+        }
+
+        .auth-card {
+            background: var(--surface);
+            padding: 2.1rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .chip {
+            width: fit-content;
+            font-size: 0.76rem;
+            font-weight: 600;
+            color: #1b4a35;
+            background: rgba(45, 106, 79, 0.12);
+            border: 1px solid rgba(45, 106, 79, 0.18);
+            padding: 0.35rem 0.56rem;
+            border-radius: 999px;
+            margin-bottom: 0.6rem;
+        }
+
+        .auth-card h2 {
+            margin: 0;
+            font-size: 1.6rem;
+            line-height: 1.2;
+            color: #10281e;
+        }
+
+        .auth-card p {
+            margin: 0.5rem 0 1.4rem;
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+
+        form {
+            display: grid;
+            gap: 0.9rem;
+        }
+
+        label {
+            font-weight: 600;
+            color: #254838;
+            font-size: 0.9rem;
+            display: block;
+            margin-bottom: 0.4rem;
+        }
+
+        input {
+            width: 100%;
+            border: 1px solid var(--input-border);
+            border-radius: 12px;
+            padding: 0.75rem 0.9rem;
+            font-size: 0.95rem;
+            background: #fff;
+            transition: border-color .2s ease, box-shadow .2s ease;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #2d6a4f;
+            box-shadow: 0 0 0 4px var(--ring);
+        }
+
+        .button {
+            margin-top: 0.4rem;
+            border: none;
+            cursor: pointer;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #2d6a4f, #40916c);
+            color: #fff;
+            font-weight: 700;
+            letter-spacing: 0.2px;
+            padding: 0.8rem 1rem;
+            box-shadow: 0 10px 20px rgba(45, 106, 79, 0.28);
+            transition: transform .2s ease, box-shadow .2s ease;
+        }
+
+        .button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 12px 26px rgba(36, 91, 67, 0.34);
+        }
+
+        .error {
+            border: 1px solid rgba(198, 40, 40, 0.2);
+            background: rgba(198, 40, 40, 0.08);
+            color: var(--danger);
+            border-radius: 12px;
+            padding: 0.65rem 0.8rem;
+            font-size: 0.9rem;
+            margin-bottom: 0.2rem;
+        }
+
+        .helper {
+            margin-top: 0.8rem;
+            font-size: 0.82rem;
+            color: #617f73;
+            text-align: center;
+        }
+
+        .back-link {
+            text-decoration: none;
+            color: #f1fff5;
+            font-size: 0.86rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            width: fit-content;
+            padding: 0.45rem 0.78rem;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.14);
+            border: 1px solid rgba(255, 255, 255, 0.38);
+            box-shadow: 0 6px 18px rgba(2, 22, 15, 0.24);
+            transition: background .2s ease, transform .2s ease, box-shadow .2s ease;
+        }
+
+        .back-link:hover,
+        .back-link:focus-visible {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.24);
+            transform: translateY(-1px);
+            box-shadow: 0 10px 22px rgba(2, 22, 15, 0.32);
+            outline: none;
+        }
+
+
+        .login-type-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+            margin-bottom: 1rem;
+            border: 1px solid var(--input-border);
+            border-radius: 999px;
+            overflow: hidden;
+            background: rgba(255,255,255,.72);
+        }
+
+        .login-type-toggle label {
+            flex: 1 1 0;
+            text-align: center;
+            padding: .72rem .85rem;
+            cursor: pointer;
+            color: #496b5d;
+            font-weight: 700;
+            transition: background .2s ease, color .2s ease;
+        }
+
+        .login-type-toggle .toggle-divider {
+            width: 1px;
+            align-self: stretch;
+            background: var(--input-border);
+        }
+
+        .login-type-toggle input {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .login-type-toggle label:has(input:checked) {
+            background: linear-gradient(135deg, #2d6a4f, #40916c);
+            color: #fff;
+        }
+
+        .form-hint {
+            display: block;
+            margin-top: .35rem;
+            color: var(--muted);
+            font-size: .82rem;
+        }
+
+        @media (max-width: 960px) {
+            .auth-shell {
+                grid-template-columns: 1fr;
+                min-height: auto;
+            }
+
+            .auth-hero {
+                gap: 1.5rem;
+                padding-bottom: 1.2rem;
+            }
+
+            .auth-hero h1 {
+                margin-top: 1rem;
+            }
+        }
+
+        @media (max-width: 540px) {
+            .auth-card,
+            .auth-hero {
+                padding: 1.4rem;
+            }
+        }
