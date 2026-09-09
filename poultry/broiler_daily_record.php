@@ -302,8 +302,8 @@ $_SESSION['success'] = "Broiler daily record saved successfully!";
                             Broiler Daily Record - <?php echo date('F Y', strtotime($yearMonth)); ?>
                         </h4>
                         <div class="d-flex flex-wrap gap-2">
-                            <input type="date" class="form-control js-calendar-input" id="monthSelector"
-                                   value="<?php echo $monthSelectorDate; ?>" style="width: 200px;">
+                            <input type="date" class="form-control js-calendar-input app-month-selector" id="monthSelector"
+                                   value="<?php echo $monthSelectorDate; ?>">
                             <button class="btn btn-primary" data-open-record-modal>
                                 <i class="bi bi-plus-circle"></i> Add Today's Record
                             </button>
@@ -322,7 +322,7 @@ $_SESSION['success'] = "Broiler daily record saved successfully!";
                         <!-- Monthly Summary -->
                         <div class="row mb-4 g-3">
                             <div class="col-6 col-md-4 col-lg-2">
-                                <div class="card text-white" style="background-color: #7c4dff;">
+                                <div class="card text-white app-purple-card">
                                     <div class="card-body text-center">
                                         <h6>Current Stock</h6>
                                         <h3><?php echo $broilerClosingStock !== null ? number_format($broilerClosingStock) : '--'; ?></h3>

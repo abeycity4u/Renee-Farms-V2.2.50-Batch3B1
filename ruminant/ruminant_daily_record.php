@@ -403,8 +403,8 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!";
                             Ruminant Daily Record - <?php echo date('F Y', strtotime($yearMonth)); ?>
                         </h4>
                         <div class="d-flex flex-wrap gap-2">
-                            <input type="date" class="form-control js-calendar-input" id="monthSelector"
-                                   value="<?php echo $monthSelectorDate; ?>" style="width: 200px;">
+                            <input type="date" class="form-control js-calendar-input app-month-selector" id="monthSelector"
+                                   value="<?php echo $monthSelectorDate; ?>">
                             <button class="btn btn-primary" data-open-record-modal>
                                 <i class="bi bi-plus-circle"></i> Add Today's Record
                             </button>

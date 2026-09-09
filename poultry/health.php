@@ -98,7 +98,7 @@ $events = poultry_health_list($pdo, $farmId, $productionFilter ?: null, $cycleFi
 require_once(__DIR__ . '/../navbar_head.php');
 require_once(__DIR__ . '/../navbar.php');
 ?>
-<div class="container-fluid py-3" style="max-width:1500px">
+<div class="container-fluid py-3 app-content-max-1500">
   <div class="d-flex justify-content-between align-items-start mb-3 gap-3 app-responsive-toolbar">
     <div>
       <h3 class="mb-1"><i class="bi bi-heart-pulse"></i> Poultry Health & Treatment</h3>
@@ -130,7 +130,7 @@ require_once(__DIR__ . '/../navbar.php');
         <td><?php echo nl2br(htmlspecialchars((string)($e['notes'] ?: '—'))); ?></td>
         <td><?php echo htmlspecialchars((string)($e['product_name'] ?: '—')); ?></td>
         <td><?php echo htmlspecialchars((string)($e['dosage'] ?: '—')); ?></td>
-        <td style="max-width:300px"><?php echo nl2br(htmlspecialchars((string)($e['reason_symptoms'] ?: '—'))); ?></td>
+        <td class="app-cell-max-300"><?php echo nl2br(htmlspecialchars((string)($e['reason_symptoms'] ?: '—'))); ?></td>
         <td><?php echo htmlspecialchars((string)($e['linked_item_name'] ?: '—')); ?></td>
         <td><?php echo htmlspecialchars((string)($e['recorded_by_name'] ?: '—')); ?></td>
         <?php if ($canEditHealth || $canDeleteHealth): ?><td class="text-end text-nowrap">

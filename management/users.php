@@ -189,7 +189,7 @@ foreach ($users as $existingUser) {
         <?php if (isPlatformOwner()): ?>
         <form method="get" class="card card-body border-0 shadow-sm mb-3">
             <label class="form-label fw-semibold" for="managedFarmSelect">Manage users for farm</label>
-            <select class="form-select" style="max-width:420px" id="managedFarmSelect" name="farm_id" data-auto-submit>
+            <select class="form-select app-select-max-420" id="managedFarmSelect" name="farm_id" data-auto-submit>
                 <?php foreach ($platformFarmOptions as $farmOption): ?>
                 <option value="<?php echo (int)$farmOption['id']; ?>" <?php echo (int)$farmOption['id'] === $farmId ? 'selected' : ''; ?>><?php echo htmlspecialchars($farmOption['name']); ?></option>
                 <?php endforeach; ?>
@@ -289,7 +289,7 @@ foreach ($users as $existingUser) {
                                             </button>
 
                                             <?php if ($user['id'] != $_SESSION['user_id']): ?>
-                                            <form method="POST" style="display: inline;" data-confirm="Delete this user account? Their login access will be removed immediately.">
+                                            <form method="POST" class="d-inline" data-confirm="Delete this user account? Their login access will be removed immediately.">
                                                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token()); ?>">
                     <?php if (isPlatformOwner()): ?><input type="hidden" name="target_farm_id" value="<?php echo (int)$farmId; ?>"><?php endif; ?>
                                                 <input type="hidden" name="user_id" value="<?php echo $user['id']; ?>">

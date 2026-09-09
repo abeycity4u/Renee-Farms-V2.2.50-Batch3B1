@@ -644,3 +644,10 @@ html[data-theme="dark"] .dropdown-item:hover { background:#374151; color:#fff; }
 html[data-theme="dark"] .btn-close { filter:invert(1) grayscale(100%) brightness(200%); }
 .feed-audit-toggle .btn { min-width:110px; }
 
+/* CSP-safe shared static layout utilities. */
+.app-month-selector{width:200px;}
+.app-purple-card{background-color:#7c4dff;}
+.app-content-max-1500{max-width:1500px;}
+.app-cell-max-300{max-width:300px;}
+.app-farm-logo-preview{max-height:72px;}
+.app-select-max-420{max-width:420px;}
