@@ -28,7 +28,7 @@ function permission_prepaint_has(string $permission): bool
 }
 
 $path = '/' . ltrim(str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? '')), '/');
-$rules = [];
+$tokens = [];
 
 $dailyPermissions = null;
 if ($path === '/poultry/layers_daily_record.php' || str_ends_with($path, '/poultry/layers_daily_record.php')) {
@@ -41,45 +41,45 @@ if ($path === '/poultry/layers_daily_record.php' || str_ends_with($path, '/poult
 
 if ($dailyPermissions) {
     [$addPermission, $editPermission, $deletePermission] = $dailyPermissions;
-    if (!permission_prepaint_has($addPermission)) $rules[] = 'button[onclick*="openRecordModal"]{display:none!important;}';
-    if (!permission_prepaint_has($editPermission)) $rules[] = 'table .edit-record-btn{display:none!important;}';
-    if (!permission_prepaint_has($deletePermission)) $rules[] = 'table button.btn-outline-danger,table button[onclick*="deleteLayerDailyRecord"],table button[onclick*="deleteBroilerDailyRecord"]{display:none!important;}';
+    if (!permission_prepaint_has($addPermission)) $tokens[] = 'daily-add';
+    if (!permission_prepaint_has($editPermission)) $tokens[] = 'daily-edit';
+    if (!permission_prepaint_has($deletePermission)) $tokens[] = 'daily-delete';
 }
 
 if ($path === '/management/expenses.php' || str_ends_with($path, '/management/expenses.php')) {
-    if (!permission_prepaint_has('expenses_edit')) $rules[] = '.edit-expense-btn{display:none!important;}';
-    if (!permission_prepaint_has('expenses_delete')) $rules[] = 'button[onclick*="deleteExpense"]{display:none!important;}';
+    if (!permission_prepaint_has('expenses_edit')) $tokens[] = 'expense-edit';
+    if (!permission_prepaint_has('expenses_delete')) $tokens[] = 'expense-delete';
 }
 
 if ($path === '/poultry/layer_expenses.php' || str_ends_with($path, '/poultry/layer_expenses.php')) {
-    if (!permission_prepaint_has('poultry_layer_expenses_add')) $rules[] = 'button[data-bs-target="#addExpenseModal"]{display:none!important;}';
+    if (!permission_prepaint_has('poultry_layer_expenses_add')) $tokens[] = 'expense-add';
 }
 if ($path === '/poultry/broiler_expenses.php' || str_ends_with($path, '/poultry/broiler_expenses.php')) {
-    if (!permission_prepaint_has('poultry_broiler_expenses_add')) $rules[] = 'button[data-bs-target="#addExpenseModal"]{display:none!important;}';
+    if (!permission_prepaint_has('poultry_broiler_expenses_add')) $tokens[] = 'expense-add';
 }
 if ($path === '/ruminant/ruminant_expenses.php' || str_ends_with($path, '/ruminant/ruminant_expenses.php')) {
-    if (!permission_prepaint_has('ruminant_expenses_add')) $rules[] = 'button[data-bs-target="#addExpenseModal"]{display:none!important;}';
+    if (!permission_prepaint_has('ruminant_expenses_add')) $tokens[] = 'expense-add';
 }
 
 if ($path === '/poultry/layer_feeds.php' || str_ends_with($path, '/poultry/layer_feeds.php') || $path === '/poultry/broiler_feeds.php' || str_ends_with($path, '/poultry/broiler_feeds.php')) {
-    if (!permission_prepaint_has('poultry_feeds_add')) $rules[] = 'button[data-bs-target="#addTransactionModal"]{display:none!important;}';
+    if (!permission_prepaint_has('poultry_feeds_add')) $tokens[] = 'feed-add';
 }
 
 if ($path === '/management/sales_records.php' || str_ends_with($path, '/management/sales_records.php')) {
     if (!permission_prepaint_has('sales_add')) {
-        $rules[] = 'button[data-bs-target="#addSaleModal"],button[onclick*="addSale"]{display:none!important;}';
+        $tokens[] = 'sales-add';
     }
     if (!permission_prepaint_has('sales_payment')) {
-        $rules[] = 'button[data-bs-target*="payment" i],button[onclick*="payment" i],form button[name="record_payment"]{display:none!important;}';
+        $tokens[] = 'sales-payment';
     }
-    if (!permission_prepaint_has('sales_edit')) $rules[] = '.edit-sale-btn{display:none!important;}';
-    if (!permission_prepaint_has('sales_delete')) $rules[] = 'button[onclick*="deleteSale"]{display:none!important;}';
+    if (!permission_prepaint_has('sales_edit')) $tokens[] = 'sales-edit';
+    if (!permission_prepaint_has('sales_delete')) $tokens[] = 'sales-delete';
 }
 
 if ($path === '/ruminant/animal_registry.php' || str_ends_with($path, '/ruminant/animal_registry.php')) {
-    if (!permission_prepaint_has('ruminant_animals_add')) $rules[] = 'button[onclick*="newAnimal"]{display:none!important;}';
-    if (!permission_prepaint_has('ruminant_animals_edit')) $rules[] = 'button[onclick*="editAnimal"]{display:none!important;}';
-    if (!permission_prepaint_has('ruminant_animals_exit')) $rules[] = 'button[onclick*="exitAnimal"]{display:none!important;}';
+    if (!permission_prepaint_has('ruminant_animals_add')) $tokens[] = 'animal-add';
+    if (!permission_prepaint_has('ruminant_animals_edit')) $tokens[] = 'animal-edit';
+    if (!permission_prepaint_has('ruminant_animals_exit')) $tokens[] = 'animal-exit';
 }
 
 // Production Cycles is intentionally a View-only delegated permission during
@@ -87,7 +87,7 @@ if ($path === '/ruminant/animal_registry.php' || str_ends_with($path, '/ruminant
 // hide those management forms before first paint so delegated viewers get a
 // genuinely read-only workspace rather than controls they cannot use.
 if (($path === '/management/production_cycles.php' || str_ends_with($path, '/management/production_cycles.php')) && !permission_prepaint_privileged()) {
-    $rules[] = 'form[method="post"],form[method="POST"]{display:none!important;}';
+    $tokens[] = 'production-cycle-readonly';
 }
 
 // Subscription entitlement is the outer navigation boundary. Reuse the runtime
@@ -107,10 +107,10 @@ if (!isPlatformOwner()) {
     }
 
     if (!$allowPoultryMenu) {
-        $rules[] = '#poultryMenu,#poultryMenu + .dropdown-menu{display:none!important;}';
+        $tokens[] = 'hide-poultry-menu';
     }
     if (!$allowRuminantMenu) {
-        $rules[] = '#ruminantMenu,#ruminantMenu + .dropdown-menu{display:none!important;}';
+        $tokens[] = 'hide-ruminant-menu';
     }
 }
 
@@ -145,17 +145,50 @@ foreach ($navLinks as $hrefSuffix => $permission) {
     $allowed = permission_prepaint_has($permission);
     if ($allowed && in_array($hrefSuffix, $managementSuffixes, true)) $anyManagement = true;
     if ($allowed) continue;
-    $escaped = str_replace('"', '\\"', $hrefSuffix);
-    $rules[] = '#appNavbar a[href$="' . $escaped . '"]{display:none!important;}';
+    $navToken = 'hide-nav-' . str_replace('_', '-', $permission);
+    $tokens[] = $navToken;
 }
 if (!$anyManagement && !permission_prepaint_privileged()) {
-    $rules[] = '#manageMenu{display:none!important;}';
+    $tokens[] = 'hide-manage-menu';
 }
 
-if (!$rules) return;
-$css = '<style id="permission-prepaint">' . implode('', $rules) . '</style>';
+if (!$tokens) return;
 
-ob_start(static function (string $html) use ($css): string {
+$tokens = array_values(array_unique($tokens));
+$tokenValue = implode(' ', $tokens);
+
+$asset = BASE_URL . '/assets/css/permission-prepaint.css';
+if (function_exists('versioned_asset')) {
+    $asset = BASE_URL . versioned_asset(
+        '/assets/css/permission-prepaint.css'
+    );
+}
+
+$css = '<link rel="stylesheet" href="'
+    . htmlspecialchars(
+        $asset,
+        ENT_QUOTES | ENT_SUBSTITUTE,
+        'UTF-8'
+    )
+    . '">';
+
+ob_start(static function (string $html) use ($css, $tokenValue): string {
     if (stripos($html, '</head>') === false) return $html;
+
+    $attribute = ' data-permission-prepaint="'
+        . htmlspecialchars(
+            $tokenValue,
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        )
+        . '"';
+
+    $html = preg_replace(
+        '/<html\b/i',
+        '<html' . $attribute,
+        $html,
+        1
+    ) ?? $html;
+
     return str_ireplace('</head>', $css . '</head>', $html);
 });

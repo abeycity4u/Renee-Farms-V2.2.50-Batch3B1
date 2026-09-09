@@ -1,0 +1,53 @@
+/*
+ * CSP-safe global permission prepaint.
+ * PHP selects permission tokens; this stylesheet owns presentation rules.
+ */
+
+html[data-permission-prepaint~="daily-add"] button[onclick*="openRecordModal"]{display:none!important;}
+html[data-permission-prepaint~="daily-edit"] table .edit-record-btn{display:none!important;}
+html[data-permission-prepaint~="daily-delete"] table button.btn-outline-danger,
+html[data-permission-prepaint~="daily-delete"] table button[onclick*="deleteLayerDailyRecord"],
+html[data-permission-prepaint~="daily-delete"] table button[onclick*="deleteBroilerDailyRecord"]{display:none!important;}
+
+html[data-permission-prepaint~="expense-edit"] .edit-expense-btn{display:none!important;}
+html[data-permission-prepaint~="expense-delete"] button[onclick*="deleteExpense"]{display:none!important;}
+html[data-permission-prepaint~="expense-add"] button[data-bs-target="#addExpenseModal"]{display:none!important;}
+
+html[data-permission-prepaint~="feed-add"] button[data-bs-target="#addTransactionModal"]{display:none!important;}
+
+html[data-permission-prepaint~="sales-add"] button[data-bs-target="#addSaleModal"],
+html[data-permission-prepaint~="sales-add"] button[onclick*="addSale"]{display:none!important;}
+html[data-permission-prepaint~="sales-payment"] button[data-bs-target*="payment" i],
+html[data-permission-prepaint~="sales-payment"] button[onclick*="payment" i],
+html[data-permission-prepaint~="sales-payment"] form button[name="record_payment"]{display:none!important;}
+html[data-permission-prepaint~="sales-edit"] .edit-sale-btn{display:none!important;}
+html[data-permission-prepaint~="sales-delete"] button[onclick*="deleteSale"]{display:none!important;}
+
+html[data-permission-prepaint~="animal-add"] button[onclick*="newAnimal"]{display:none!important;}
+html[data-permission-prepaint~="animal-edit"] button[onclick*="editAnimal"]{display:none!important;}
+html[data-permission-prepaint~="animal-exit"] button[onclick*="exitAnimal"]{display:none!important;}
+
+html[data-permission-prepaint~="production-cycle-readonly"] form[method="post"],
+html[data-permission-prepaint~="production-cycle-readonly"] form[method="POST"]{display:none!important;}
+
+html[data-permission-prepaint~="hide-poultry-menu"] #poultryMenu,
+html[data-permission-prepaint~="hide-poultry-menu"] #poultryMenu + .dropdown-menu{display:none!important;}
+
+html[data-permission-prepaint~="hide-ruminant-menu"] #ruminantMenu,
+html[data-permission-prepaint~="hide-ruminant-menu"] #ruminantMenu + .dropdown-menu{display:none!important;}
+
+html[data-permission-prepaint~="hide-nav-inventory"] #appNavbar a[href$="/inventory.php"]{display:none!important;}
+html[data-permission-prepaint~="hide-nav-poultry-layer-expenses"] #appNavbar a[href$="/poultry/layer_expenses.php"]{display:none!important;}
+html[data-permission-prepaint~="hide-nav-poultry-broiler-expenses"] #appNavbar a[href$="/poultry/broiler_expenses.php"]{display:none!important;}
+html[data-permission-prepaint~="hide-nav-ruminant-animals"] #appNavbar a[href$="/ruminant/animal_registry.php"]{display:none!important;}
+html[data-permission-prepaint~="hide-nav-ruminant-expenses"] #appNavbar a[href$="/ruminant/ruminant_expenses.php"]{display:none!important;}
+html[data-permission-prepaint~="hide-nav-sales"] #appNavbar a[href$="/management/sales_records.php"]{display:none!important;}
+html[data-permission-prepaint~="hide-nav-expenses"] #appNavbar a[href$="/management/expenses.php"]{display:none!important;}
+html[data-permission-prepaint~="hide-nav-reports"] #appNavbar a[href$="/management/poultry_ruminant_report.php"],
+html[data-permission-prepaint~="hide-nav-reports"] #appNavbar a[href$="/management/reports.php"]{display:none!important;}
+html[data-permission-prepaint~="hide-nav-farm-intelligence"] #appNavbar a[href$="/management/intelligence.php"]{display:none!important;}
+html[data-permission-prepaint~="hide-nav-profitability"] #appNavbar a[href$="/management/profitability.php"]{display:none!important;}
+html[data-permission-prepaint~="hide-nav-production-cycles"] #appNavbar a[href$="/management/production_cycles.php"]{display:none!important;}
+html[data-permission-prepaint~="hide-nav-users"] #appNavbar a[href$="/management/users.php"]{display:none!important;}
+
+html[data-permission-prepaint~="hide-manage-menu"] #manageMenu{display:none!important;}
