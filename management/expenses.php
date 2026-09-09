@@ -130,15 +130,15 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                 <option value="monthly" <?php echo $reportMode === 'monthly' ? 'selected' : ''; ?>>Monthly</option>
                                 <option value="yearly" <?php echo $reportMode === 'yearly' ? 'selected' : ''; ?>>Yearly</option>
                             </select>
-                            <input type="date" class="form-control js-calendar-input" id="monthFilter"
-                                   value="<?php echo $monthFilterDate ?? date('Y-m-d'); ?>" style="width: 170px; <?php echo $reportMode === 'yearly' ? 'display:none;' : ''; ?>">
-                            <select class="form-select" id="yearFilter" style="width: 130px; <?php echo $reportMode === 'monthly' ? 'display:none;' : ''; ?>">
+                            <input type="date" class="form-control js-calendar-input app-width-170<?php echo $reportMode === 'yearly' ? ' d-none' : ''; ?>" id="monthFilter"
+                                   value="<?php echo $monthFilterDate ?? date('Y-m-d'); ?>">
+                            <select class="form-select app-width-130<?php echo $reportMode === 'monthly' ? ' d-none' : ''; ?>" id="yearFilter">
                                 <?php for ($y = date('Y'); $y >= 2020; $y--): ?>
                                 <option value="<?php echo $y; ?>" <?php echo (string)$y === (string)$year ? 'selected' : ''; ?>><?php echo $y; ?></option>
                                 <?php endfor; ?>
                             </select>
-                            <a class="btn btn-primary" id="printMonthlyBtn" <?php echo $reportMode === 'yearly' ? 'style="display:none;"' : ''; ?> href="<?php echo htmlspecialchars($pdfReportUrl); ?>" target="_blank"><i class="bi bi-file-earmark-pdf"></i> PDF Monthly</a>
-                            <a class="btn btn-primary" id="printYearlyBtn" <?php echo $reportMode === 'monthly' ? 'style="display:none;"' : ''; ?> href="<?php echo htmlspecialchars($pdfReportUrl); ?>" target="_blank"><i class="bi bi-file-earmark-pdf"></i> PDF Yearly</a>
+                            <a class="btn btn-primary<?php echo $reportMode === 'yearly' ? ' d-none' : ''; ?>" id="printMonthlyBtn" href="<?php echo htmlspecialchars($pdfReportUrl); ?>" target="_blank"><i class="bi bi-file-earmark-pdf"></i> PDF Monthly</a>
+                            <a class="btn btn-primary<?php echo $reportMode === 'monthly' ? ' d-none' : ''; ?>" id="printYearlyBtn" href="<?php echo htmlspecialchars($pdfReportUrl); ?>" target="_blank"><i class="bi bi-file-earmark-pdf"></i> PDF Yearly</a>
                         </div>
                     </div>
                     

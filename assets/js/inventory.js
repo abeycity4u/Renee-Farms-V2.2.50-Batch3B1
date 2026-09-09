@@ -78,7 +78,7 @@ $(document).ready(function() {
         const productionType = productionSelect.value || 'shared';
         const shouldShow = typeSelect.value === 'used' && usage === 'general' && productionType !== 'shared' && farmType !== 'both';
         if (!shouldShow) {
-            cycleWrap.style.display = 'none';
+            cycleWrap.classList.add('d-none');
             cycleSelect.innerHTML = '<option value="">No specific cycle / pooled usage</option>';
             return;
         }
@@ -91,7 +91,7 @@ $(document).ready(function() {
         matches.forEach(cycle => {
             cycleSelect.add(new Option(String(cycle.cycle_code ?? ''), String(cycle.id ?? '')));
         });
-        cycleWrap.style.display = '';
+        cycleWrap.classList.remove('d-none');
     }
 
     function updateTransactionProductionAttribution(selectedOption) {
@@ -103,7 +103,7 @@ $(document).ready(function() {
         const farmType = selectedOption.dataset.farmType || 'both';
         const defaultProduction = selectedOption.dataset.defaultProductionType || 'shared';
         if (usage !== 'general') {
-            wrap.style.display = 'none';
+            wrap.classList.add('d-none');
             select.innerHTML = '';
             updateTransactionCycleOptions();
             return;
@@ -118,7 +118,7 @@ $(document).ready(function() {
         options.forEach(([value,label]) => select.add(new Option(label, value)));
         select.value = options.some(([value]) => value === defaultProduction) ? defaultProduction : 'shared';
         select.onchange = updateTransactionCycleOptions;
-        wrap.style.display = '';
+        wrap.classList.remove('d-none');
         updateTransactionCycleOptions();
     }
 
@@ -163,7 +163,7 @@ $(document).ready(function() {
             label.innerHTML = 'Quantity <small class="text-danger">(will be subtracted)</small>';
             input.min = 0.01;
             if (costWrapper) {
-                costWrapper.style.display = 'none';
+                costWrapper.classList.add('d-none');
             }
             if (costInput) {
                 costInput.required = false;
@@ -174,7 +174,7 @@ $(document).ready(function() {
             label.innerHTML = 'Quantity <small class="text-success">(will be added)</small>';
             input.min = 0.01;
             if (costWrapper) {
-                costWrapper.style.display = 'block';
+                costWrapper.classList.remove('d-none');
             }
             if (costInput) {
                 costInput.required = true;
@@ -244,7 +244,7 @@ $(document).ready(function() {
         // Feed ownership is already explicit in Usage Classification; only
         // General / Non-feed stock needs an owner chosen by the farmer.
         if (usage !== 'general') {
-            wrap.style.display = 'none';
+            wrap.classList.add('d-none');
             select.replaceChildren(
                 new Option(
                     'Automatic',
@@ -254,7 +254,7 @@ $(document).ready(function() {
             return;
         }
 
-        wrap.style.display = '';
+        wrap.classList.remove('d-none');
         const options = farmType === 'poultry'
             ? [['shared','Shared Poultry'],['layer','Layer'],['broiler','Broiler']]
             : farmType === 'ruminant'

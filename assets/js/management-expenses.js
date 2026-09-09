@@ -43,10 +43,10 @@ const csrfToken =
     });
     $('#productionTypeFilter, #categoryFilter, #monthFilter, #reportMode, #yearFilter').change(function() {
         const mode = $('#reportMode').val();
-        $('#monthFilter').toggle(mode === 'monthly');
-        $('#yearFilter').toggle(mode === 'yearly');
-        $('#printMonthlyBtn').toggle(mode === 'monthly');
-        $('#printYearlyBtn').toggle(mode === 'yearly');
+        $('#monthFilter').toggleClass('d-none', mode !== 'monthly');
+        $('#yearFilter').toggleClass('d-none', mode !== 'yearly');
+        $('#printMonthlyBtn').toggleClass('d-none', mode !== 'monthly');
+        $('#printYearlyBtn').toggleClass('d-none', mode !== 'yearly');
         applyFilters();
     });
 

@@ -12,7 +12,7 @@ function applyFilters() {
 }
 $('#farmTypeFilter, #reportMode, #monthFilter, #yearFilter').on('change', function() {
     const mode = $('#reportMode').val();
-    $('#monthFilter').toggle(mode === 'monthly');
-    $('#yearFilter').toggle(mode === 'yearly');
+    $('#monthFilter').toggleClass('d-none', mode !== 'monthly');
+    $('#yearFilter').toggleClass('d-none', mode !== 'yearly');
     applyFilters();
 });

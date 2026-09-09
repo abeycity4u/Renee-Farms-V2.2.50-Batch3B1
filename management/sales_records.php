@@ -638,15 +638,15 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 <option value="monthly" <?php echo $reportMode === 'monthly' ? 'selected' : ''; ?>>Monthly</option>
                                 <option value="yearly" <?php echo $reportMode === 'yearly' ? 'selected' : ''; ?>>Yearly</option>
                             </select>
-                            <input type="date" class="form-control js-calendar-input" id="monthFilter"
-                                   value="<?php echo $monthFilterDate ?? date('Y-m-d'); ?>" style="width: 170px; <?php echo $reportMode === 'yearly' ? 'display:none;' : ''; ?>">
-                            <select class="form-select" id="yearFilter" style="width: 130px; <?php echo $reportMode === 'monthly' ? 'display:none;' : ''; ?>">
+                            <input type="date" class="form-control js-calendar-input app-width-170<?php echo $reportMode === 'yearly' ? ' d-none' : ''; ?>" id="monthFilter"
+                                   value="<?php echo $monthFilterDate ?? date('Y-m-d'); ?>">
+                            <select class="form-select app-width-130<?php echo $reportMode === 'monthly' ? ' d-none' : ''; ?>" id="yearFilter">
                                 <?php for ($y = date('Y'); $y >= 2020; $y--): ?>
                                 <option value="<?php echo $y; ?>" <?php echo (string)$y === (string)$year ? 'selected' : ''; ?>><?php echo $y; ?></option>
                                 <?php endfor; ?>
                             </select>
-                            <a class="btn btn-primary" id="printMonthlyBtn" <?php echo $reportMode === 'yearly' ? 'style="display:none;"' : ''; ?> href="<?php echo htmlspecialchars($pdfReportUrl); ?>" target="_blank"><i class="bi bi-file-earmark-pdf"></i> PDF Monthly</a>
-                            <a class="btn btn-primary" id="printYearlyBtn" <?php echo $reportMode === 'monthly' ? 'style="display:none;"' : ''; ?> href="<?php echo htmlspecialchars($pdfReportUrl); ?>" target="_blank"><i class="bi bi-file-earmark-pdf"></i> PDF Yearly</a>
+                            <a class="btn btn-primary<?php echo $reportMode === 'yearly' ? ' d-none' : ''; ?>" id="printMonthlyBtn" href="<?php echo htmlspecialchars($pdfReportUrl); ?>" target="_blank"><i class="bi bi-file-earmark-pdf"></i> PDF Monthly</a>
+                            <a class="btn btn-primary<?php echo $reportMode === 'monthly' ? ' d-none' : ''; ?>" id="printYearlyBtn" href="<?php echo htmlspecialchars($pdfReportUrl); ?>" target="_blank"><i class="bi bi-file-earmark-pdf"></i> PDF Yearly</a>
                             <?php if ($canAddSales): ?>
                             <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addSaleModal">
                                 <i class="bi bi-plus-circle"></i> Add Sale
@@ -1071,7 +1071,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                     <?php foreach (sales_unit_presets() as $value => $label): ?><option value="<?php echo htmlspecialchars($value); ?>"><?php echo htmlspecialchars($label); ?></option><?php endforeach; ?>
                                     <option value="__custom__">Other / Custom...</option>
                                 </select>
-                                <input type="text" name="unit_custom" id="addUnitCustom" class="form-control mt-2" maxlength="30" placeholder="Enter custom unit" style="display:none;">
+                                <input type="text" name="unit_custom" id="addUnitCustom" class="form-control mt-2 d-none" maxlength="30" placeholder="Enter custom unit">
                             </div>
                         </div>
 
@@ -1107,7 +1107,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                             </div>
                         </div>
                         
-                        <div class="mb-3 ruminant-sale-animal-panel" id="addRuminantSaleAnimalPanel" style="display:none;">
+                        <div class="mb-3 ruminant-sale-animal-panel d-none" id="addRuminantSaleAnimalPanel">
                             <label>Animal Revenue Attribution</label>
                             <select name="sale_animal_allocation_mode" id="addSaleAnimalAllocationMode" class="form-select">
                                 <option value="shared">Shared revenue — no individual animal allocation</option>
@@ -1115,7 +1115,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 <option value="custom">Selected animals — Custom split</option>
                             </select>
                             <small class="text-muted">Use individual attribution only when this revenue genuinely belongs to specific animals. For each selected animal, explicitly choose whether this is revenue only, a live sale, or a cull/slaughter exit.</small>
-                            <div id="addSaleAnimalChoices" class="border rounded p-2 mt-2" style="display:none;"></div>
+                            <div id="addSaleAnimalChoices" class="border rounded p-2 mt-2 d-none"></div>
                         </div>
 
                         <div class="mb-3">
@@ -1280,7 +1280,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                     <?php foreach (sales_unit_presets() as $value => $label): ?><option value="<?php echo htmlspecialchars($value); ?>"><?php echo htmlspecialchars($label); ?></option><?php endforeach; ?>
                                     <option value="__custom__">Other / Custom...</option>
                                 </select>
-                                <input type="text" name="unit_custom" id="editSaleUnitCustom" class="form-control mt-2" maxlength="30" placeholder="Enter custom unit" style="display:none;">
+                                <input type="text" name="unit_custom" id="editSaleUnitCustom" class="form-control mt-2 d-none" maxlength="30" placeholder="Enter custom unit">
                                 <small class="text-muted" id="editSaleUnitLegacyHint"></small>
                             </div>
                         </div>
@@ -1322,7 +1322,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                             </div>
                         </div>
 
-                        <div class="mb-3 ruminant-sale-animal-panel" id="editRuminantSaleAnimalPanel" style="display:none;">
+                        <div class="mb-3 ruminant-sale-animal-panel d-none" id="editRuminantSaleAnimalPanel">
                             <label>Animal Revenue Attribution</label>
                             <select name="sale_animal_allocation_mode" id="editSaleAnimalAllocationMode" class="form-select">
                                 <option value="shared">Shared revenue — no individual animal allocation</option>
@@ -1330,7 +1330,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 <option value="custom">Selected animals — Custom split</option>
                             </select>
                             <small class="text-muted">Revenue allocation and lifecycle are separate. Only an explicit Sold live or Culled/slaughtered outcome changes Animal Registry status.</small>
-                            <div id="editSaleAnimalChoices" class="border rounded p-2 mt-2" style="display:none;"></div>
+                            <div id="editSaleAnimalChoices" class="border rounded p-2 mt-2 d-none"></div>
                         </div>
 
                         <div class="mb-3">

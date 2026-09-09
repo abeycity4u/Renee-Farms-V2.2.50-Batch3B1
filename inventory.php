@@ -1134,13 +1134,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 <small class="text-muted">Business date of the receipt or usage. You may back-date a transaction entered later.</small>
                             </div>
 
-                            <div class="mb-3" id="transactionProductionWrap" style="display:none;">
+                            <div class="mb-3 d-none" id="transactionProductionWrap">
                                 <label>Production Attribution</label>
                                 <select name="production_type" id="transactionProductionType" class="form-select"></select>
                                 <small class="text-muted">General / Non-feed stock may be assigned per transaction. This controls where the purchase or usage is reported; it does not change the Inventory Category.</small>
                             </div>
 
-                            <div class="mb-3" id="transactionCycleWrap" style="display:none;">
+                            <div class="mb-3 d-none" id="transactionCycleWrap">
                                 <label>Production Cycle <span class="text-muted">(optional)</span></label>
                                 <select name="cycle_id" id="transactionCycleId" class="form-select">
                                     <option value="">No specific cycle / pooled usage</option>

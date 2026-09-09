@@ -45,7 +45,7 @@
 const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
     function toggleCustomSaleUnit(selectSelector, customSelector) {
         const isCustom = $(selectSelector).val() === '__custom__';
-        $(customSelector).toggle(isCustom).prop('required', isCustom);
+        $(customSelector).toggleClass('d-none', !isCustom).prop('required', isCustom);
         if (!isCustom) $(customSelector).val('');
     }
     function setEditSaleUnit(unit) {
@@ -53,16 +53,16 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
         $('#editSaleUnitLegacyHint').text('');
         if (!unit) {
             $('#editSaleUnitPreset').val('');
-            $('#editSaleUnitCustom').val('').hide().prop('required', false);
+            $('#editSaleUnitCustom').val('').addClass('d-none').prop('required', false);
             $('#editSaleUnitLegacyHint').text('Legacy sale: choose the correct unit before saving changes.');
             return;
         }
         if (saleUnitPresets.includes(unit)) {
             $('#editSaleUnitPreset').val(unit);
-            $('#editSaleUnitCustom').val('').hide().prop('required', false);
+            $('#editSaleUnitCustom').val('').addClass('d-none').prop('required', false);
         } else {
             $('#editSaleUnitPreset').val('__custom__');
-            $('#editSaleUnitCustom').val(unit).show().prop('required', true);
+            $('#editSaleUnitCustom').val(unit).removeClass('d-none').prop('required', true);
         }
     }
 
@@ -135,12 +135,12 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
         const modeEl = $(isEdit ? '#editSaleAnimalAllocationMode' : '#addSaleAnimalAllocationMode');
         const choices = $(isEdit ? '#editSaleAnimalChoices' : '#addSaleAnimalChoices');
         const specific = farm === 'ruminant' && production && production !== 'shared';
-        panel.toggle(farm === 'ruminant');
-        if (farm !== 'ruminant') { modeEl.val('shared'); choices.hide().empty(); return; }
+        panel.toggleClass('d-none', farm !== 'ruminant');
+        if (farm !== 'ruminant') { modeEl.val('shared'); choices.addClass('d-none').empty(); return; }
         if (!specific && modeEl.val() !== 'shared') modeEl.val('shared');
         modeEl.find('option[value="equal"],option[value="custom"]').prop('disabled', !specific);
         const mode = modeEl.val() || 'shared';
-        if (mode === 'shared' || !specific) { choices.hide().empty(); return; }
+        if (mode === 'shared' || !specific) { choices.addClass('d-none').empty(); return; }
         let rows = Array.isArray(selectedRows) ? selectedRows : null;
         if (rows === null) {
             rows = [];
@@ -163,20 +163,20 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
             html += '<div class="d-flex flex-wrap align-items-center gap-2 mb-2">'
                 + '<input class="form-check-input sale-animal-check" type="checkbox" name="sale_animal_ids[]" value="'+a.id+'" id="'+prefix+'SaleAnimal'+a.id+'"'+checked+'>'
                 + '<label class="form-check-label flex-grow-1" for="'+prefix+'SaleAnimal'+a.id+'"><strong>'+safeTag+'</strong> <span class="text-muted small">'+a.status+'</span></label>';
-            if (mode === 'custom') html += '<input type="number" step="0.01" min="0" class="form-control form-control-sm sale-animal-amount" style="max-width:150px" name="sale_animal_amounts['+a.id+']" value="'+amount+'" placeholder="Amount (₦)">';
+            if (mode === 'custom') html += '<input type="number" step="0.01" min="0" class="form-control form-control-sm sale-animal-amount" name="sale_animal_amounts['+a.id+']" value="'+amount+'" placeholder="Amount (₦)">';
             const saleIdForOutcome = isEdit ? Number($('#editSaleId').val() || 0) : 0;
             const eventRow = saleIdForOutcome && ruminantSaleExitMap[String(saleIdForOutcome)] ? ruminantSaleExitMap[String(saleIdForOutcome)][String(a.id)] : null;
             const selectedOutcome = row && row.exit_outcome ? String(row.exit_outcome) : (eventRow ? String(eventRow.exit_outcome || 'remain_active') : 'remain_active');
             const canExit = String(a.status || '') === 'active' || !!eventRow;
-            const exitDisplay = checked ? '' : 'display:none;';
-            html += '<select class="form-select form-select-sm sale-animal-exit" style="flex-basis:100%;max-width:calc(100% - 1.75rem);margin-left:1.75rem;'+exitDisplay+'" name="sale_animal_exit_outcomes['+a.id+']">'
+            const exitHiddenClass = checked ? '' : ' d-none';
+            html += '<select class="form-select form-select-sm sale-animal-exit'+exitHiddenClass+'" name="sale_animal_exit_outcomes['+a.id+']">'
                 + '<option value="remain_active"'+(selectedOutcome==='remain_active'?' selected':'')+'>Revenue only — no exit</option>'
                 + '<option value="sold_live"'+(selectedOutcome==='sold_live'?' selected':'')+(canExit?'':' disabled')+'>Sold live — mark Sold</option>'
                 + '<option value="culled_slaughtered"'+(selectedOutcome==='culled_slaughtered'?' selected':'')+(canExit?'':' disabled')+'>Culled/slaughtered — mark Culled</option>'
                 + '</select>';
             html += '</div>';
         });
-        choices.html(html).show();
+        choices.html(html).removeClass('d-none');
     }
 
     function loadEditSaleAnimalAllocation(saleId) {
@@ -196,7 +196,7 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
         $('#addSaleAnimalAllocationMode').on('change', () => refreshRuminantSaleAnimalChoices('add'));
         $('#editSaleAnimalAllocationMode').on('change', () => refreshRuminantSaleAnimalChoices('edit'));
         $(document).on('change', '.sale-animal-check', function() {
-            $(this).closest('.d-flex').find('.sale-animal-exit').toggle(this.checked);
+            $(this).closest('.d-flex').find('.sale-animal-exit').toggleClass('d-none', !this.checked);
         });
 
         function refreshEditReceivablePosition() {
@@ -245,10 +245,10 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
         });
         $('#productionTypeFilter, #monthFilter, #yearFilter, #reportMode').change(function() {
             const mode = $('#reportMode').val();
-            $('#monthFilter').toggle(mode === 'monthly');
-            $('#yearFilter').toggle(mode === 'yearly');
-            $('#printMonthlyBtn').toggle(mode === 'monthly');
-            $('#printYearlyBtn').toggle(mode === 'yearly');
+            $('#monthFilter').toggleClass('d-none', mode !== 'monthly');
+            $('#yearFilter').toggleClass('d-none', mode !== 'yearly');
+            $('#printMonthlyBtn').toggleClass('d-none', mode !== 'monthly');
+            $('#printYearlyBtn').toggleClass('d-none', mode !== 'yearly');
             applyFilters();
         });
 

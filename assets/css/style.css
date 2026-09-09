@@ -659,3 +659,7 @@ html[data-theme="dark"] .btn-close { filter:invert(1) grayscale(100%) brightness
 .app-scroll-max-340{max-height:340px;overflow-y:auto;}
 .app-width-190{width:190px;}
 .app-width-140{width:140px;}
+.app-width-170{width:170px;}
+.app-width-130{width:130px;}
+.sale-animal-amount{max-width:150px;}
+.sale-animal-exit{flex-basis:100%;max-width:calc(100% - 1.75rem);margin-left:1.75rem;}
