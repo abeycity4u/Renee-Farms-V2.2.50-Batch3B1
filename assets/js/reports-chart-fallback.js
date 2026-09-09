@@ -1,7 +1,7 @@
 /**
  * Reports Chart.js fallback loader.
- * Loaded before the Chart.js CDN request so shared app-behaviors.js
- * can invoke window.loadChartFallback if the CDN script fails.
+ * Loaded before the primary Chart.js request so shared app-behaviors.js
+ * can invoke window.loadChartFallback if the primary script fails.
  * Externalized for CSP compatibility.
  */
 (function () {

@@ -280,7 +280,7 @@ $pageTitle = "Dashboard";
             'UTF-8'
         ); ?>"
     ></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous" data-chart-fallback></script>
+    <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/chartjs-4.4.1/chart.umd.min.js'); ?>" crossorigin="anonymous" data-chart-fallback></script>
     
     <!-- Dashboard Specific CSS -->
     <link rel="stylesheet" href="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/css/dashboard-page.css'); ?>">

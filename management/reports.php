@@ -124,7 +124,7 @@ $pdfReportUrl = pdf_report_current_url();
             'UTF-8'
         ); ?>"
     ></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous" data-chart-fallback></script>
+    <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/chartjs-4.4.1/chart.umd.min.js'); ?>" crossorigin="anonymous" data-chart-fallback></script>
 </head>
 <body>
     <?php include(__DIR__ . '/../navbar.php'); ?>
