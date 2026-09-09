@@ -655,3 +655,7 @@ html[data-theme="dark"] .btn-close { filter:invert(1) grayscale(100%) brightness
 .app-progress-h-5{height:5px;}
 .app-width-150{width:150px;}
 .app-width-200{width:200px;}
+.app-z-1{z-index:1;}
+.app-scroll-max-340{max-height:340px;overflow-y:auto;}
+.app-width-190{width:190px;}
+.app-width-140{width:140px;}

@@ -294,7 +294,7 @@ $pageTitle = "Dashboard";
             <div class="col-12">
                 <div class="card dashboard-card dashboard-hero">
                     <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 position-relative" style="z-index:1;">
+                        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 position-relative app-z-1">
                             <div>
                                 <span class="hero-pill mb-2">
                                     <i class="bi bi-stars"></i> <?php echo $greetingText; ?>
@@ -319,7 +319,7 @@ $pageTitle = "Dashboard";
                                 </div>
                             </div>
                         </div>
-                        <div class="row g-2 mt-3 position-relative" style="z-index:1;">
+                        <div class="row g-2 mt-3 position-relative app-z-1">
                             <div class="col-sm-6 col-lg-4 col-xl">
                                 <div class="hero-metric">
                                     <span>Total Operating Cost</span>
@@ -616,7 +616,7 @@ $pageTitle = "Dashboard";
                         </div>
                         <span class="badge bg-info-subtle text-info"><?php echo count($todayTransactions); ?> today</span>
                     </div>
-                    <div class="card-body" style="max-height: 340px; overflow-y: auto;">
+                    <div class="card-body app-scroll-max-340">
                         <?php if (empty($todayTransactions)): ?>
                         <div class="empty-state-smart">
                             <div>
@@ -672,7 +672,7 @@ $pageTitle = "Dashboard";
                                     <span class="fw-semibold"><?php echo htmlspecialchars($item['item_name']); ?></span>
                                     <small class="text-muted"><?php echo number_format((float) $item['current_stock'], 2); ?> / <?php echo number_format((float) $item['min_stock_level'], 2); ?> <?php echo htmlspecialchars($item['unit']); ?></small>
                                 </div>
-                                <div class="progress" style="height: 8px;">
+                                <div class="progress app-progress-h-8">
                                     <div class="progress-bar bg-danger" role="progressbar" style="width: <?php echo (int) round($progress); ?>%"></div>
                                 </div>
                             </div>

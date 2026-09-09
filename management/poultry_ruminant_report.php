@@ -162,7 +162,7 @@ $pdfReportUrl = pdf_report_current_url();
         <div class="card-header d-flex justify-content-between align-items-center">
             <h4><i class="bi bi-clipboard-data"></i> Poultry & Ruminant Report - <?php echo htmlspecialchars($periodLabel); ?></h4>
             <div class="d-flex gap-2 report-controls">
-                <select class="form-select" id="farmTypeFilter" style="width: 150px;">
+                <select class="form-select app-width-150" id="farmTypeFilter">
                     <?php if ($canChooseFarmType): ?>
                         <?php if (count(accessibleFarmTypes()) === 2): ?><option value="all" <?php echo $farmType === 'all' ? 'selected' : ''; ?>>All Farms</option><?php endif; ?>
                         <?php foreach (accessibleFarmTypes() as $type): ?><option value="<?php echo $type; ?>" <?php echo $farmType === $type ? 'selected' : ''; ?>><?php echo ucfirst($type); ?></option><?php endforeach; ?>
@@ -170,7 +170,7 @@ $pdfReportUrl = pdf_report_current_url();
                         <option value="<?php echo $farmType; ?>" selected><?php echo ucfirst($farmType); ?></option>
                     <?php endif; ?>
                 </select>
-                <select class="form-select" id="reportMode" style="width: 140px;">
+                <select class="form-select app-width-140" id="reportMode">
                     <option value="monthly" <?php echo $reportMode === 'monthly' ? 'selected' : ''; ?>>Monthly</option>
                     <option value="yearly" <?php echo $reportMode === 'yearly' ? 'selected' : ''; ?>>Yearly</option>
                 </select>

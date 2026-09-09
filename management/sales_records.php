@@ -620,7 +620,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                             Sales Report - <?php echo htmlspecialchars($periodLabel); ?>
                         </h4>
                         <div class="d-flex gap-2 report-controls">
-                            <select class="form-select" id="farmTypeFilter" style="width: 150px;">
+                            <select class="form-select app-width-150" id="farmTypeFilter">
                                 <?php if ($canChooseFarmType): ?>
                                 <?php if ($salesOnlyScope): ?><option value="general" selected>All Sales</option><?php endif; ?>
                                 <?php if (count(accessibleFarmTypes()) === 2): ?><option value="all" <?php echo $farmType == 'all' ? 'selected' : ''; ?>>All Farms</option><?php endif; ?>
@@ -630,11 +630,11 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 <option value="<?php echo $farmType; ?>" selected><?php echo ucfirst($farmType); ?></option>
                                 <?php endif; ?>
                             </select>
-                            <select class="form-select" id="productionTypeFilter" style="width: 190px;">
+                            <select class="form-select app-width-190" id="productionTypeFilter">
                                 <option value="all">All Production Types</option>
                                 <?php foreach($reportProductionOptions as $value=>$label): ?><option value="<?php echo htmlspecialchars($value); ?>" <?php echo $productionTypeFilter===$value?'selected':''; ?>><?php echo htmlspecialchars($label); ?></option><?php endforeach; ?>
                             </select>
-                            <select class="form-select" id="reportMode" style="width: 140px;">
+                            <select class="form-select app-width-140" id="reportMode">
                                 <option value="monthly" <?php echo $reportMode === 'monthly' ? 'selected' : ''; ?>>Monthly</option>
                                 <option value="yearly" <?php echo $reportMode === 'yearly' ? 'selected' : ''; ?>>Yearly</option>
                             </select>
