@@ -190,7 +190,7 @@ $showManagementMenu = $canViewSales || $canViewExpenseReport || $canViewReports 
             <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/admin/permissions.php"><i class="bi bi-shield-lock menu-icon me-2"></i> Permissions</a></li>
             <?php endif; ?>
             <?php if (isPlatformOwner()): ?>
-            <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/management/farms.php"><i class="bi bi-buildings menu-icon me-2"></i> Platform Farms</a></li>
+            <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/management/farms.php"><i class="bi bi-buildings menu-icon me-2"></i> Farms &amp; Tenants</a></li>
             <?php endif; ?>
           </ul>
         </li>

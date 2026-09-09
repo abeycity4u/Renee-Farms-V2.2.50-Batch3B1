@@ -1,0 +1,60 @@
+/*
+ * Tenant user management workspace presentation.
+ * Externalized from management/users.php for CSP compatibility.
+ */
+.user-management-shell {
+            background: radial-gradient(circle at top right, rgba(25, 135, 84, 0.09), transparent 45%),
+                        radial-gradient(circle at top left, rgba(13, 110, 253, 0.1), transparent 40%);
+            border-radius: 1.5rem;
+            padding: 1.5rem;
+            border: 1px solid rgba(13, 110, 253, 0.08);
+        }
+
+        .hero-card {
+            border: 0;
+            border-radius: 1rem;
+            background: linear-gradient(120deg, #0d6efd, #198754);
+            color: #fff;
+            box-shadow: 0 1rem 2rem rgba(13, 110, 253, 0.25);
+        }
+
+        .metric-card {
+            border: 0;
+            border-radius: .9rem;
+            box-shadow: 0 .5rem 1rem rgba(0, 0, 0, .06);
+            transition: transform .2s ease, box-shadow .2s ease;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 .8rem 1.3rem rgba(0, 0, 0, .1);
+        }
+
+        .users-table-wrap {
+            border-radius: 1rem;
+            overflow: hidden;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+        }
+
+        .table thead th {
+            border-bottom: 0;
+            text-transform: uppercase;
+            font-size: .75rem;
+            letter-spacing: .04em;
+        }
+
+        .table tbody td {
+            vertical-align: middle;
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: #0d6efd;
+            background-color: rgba(13, 110, 253, .12);
+        }
