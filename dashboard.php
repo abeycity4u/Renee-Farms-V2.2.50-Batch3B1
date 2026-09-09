@@ -502,7 +502,7 @@ $pageTitle = "Dashboard";
                                                 <?php echo number_format((float) $item['current_stock'], 2); ?> <?php echo htmlspecialchars($item['unit']); ?>
                                             </div>
                                             <div class="progress inventory-progress mt-1">
-                                                <div class="progress-bar bg-<?php echo $statusClass; ?>" role="progressbar" style="width: <?php echo (int) min(100, round($stockPercent)); ?>%"></div>
+                                                <div class="progress-bar bg-<?php echo $statusClass; ?> <?php echo app_percent_class($stockPercent); ?>" role="progressbar"></div>
                                             </div>
                                         </td>
                                         <td><?php echo number_format((float) $item['min_stock_level'], 2); ?></td>
@@ -673,7 +673,7 @@ $pageTitle = "Dashboard";
                                     <small class="text-muted"><?php echo number_format((float) $item['current_stock'], 2); ?> / <?php echo number_format((float) $item['min_stock_level'], 2); ?> <?php echo htmlspecialchars($item['unit']); ?></small>
                                 </div>
                                 <div class="progress app-progress-h-8">
-                                    <div class="progress-bar bg-danger" role="progressbar" style="width: <?php echo (int) round($progress); ?>%"></div>
+                                    <div class="progress-bar bg-danger <?php echo app_percent_class($progress); ?>" role="progressbar"></div>
                                 </div>
                             </div>
                         <?php endforeach; ?>

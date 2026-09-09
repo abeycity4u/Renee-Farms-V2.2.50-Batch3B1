@@ -697,7 +697,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <div class="row g-4 align-items-center">
                         <div class="col-lg-4">
                             <div class="d-flex align-items-center gap-3">
-                                <div class="inventory-score-ring score-<?php echo htmlspecialchars($inventoryHealthClass); ?>" style="--score: <?php echo (int) $inventoryHealthScore; ?>;">
+                                <div class="inventory-score-ring score-<?php echo htmlspecialchars($inventoryHealthClass); ?> <?php echo app_score_class($inventoryHealthScore); ?>">
                                     <strong class="fs-4"><?php echo (int) $inventoryHealthScore; ?>%</strong>
                                 </div>
                                 <div>
@@ -833,8 +833,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
                                 <td>
                                     <div class="progress stock-progress">
-                                        <div class="progress-bar bg-<?= $statusClass ?>"
-                                            style="width: <?= min($stockPercentage, 100) ?>%">
+                                        <div class="progress-bar bg-<?= $statusClass ?> <?= app_percent_class($stockPercentage) ?>">
                                             <?= round($stockPercentage, 1) ?>%
                                         </div>
                                     </div>

@@ -152,7 +152,7 @@ $pdfReportUrl = pdf_report_current_url();
                                         <h6 class="card-title text-uppercase"><?php echo htmlspecialchars(inventory_financial_spending_label((string)$category)); ?></h6>
                                         <h4 class="text-danger">₦<?php echo number_format($total, 2); ?></h4>
                                         <div class="progress app-progress-h-5">
-                                            <div class="progress-bar bg-danger" style="width: <?php echo $percentage; ?>%"></div>
+                                            <div class="progress-bar bg-danger <?php echo app_percent_class($percentage); ?>"></div>
                                         </div>
                                         <small><?php echo number_format($percentage, 1); ?>% of total</small>
                                     </div>

@@ -206,8 +206,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_transaction']) &
                                             <small class="text-muted d-block"><?php echo app_html($item['unit']); ?></small>
                                         </div>
                                         <div class="progress app-progress-h-8">
-                                            <div class="progress-bar <?php echo $item['current_stock'] <= $item['min_stock_level'] ? 'bg-danger' : 'bg-success'; ?>"
-                                                 style="width: <?php echo min($stockPercent, 100); ?>%"></div>
+                                            <div class="progress-bar <?php echo $item['current_stock'] <= $item['min_stock_level'] ? 'bg-danger' : 'bg-success'; ?> <?php echo app_percent_class($stockPercent); ?>"></div>
                                         </div>
                                         <small class="text-muted">Min: <?php echo $item['min_stock_level']; ?></small>
                                     </div>

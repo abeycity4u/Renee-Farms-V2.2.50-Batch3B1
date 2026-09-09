@@ -76,6 +76,10 @@ require_once __DIR__ . '/includes/csrf.php';
 // PHP data embedded directly inside JavaScript.
 require_once __DIR__ . '/includes/output_security.php';
 
+// CSP-safe finite visual percentage classes. Dynamic widths/scores use
+// shared 0..100 class buckets instead of browser inline style attributes.
+require_once __DIR__ . '/includes/csp_style_classes.php';
+
 // Canonical password policy/storage/verification contract. Load it explicitly at
 // bootstrap so every route can reuse one minimum-length, hash and hash-only verify
 // implementation without depending on an indirect include chain.

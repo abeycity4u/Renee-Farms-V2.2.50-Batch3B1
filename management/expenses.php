@@ -180,7 +180,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                                 <div class="progress-bar bg-<?php 
                                                     echo $type == 'poultry' ? 'info' : 
                                                          ($type == 'ruminant' ? 'warning' : 'secondary'); 
-                                                ?>" style="width: <?php echo $percentage; ?>%"></div>
+                                                ?> <?php echo app_percent_class($percentage); ?>"></div>
                                             </div>
                                             <small class="text-muted"><?php echo number_format($percentage, 1); ?>%</small>
                                         </div>
@@ -227,7 +227,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                                         case 'fuel': echo 'secondary'; break;
                                                         default: echo 'dark';
                                                     }
-                                                ?>" style="width: <?php echo $percentage; ?>%"></div>
+                                                ?> <?php echo app_percent_class($percentage); ?>"></div>
                                             </div>
                                             <small class="text-muted"><?php echo number_format($percentage, 1); ?>%</small>
                                         </div>
