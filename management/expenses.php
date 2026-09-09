@@ -265,8 +265,12 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                         </td>
                                     </tr>
                                     <?php else: ?>
-                                        <?php foreach ($expenses as $expense): 
+                                        <?php foreach ($expenses as $expense):
                                             $lineTotal = (float)($expense['amount'] ?? 0) * (float)($expense['unit'] ?? 1);
+                                            $expenseActionPermission = $managementExpenseActionPermissions[(int)$expense['id']] ?? [
+                                                'edit' => false,
+                                                'delete' => false,
+                                            ];
                                         ?>
                                         <tr>
                                             <td>
@@ -312,6 +316,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                             </td>
                                             <?php if ($canManageExpenses): ?>
                                             <td>
+                                                <?php if ($expenseActionPermission['edit']): ?>
                                                 <button class="btn btn-sm btn-outline-primary edit-expense-btn"
                                                         data-id="<?php echo $expense['id']; ?>"
                                                         data-date="<?php echo $expense['expense_date']; ?>"
@@ -320,12 +325,16 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                                         data-amount="<?php echo $expense['amount']; ?>"
                                                         data-unit="<?php echo $expense['unit'] ?? 1; ?>"
                                                         data-description="<?php echo htmlspecialchars($expense['description'] ?? '', ENT_QUOTES); ?>">
-                                                <i class="bi bi-pencil"></i>
-                                            </button>
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <?php endif; ?>
+
+                                                <?php if ($expenseActionPermission['delete']): ?>
                                                 <button class="btn btn-sm btn-outline-danger"
                                                         data-delete-expense-id="<?php echo (int)$expense['id']; ?>">
                                                     <i class="bi bi-trash"></i>
                                                 </button>
+                                                <?php endif; ?>
                                             </td>
                                             <?php endif; ?>
                                         </tr>

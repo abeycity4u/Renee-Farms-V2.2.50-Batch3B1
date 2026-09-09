@@ -19,7 +19,6 @@ if (($headPath === '/ruminant/ruminant_daily_record.php' || str_ends_with($headP
 // admin-only flag. Keep View/Edit/Delete independent without reconstructing the
 // large Sales Records page: View controls whether the debt section renders,
 // while Edit/Delete independently control their existing action buttons.
-$salesReceivableActionRules = [];
 if (($headPath === '/management/sales_records.php' || str_ends_with($headPath, '/management/sales_records.php')) && isset($debtFeatureEnabled, $canManageLedger)) {
     $receivablePrivileged = isPlatformOwner() || hasRole('farm_admin');
     $canViewReceivables = $receivablePrivileged || hasPermission(getUserType(), 'sales_receivables');
@@ -29,20 +28,19 @@ if (($headPath === '/management/sales_records.php' || str_ends_with($headPath, '
     if (!$canViewReceivables) {
         $debtFeatureEnabled = false;
     }
-    $canManageLedger = $canViewReceivables && ($canEditReceivables || $canDeleteReceivables);
-    if ($canViewReceivables && !$canEditReceivables) {
-        $salesReceivableActionRules[] = '.edit-ledger-btn{display:none!important;}';
-    }
-    if ($canViewReceivables && !$canDeleteReceivables) {
-        $salesReceivableActionRules[] = 'button[name="delete_ledger_entry"]{display:none!important;}';
-    }
+
+    // The ledger template already renders Edit/Delete independently.
+    // Align those canonical booleans directly instead of hiding controls with CSS.
+    $canEditLedger = $canViewReceivables && $canEditReceivables;
+    $canDeleteLedger = $canViewReceivables && $canDeleteReceivables;
+    $canManageLedger = $canEditLedger || $canDeleteLedger;
 }
 
 // The consolidated Expense & Cost Report contains Layer, Broiler, Ruminant and
 // general rows. Its legacy page uses one broad Actions flag, while the APIs
 // already enforce the exact row permission. Mirror that canonical mapping here
 // so only the Edit/Delete controls authorized for each rendered row are visible.
-$managementExpenseActionRules = [];
+$managementExpenseActionPermissions = [];
 if (($headPath === '/management/expenses.php' || str_ends_with($headPath, '/management/expenses.php')) && isset($expenses, $canManageExpenses) && is_array($expenses)) {
     require_once __DIR__ . '/includes/permission_catalog.php';
     $expensePrivileged = isPlatformOwner() || hasRole('farm_admin');
@@ -58,10 +56,10 @@ if (($headPath === '/management/expenses.php' || str_ends_with($headPath, '/mana
         $canDeleteExpenseRow = $expensePrivileged || ($deletePermission && hasPermission(getUserType(), $deletePermission));
         $canManageAnyExpenseAction = $canManageAnyExpenseAction || $canEditExpenseRow || $canDeleteExpenseRow;
 
-        $editSelector = 'body .edit-expense-btn[data-id="' . $expenseId . '"]';
-        $deleteSelector = 'body button[onclick="deleteExpense(' . $expenseId . ')"]';
-        $managementExpenseActionRules[] = $editSelector . '{display:' . ($canEditExpenseRow ? 'inline-flex' : 'none') . '!important;}';
-        $managementExpenseActionRules[] = $deleteSelector . '{display:' . ($canDeleteExpenseRow ? 'inline-flex' : 'none') . '!important;}';
+        $managementExpenseActionPermissions[$expenseId] = [
+            'edit' => $canEditExpenseRow,
+            'delete' => $canDeleteExpenseRow,
+        ];
     }
 
     // If none of the visible rows carries an authorized action, let the legacy
@@ -69,9 +67,6 @@ if (($headPath === '/management/expenses.php' || str_ends_with($headPath, '/mana
     $canManageExpenses = $canManageAnyExpenseAction;
 }
 ?>
-<?php if ($salesReceivableActionRules || $managementExpenseActionRules): ?>
-<style><?php echo implode("\n", array_merge($salesReceivableActionRules, $managementExpenseActionRules)); ?></style>
-<?php endif; ?>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="csrf-token" content="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>">
