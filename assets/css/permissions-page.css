@@ -101,3 +101,5 @@
       .sticky-actions { flex-direction: column; align-items: stretch; }
       .sticky-actions button { width: 100%; }
     }
+
+.permission-farm-select{max-width:420px;}

@@ -44,7 +44,7 @@ function intel_href(string $path): string { return rtrim(BASE_URL, '/') . '/' . 
 
     <?php if ($canChooseFarmType && !$salesOnlyScope): ?>
     <form class="d-flex align-items-end gap-2 mb-2 app-responsive-form" method="get">
-        <div style="min-width:280px;max-width:420px;flex:1"><label class="form-label small mb-1">Farm scope</label><select class="form-select form-select-sm" name="farm_type">
+        <div class="intelligence-farm-scope"><label class="form-label small mb-1">Farm scope</label><select class="form-select form-select-sm" name="farm_type">
             <option value="all" <?php echo $farmType==='all'?'selected':''; ?>>All accessible farm activity</option>
             <?php if (in_array('poultry', accessibleFarmTypes(), true)): ?><option value="poultry" <?php echo $farmType==='poultry'?'selected':''; ?>>Poultry</option><?php endif; ?>
             <?php if (in_array('ruminant', accessibleFarmTypes(), true)): ?><option value="ruminant" <?php echo $farmType==='ruminant'?'selected':''; ?>>Ruminant</option><?php endif; ?>

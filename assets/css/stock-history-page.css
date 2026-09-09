@@ -13,3 +13,5 @@
         .history-table td, .history-table th {
             vertical-align: middle;
         }
+
+.stock-history-days-filter{width:auto;}

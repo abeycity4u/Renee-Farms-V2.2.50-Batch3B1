@@ -156,7 +156,7 @@ $providerHtml = htmlspecialchars($provider, ENT_QUOTES, 'UTF-8');
         <button type="submit">Start <?= $providerLabelHtml ?> Test Checkout</button>
     </form>
 
-    <p style="margin-top:18px;font-size:13px;color:#6c7786;">Do not use this launcher for production billing. Disable the sandbox launcher environment flags after Stage 2I provider QA.</p>
+    <p class="sandbox-checkout-warning">Do not use this launcher for production billing. Disable the sandbox launcher environment flags after Stage 2I provider QA.</p>
 </div>
 </body>
 </html>

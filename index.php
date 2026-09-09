@@ -37,7 +37,7 @@
                     Renee Farms delivers a modern agricultural ecosystem built for productivity, transparency,
                     and long-term ecological stewardship.
                 </p>
-                <p style="margin-top:1.25rem;color:#365446;font-weight:500;">Use <strong>Launch farm portal</strong> in the top navigation to access your workspace.</p>
+                <p class="portal-launch-note">Use <strong>Launch farm portal</strong> in the top navigation to access your workspace.</p>
                 <div class="metrics" role="list" aria-label="Farm highlights">
                     <article class="metric" role="listitem"><strong>24/7</strong><span>Operational visibility</span></article>
                     <article class="metric" role="listitem"><strong>Data-first</strong><span>Production decisions</span></article>

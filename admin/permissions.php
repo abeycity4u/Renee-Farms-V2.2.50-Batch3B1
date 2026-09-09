@@ -104,7 +104,7 @@ unset($_SESSION['permission_error_detail']);
     <form method="get" class="card card-body mb-3 border-0 shadow-sm">
       <label class="form-label fw-semibold" for="permissionFarmSelect">Manage permissions for farm</label>
       <div class="d-flex gap-2 flex-wrap">
-        <select class="form-select" style="max-width:420px" id="permissionFarmSelect" name="farm_id" data-auto-submit>
+        <select class="form-select permission-farm-select" id="permissionFarmSelect" name="farm_id" data-auto-submit>
           <?php foreach ($permissionFarms as $farmOption): ?>
             <option value="<?= (int)$farmOption['id'] ?>" <?= (int)$farmOption['id'] === $permissionFarmId ? 'selected' : '' ?>><?= htmlspecialchars($farmOption['name']) ?></option>
           <?php endforeach; ?>

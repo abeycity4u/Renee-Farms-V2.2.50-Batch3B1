@@ -105,7 +105,7 @@ $pageTitle = 'Stock History - ' . htmlspecialchars($item['item_name']);
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <h5 class="card-title mb-0">Stock Trend</h5>
-                <select id="daysFilter" class="form-select form-select-sm" style="width:auto;">
+                <select id="daysFilter" class="form-select form-select-sm stock-history-days-filter">
                     <option value="30">Last 30 days</option>
                     <option value="60">Last 60 days</option>
                     <option value="90">Last 90 days</option>
