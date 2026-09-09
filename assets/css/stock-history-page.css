@@ -1,0 +1,15 @@
+/*
+ * Stock history page presentation.
+ * Externalized from api/stock_history.php for CSP compatibility.
+ */
+.summary-card {
+            border: none;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+        .summary-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        .history-table td, .history-table th {
+            vertical-align: middle;
+        }

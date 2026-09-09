@@ -59,19 +59,7 @@ $pageTitle = 'Stock History - ' . htmlspecialchars($item['item_name']);
         ); ?>"
     ></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous" data-chart-fallback></script>
-    <style>
-        .summary-card {
-            border: none;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-        }
-        .summary-value {
-            font-size: 1.5rem;
-            font-weight: 700;
-        }
-        .history-table td, .history-table th {
-            vertical-align: middle;
-        }
-    </style>
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/css/stock-history-page.css'); ?>">
 </head>
 <body>
 <?php include(dirname(__DIR__) . '/navbar.php'); ?>
