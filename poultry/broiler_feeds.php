@@ -160,25 +160,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_transaction']) &
 </head>
 <body class="poultry-page feeds-ledger-page feeds-ledger-stock-hover">
     <?php include(__DIR__ . '/../navbar.php'); ?>
-    
+
     <div class="container-fluid mt-4 poultry-shell">
         <div class="row">
             <div class="col-12">
                 <div class="card poultry-panel">
                     <div class="card-header poultry-hero d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <h4 class="mb-0">
-                            <i class="bi bi-basket"></i> 
+                            <i class="bi bi-basket"></i>
                             Broiler Feeds Record - <?php echo date('F Y', strtotime($yearMonth)); ?>
                         </h4>
                         <div class="d-flex flex-wrap gap-2">
-                            <input type="date" class="form-control js-calendar-input" id="monthSelector" 
-                                   value="<?php echo $monthSelectorDate; ?>" style="width: 200px;">
+                            <input type="date" class="form-control js-calendar-input app-month-selector" id="monthSelector"
+                                   value="<?php echo $monthSelectorDate; ?>">
                             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
                                 <i class="bi bi-plus-circle"></i> New Transaction
                             </button>
                         </div>
                     </div>
-                    
+
                     <!-- Current Stock Summary -->
                     <div class="card-body">
                         <div class="smart-poultry-note p-3 mb-4 d-flex gap-3 align-items-start">
@@ -190,9 +190,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_transaction']) &
                         </div>
                         <h5 class="mb-3">Current Feed Stock</h5>
                         <div class="row mb-4">
-                            <?php foreach ($feedItems as $item): 
+                            <?php foreach ($feedItems as $item):
                                 $stockPercent = ($item['current_stock'] / ($item['min_stock_level'] * 2)) * 100;
-                                $cardClass = $item['current_stock'] <= $item['min_stock_level'] ? 'border-danger' : 
+                                $cardClass = $item['current_stock'] <= $item['min_stock_level'] ? 'border-danger' :
                                             ($stockPercent <= 50 ? 'border-warning' : 'border-success');
                             ?>
                             <div class="col-md-3 mb-3 d-flex">
@@ -205,8 +205,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_transaction']) &
                                             </span>
                                             <small class="text-muted d-block"><?php echo app_html($item['unit']); ?></small>
                                         </div>
-                                        <div class="progress" style="height: 8px;">
-                                            <div class="progress-bar <?php echo $item['current_stock'] <= $item['min_stock_level'] ? 'bg-danger' : 'bg-success'; ?>" 
+                                        <div class="progress app-progress-h-8">
+                                            <div class="progress-bar <?php echo $item['current_stock'] <= $item['min_stock_level'] ? 'bg-danger' : 'bg-success'; ?>"
                                                  style="width: <?php echo min($stockPercent, 100); ?>%"></div>
                                         </div>
                                         <small class="text-muted">Min: <?php echo $item['min_stock_level']; ?></small>
@@ -215,13 +215,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_transaction']) &
                             </div>
                             <?php endforeach; ?>
                         </div>
-                        
+
                         <!-- Monthly Summary -->
                         <?php
                         $monthlySummary = stock_effective_movement_summary($transactions);
                         $summaryUnitLabel = stock_effective_summary_unit_label($transactions);
                         ?>
-                        
+
                         <div class="row mb-4">
                             <div class="col-md-4">
                                 <div class="card bg-success text-white">
@@ -251,7 +251,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_transaction']) &
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Transactions Table -->
                         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
                             <div><h5 class="mb-0">Monthly Transactions</h5><div class="small text-muted feed-view-note">Operational View shows current valid activity. Full Audit includes reversed originals and restoration rows.</div></div>

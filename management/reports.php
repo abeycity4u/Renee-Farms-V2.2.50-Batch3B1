@@ -136,14 +136,14 @@ $pdfReportUrl = pdf_report_current_url();
                     <div class="card-header">
                         <h4><i class="bi bi-graph-up-arrow"></i> Farm Reports & Analytics</h4>
                         <div class="d-flex gap-2 mt-2 report-controls">
-                            <select class="form-select" id="yearFilter" style="width: 150px;">
+                            <select class="form-select app-width-150" id="yearFilter">
                                 <?php for ($y = date('Y'); $y >= 2020; $y--): ?>
                                 <option value="<?php echo $y; ?>" <?php echo $y == $year ? 'selected' : ''; ?>>
                                     <?php echo $y; ?>
                                 </option>
                                 <?php endfor; ?>
                             </select>
-                            <select class="form-select" id="farmTypeFilter" style="width: 200px;">
+                            <select class="form-select app-width-200" id="farmTypeFilter">
                                 <?php if ($canChooseFarmType): ?>
                                 <?php if (count(accessibleFarmTypes()) === 2): ?><option value="all" <?php echo $farmType == 'all' ? 'selected' : ''; ?>>All Farms</option><?php endif; ?>
                                 <?php foreach (accessibleFarmTypes() as $type): ?><option value="<?php echo $type; ?>" <?php echo $farmType === $type ? 'selected' : ''; ?>><?php echo ucfirst($type); ?> Only</option><?php endforeach; ?>

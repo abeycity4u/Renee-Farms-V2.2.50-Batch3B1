@@ -651,3 +651,7 @@ html[data-theme="dark"] .btn-close { filter:invert(1) grayscale(100%) brightness
 .app-cell-max-300{max-width:300px;}
 .app-farm-logo-preview{max-height:72px;}
 .app-select-max-420{max-width:420px;}
+.app-progress-h-8{height:8px;}
+.app-progress-h-5{height:5px;}
+.app-width-150{width:150px;}
+.app-width-200{width:200px;}

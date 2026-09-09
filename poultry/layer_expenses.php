@@ -118,19 +118,19 @@ $pdfReportUrl = pdf_report_current_url();
                 <div class="card poultry-panel">
                     <div class="card-header poultry-hero d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <h4 class="mb-0">
-                            <i class="bi bi-cash-stack"></i> 
+                            <i class="bi bi-cash-stack"></i>
                             Layer Expenses Record - <?php echo date('F Y', strtotime($yearMonth)); ?>
                         </h4>
                         <div class="d-flex flex-wrap gap-2">
-                            <input type="date" class="form-control js-calendar-input" id="monthSelector" 
-                                   value="<?php echo $monthSelectorDate; ?>" style="width: 200px;">
+                            <input type="date" class="form-control js-calendar-input app-month-selector" id="monthSelector"
+                                   value="<?php echo $monthSelectorDate; ?>">
                             <a class="btn btn-outline-primary" href="<?php echo htmlspecialchars($pdfReportUrl); ?>" target="_blank"><i class="bi bi-file-earmark-pdf"></i> PDF Report</a>
                             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addExpenseModal">
                                 <i class="bi bi-plus-circle"></i> Add Expense
                             </button>
                         </div>
                     </div>
-                    
+
                     <!-- Expense Summary -->
                     <div class="card-body bg-light">
                         <div class="smart-poultry-note p-3 mb-4 d-flex gap-3 align-items-start">
@@ -142,7 +142,7 @@ $pdfReportUrl = pdf_report_current_url();
                         </div>
                         <h5>Expense Summary for <?php echo date('F Y', strtotime($yearMonth)); ?></h5>
                         <div class="row mb-4">
-                            <?php foreach ($spendingCategoryTotals as $category => $total): 
+                            <?php foreach ($spendingCategoryTotals as $category => $total):
                                 if ($total > 0):
                                     $percentage = $totalSpending > 0 ? ($total / $totalSpending * 100) : 0;
                             ?>
@@ -151,7 +151,7 @@ $pdfReportUrl = pdf_report_current_url();
                                     <div class="card-body text-center">
                                         <h6 class="card-title text-uppercase"><?php echo htmlspecialchars(inventory_financial_spending_label((string)$category)); ?></h6>
                                         <h4 class="text-danger">₦<?php echo number_format($total, 2); ?></h4>
-                                        <div class="progress" style="height: 5px;">
+                                        <div class="progress app-progress-h-5">
                                             <div class="progress-bar bg-danger" style="width: <?php echo $percentage; ?>%"></div>
                                         </div>
                                         <small><?php echo number_format($percentage, 1); ?>% of total</small>
@@ -159,7 +159,7 @@ $pdfReportUrl = pdf_report_current_url();
                                 </div>
                             </div>
                             <?php endif; endforeach; ?>
-                            
+
                             <div class="col-md-12 mt-3">
                                 <div class="card bg-danger text-white">
                                     <div class="card-body text-center">
@@ -169,7 +169,7 @@ $pdfReportUrl = pdf_report_current_url();
                                 </div>
                             </div>
                         </div>
-                        
+
 
                         <div class="card border-primary-subtle mb-4">
                             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -244,7 +244,7 @@ $pdfReportUrl = pdf_report_current_url();
                                         <tr>
                                             <td><?php echo date('d/m/Y', strtotime($expense['expense_date'])); ?></td>
                                             <td>
-                                                <span class="badge bg-<?php 
+                                                <span class="badge bg-<?php
                                                     switch($expense['category']) {
                                                         case 'feeds': echo 'primary'; break;
                                                         case 'medication': echo 'success'; break;
@@ -399,7 +399,7 @@ $pdfReportUrl = pdf_report_current_url();
                         <div class="alert alert-info py-2 small"><strong>Non-stock costs only:</strong> physical items purchased into store should be received through Inventory. Their purchase activity appears automatically on this page.</div>
                         <div class="mb-3">
                             <label>Date</label>
-                            <input type="date" name="expense_date" class="form-control" 
+                            <input type="date" name="expense_date" class="form-control"
                                    value="<?php echo date('Y-m-d'); ?>" required>
                         </div>
                         <div class="mb-3">
@@ -410,7 +410,7 @@ $pdfReportUrl = pdf_report_current_url();
                             <input type="hidden" name="production_type" value="layer">
                             <small class="text-muted">This expense page is scoped to Layer.</small>
                         </div>
-                        
+
                         <div class="mb-3">
                             <label>Production Cycle (optional)</label>
                             <select name="cycle_id" class="form-select">
@@ -438,13 +438,13 @@ $pdfReportUrl = pdf_report_current_url();
 
                         <div class="mb-3">
                             <label>Amount (₦)</label>
-                            <input type="number" name="amount" class="form-control" 
+                            <input type="number" name="amount" class="form-control"
                                    step="0.01" min="0.01" required>
                         </div>
-                        
+
                         <div class="mb-3">
                             <label>Description</label>
-                            <textarea name="description" class="form-control" rows="3" 
+                            <textarea name="description" class="form-control" rows="3"
                                       placeholder="Describe the expense (e.g., Layer mash purchase, Vaccine for layers, etc.)"></textarea>
                         </div>
                     </div>

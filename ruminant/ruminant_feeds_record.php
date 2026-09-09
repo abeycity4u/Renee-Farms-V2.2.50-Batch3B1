@@ -173,8 +173,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_transaction']) &
                             Ruminant Feeds Record - <?php echo date('F Y', strtotime($yearMonth)); ?>
                         </h4>
                         <div class="d-flex flex-wrap gap-2">
-                            <input type="date" class="form-control js-calendar-input" id="monthSelector"
-                                   value="<?php echo $monthSelectorDate; ?>" style="width: 200px;">
+                            <input type="date" class="form-control js-calendar-input app-month-selector" id="monthSelector"
+                                   value="<?php echo $monthSelectorDate; ?>">
                             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
                                 <i class="bi bi-plus-circle"></i> New Transaction
                             </button>
@@ -206,7 +206,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_transaction']) &
                                             </span>
                                             <small class="text-muted d-block"><?php echo app_html($item['unit']); ?></small>
                                         </div>
-                                        <div class="progress" style="height: 8px;">
+                                        <div class="progress app-progress-h-8">
                                             <div class="progress-bar <?php echo $item['current_stock'] <= $item['min_stock_level'] ? 'bg-danger' : 'bg-success'; ?>"
                                                  style="width: <?php echo min($stockPercent, 100); ?>%"></div>
                                         </div>
