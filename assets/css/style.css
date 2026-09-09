@@ -663,3 +663,8 @@ html[data-theme="dark"] .btn-close { filter:invert(1) grayscale(100%) brightness
 .app-width-130{width:130px;}
 .sale-animal-amount{max-width:150px;}
 .sale-animal-exit{flex-basis:100%;max-width:calc(100% - 1.75rem);margin-left:1.75rem;}
+.app-scroll-max-320{max-height:320px;overflow-y:auto;}
+.app-min-width-170{min-width:170px;}
+.app-min-width-220{min-width:220px;}
+.app-min-height-120{min-height:120px;}
+.app-progress-h-10{height:10px;}

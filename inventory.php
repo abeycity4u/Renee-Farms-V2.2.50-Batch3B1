@@ -921,7 +921,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                     <h6 class="mb-0">Category List</h6>
                                     <small class="text-muted">Delete only if category is no longer needed.</small>
                                 </div>
-                                <div class="table-responsive" style="max-height: 320px; overflow-y: auto;">
+                                <div class="table-responsive app-scroll-max-320">
                                     <table class="table table-sm table-striped align-middle">
                                         <thead>
                                             <tr>
@@ -942,7 +942,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                                 <td>
                                                     <form method="POST" class="d-flex gap-1 align-items-center">
                                                         <input type="hidden" name="category_id" value="<?php echo (int)$category['id']; ?>">
-                                                        <select name="category_financial_type" class="form-select form-select-sm" style="min-width:170px">
+                                                        <select name="category_financial_type" class="form-select form-select-sm app-min-width-170">
                                                             <?php foreach (inventory_financial_classifications() as $financialKey => $financialLabel): ?>
                                                                 <option value="<?php echo htmlspecialchars($financialKey); ?>" <?php echo (($category['financial_type'] ?? 'other_stock') === $financialKey) ? 'selected' : ''; ?>><?php echo htmlspecialchars($financialLabel); ?></option>
                                                             <?php endforeach; ?>

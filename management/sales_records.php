@@ -738,7 +738,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                         <input type="hidden" name="month" value="<?php echo htmlspecialchars($month); ?>">
                                         <input type="hidden" name="year" value="<?php echo htmlspecialchars($year); ?>">
                                         <input type="hidden" name="farm_type" value="<?php echo htmlspecialchars($farmType); ?>">
-                                        <select name="customer" class="form-select form-select-sm" style="min-width:220px;" data-auto-submit>
+                                        <select name="customer" class="form-select form-select-sm app-min-width-220" data-auto-submit>
                                             <option value="">Select customer ledger...</option>
                                             <?php foreach ($customerBalances as $customerRow): ?>
                                             <option value="<?php echo htmlspecialchars($customerRow['customer_name']); ?>" <?php echo $selectedCustomer === $customerRow['customer_name'] ? 'selected' : ''; ?>>
@@ -770,19 +770,19 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 <?php else: ?>
                                     <div class="row mb-3">
                                         <div class="col-md-4 mb-2">
-                                            <div class="p-3 rounded border bg-light h-100 d-flex flex-column justify-content-center" style="min-height: 120px;">
+                                            <div class="p-3 rounded border bg-light h-100 d-flex flex-column justify-content-center app-min-height-120">
                                                 <small class="text-muted d-block">Current Outstanding Balance</small>
                                                 <h5 class="mb-0 <?php echo $selectedCustomerBalance > 0 ? 'text-danger' : 'text-success'; ?>">₦<?php echo number_format($selectedCustomerBalance, 2); ?></h5>
                                             </div>
                                         </div>
                                         <div class="col-md-4 mb-2">
-                                            <div class="p-3 rounded border bg-light h-100 d-flex flex-column justify-content-center" style="min-height: 120px;">
+                                            <div class="p-3 rounded border bg-light h-100 d-flex flex-column justify-content-center app-min-height-120">
                                                 <small class="text-muted d-block">Total Credit Taken</small>
                                                 <h5 class="mb-0 text-primary">₦<?php echo number_format($selectedCustomerTotalCredit, 2); ?></h5>
                                             </div>
                                         </div>
                                         <div class="col-md-4 mb-2">
-                                            <div class="p-3 rounded border bg-light h-100 d-flex flex-column justify-content-center" style="min-height: 120px;">
+                                            <div class="p-3 rounded border bg-light h-100 d-flex flex-column justify-content-center app-min-height-120">
                                                 <small class="text-muted d-block">Total Paid (Upfront + Debt)</small>
                                                 <h5 class="mb-0 text-success">₦<?php echo number_format($selectedCustomerGrandTotalPaid, 2); ?></h5>
                                                 <small class="text-muted d-block mt-1">Debt Settlements: ₦<?php echo number_format($selectedCustomerTotalPayments, 2); ?></small>

@@ -176,7 +176,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                                 </span>
                                                 <span>₦<?php echo number_format($total, 2); ?></span>
                                             </div>
-                                            <div class="progress" style="height: 10px;">
+                                            <div class="progress app-progress-h-10">
                                                 <div class="progress-bar bg-<?php 
                                                     echo $type == 'poultry' ? 'info' : 
                                                          ($type == 'ruminant' ? 'warning' : 'secondary'); 
@@ -217,7 +217,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                                 </span>
                                                 <span>₦<?php echo number_format($total, 2); ?></span>
                                             </div>
-                                            <div class="progress" style="height: 10px;">
+                                            <div class="progress app-progress-h-10">
                                                 <div class="progress-bar bg-<?php 
                                                     switch($cat) {
                                                         case 'feeds': echo 'primary'; break;
