@@ -57,9 +57,7 @@ $expensesUrl=$type==='layer'?'/poultry/layer_expenses.php':'/poultry/broiler_exp
 <!doctype html><html lang="en"><head>
 <title>Poultry Cycle Workspace</title>
 <?php include(dirname(__DIR__).'/navbar_head.php'); ?>
-<style>
-.workspace-stat{min-height:100%}.workspace-stat .value{font-size:1.25rem;font-weight:700}.explain-row{display:flex;justify-content:space-between;gap:18px;padding:.55rem 0;border-bottom:1px solid rgba(127,127,127,.16)}.explain-row:last-child{border-bottom:0}.explain-row .label{color:var(--bs-secondary-color)}.workspace-actions .btn{min-width:150px}.compact-table td,.compact-table th{vertical-align:middle}.section-anchor{scroll-margin-top:90px}.basis-history-table{min-width:1040px}.basis-history-table .history-version{white-space:nowrap;font-weight:700}.basis-history-table .history-number{white-space:nowrap}.basis-history-table .history-category{font-weight:600;text-transform:capitalize}.basis-history-table .history-reason{display:block;margin-top:.2rem;color:var(--bs-secondary-color);line-height:1.35}.basis-history-table .history-approved{white-space:nowrap}.basis-history-table tbody tr:first-child{background:rgba(25,135,84,.06)}
-</style>
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/css/management-workspaces.css'); ?>">
 </head><body>
 <?php include(dirname(__DIR__).'/navbar.php'); ?>
 <div class="container-fluid px-3 px-lg-4 py-3">

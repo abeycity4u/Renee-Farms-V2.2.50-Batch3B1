@@ -100,15 +100,7 @@ if ($tenantId > 0) {
 <head>
     <?php include dirname(__DIR__) . '/navbar_head.php'; ?>
     <title>Tenant View - Renee Farms Platform</title>
-    <style>
-        .tenant-view-shell{max-width:1500px;margin:0 auto}
-        .tenant-view-banner{border-left:4px solid #0d6efd}
-        .tenant-view-card{border:1px solid var(--bs-border-color);border-radius:14px}
-        .tenant-view-stat{font-size:1.35rem;font-weight:800}
-        .tenant-view-meta{font-size:.82rem;color:var(--bs-secondary-color)}
-        .tenant-view-table td,.tenant-view-table th{vertical-align:middle}
-        .tenant-view-readonly{font-weight:700;letter-spacing:.02em}
-    </style>
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/css/management-workspaces.css'); ?>">
 </head>
 <body>
 <?php include dirname(__DIR__) . '/navbar.php'; ?>

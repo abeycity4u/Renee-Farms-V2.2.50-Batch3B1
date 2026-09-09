@@ -28,23 +28,7 @@ function intel_href(string $path): string { return rtrim(BASE_URL, '/') . '/' . 
 <head>
     <?php include(__DIR__ . '/../navbar_head.php'); ?>
     <title>Farm Intelligence - Renee Farms</title>
-    <style>
-        .intel-shell{max-width:1440px;margin:0 auto}
-        .intel-hero{border-left:3px solid var(--bs-primary)}
-        .intel-hero .card-body{padding:.8rem 1rem}
-        .intel-stat{border:1px solid var(--bs-border-color);border-radius:.5rem;padding:.5rem .65rem;height:100%}
-        .intel-stat small{display:block;line-height:1.1}
-        .intel-category-anchor{scroll-margin-top:80px}
-        .intel-category{border:1px solid var(--bs-border-color);border-radius:.65rem;overflow:hidden;background:var(--bs-body-bg)}
-        .intel-category-head{padding:.55rem .75rem;background:var(--bs-tertiary-bg);border-bottom:1px solid var(--bs-border-color)}
-        .intel-row{padding:.6rem .75rem;border-bottom:1px solid var(--bs-border-color)}
-        .intel-row:last-child{border-bottom:0}
-        .intel-row-icon{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex:0 0 30px}
-        .intel-measure{font-weight:700;white-space:nowrap}
-        .intel-reason{line-height:1.3}
-        .intel-action .btn{white-space:normal}
-        @media (min-width:992px){.intel-action{min-width:135px;text-align:right}}
-    </style>
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/css/management-workspaces.css'); ?>">
 </head>
 <body>
 <?php include(__DIR__ . '/../navbar.php'); ?>
