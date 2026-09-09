@@ -128,10 +128,7 @@ $decodeModules = static function ($json): string {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Billing &amp; Subscription | <?= htmlspecialchars($farmName, ENT_QUOTES, 'UTF-8') ?></title>
-    <style>
-        .billing-shell{max-width:1180px;margin:0 auto;padding:1.5rem 1rem 3rem}.billing-hero{border:0;border-radius:1rem;background:linear-gradient(120deg,#185c43,#2d8a63);color:#fff;box-shadow:0 1rem 2rem rgba(24,92,67,.18)}
-        .billing-card{border:1px solid rgba(25,80,60,.1);border-radius:1rem;box-shadow:0 .45rem 1.2rem rgba(22,66,50,.06)}.metric-label{font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;color:#6c837a;font-weight:700}.metric-value{font-size:1.08rem;font-weight:750;color:#153d2e}.provider-option{display:flex;align-items:center;gap:.7rem;border:1px solid #d9e6df;border-radius:.8rem;padding:.8rem 1rem;margin:.55rem 0}.provider-primary{margin-left:auto}.table td,.table th{vertical-align:middle}.seat-meter{min-width:6.5rem}.billing-note{background:#f4faf7;border:1px solid #dcece4;border-radius:.8rem;padding:.9rem 1rem;color:#456459}.empty-state{color:#73867e;text-align:center;padding:1.5rem}.billing-email-box{border:1px solid #dce8e2;border-radius:.8rem;padding:.85rem;background:#f8fbf9}
-    </style>
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/css/billing-account-page.css'); ?>">
 </head>
 <body>
 <?php include dirname(__DIR__) . '/navbar.php'; ?>
