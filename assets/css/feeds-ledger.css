@@ -1,0 +1,36 @@
+/*
+ * Shared feed-ledger presentation.
+ * Centralizes Layer, Broiler and Ruminant feed ledger styling for CSP.
+ */
+
+.feeds-ledger-page #feedsTable {
+    width: 100% !important;
+    min-width: 1320px;
+}
+
+.feeds-ledger-page #feedsTable thead th {
+    background-color: #198754;
+    color: #ffffff;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.feeds-ledger-page #feedsTable tbody td {
+    vertical-align: middle;
+}
+
+.feeds-ledger-page #feedsTable_wrapper {
+    width: 100%;
+}
+
+.feeds-ledger-light-filter #feedsTable_wrapper .dataTables_filter label {
+    color: #ffffff;
+}
+
+.feeds-ledger-stock-hover .stock-card {
+    transition: transform 0.2s;
+}
+
+.feeds-ledger-stock-hover .stock-card:hover {
+    transform: translateY(-5px);
+}

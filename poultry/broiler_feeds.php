@@ -156,35 +156,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_transaction']) &
     <title>Broiler Feeds Record - Renee Farms</title>
     <link rel="stylesheet" href="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/datatables/css/dataTables.bootstrap5.min.css'); ?>">
     <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.2.9/css/responsive.bootstrap5.min.css">
-    <style>
-        .stock-card {
-            transition: transform 0.2s;
-        }
-        .stock-card:hover {
-            transform: translateY(-5px);
-        }
-    
-        /* V2.2.13: keep the three feed ledgers visually aligned and prevent
-           DataTables from collapsing the header when action/origin labels are wide. */
-        #feedsTable {
-            width: 100% !important;
-            min-width: 1320px;
-        }
-        #feedsTable thead th {
-            background-color: #198754;
-            color: #ffffff;
-            white-space: nowrap;
-            vertical-align: middle;
-        }
-        #feedsTable tbody td {
-            vertical-align: middle;
-        }
-        #feedsTable_wrapper {
-            width: 100%;
-        }
-    </style>
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/css/feeds-ledger.css'); ?>">
 </head>
-<body class="poultry-page">
+<body class="poultry-page feeds-ledger-page feeds-ledger-stock-hover">
     <?php include(__DIR__ . '/../navbar.php'); ?>
     
     <div class="container-fluid mt-4 poultry-shell">
