@@ -68,7 +68,6 @@ $homepageSlideshowVersion = is_file($homepageSlideshowFile)
                     >
                     <img
                         id="hero-slideshow-image-next"
-                        src="assets/images/chick.png?v=2024.06.01"
                         alt=""
                         width="420"
                         height="420"
