@@ -459,20 +459,34 @@ $check(
     'durable request workflow is the only direct application-state mutation'
 );
 
+$seatTopupDispatchBranch = preg_match(
+    '/\$purpose\s*===\s*[\'"]seat_topup[\'"]/',
+    $dispatcher,
+    $seatTopupDispatchMatch,
+    PREG_OFFSET_CAPTURE
+) === 1
+    ? $seatTopupDispatchMatch[0][1]
+    : false;
+
+$seatTopupDispatchApply = strpos(
+    $dispatcher,
+    'billing_seat_topup_apply_paid_attempt('
+);
+
 $check(
     strpos(
         $dispatcher,
         'billing_seat_topup_application.php'
-    ) === false
-    && strpos(
-        $dispatcher,
-        'billing_seat_topup_apply_paid_attempt('
-    ) === false
+    ) !== false
+    && $seatTopupDispatchBranch !== false
+    && $seatTopupDispatchApply !== false
+    && $seatTopupDispatchBranch
+        < $seatTopupDispatchApply
     && strpos(
         $dispatcher,
         'Paid seat top-up application is not enabled yet.'
-    ) !== false,
-    'dispatcher remains fail-closed for seat_topup until the service is independently reviewed'
+    ) === false,
+    'central dispatcher delegates seat_topup only to the independently verified application service'
 );
 
 echo PHP_EOL;

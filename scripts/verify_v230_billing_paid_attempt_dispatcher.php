@@ -74,8 +74,12 @@ $check(
     && strpos(
         $dispatcher,
         "billing_subscription_application.php"
+    ) !== false
+    && strpos(
+        $dispatcher,
+        "billing_seat_topup_application.php"
     ) !== false,
-    'dispatcher reuses the canonical payment, audit and subscription services'
+    'dispatcher reuses the canonical payment, audit and purpose-specific application services'
 );
 
 $check(
@@ -161,16 +165,16 @@ $seatTopupPos = preg_match(
     ? $seatTopupMatch[0][1]
     : false;
 
-$seatTopupClosedPos = strpos(
+$seatTopupApplyPos = strpos(
     $dispatcher,
-    'Paid seat top-up application is not enabled yet.'
+    'billing_seat_topup_apply_paid_attempt('
 );
 
 $check(
     $seatTopupPos !== false
-    && $seatTopupClosedPos !== false
-    && $seatTopupPos < $seatTopupClosedPos,
-    'seat_topup purpose remains explicitly fail-closed until its dedicated service exists'
+    && $seatTopupApplyPos !== false
+    && $seatTopupPos < $seatTopupApplyPos,
+    'seat_topup purpose delegates only to the independently verified seat-top-up application service'
 );
 
 $check(

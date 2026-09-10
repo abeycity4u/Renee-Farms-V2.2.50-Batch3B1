@@ -11,7 +11,7 @@
  * - application is exactly-once through the locked request workflow state;
  * - no provider/network call occurs here.
  *
- * This service is intentionally NOT wired into the paid-purpose dispatcher yet.
+ * This service is reached only through the central paid-purpose dispatcher after provider verification and audit-state application.
  */
 
 require_once __DIR__ . '/subscription_plan_catalog.php';

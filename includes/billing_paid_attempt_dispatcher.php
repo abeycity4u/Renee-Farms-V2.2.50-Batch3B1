@@ -7,8 +7,7 @@
  *
  * Current contract:
  * - subscription -> existing exactly-once subscription application service;
- * - seat_topup -> fail closed until the dedicated top-up application service
- *   is independently implemented and verified;
+ * - seat_topup -> dedicated exactly-once seat-top-up application service;
  * - every other purpose -> fail closed.
  *
  * Provider verification and audit-state transitions remain owned by the
@@ -19,6 +18,7 @@
 require_once __DIR__ . '/billing_payment_foundation.php';
 require_once __DIR__ . '/billing_payment_audit_state.php';
 require_once __DIR__ . '/billing_subscription_application.php';
+require_once __DIR__ . '/billing_seat_topup_application.php';
 
 if (!function_exists('billing_paid_attempt_dispatch')) {
     function billing_paid_attempt_dispatch(
@@ -77,8 +77,9 @@ if (!function_exists('billing_paid_attempt_dispatch')) {
         }
 
         if ($purpose === 'seat_topup') {
-            throw new RuntimeException(
-                'Paid seat top-up application is not enabled yet.'
+            return billing_seat_topup_apply_paid_attempt(
+                $pdo,
+                $attemptId
             );
         }
 
