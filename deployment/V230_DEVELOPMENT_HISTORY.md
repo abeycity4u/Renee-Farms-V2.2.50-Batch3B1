@@ -6,14 +6,14 @@ Audit snapshot: 2026-09-10
 
 - Repository: `abeycity4u/Renee-Farms-V2.2.50-Batch3B1`
 - Branch: `v230-commercial-hardening-saas-readiness`
-- Audit HEAD: `b6e720cd6a74f2f0faab1bb8e6482ba76c7b81d1`
+- Audit HEAD: `e7b8326a2d415db552d917fa46fc6e515f4a4b8f`
 - Production: `https://reneefarms.com`
 - Server checkout: `~/renee-deploy`
 - Live root: `~/public_html`
 
 ## Current deployment position
 
-Production runtime was reconciled against commit `b6e720c`. Runtime application files were verified against the current HEAD. Production-specific `config.php` and `.htaccess` remain protected and are not blindly overwritten.
+Production runtime is now carried forward through commit `e7b8326`. The Recorded By / feed-origin production batch was deployed on 2026-09-10 after a zero-drift pre-flight. All 20 targeted runtime files matched source HEAD after deployment and all 19 deployed PHP files passed lint. Production-specific `config.php` and `.htaccess` remain protected and are not blindly overwritten.
 
 Development-only files such as scripts, tests, migrations, notes and deployment documentation are kept in source control but are not required inside the public web runtime.
 
@@ -89,6 +89,23 @@ Development-only files such as scripts, tests, migrations, notes and deployment 
 | 66 | `4299005` | Batch 74 - Bootstrap Icons 1.11.3 vendoring | CSP readiness: vendor Bootstrap Icons 1.11.3 | Current HEAD ancestor |
 | 67 | `93c1844` | CSP Report-Only baseline | CSP readiness: add Report-Only baseline | Current HEAD ancestor |
 | 68 | `b6e720c` | CSP standalone homepage coverage | CSP readiness: cover standalone homepage | Current HEAD ancestor |
+| 69 | `0125bcd` | Permanent V2.3 development history | Document V2.3 development and deployment history | Current HEAD ancestor |
+| 70 | `d8ef687` | Feed audit controls and tenant attribution | Harden feed audit controls and tenant attribution | Current HEAD ancestor |
+| 71 | `b93ffcb` | Platform-wide Recorded By contract and feed origins | Standardize Recorded By attribution and feed origins | Current HEAD ancestor |
+| 72 | `e7b8326` | Investigation actor SQL quoting correction | Fix investigation actor SQL quoting | Current HEAD |
+
+## 2026-09-10 feed audit and Recorded By closure
+
+- Commit `d8ef687` centralized feed audit action/origin behavior and tenant actor attribution. Manual `manual_feed` Used movements remain editable/reversible for authorized Platform Owner/Farm Admin users; Daily Record and Inventory-owned movements remain controlled by their originating modules.
+- Database tracing confirmed the questioned `1.30` Used transaction was `source_type='inventory_manual'`, so it is Inventory-owned rather than a Feed Record manual transaction.
+- Commit `b93ffcb` expanded the canonical Recorded By contract across expenses, sales, receivables/debt reports, Poultry Health, Stock History, investigations, ruminant animal exit history, subscription history and Dashboard Recent Sales.
+- Canonical synthetic account display now collapses examples such as `Farm A LLC` + legacy `Farm A` Farm Admin to `Farm A LLC — Farm Admin`; genuine person names remain visible as `Farm Name — Person Name (Role)`.
+- The mandatory remote GitHub semantic review of `b93ffcb` caught an escaping problem in the double-quoted investigation follow-up SQL before production deployment.
+- Commit `e7b8326` corrected that SQL and strengthened `scripts/verify_v230_recorded_by_contract.php` to prevent regression. A second remote GitHub semantic review passed.
+- Production deployment backup: `/home/renee/renee-backups/recorded-by-feed-origin-20260910-073813`.
+- Production deployment result: 20 runtime files deployed, 0 live hash failures, 19 PHP files linted, 0 lint failures.
+- Targeted live UI QA passed for Inventory-origin Feed rows, genuine Manual Feed Used Edit/Reverse behavior, Expenses Recorded By, Poultry Health Recorded By and Dashboard Recent Sales attribution.
+- The verifier script remains source/development-only and was not deployed to `public_html`.
 
 ## Important interpretation
 
@@ -108,8 +125,8 @@ The numbered CSP verifier filename series ends at Batch 68. Working development 
 
 ## Current roadmap position
 
-1. Full current runtime deployment: COMPLETE.
-2. Manual regression smoke test after full deployment: PENDING.
+1. Current production runtime deployment through `e7b8326`: COMPLETE.
+2. Feed audit / platform-wide Recorded By targeted production QA: COMPLETE.
 3. CSP Report-Only browser observation across major roles/flows: NEXT.
 4. Fix genuine CSP violations centrally without `unsafe-inline` or `unsafe-eval`.
 5. Enforce CSP only after Report-Only observation is clean.
