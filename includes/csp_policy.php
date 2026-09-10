@@ -13,7 +13,8 @@ if (!function_exists('app_csp_report_only_policy')) {
             . "connect-src 'self'; "
             . "frame-src 'none'; "
             . "frame-ancestors 'self'; "
-            . "form-action 'self'";
+            . "form-action 'self'; "
+            . "report-uri /csp-report.php";
     }
 }
 

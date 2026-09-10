@@ -5,11 +5,13 @@ $root = dirname(__DIR__);
 $configPath = $root . '/config.php';
 $policyPath = $root . '/includes/csp_policy.php';
 $indexPath = $root . '/index.php';
+$reportPath = $root . '/csp-report.php';
 
 $files = [
     'config.php' => $configPath,
     'includes/csp_policy.php' => $policyPath,
     'index.php' => $indexPath,
+    'csp-report.php' => $reportPath,
 ];
 
 $sources = [];
@@ -33,6 +35,7 @@ foreach ($files as $name => $path) {
 $config = $sources['config.php'];
 $policy = $sources['includes/csp_policy.php'];
 $index = $sources['index.php'];
+$report = $sources['csp-report.php'];
 
 $combined = implode("\n", $sources);
 
@@ -84,6 +87,26 @@ foreach ($requiredDirectives as $directive) {
         "policy contains {$directive}"
     );
 }
+
+$check(
+    strpos($policy, 'report-uri /csp-report.php') !== false,
+    'Report-Only policy sends violations to same-origin CSP collector'
+);
+
+$check(
+    strpos($report, "REQUEST_METHOD'] !== 'POST'") !== false,
+    'CSP collector accepts POST reports only'
+);
+
+$check(
+    strpos($report, "php://input") !== false,
+    'CSP collector reads the browser report body'
+);
+
+$check(
+    strpos($report, "[CSP_REPORT]") !== false,
+    'CSP collector records normalized violations'
+);
 
 $check(
     strpos($combined, "'unsafe-inline'") === false,
