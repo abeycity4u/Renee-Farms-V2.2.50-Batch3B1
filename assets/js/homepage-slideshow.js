@@ -12,8 +12,8 @@
                 { src: 'assets/images/bookkeeping.jpg?v=2024.06.01', alt: 'Farm bookkeeping and financial records' },
                 { src: 'assets/images/eggs.jpg?v=2024.06.01', alt: 'Fresh farm eggs in a basket' },
                 { src: 'assets/images/cow.jpg?v=2024.06.01', alt: 'Cow in a green pasture' },
-                { src: 'assets/images/goats.jpg?v=2024.06.01', alt: 'Goat in a farm field' },
-                { src: 'assets/images/sheeps2.jpg?v=2024.06.01', alt: 'Sheep grazing on grassland' }
+                { src: 'assets/images/goat.jpg?v=2024.06.01', alt: 'Goat in a farm field' },
+                { src: 'assets/images/sheeps.jpg?v=2024.06.01', alt: 'Sheep grazing on grassland' }
             ];
 
             const loadedSlides = new Set([slides[0].src]);
