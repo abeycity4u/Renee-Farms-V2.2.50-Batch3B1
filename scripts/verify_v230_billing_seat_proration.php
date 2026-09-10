@@ -257,6 +257,18 @@ $check(
     'half-cent-equivalent fractional result rounds half-up in minor units'
 );
 
+$check(
+    strpos(
+        $source,
+        "'lineage_start' =>"
+    ) !== false
+    && strpos(
+        $source,
+        "\$timeline['lineage_start']->format("
+    ) !== false,
+    'final proration quote exposes authoritative commercial lineage start'
+);
+
 echo "\nChecks: {$checks}\n";
 echo "Failures: {$failures}\n";
 

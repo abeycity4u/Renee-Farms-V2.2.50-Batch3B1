@@ -601,6 +601,10 @@ if (!function_exists('billing_seat_proration_quote')) {
                 $amount['total_minor']
             ),
             'quoted_at' => $quoteNow->format('Y-m-d H:i:s'),
+            'lineage_start' =>
+                $timeline['lineage_start']->format(
+                    'Y-m-d H:i:s'
+                ),
             'segment_start' =>
                 $timeline['segment_start']->format(
                     'Y-m-d H:i:s'
