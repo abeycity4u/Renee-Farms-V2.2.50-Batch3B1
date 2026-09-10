@@ -36,8 +36,7 @@ let dashboardLowStockCount = dashboardConfig.lowStockCount;
 
     // Initialize dashboard
     $(document).ready(function() {
-        // Initialize tooltips
-        $('[title]').tooltip();
+        // Native title hints do not require Bootstrap Tooltip or Popper.
         
         // Auto-refresh stock every 30 seconds without reloading or moving the page.
         setInterval(refreshStockData, 30000);

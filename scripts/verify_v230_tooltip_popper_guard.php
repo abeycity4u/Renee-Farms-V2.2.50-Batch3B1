@@ -58,7 +58,7 @@ $check(
 );
 $check(str_contains($head, "versioned_asset('/assets/js/navigation.js')") && str_contains($head, '<script defer'), 'tooltip guard is loaded globally through deferred navigation asset');
 $check(str_contains($main, 'new bootstrap.Tooltip(tooltipTriggerEl)'), 'legacy main tooltip initializer remains intercepted rather than broadly rewritten');
-$check(str_contains($dashboard, "$('[title]').tooltip();"), 'dashboard legacy tooltip initializer remains intercepted');
+$check(!str_contains($dashboard, "$('[title]').tooltip();"), 'dashboard avoids broad Bootstrap tooltip initialization for native title hints');
 $check(!str_contains($nav, 'window.bootstrap.Modal =') && !str_contains($nav, 'window.bootstrap.Dropdown =') && !str_contains($nav, 'window.bootstrap.Collapse ='), 'guard does not replace Bootstrap modal/dropdown/collapse components');
 
 echo "\n{$checks} checks, {$failures} failure(s).\n";
