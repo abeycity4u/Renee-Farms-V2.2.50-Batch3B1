@@ -14,8 +14,9 @@ $root = dirname(__DIR__);
 $servicePath = $root . '/includes/billing_payment_foundation.php';
 $migrationPath = $root . '/migrations/045_billing_seat_change_foundation.sql';
 $checkoutPath = $root . '/billing/checkout.php';
+$applicationPath = $root . '/includes/billing_subscription_application.php';
 
-foreach ([$servicePath, $migrationPath, $checkoutPath] as $path) {
+foreach ([$servicePath, $migrationPath, $checkoutPath, $applicationPath] as $path) {
     if (!is_file($path)) {
         fwrite(STDERR, "FAIL: missing {$path}\n");
         exit(1);
@@ -25,6 +26,7 @@ foreach ([$servicePath, $migrationPath, $checkoutPath] as $path) {
 $service = (string)file_get_contents($servicePath);
 $migration = (string)file_get_contents($migrationPath);
 $checkout = (string)file_get_contents($checkoutPath);
+$application = (string)file_get_contents($applicationPath);
 
 $checks = 0;
 $failures = 0;
@@ -150,6 +152,54 @@ $check(
 $check(
     strpos($checkout, 'seat_topup') === false,
     'this checkpoint does not expose seat-top-up checkout'
+);
+
+$check(
+    strpos(
+        $application,
+        '$purpose = billing_payment_attempt_purpose($attempt);'
+    ) !== false
+    && strpos(
+        $application,
+        "if (\$purpose !== 'subscription')"
+    ) !== false
+    && strpos(
+        $application,
+        'Only subscription-purpose payment attempts can be applied to a subscription.'
+    ) !== false,
+    'full subscription application rejects non-subscription payment purposes'
+);
+
+$applyAttemptPos = strpos(
+    $application,
+    '$attempt = billing_audit_attempt_by_id($pdo, $attemptId, true);'
+);
+
+$applyPurposePos = strpos(
+    $application,
+    '$attemptPurpose = billing_payment_attempt_purpose($attempt);'
+);
+
+$applyExistingPos = strpos(
+    $application,
+    '$existing = billing_subscription_existing_application($pdo, $attempt);'
+);
+
+$check(
+    $applyAttemptPos !== false
+    && $applyPurposePos !== false
+    && $applyExistingPos !== false
+    && $applyAttemptPos < $applyPurposePos
+    && $applyPurposePos < $applyExistingPos
+    && strpos(
+        $application,
+        "if (\$attemptPurpose !== 'subscription')"
+    ) !== false
+    && strpos(
+        $application,
+        'Only subscription-purpose payment attempts can enter subscription application.'
+    ) !== false,
+    'subscription application purpose gate runs before idempotent application shortcut'
 );
 
 $protectedWritePattern =

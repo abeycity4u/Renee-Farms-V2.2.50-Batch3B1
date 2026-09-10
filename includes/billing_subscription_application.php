@@ -114,6 +114,14 @@ if (!function_exists('billing_subscription_attempt_contract')) {
         if ($attemptId < 1 || $farmId < 1) {
             throw new RuntimeException('Verified billing attempt identity is invalid.');
         }
+
+        $purpose = billing_payment_attempt_purpose($attempt);
+        if ($purpose !== 'subscription') {
+            throw new RuntimeException(
+                'Only subscription-purpose payment attempts can be applied to a subscription.'
+            );
+        }
+
         if (strtolower(trim((string)($attempt['status'] ?? ''))) !== 'paid') {
             throw new RuntimeException('Only a verified paid billing attempt can be applied to a subscription.');
         }
@@ -352,6 +360,13 @@ if (!function_exists('billing_subscription_apply_paid_attempt')) {
         try {
             $attempt = billing_audit_attempt_by_id($pdo, $attemptId, true);
             if (!$attempt) throw new RuntimeException('Billing payment attempt could not be found for subscription application.');
+
+            $attemptPurpose = billing_payment_attempt_purpose($attempt);
+            if ($attemptPurpose !== 'subscription') {
+                throw new RuntimeException(
+                    'Only subscription-purpose payment attempts can enter subscription application.'
+                );
+            }
 
             $existing = billing_subscription_existing_application($pdo, $attempt);
             if ($existing !== null) {
