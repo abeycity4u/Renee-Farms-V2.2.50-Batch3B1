@@ -730,10 +730,37 @@ $statements = array_values(
     )
 );
 
+function v230_046_exec_migration_statement(
+    PDO $pdo,
+    string $statement
+): void {
+    if (preg_match(
+        '/^\s*EXECUTE\b/i',
+        $statement
+    ) === 1) {
+        $stmt = $pdo->query(
+            $statement
+        );
+
+        if ($stmt instanceof PDOStatement) {
+            $stmt->closeCursor();
+        }
+
+        return;
+    }
+
+    $pdo->exec(
+        $statement
+    );
+}
+
 try {
     foreach ($statements as $statement) {
         if ($statement !== '') {
-            $pdo->exec($statement);
+            v230_046_exec_migration_statement(
+                $pdo,
+                $statement
+            );
         }
     }
 } catch (Throwable $e) {

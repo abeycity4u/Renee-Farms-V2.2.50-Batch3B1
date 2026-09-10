@@ -395,6 +395,42 @@ $check(
 );
 
 
+$executeHelperPresent =
+    preg_match(
+        '/function\s+v230_046_exec_migration_statement\s*'
+        . '\(\s*PDO\s+\$pdo\s*,\s*string\s+\$statement\s*\)'
+        . '\s*:\s*void/',
+        $runner
+    ) === 1;
+
+$executeUsesQuery =
+    preg_match(
+        '/EXECUTE\\\\b[\s\S]*?'
+        . '\$pdo->query\s*\(\s*\$statement\s*\)'
+        . '[\s\S]*?closeCursor\s*\(\s*\)/',
+        $runner
+    ) === 1;
+
+$check(
+    $executeHelperPresent
+    && $executeUsesQuery,
+    'runner drains dynamic EXECUTE result sets before subsequent SQL'
+);
+
+$check(
+    strpos(
+        $runner,
+        'v230_046_exec_migration_statement('
+    ) !== false
+    && preg_match(
+        '/foreach\s*\(\s*\$statements\s+as\s+\$statement\s*\)'
+        . '[\s\S]*?v230_046_exec_migration_statement\s*\(/',
+        $runner
+    ) === 1,
+    'migration loop routes statements through the controlled execution helper'
+);
+
+
 echo PHP_EOL;
 echo 'Checks: ' . $checks . PHP_EOL;
 echo 'Failures: ' . $failures . PHP_EOL;
