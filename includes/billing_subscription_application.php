@@ -263,15 +263,13 @@ if (!function_exists('billing_subscription_save_effective_limits')) {
         array $modules,
         array $seatAddOns
     ): array {
-        $limits = subscription_plan_effective_role_limits($planCode, $modules, $seatAddOns);
-        $stmt = $pdo->prepare(
-            'INSERT INTO farm_role_limits (farm_id, role_code, max_users) VALUES (?, ?, ?) '
-            . 'ON DUPLICATE KEY UPDATE max_users = VALUES(max_users)'
+        return subscription_seat_save_effective_limits(
+            $pdo,
+            $farmId,
+            $planCode,
+            $modules,
+            $seatAddOns
         );
-        foreach (subscription_seat_roles() as $role => $_label) {
-            $stmt->execute([$farmId, $role, max(0, (int)($limits[$role] ?? 0))]);
-        }
-        return $limits;
     }
 }
 

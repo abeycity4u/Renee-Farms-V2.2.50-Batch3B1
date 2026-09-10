@@ -212,3 +212,63 @@ if (!function_exists('subscription_seat_assert_capacity')) {
         }
     }
 }
+
+
+if (!function_exists('subscription_seat_save_effective_limits')) {
+    function subscription_seat_save_effective_limits(
+        PDO $pdo,
+        int $farmId,
+        string $planCode,
+        array $modules,
+        array $seatAddOns
+    ): array {
+        if ($farmId < 1) {
+            throw new InvalidArgumentException(
+                'A valid farm is required for effective seat limits.'
+            );
+        }
+
+        if (!function_exists('subscription_plan_is_valid')
+            || !subscription_plan_is_valid($planCode)) {
+            throw new RuntimeException(
+                'A valid subscription plan is required for effective seat limits.'
+            );
+        }
+
+        $seatAddOns =
+            subscription_seat_normalize_addons(
+                $seatAddOns
+            );
+
+        $limits =
+            subscription_plan_effective_role_limits(
+                $planCode,
+                $modules,
+                $seatAddOns
+            );
+
+        $stmt = $pdo->prepare(
+            'INSERT INTO farm_role_limits '
+            . '(farm_id, role_code, max_users) '
+            . 'VALUES (?, ?, ?) '
+            . 'ON DUPLICATE KEY UPDATE '
+            . 'max_users = VALUES(max_users)'
+        );
+
+        foreach (
+            subscription_seat_roles()
+            as $role => $_label
+        ) {
+            $stmt->execute([
+                $farmId,
+                $role,
+                max(
+                    0,
+                    (int)($limits[$role] ?? 0)
+                ),
+            ]);
+        }
+
+        return $limits;
+    }
+}
