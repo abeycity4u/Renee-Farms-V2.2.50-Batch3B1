@@ -83,7 +83,7 @@ function deleteFarmData(PDO $pdo, int $farmId): void {
     foreach (['sales_allocations', 'financial_allocations', 'poultry_cycle_acquisitions', 'production_cycle_phases', 'poultry_health_events', 'ruminant_animal_weights', 'ruminant_health_events'] as $table) {
         deleteFarmRows($pdo, $table, $farmId);
     }
-    foreach (['customer_ledger_entries', 'stock_transactions', 'stock_batches', 'layer_daily_records', 'broiler_daily_records', 'ruminant_daily_records', 'ruminant_animals', 'farm_expenses', 'profit_loss_summary', 'sales_records', 'production_cycles', 'stock_items', 'inventory_categories', 'financial_settings', 'permissions', 'farm_subscription_seat_addons', 'farm_role_limits', 'v2_audit_log', 'farm_modules', 'subscriptions'] as $table) {
+    foreach (['customer_ledger_entries', 'stock_transactions', 'stock_batches', 'layer_daily_records', 'broiler_daily_records', 'ruminant_daily_records', 'ruminant_animals', 'farm_expenses', 'profit_loss_summary', 'sales_records', 'production_cycles', 'stock_items', 'inventory_categories', 'financial_settings', 'permissions', 'farm_subscription_seat_addons', 'farm_role_limits', 'v2_audit_log', 'farm_modules', 'billing_seat_change_requests', 'subscriptions'] as $table) {
         deleteFarmRows($pdo, $table, $farmId);
     }
     $pdo->prepare('DELETE ur FROM user_roles ur INNER JOIN users u ON u.id = ur.user_id WHERE u.farm_id = ?')->execute([$farmId]);
