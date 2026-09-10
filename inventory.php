@@ -582,7 +582,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <?php include(__DIR__ . '/navbar_head.php'); ?>
     
     <!-- DataTables CSS (local copies to avoid CDN issues) -->
-    <link rel="stylesheet" href="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/datatables/css/jquery.dataTables.min.css'); ?>">
     <link rel="stylesheet" href="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/datatables/css/dataTables.bootstrap5.min.css'); ?>">
     <link rel="stylesheet" href="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/datatables-responsive/css/responsive.dataTables.min.css'); ?>">
     <link rel="stylesheet" href="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/datatables-responsive/css/responsive.bootstrap.min.css'); ?>">
