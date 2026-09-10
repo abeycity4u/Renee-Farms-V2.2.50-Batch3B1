@@ -6,7 +6,7 @@ Audit snapshot: 2026-09-10
 
 - Repository: `abeycity4u/Renee-Farms-V2.2.50-Batch3B1`
 - Branch: `v230-commercial-hardening-saas-readiness`
-- Audit HEAD: `e7b8326a2d415db552d917fa46fc6e515f4a4b8f`
+- Production runtime HEAD: `e7b8326a2d415db552d917fa46fc6e515f4a4b8f`
 - Production: `https://reneefarms.com`
 - Server checkout: `~/renee-deploy`
 - Live root: `~/public_html`
@@ -16,6 +16,8 @@ Audit snapshot: 2026-09-10
 Production runtime is now carried forward through commit `e7b8326`. The Recorded By / feed-origin production batch was deployed on 2026-09-10 after a zero-drift pre-flight. All 20 targeted runtime files matched source HEAD after deployment and all 19 deployed PHP files passed lint. Production-specific `config.php` and `.htaccess` remain protected and are not blindly overwritten.
 
 Development-only files such as scripts, tests, migrations, notes and deployment documentation are kept in source control but are not required inside the public web runtime.
+
+Documentation-only commits may therefore exist after the production runtime HEAD without requiring another production deployment.
 
 ## Historical committed checkpoints
 
@@ -92,7 +94,7 @@ Development-only files such as scripts, tests, migrations, notes and deployment 
 | 69 | `0125bcd` | Permanent V2.3 development history | Document V2.3 development and deployment history | Current HEAD ancestor |
 | 70 | `d8ef687` | Feed audit controls and tenant attribution | Harden feed audit controls and tenant attribution | Current HEAD ancestor |
 | 71 | `b93ffcb` | Platform-wide Recorded By contract and feed origins | Standardize Recorded By attribution and feed origins | Current HEAD ancestor |
-| 72 | `e7b8326` | Investigation actor SQL quoting correction | Fix investigation actor SQL quoting | Current HEAD |
+| 72 | `e7b8326` | Investigation actor SQL quoting correction | Fix investigation actor SQL quoting | Production runtime checkpoint |
 
 ## 2026-09-10 feed audit and Recorded By closure
 
