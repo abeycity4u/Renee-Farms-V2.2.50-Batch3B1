@@ -8,7 +8,7 @@ $root = dirname(__DIR__);
 $files = [
     'navigation' => $root . '/assets/js/navigation.js',
     'main' => $root . '/assets/js/main.js',
-    'dashboard' => $root . '/dashboard.php',
+    'dashboard' => $root . '/assets/js/dashboard.js',
     'head' => $root . '/navbar_head.php',
 ];
 
@@ -40,7 +40,22 @@ $check(str_contains($nav, 'function installTooltipFallback()'), 'global navigati
 $check(str_contains($nav, "window.jQuery.fn.tooltip = function () { return this; };"), 'jQuery tooltip constructor is neutralized');
 $check(str_contains($nav, 'window.bootstrap.Tooltip = NativeTitleTooltip;'), 'Bootstrap Tooltip alone is replaced by native-title fallback');
 $check(str_contains($nav, 'static getOrCreateInstance(element)'), 'fallback exposes Bootstrap-compatible getOrCreateInstance');
-$check(str_contains($nav, 'installTooltipFallback();') && strpos($nav, 'installTooltipFallback();') < strpos($nav, "const navbar = document.getElementById('appNavbar')"), 'guard runs before navbar early return');
+$firstFallbackCall = strpos($nav, 'installTooltipFallback();');
+$initNavigation = strpos($nav, 'function initNavigation()');
+$navbarLookup = strpos($nav, "const navbar = document.getElementById('appNavbar')");
+
+$check(
+    $firstFallbackCall !== false
+    && $initNavigation !== false
+    && $firstFallbackCall < $initNavigation,
+    'tooltip guard installs immediately before DOM-ready navigation initialization'
+);
+$check(
+    substr_count($nav, 'installTooltipFallback();') >= 2
+    && $navbarLookup !== false
+    && $firstFallbackCall < $navbarLookup,
+    'tooltip guard retains defensive pass before navbar early return'
+);
 $check(str_contains($head, "versioned_asset('/assets/js/navigation.js')") && str_contains($head, '<script defer'), 'tooltip guard is loaded globally through deferred navigation asset');
 $check(str_contains($main, 'new bootstrap.Tooltip(tooltipTriggerEl)'), 'legacy main tooltip initializer remains intercepted rather than broadly rewritten');
 $check(str_contains($dashboard, "$('[title]').tooltip();"), 'dashboard legacy tooltip initializer remains intercepted');

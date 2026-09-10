@@ -33,9 +33,15 @@
     }
   }
 
+  // This asset is deferred, so synchronous page vendor scripts have already
+  // loaded by the time it executes, while DOM-ready callbacks have not fired.
+  // Install the tooltip compatibility guard now to prevent those callbacks
+  // from reaching Popper-dependent Bootstrap Tooltip code.
+  installTooltipFallback();
+
   function initNavigation() {
-    // Run before the navbar early-return so pages without the main navbar also
-    // receive the tooltip compatibility guard.
+    // Re-run before the navbar early-return as a defensive second pass for
+    // pages whose runtime dependencies may have changed after initial install.
     installTooltipFallback();
 
     const navbar = document.getElementById('appNavbar');
