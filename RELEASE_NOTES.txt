@@ -392,3 +392,20 @@ V2.2.50 Batch 3A2 — Tenant-Aware Economics Polish
 
 V2.2.50 Batch 3B1 — Commercial UI Cleanup
 - Tenant operational screens no longer display internal V2.2.50 batch/version labels.
+
+V2.3 Commercial Hardening Checkpoint — 2026-09-10
+--------------------------------------------------
+- Standardized farm/user attribution through the platform-wide Recorded By contract.
+- Hardened Feed transaction history with clear Operational View and Full Audit behavior.
+- Added PDF transaction-history reporting to Layer, Broiler and Ruminant Feed pages.
+- Feed PDFs follow the currently selected month and Operational/Audit view.
+- Added centralized tenant branding to generated PDFs so the current farm name appears on every page instead of a hard-coded tenant identity.
+- Verified tenant PDF branding independently with Farm A LLC and Farm B LTD.
+- Improved daylight visibility of PDF Report buttons on Layer, Broiler and Ruminant Expense pages.
+- Corrected homepage image-path/preload/runtime issues and Poultry Health standards-mode rendering.
+- Cleaned stale vendor source-map / legacy DataTables browser-console references.
+- Corrected Dashboard tooltip initialization so Bootstrap Popper errors no longer break Smart Stock Control interaction.
+- Deployed a same-origin CSP Report-Only collector. CSP enforcement remains intentionally paused while report observation completes.
+- No unsafe-inline or unsafe-eval relaxation was introduced.
+- No financial, profitability, receivables, inventory-costing, lifecycle, acquisition, mortality or payment formula was changed by these runtime refinements.
+- Payments remain TEST only.

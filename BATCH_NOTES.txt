@@ -612,3 +612,64 @@ V2.2.50 Batch 3B1 — Commercial UI Cleanup
 - Removed V2.2.50 Batch 1/2/3A/3B development badges from tenant-facing Production Cycles and Poultry Cycle Workspace UI.
 - Development lineage remains in package filenames, release/batch notes and verification scripts rather than farm operational screens.
 - No accounting, lifecycle, acquisition, profitability or snapshot logic changed.
+
+V2.3 Commercial Hardening Runtime Checkpoint — 2026-09-10
+----------------------------------------------------------
+Authoritative source:
+- Repository: abeycity4u/Renee-Farms-V2.2.50-Batch3B1
+- Branch: v230-commercial-hardening-saas-readiness
+- Production runtime carried forward through commit 3bba1dcb2407e96746330888ae86a761d644c20e.
+
+Recorded By / Feed ledger closure:
+- d8ef687 hardened Feed Operational View / Full Audit behavior and tenant attribution.
+- b93ffcb standardized Recorded By presentation across major operational, financial, health, investigation and billing surfaces.
+- e7b8326 corrected investigation actor SQL quoting found during mandatory remote GitHub review.
+- Production QA passed for Feed origin/action behavior and platform-wide Recorded By attribution.
+
+Homepage / browser runtime reliability:
+- cccc969 corrected homepage slideshow image paths.
+- cb3fb9d removed duplicate homepage hero image preload behavior.
+- 87b74ca stripped problematic metadata from the homepage chick image without replacing the asset.
+- bf6c0e2 restored standards mode on Poultry Health & Treatment.
+- These browser/runtime regressions were closed after targeted production QA.
+
+CSP Report-Only:
+- 1b770ab added the same-origin CSP report collector and Report-Only reporting path.
+- Production is running Content-Security-Policy-Report-Only; enforcing CSP remains disabled.
+- Static CSP readiness and broad browser/role smoke observation produced no genuine blocking violation requiring unsafe-inline or unsafe-eval.
+- A longer report-collector observation window remains pending before any decision to enforce CSP.
+- CSP enforcement must not be enabled merely because browser smoke QA passed.
+
+Vendor / tooltip console cleanup:
+- 55971dd cleaned stale vendor source-map and legacy DataTables asset references.
+- cc78e73 removed the remaining Bootstrap source-map reference.
+- Bootstrap Icons remained intact because the live font resource was verified rather than replaced based on a one-off Firefox warning.
+- 36d81d1 corrected tooltip fallback initialization order.
+- 3b710ab removed the Dashboard Bootstrap tooltip trigger that caused createPopper errors.
+- Dashboard Smart Stock Control browser retest passed; the Popper regression is closed.
+
+Tenant PDF branding:
+- 70ab9d1 centralized tenant farm-name branding in PdfReportService.
+- Generated PDFs now use the current tenant Farm Name at top-left on every page.
+- Footer format uses Farm Name + Report Title at bottom-left and Page X of Y at bottom-right.
+- Generic PDF defaults no longer hard-code Renee Farms as the tenant identity.
+- Production proof passed with two separate tenants: Farm A LLC and Farm B LTD.
+
+Feed transaction PDF history / Expense PDF button refinement:
+- 3bba1dc added one shared Feed transaction PDF renderer used by Layer, Broiler and Ruminant Feed pages.
+- Feed PDF preserves the selected month and current ledger view.
+- Operational View PDF prints only current valid activity.
+- Full Audit PDF includes reversed originals and restoration/correction rows.
+- Feed PDF includes transaction date, item, type/status, quantity, stock movement, production type, cycle, remarks, origin and Recorded By.
+- PDF output uses the centralized tenant-aware PdfReportService and excludes action controls.
+- Layer, Broiler and Ruminant Expense PDF buttons were changed to a high-contrast daylight presentation.
+- Production browser QA passed for Layer Operational and Full Audit PDFs, Broiler PDF, Ruminant PDF and all three Expense PDF buttons.
+
+Verification / deployment discipline:
+- Feed PDF / Expense button verifier passed 27 checks with 0 failures.
+- Tenant PDF branding verifier passed 23 checks with 0 failures.
+- All targeted live PHP files passed syntax lint and matched committed source hashes after deployment.
+- Runtime backup for Feed PDF / Expense button deployment:
+  /home/renee/renee-backups/feed-pdf-expense-button-20260910-141050
+- No database migration was required for the runtime refinements in this checkpoint.
+- Payments remain TEST only.

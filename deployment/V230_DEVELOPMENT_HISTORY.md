@@ -6,14 +6,14 @@ Audit snapshot: 2026-09-10
 
 - Repository: `abeycity4u/Renee-Farms-V2.2.50-Batch3B1`
 - Branch: `v230-commercial-hardening-saas-readiness`
-- Production runtime HEAD: `e7b8326a2d415db552d917fa46fc6e515f4a4b8f`
+- Production runtime HEAD: `3bba1dcb2407e96746330888ae86a761d644c20e`
 - Production: `https://reneefarms.com`
 - Server checkout: `~/renee-deploy`
 - Live root: `~/public_html`
 
 ## Current deployment position
 
-Production runtime is now carried forward through commit `e7b8326`. The Recorded By / feed-origin production batch was deployed on 2026-09-10 after a zero-drift pre-flight. All 20 targeted runtime files matched source HEAD after deployment and all 19 deployed PHP files passed lint. Production-specific `config.php` and `.htaccess` remain protected and are not blindly overwritten.
+Production runtime is now carried forward through commit `3bba1dc`. The 2026-09-10 runtime sequence includes the Recorded By/feed-origin closure, homepage/browser reliability fixes, same-origin CSP Report-Only reporting, vendor-console cleanup, Dashboard tooltip/Popper correction, tenant-aware PDF branding, Feed transaction-history PDFs and Expense PDF button visibility refinement. Targeted deployments used zero-drift pre-flight guards, rollback backups, live/source hash checks and PHP lint. Production-specific `config.php` and `.htaccess` remain protected and are not blindly overwritten.
 
 Development-only files such as scripts, tests, migrations, notes and deployment documentation are kept in source control but are not required inside the public web runtime.
 
@@ -95,6 +95,19 @@ Documentation-only commits may therefore exist after the production runtime HEAD
 | 70 | `d8ef687` | Feed audit controls and tenant attribution | Harden feed audit controls and tenant attribution | Current HEAD ancestor |
 | 71 | `b93ffcb` | Platform-wide Recorded By contract and feed origins | Standardize Recorded By attribution and feed origins | Current HEAD ancestor |
 | 72 | `e7b8326` | Investigation actor SQL quoting correction | Fix investigation actor SQL quoting | Production runtime checkpoint |
+| 73 | `7b79010` | Development history update | Update V2.3 production development history | Current HEAD ancestor |
+| 74 | `b1e72a7` | Runtime/documentation checkpoint clarification | Clarify V2.3 production runtime checkpoint | Current HEAD ancestor |
+| 75 | `cccc969` | Homepage slideshow path correction | Fix homepage slideshow image paths | Current HEAD ancestor |
+| 76 | `cb3fb9d` | Homepage duplicate preload correction | Avoid duplicate homepage hero image preload | Current HEAD ancestor |
+| 77 | `87b74ca` | Homepage chick image metadata cleanup | Strip incompatible metadata from homepage chick image | Current HEAD ancestor |
+| 78 | `bf6c0e2` | Poultry Health standards-mode correction | Fix standards mode for poultry health page | Current HEAD ancestor |
+| 79 | `1b770ab` | Same-origin CSP report collector | Add same-origin CSP report collector | Current HEAD ancestor |
+| 80 | `55971dd` | Vendor console-warning cleanup | Clean vendor asset console warnings | Current HEAD ancestor |
+| 81 | `cc78e73` | Final Bootstrap source-map cleanup | Remove final Bootstrap source map reference | Current HEAD ancestor |
+| 82 | `36d81d1` | Tooltip fallback initialization correction | Fix tooltip fallback initialization order | Current HEAD ancestor |
+| 83 | `3b710ab` | Dashboard Popper regression correction | Remove Dashboard Popper tooltip trigger | Current HEAD ancestor |
+| 84 | `70ab9d1` | Tenant-aware generated PDF branding | Brand generated PDFs with tenant farm name | Current HEAD ancestor |
+| 85 | `3bba1dc` | Feed transaction PDFs / Expense PDF button visibility | Add feed history PDFs and improve expense PDF buttons | Production runtime checkpoint |
 
 ## 2026-09-10 feed audit and Recorded By closure
 
@@ -108,6 +121,18 @@ Documentation-only commits may therefore exist after the production runtime HEAD
 - Production deployment result: 20 runtime files deployed, 0 live hash failures, 19 PHP files linted, 0 lint failures.
 - Targeted live UI QA passed for Inventory-origin Feed rows, genuine Manual Feed Used Edit/Reverse behavior, Expenses Recorded By, Poultry Health Recorded By and Dashboard Recent Sales attribution.
 - The verifier script remains source/development-only and was not deployed to `public_html`.
+
+## 2026-09-10 commercial runtime hardening continuation
+
+- Homepage runtime was stabilized through `cccc969`, `cb3fb9d` and `87b74ca`; targeted browser QA closed the path/preload/image warning investigation without broad asset replacement.
+- Poultry Health returned to standards mode through `bf6c0e2`.
+- `1b770ab` deployed the same-origin CSP Report-Only collector. Enforcing CSP is still intentionally paused until the longer report-observation window is reviewed.
+- `55971dd` and `cc78e73` removed stale vendor-console/source-map noise without changing Bootstrap/Chart.js executable behavior.
+- `36d81d1` and `3b710ab` closed the Dashboard tooltip/Popper regression; Smart Stock Control browser retest passed.
+- `70ab9d1` centralized tenant-aware generated PDF branding. Live proof passed with Farm A LLC and Farm B LTD.
+- `3bba1dc` added one shared Feed transaction-history PDF renderer for Layer, Broiler and Ruminant pages and improved daylight contrast of the operational Expense PDF buttons.
+- Live Feed PDF QA passed for Operational View and Full Audit, and the three Expense-page PDF controls passed browser QA.
+- No CSP enforcement, payment-mode change, financial formula change or database migration was introduced by these runtime refinements.
 
 ## Important interpretation
 
@@ -127,12 +152,14 @@ The numbered CSP verifier filename series ends at Batch 68. Working development 
 
 ## Current roadmap position
 
-1. Current production runtime deployment through `e7b8326`: COMPLETE.
+1. Current production runtime deployment through `3bba1dc`: COMPLETE.
 2. Feed audit / platform-wide Recorded By targeted production QA: COMPLETE.
-3. CSP Report-Only browser observation across major roles/flows: NEXT.
-4. Fix genuine CSP violations centrally without `unsafe-inline` or `unsafe-eval`.
-5. Enforce CSP only after Report-Only observation is clean.
-6. Continue remaining V2.3 commercial/SaaS hardening and commercial QA.
+3. Homepage, Poultry Health, vendor-console, Dashboard Popper, tenant PDF branding and Feed PDF targeted production QA: COMPLETE.
+4. CSP Report-Only collector deployment and browser smoke observation: COMPLETE.
+5. Longer CSP report-collector observation window: PENDING REVIEW.
+6. Fix any genuine reported CSP violation centrally without `unsafe-inline` or `unsafe-eval`.
+7. Enforce CSP only after the Report-Only observation remains clean and the owner explicitly proceeds.
+8. Continue remaining V2.3 commercial/SaaS hardening and commercial QA.
 
 ## Safety rules
 
