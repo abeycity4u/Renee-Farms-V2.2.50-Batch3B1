@@ -16,7 +16,7 @@ require_once dirname(__DIR__) . '/includes/billing_provider_contract.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_selection.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_adapters.php';
 require_once dirname(__DIR__) . '/includes/billing_payment_audit_state.php';
-require_once dirname(__DIR__) . '/includes/billing_subscription_application.php';
+require_once dirname(__DIR__) . '/includes/billing_paid_attempt_dispatcher.php';
 require_once dirname(__DIR__) . '/includes/billing_tenant_actor.php';
 
 if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'GET') {
@@ -74,7 +74,7 @@ try {
 
         $updated = billing_audit_apply_verification($pdo, (int)$locked['id'], $verification);
         if ((string)($updated['status'] ?? '') === 'paid') {
-            $application = billing_subscription_apply_paid_attempt($pdo, (int)$locked['id']);
+            $application = billing_paid_attempt_dispatch($pdo, (int)$locked['id']);
         }
         $pdo->commit();
     } catch (Throwable $e) {

@@ -10,6 +10,7 @@ $paths = [
     'selection' => $root . '/includes/billing_provider_selection.php',
     'request' => $root . '/includes/billing_route_request.php',
     'audit' => $root . '/includes/billing_payment_audit_state.php',
+    'actor' => $root . '/includes/billing_tenant_actor.php',
     'checkout' => $root . '/billing/checkout.php',
     'return' => $root . '/billing/return.php',
     'webhook' => $root . '/billing/webhook.php',
@@ -48,6 +49,7 @@ $check = static function (bool $ok, string $message) use (&$checks, &$failures):
 
 $request = $source['request'];
 $audit = $source['audit'];
+$actor = $source['actor'];
 $checkout = $source['checkout'];
 $return = $source['return'];
 $webhook = $source['webhook'];
@@ -164,15 +166,46 @@ $check(strpos($request, '1048576') !== false
     && strpos($request, "file_get_contents('php://input'") !== false,
     'webhook raw-body helper enforces the one-MiB payload boundary');
 
-$check(strpos($checkout, 'requireLogin();') !== false
-    && strpos($checkout, "hasRole('farm_admin')") !== false
-    && strpos($checkout, 'isPlatformOwner()') !== false,
-    'checkout requires the existing tenant Farm Admin session and excludes Platform Owner');
+$check(
+    strpos(
+        $checkout,
+        'billing_require_farm_admin_actor('
+    ) !== false
+    && strpos(
+        $checkout,
+        'subscription_recovery_target_statuses()'
+    ) !== false
+    && strpos(
+        $actor,
+        'requireLogin();'
+    ) !== false
+    && strpos(
+        $actor,
+        'requireCurrentFarmId();'
+    ) !== false
+    && strpos(
+        $actor,
+        'isPlatformOwner()'
+    ) !== false
+    && strpos(
+        $actor,
+        "hasRole('farm_admin')"
+    ) !== false,
+    'checkout enters through the centralized Farm Admin/recovery actor boundary'
+);
 $check(strpos($checkout, 'require_valid_csrf_post();') !== false,
     'checkout is POST/CSRF protected through the central helper');
-$check(strpos($checkout, 'requireCurrentFarmId()') !== false
-    && strpos($checkout, 'currentFarm()') !== false,
-    'checkout farm identity comes from the current authenticated tenant');
+$check(
+    strpos(
+        $checkout,
+        "\$farmId = (int)\$actor['farm_id'];"
+    ) !== false
+    && strpos(
+        $actor,
+        '$farmId = requireCurrentFarmId();'
+    ) !== false,
+    'checkout farm identity comes from the centralized authenticated tenant actor'
+);
 $check(strpos($checkout, "\$_POST['amount']") === false
     && strpos($checkout, "\$_POST['currency']") === false
     && strpos($checkout, "\$_POST['farm_id']") === false,
@@ -180,10 +213,29 @@ $check(strpos($checkout, "\$_POST['amount']") === false
 $check(strpos($checkout, "['contact_email']") !== false
     && strpos($checkout, 'FILTER_VALIDATE_EMAIL') !== false,
     'checkout customer email comes from the current farm profile and is validated');
-$check(strpos($checkout, 'billing_pricing_build_payment_quote(') !== false
-    && strpos($checkout, "\$pricing['amount']") !== false
-    && strpos($checkout, "\$pricing['currency']") !== false,
-    'attempt amount/currency come from the server-authoritative priced quote');
+$check(
+    strpos(
+        $checkout,
+        'billing_current_product_assert_selection('
+    ) !== false
+    && strpos(
+        $checkout,
+        'billing_reactivation_assert_selection('
+    ) !== false
+    && preg_match(
+        '/\$pricing\s*=\s*\$currentProduct\s*\[\s*[\'"]pricing[\'"]\s*\]\s*;/',
+        $checkout
+    ) === 1
+    && strpos(
+        $checkout,
+        "\$pricing['amount']"
+    ) !== false
+    && strpos(
+        $checkout,
+        "\$pricing['currency']"
+    ) !== false,
+    'attempt amount/currency come from server-authoritative current-product pricing'
+);
 $check(strpos($checkout, 'billing_provider_readiness_resolve_checkout(') !== false
     && strpos($checkout, 'billing_provider_register_configured_adapters($provider)') !== false,
     'checkout resolves and registers exactly the selected mode-ready provider');
@@ -204,10 +256,25 @@ $check(strpos($checkout, "header('Location: ' . \$checkout['checkout_url'], true
 $check(strpos($return, "REQUEST_METHOD") !== false
     && strpos($return, "!== 'GET'") !== false,
     'provider return route accepts GET only');
-$check(strpos($return, 'requireLogin();') !== false
-    && strpos($return, "hasRole('farm_admin')") !== false
-    && strpos($return, 'requireCurrentFarmId()') !== false,
-    'provider return verification is current-tenant Farm Admin scoped');
+$check(
+    strpos(
+        $return,
+        'billing_require_farm_admin_actor('
+    ) !== false
+    && preg_match(
+        '/\$farmId\s*=\s*\(int\)\s*\$actor\s*\[\s*[\'"]farm_id[\'"]\s*\]\s*;/',
+        $return
+    ) === 1
+    && strpos(
+        $actor,
+        'requireCurrentFarmId();'
+    ) !== false
+    && strpos(
+        $actor,
+        "hasRole('farm_admin')"
+    ) !== false,
+    'provider return verification is scoped through the centralized tenant Farm Admin/recovery actor'
+);
 $check(strpos($return, "\$_GET['status']") === false
     && strpos($return, "\$_GET['amount']") === false
     && strpos($return, "\$_GET['currency']") === false
@@ -266,9 +333,29 @@ $combinedStage2F = $request . "\n" . $audit . "\n" . $checkout . "\n" . $return 
 $protectedDml = '/\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+(?:farms|farm_modules|farm_role_limits|farm_subscription_seat_addons|subscriptions)\b/i';
 $check(!preg_match($protectedDml, $combinedStage2F),
     'route/audit layer still contains no direct subscription or entitlement DML');
-$check(strpos($combinedStage2F, 'subscription_record_capture(') === false
-    && strpos($combinedStage2F, 'farm_entitlement_set') === false,
-    'route layer does not bypass the centralized Stage 2G subscription application service');
+$check(
+    strpos(
+        $combinedStage2F,
+        'subscription_record_capture('
+    ) === false
+    && strpos(
+        $combinedStage2F,
+        'farm_entitlement_set'
+    ) === false
+    && strpos(
+        $combinedStage2F,
+        'billing_subscription_apply_paid_attempt('
+    ) === false
+    && substr_count(
+        $return,
+        'billing_paid_attempt_dispatch('
+    ) === 1
+    && substr_count(
+        $webhook,
+        'billing_paid_attempt_dispatch('
+    ) === 1,
+    'verified-payment routes do not bypass the centralized paid-purpose dispatcher'
+);
 $check(strpos($audit, 'UPDATE billing_payment_attempts') !== false
     && strpos($audit, 'UPDATE billing_provider_events') !== false,
     'Stage 2F audit helper state mutation remains limited to the billing audit tables');

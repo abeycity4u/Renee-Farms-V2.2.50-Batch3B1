@@ -12,6 +12,7 @@ $paths = [
     'pricing' => $root . '/includes/billing_pricing_contract.php',
     'selection' => $root . '/includes/billing_provider_selection.php',
     'audit' => $root . '/includes/billing_payment_audit_state.php',
+    'dispatcher' => $root . '/includes/billing_paid_attempt_dispatcher.php',
     'application' => $root . '/includes/billing_subscription_application.php',
     'record' => $root . '/includes/subscription_record.php',
     'checkout' => $root . '/billing/checkout.php',
@@ -216,6 +217,7 @@ $check(($annualTerm['extended_existing_term'] ?? null) === false
     'plan/module change starts immediately and grants exactly one annual term');
 
 $app = $source['application'];
+$dispatcherSource = $source['dispatcher'];
 $pricingSource = $source['pricing'];
 $combinedRoutes = $source['checkout'] . "\n" . $source['return'] . "\n" . $source['webhook'];
 
@@ -284,10 +286,45 @@ $check(strpos($pricingSource, 'Extra Poultry Manager seats require a Poultry sub
 $check(strpos($source['record'], "'inserted' => false") !== false
     && strpos($source['record'], 'hash_equals((string)($latest[\'snapshot_hash\'] ?? \'\'), $hash)') !== false,
     'ordinary subscription-record no-op suppression remains unchanged for non-payment captures');
-$check(strpos($source['checkout'], 'billing_subscription_apply_paid_attempt(') === false
-    && substr_count($source['return'], 'billing_subscription_apply_paid_attempt(') === 1
-    && substr_count($source['webhook'], 'billing_subscription_apply_paid_attempt(') === 1,
-    'Stage 2G application is invoked only by Stage 2H verified return/webhook paths, never checkout initialization');
+$check(
+    strpos(
+        $source['checkout'],
+        'billing_paid_attempt_dispatch('
+    ) === false
+    && substr_count(
+        $source['return'],
+        'billing_paid_attempt_dispatch('
+    ) === 1
+    && substr_count(
+        $source['webhook'],
+        'billing_paid_attempt_dispatch('
+    ) === 1
+    && strpos(
+        $source['return'],
+        'billing_subscription_apply_paid_attempt('
+    ) === false
+    && strpos(
+        $source['webhook'],
+        'billing_subscription_apply_paid_attempt('
+    ) === false,
+    'verified return/webhook paths use paid-purpose dispatch while checkout never applies paid state'
+);
+
+$check(
+    preg_match(
+        '/\$purpose\s*===\s*[\'"]subscription[\'"]/',
+        $dispatcherSource
+    ) === 1
+    && substr_count(
+        $dispatcherSource,
+        'billing_subscription_apply_paid_attempt('
+    ) === 1
+    && preg_match(
+        '/\$purpose\s*===\s*[\'"]seat_topup[\'"]/',
+        $dispatcherSource
+    ) === 1,
+    'Stage 2G subscription application is reachable only from the subscription branch of the central dispatcher'
+);
 $check(strpos($source['init'], 'billing_subscription_application.php') === false,
     'Stage 2G application is not globally loaded through init.php');
 
