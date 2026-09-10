@@ -15,6 +15,7 @@ require_once(__DIR__ . '/../lib/sales_allocation.php');
 require_once(__DIR__ . '/../lib/ruminant_sale_animal_allocation.php');
 require_once(__DIR__ . '/../lib/ruminant_animal_exit.php');
 require_once(__DIR__ . '/../lib/sales_units.php');
+require_once(__DIR__ . '/../lib/transaction_actor_display.php');
 $tenantFarmId = requireCurrentFarmId();
 
 $userType = getUserType();
@@ -88,7 +89,7 @@ try {
 }
 
 // Build query based on filters
-$salesSqlBase = "SELECT s.*, u.full_name as seller, pc.cycle_code,
+$salesSqlBase = "SELECT s.*, u.full_name as seller, u.user_type AS seller_user_type, pc.cycle_code,
                         COALESCE((SELECT SUM(sa.allocated_amount) FROM sales_allocations sa WHERE sa.farm_id=s.farm_id AND sa.sale_id=s.id),0) AS allocated_amount
                  FROM sales_records s
                  LEFT JOIN production_cycles pc ON pc.id=s.cycle_id AND pc.farm_id=s.farm_id
@@ -151,7 +152,7 @@ if ($debtFeatureEnabled) {
     $customerBalances = $customerBalancesStmt->fetchAll();
 
     if ($selectedCustomer !== '') {
-        $ledgerStmt = $pdo->prepare("SELECT l.*, u.full_name AS recorded_by
+        $ledgerStmt = $pdo->prepare("SELECT l.*, u.full_name AS recorded_by_name, u.user_type AS recorded_by_user_type
             FROM customer_ledger_entries l
             LEFT JOIN users u ON l.user_id = u.id AND u.farm_id = l.farm_id
             WHERE l.farm_id = ? AND l.customer_name = ?
@@ -833,7 +834,14 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                                             <td class="fw-bold <?php echo $runningBalance > 0 ? 'text-danger' : 'text-success'; ?>">
                                                                 <?php echo number_format($runningBalance, 2); ?>
                                                             </td>
-                                                            <td><?php echo htmlspecialchars($entry['recorded_by'] ?? '--'); ?></td>
+                                                            <td><?php echo htmlspecialchars(transaction_recorded_by_label(
+        transaction_actor_farm_name(
+            $pdo,
+            $tenantFarmId
+        ),
+        $entry['recorded_by_name'] ?? null,
+        $entry['recorded_by_user_type'] ?? null
+    )); ?></td>
                                                             <?php if ($canManageLedger): ?>
                                                             <td class="no-print">
                                                                 <?php if ($canEditLedger): ?>
@@ -978,7 +986,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <small><?php echo app_html($sale['seller']); ?></small>
+                                                <small><?php echo app_html(transaction_recorded_by_label(transaction_actor_farm_name($pdo, $tenantFarmId), $sale['seller'] ?? null, $sale['seller_user_type'] ?? null)); ?></small>
                                             </td>
                                             <?php if ($showActions): ?>
                                             <td>

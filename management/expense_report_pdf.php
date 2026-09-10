@@ -4,6 +4,7 @@ require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/../includes/pdf/PdfReportService.php');
 require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/../lib/attribution.php');
+require_once(__DIR__ . '/../lib/transaction_actor_display.php');
 requireLogin();
 if (!isPlatformOwner() && !hasRole('farm_admin') && !hasPermission(getUserType(), 'expenses')) { header('Location: ' . BASE_URL . '/no_access.php'); exit(); }
 $tenantFarmId = requireCurrentFarmId();
@@ -42,7 +43,7 @@ elseif ($farmType !== 'all') {
 }
 if ($productionType !== 'all') { $where .= " AND e.production_type=?"; $params[]=$productionType; }
 if ($category !== 'all') { $where .= " AND e.category=?"; $params[]=$category; }
-$stmt=$pdo->prepare("SELECT e.*,u.full_name FROM farm_expenses e LEFT JOIN users u ON u.id=e.user_id AND u.farm_id=e.farm_id {$where} ORDER BY e.expense_date DESC,e.id DESC");
+$stmt=$pdo->prepare("SELECT e.*,u.full_name AS recorded_by_name,u.user_type AS recorded_by_user_type FROM farm_expenses e LEFT JOIN users u ON u.id=e.user_id AND u.farm_id=e.farm_id {$where} ORDER BY e.expense_date DESC,e.id DESC");
 $stmt->execute($params); $expenses=$stmt->fetchAll(PDO::FETCH_ASSOC);
 $totalExpenses=0.0; $categoryTotals=[]; $farmTypeTotals=[];
 foreach($expenses as $expense){
@@ -66,7 +67,11 @@ ob_start();
 <table class="table"><thead><tr><th>Date</th><th>Farm Type</th><th>Production Type</th><th>Category</th><th>Unit</th><th>Amount</th><th>Total</th><th>Description</th><th>Recorded By</th></tr></thead><tbody>
 <?php if(!$expenses): ?><tr><td colspan="9">No expenses recorded for this period.</td></tr>
 <?php else: foreach($expenses as $expense): $line=(float)($expense['amount']??0)*(float)($expense['unit']??1); ?>
-<tr><td><?php echo htmlspecialchars(date('d/m/Y',strtotime((string)$expense['expense_date']))); ?></td><td><?php echo htmlspecialchars(ucfirst((string)$expense['farm_type'])); ?></td><td><?php echo htmlspecialchars(ucfirst((string)($expense['production_type']??'--'))); ?></td><td><?php echo htmlspecialchars(ucfirst((string)$expense['category'])); ?></td><td><?php echo number_format((float)($expense['unit']??1),2); ?></td><td>₦<?php echo number_format((float)($expense['amount']??0),2); ?></td><td>₦<?php echo number_format($line,2); ?></td><td><?php echo htmlspecialchars((string)($expense['description']?:'--')); ?></td><td><?php echo htmlspecialchars((string)($expense['full_name']?:'--')); ?></td></tr>
+<tr><td><?php echo htmlspecialchars(date('d/m/Y',strtotime((string)$expense['expense_date']))); ?></td><td><?php echo htmlspecialchars(ucfirst((string)$expense['farm_type'])); ?></td><td><?php echo htmlspecialchars(ucfirst((string)($expense['production_type']??'--'))); ?></td><td><?php echo htmlspecialchars(ucfirst((string)$expense['category'])); ?></td><td><?php echo number_format((float)($expense['unit']??1),2); ?></td><td>₦<?php echo number_format((float)($expense['amount']??0),2); ?></td><td>₦<?php echo number_format($line,2); ?></td><td><?php echo htmlspecialchars((string)($expense['description']?:'--')); ?></td><td><?php echo htmlspecialchars(transaction_recorded_by_label_from_row(
+        $pdo,
+        $tenantFarmId,
+        $expense
+    )); ?></td></tr>
 <?php endforeach; endif; ?></tbody></table>
 </body></html>
 <?php

@@ -6,6 +6,7 @@ require_once(__DIR__ . '/../includes/audit_helpers.php');
 require_once(__DIR__ . '/../lib/ruminant_animal_economics.php');
 require_once(__DIR__ . '/../lib/ruminant_cycle_membership.php');
 require_once(__DIR__ . '/../lib/ruminant_lifecycle_integrity.php');
+require_once(__DIR__ . '/../lib/transaction_actor_display.php');
 requireLogin();
 ensureAllowed('ruminant_daily');
 $farmId = requireCurrentFarmId();
@@ -112,7 +113,8 @@ $healthStmt = $pdo->prepare('SELECT h.*, u.full_name AS recorded_by_name FROM ru
 $healthStmt->execute([$animalId, $farmId]);
 $healthEvents = $healthStmt->fetchAll(PDO::FETCH_ASSOC);
 
-$exitStmt = $pdo->prepare("SELECT e.*, s.product_type, s.customer_name, rsa.allocated_amount, u.full_name AS recorded_by_name
+$exitStmt = $pdo->prepare("SELECT e.*, s.product_type, s.customer_name, rsa.allocated_amount, u.full_name AS recorded_by_name,
+    u.user_type AS recorded_by_user_type
     FROM ruminant_animal_exit_events e
     LEFT JOIN sales_records s ON s.id=e.sale_id AND s.farm_id=e.farm_id
     LEFT JOIN ruminant_sale_animal_allocations rsa ON rsa.sale_id=e.sale_id AND rsa.animal_id=e.animal_id AND rsa.farm_id=e.farm_id
@@ -301,7 +303,11 @@ $today = app_today();
             <td><?php echo $e['sale_id'] ? '#'.(int)$e['sale_id'].' · '.htmlspecialchars($e['product_type'] ?: 'Sale') : '—'; ?></td>
             <td><?php echo $e['allocated_amount'] !== null ? '₦'.number_format((float)$e['allocated_amount'],2) : '—'; ?></td>
             <td><?php echo htmlspecialchars($e['customer_name'] ?: '—'); ?></td>
-            <td><?php echo htmlspecialchars($e['recorded_by_name'] ?: '—'); ?></td>
+            <td><?php echo htmlspecialchars(transaction_recorded_by_label_from_row(
+        $pdo,
+        $farmId,
+        $e
+    )); ?></td>
           </tr>
         <?php endforeach; if (!$exitEvents): ?><tr><td colspan="6" class="text-center text-muted py-3">No sale-linked exit event recorded.</td></tr><?php endif; ?></tbody></table></div>
       </div>

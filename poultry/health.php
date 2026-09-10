@@ -4,6 +4,7 @@ require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/../includes/audit_helpers.php');
 require_once(__DIR__ . '/../lib/poultry_health.php');
+require_once(__DIR__ . '/../lib/transaction_actor_display.php');
 requireLogin();
 ensureAllowed('poultry_health');
 $farmId = requireCurrentFarmId();
@@ -132,7 +133,11 @@ require_once(__DIR__ . '/../navbar.php');
         <td><?php echo htmlspecialchars((string)($e['dosage'] ?: '—')); ?></td>
         <td class="app-cell-max-300"><?php echo nl2br(htmlspecialchars((string)($e['reason_symptoms'] ?: '—'))); ?></td>
         <td><?php echo htmlspecialchars((string)($e['linked_item_name'] ?: '—')); ?></td>
-        <td><?php echo htmlspecialchars((string)($e['recorded_by_name'] ?: '—')); ?></td>
+        <td><?php echo htmlspecialchars(transaction_recorded_by_label_from_row(
+            $pdo,
+            $farmId,
+            $e
+        )); ?></td>
         <?php if ($canEditHealth || $canDeleteHealth): ?><td class="text-end text-nowrap">
           <?php if ($canEditHealth): ?><button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#eventModal" data-health-edit-event data-health-event="<?php echo app_attr(json_encode($e, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE)); ?>" ><i class="bi bi-pencil"></i></button><?php endif; ?>
           <?php if ($canDeleteHealth): ?><button type="button" class="btn btn-sm btn-outline-danger" data-health-delete-id="<?php echo (int)$e['id']; ?>"><i class="bi bi-trash"></i></button><?php endif; ?>

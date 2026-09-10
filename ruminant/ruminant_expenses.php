@@ -4,6 +4,7 @@ require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/../includes/pdf/PdfReportService.php');
 require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/../lib/attribution.php');
+require_once(__DIR__ . '/../lib/transaction_actor_display.php');
 require_once(__DIR__ . '/../lib/inventory_financial.php');
 require_once(__DIR__ . '/../lib/ruminant_expense_allocation.php');
 requireLogin();
@@ -33,7 +34,7 @@ $startDate = date('Y-m-01', strtotime($yearMonth . '-01'));
 $endDate = date('Y-m-t', strtotime($yearMonth . '-01'));
 
 // Get expenses for the month
-$query = "SELECT e.*, u.full_name, pc.cycle_code AS expense_cycle_code
+$query = "SELECT e.*, u.full_name AS recorded_by_name, u.user_type AS recorded_by_user_type, pc.cycle_code AS expense_cycle_code
           FROM farm_expenses e
           LEFT JOIN users u ON e.user_id = u.id AND u.farm_id = e.farm_id
           LEFT JOIN production_cycles pc ON pc.id = e.cycle_id AND pc.farm_id = e.farm_id
@@ -294,7 +295,7 @@ $pdfReportUrl = pdf_report_current_url();
                                                 <?php echo app_html($expense['description'] ?: '--'); ?>
                                             </td>
                                             <td>
-                                                <small><?php echo app_html($expense['full_name']); ?></small>
+                                                <small><?php echo app_html(transaction_recorded_by_label_from_row($pdo, $tenantFarmId, $expense)); ?></small>
                                             </td>
                                             <?php if ($canManageExpenses): ?>
                                             <td class="no-print">

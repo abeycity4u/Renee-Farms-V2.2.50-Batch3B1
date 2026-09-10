@@ -14,6 +14,7 @@ require_once(__DIR__ . '/config.php');
 require_once(__DIR__ . '/includes/functions.php');
 require_once(__DIR__ . '/includes/dashboard_livestock_snapshot.php');
 require_once(__DIR__ . '/lib/farm_intelligence.php');
+require_once(__DIR__ . '/lib/transaction_actor_display.php');
 requireLogin();
 
 $userType = getUserType();
@@ -86,7 +87,7 @@ $lowStockItems = $lowStockStmt->fetchAll();
 
 // Get recent sales
 if ($farmAccess === 'both') {
-    $salesQuery = "SELECT s.*, u.full_name as seller
+    $salesQuery = "SELECT s.*, u.full_name as seller, u.user_type AS seller_user_type
                    FROM sales_records s
                    LEFT JOIN users u ON s.user_id = u.id AND u.farm_id = s.farm_id
                    WHERE s.farm_id = ? ORDER BY s.sale_date DESC, s.id DESC
@@ -97,7 +98,7 @@ if ($farmAccess === 'both') {
     $salesFarmTypePredicate = $includeGeneralSales
         ? "(s.farm_type = ? OR s.farm_type = 'general')"
         : 's.farm_type = ?';
-    $salesQuery = "SELECT s.*, u.full_name as seller
+    $salesQuery = "SELECT s.*, u.full_name as seller, u.user_type AS seller_user_type
                    FROM sales_records s
                    LEFT JOIN users u ON s.user_id = u.id AND u.farm_id = s.farm_id
                    WHERE s.farm_id = ? AND {$salesFarmTypePredicate}
@@ -739,7 +740,7 @@ $pageTitle = "Dashboard";
                                     ₦<?php echo number_format($sale['total_amount'], 2); ?>
                                 </span>
                                 <div class="small text-muted">
-                                    <?php echo app_html($sale['seller']); ?>
+                                    <?php echo app_html(transaction_recorded_by_label(transaction_actor_farm_name($pdo, $tenantFarmId), $sale['seller'] ?? null, $sale['seller_user_type'] ?? null)); ?>
                                 </div>
                             </div>
                         </div>

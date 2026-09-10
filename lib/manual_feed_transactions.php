@@ -33,7 +33,11 @@ function manual_feed_transaction_action_state(array $transaction): string
     }
 
     if (
-        $sourceType === 'inventory_api' ||
+        in_array(
+            $sourceType,
+            ['inventory_api', 'inventory_manual'],
+            true
+        ) ||
         $transactionType === 'received'
     ) {
         return 'inventory';
@@ -64,7 +68,13 @@ function manual_feed_transaction_origin_label(array $transaction): string
         return 'Daily Record';
     }
 
-    if ($sourceType === 'inventory_api') {
+    if (
+        in_array(
+            $sourceType,
+            ['inventory_api', 'inventory_manual'],
+            true
+        )
+    ) {
         return 'Inventory';
     }
 

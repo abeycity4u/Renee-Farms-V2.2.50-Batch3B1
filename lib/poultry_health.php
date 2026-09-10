@@ -59,7 +59,8 @@ function poultry_health_validate_stock_item(PDO $pdo, int $farmId, ?int $stockIt
 function poultry_health_list(PDO $pdo, int $farmId, ?string $productionType = null, ?int $cycleId = null, ?string $from = null, ?string $to = null): array
 {
     $sql = "SELECT phe.*, pc.cycle_code, si.item_name AS linked_item_name, si.unit AS linked_item_unit,
-                   u.full_name AS recorded_by_name
+                   u.full_name AS recorded_by_name,
+                   u.user_type AS recorded_by_user_type
             FROM poultry_health_events phe
             LEFT JOIN production_cycles pc ON pc.id=phe.cycle_id AND pc.farm_id=phe.farm_id
             LEFT JOIN stock_items si ON si.id=phe.stock_item_id AND si.farm_id=phe.farm_id

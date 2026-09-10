@@ -3,6 +3,7 @@
 require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/../lib/stock_service.php');
+require_once(__DIR__ . '/../lib/transaction_actor_display.php');
 requireLogin();
 header('Content-Type: application/json');
 
@@ -53,7 +54,9 @@ try {
     // Keep the full audit trail. Physical balances use every posted movement;
     // reversal pairs cancel each other mathematically. Active-only filtering is
     // reserved for operational consumption/cost summaries.
-    $query = "SELECT t.*, s.item_name, s.unit, u.full_name,
+    $query = "SELECT t.*, s.item_name, s.unit,
+                     u.full_name AS recorded_by_name,
+                     u.user_type AS recorded_by_user_type,
                      pc.cycle_code, pc.status AS cycle_status
               FROM stock_transactions t
               JOIN stock_items s ON t.stock_item_id = s.id AND s.farm_id = t.farm_id
@@ -64,6 +67,16 @@ try {
     $stmt = $pdo->prepare($query);
     $stmt->execute([$itemId, $farmId, $dateLimit]);
     $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($transactions as &$transaction) {
+        $transaction['recorded_by_label'] =
+            transaction_recorded_by_label_from_row(
+                $pdo,
+                $farmId,
+                $transaction
+            );
+    }
+    unset($transaction);
 
     $activeOperational = array_values(array_filter($transactions, static fn($tx) =>
         (int)($tx['is_reversed'] ?? 0) === 0 && (int)($tx['reversal_of_id'] ?? 0) === 0

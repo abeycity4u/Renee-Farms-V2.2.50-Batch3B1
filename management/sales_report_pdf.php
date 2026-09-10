@@ -4,6 +4,7 @@ require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/../includes/pdf/PdfReportService.php');
 require_once(__DIR__ . '/../lib/attribution.php');
 require_once(__DIR__ . '/../lib/sales_units.php');
+require_once(__DIR__ . '/../lib/transaction_actor_display.php');
 requireLogin();
 requireBusinessReportAccess();
 if (!isPlatformOwner() && !hasRole('farm_admin') && !hasPermission(getUserType(), 'sales')) {
@@ -50,7 +51,7 @@ if ($selectedCustomer !== '' && !isPlatformOwner() && !hasRole('farm_admin') && 
     exit('Sales receivables view access required.');
 }
 
-$sql = "SELECT s.*, u.full_name AS seller, pc.cycle_code
+$sql = "SELECT s.*, u.full_name AS seller, u.user_type AS seller_user_type, pc.cycle_code
         FROM sales_records s
         LEFT JOIN production_cycles pc ON pc.id=s.cycle_id AND pc.farm_id=s.farm_id
         LEFT JOIN users u ON u.id=s.user_id AND u.farm_id=s.farm_id
@@ -81,7 +82,9 @@ $debtSettlements = 0.0;
 $upfront = 0.0;
 $totalPaid = 0.0;
 if ($selectedCustomer !== '') {
-    $ls = $pdo->prepare("SELECT l.*, COALESCE(u.full_name,'Farm User') AS recorded_by
+    $ls = $pdo->prepare("SELECT l.*,
+        u.full_name AS recorded_by_name,
+        u.user_type AS recorded_by_user_type
         FROM customer_ledger_entries l
         LEFT JOIN users u ON u.id=l.user_id AND u.farm_id=l.farm_id
         WHERE l.farm_id=? AND l.customer_name=?
@@ -116,14 +119,28 @@ ob_start();
 <table class="table" style="margin-bottom:14px"><thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Amount (₦)</th><th>Running Balance (₦)</th><th>Recorded By</th></tr></thead><tbody>
 <?php if (!$ledger): ?><tr><td colspan="6">No debt ledger entries for this customer.</td></tr>
 <?php else: $running=0.0; foreach($ledger as $entry): $running+=(float)$entry['amount']; ?>
-<tr><td><?php echo htmlspecialchars(date('d/m/Y',strtotime((string)$entry['entry_date']))); ?></td><td><?php echo htmlspecialchars(ucfirst((string)$entry['entry_type'])); ?></td><td><?php echo htmlspecialchars((string)($entry['notes']??'--')); ?></td><td><?php echo number_format((float)$entry['amount'],2); ?></td><td><?php echo number_format($running,2); ?></td><td><?php echo htmlspecialchars((string)($entry['recorded_by']??'--')); ?></td></tr>
+<tr><td><?php echo htmlspecialchars(date('d/m/Y',strtotime((string)$entry['entry_date']))); ?></td><td><?php echo htmlspecialchars(ucfirst((string)$entry['entry_type'])); ?></td><td><?php echo htmlspecialchars((string)($entry['notes']??'--')); ?></td><td><?php echo number_format((float)$entry['amount'],2); ?></td><td><?php echo number_format($running,2); ?></td><td><?php echo htmlspecialchars(transaction_recorded_by_label(
+        transaction_actor_farm_name(
+            $pdo,
+            $tenantFarmId
+        ),
+        $entry['recorded_by_name'] ?? null,
+        $entry['recorded_by_user_type'] ?? null
+    )); ?></td></tr>
 <?php endforeach; endif; ?></tbody></table>
 <?php endif; ?>
 <h3>Sales Records</h3>
 <table class="table"><thead><tr><th>Date</th><th>Farm Type</th><th>Production Type</th><th>Cycle</th><th>Product</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>Total Amount</th><th>Customer</th><th>Remarks</th><th>Recorded By</th></tr></thead><tbody>
 <?php if (!$sales): ?><tr><td colspan="11">No sales records for this period.</td></tr>
 <?php else: foreach($sales as $sale): $rowTotal=(float)($sale['total_amount'] ?? ((float)$sale['quantity']*(float)$sale['unit_price'])); ?>
-<tr><td><?php echo htmlspecialchars(date('d/m/Y',strtotime((string)$sale['sale_date']))); ?></td><td><?php echo htmlspecialchars(ucfirst((string)$sale['farm_type'])); ?></td><td><?php echo htmlspecialchars(ucfirst((string)($sale['production_type']??'--'))); ?></td><td><?php echo htmlspecialchars((string)($sale['cycle_code'] ?: 'Shared / Unassigned')); ?></td><td><?php echo htmlspecialchars((string)$sale['product_type']); ?></td><td><?php echo number_format((float)$sale['quantity'],2); ?></td><td><?php echo htmlspecialchars(sales_unit_label($sale['unit_of_measure'] ?? null)); ?></td><td>₦<?php echo number_format((float)$sale['unit_price'],2); ?></td><td>₦<?php echo number_format($rowTotal,2); ?></td><td><?php echo htmlspecialchars((string)($sale['customer_name']?:'--')); ?></td><td><?php echo htmlspecialchars((string)($sale['remarks']?:'--')); ?></td><td><?php echo htmlspecialchars((string)($sale['seller']?:'--')); ?></td></tr>
+<tr><td><?php echo htmlspecialchars(date('d/m/Y',strtotime((string)$sale['sale_date']))); ?></td><td><?php echo htmlspecialchars(ucfirst((string)$sale['farm_type'])); ?></td><td><?php echo htmlspecialchars(ucfirst((string)($sale['production_type']??'--'))); ?></td><td><?php echo htmlspecialchars((string)($sale['cycle_code'] ?: 'Shared / Unassigned')); ?></td><td><?php echo htmlspecialchars((string)$sale['product_type']); ?></td><td><?php echo number_format((float)$sale['quantity'],2); ?></td><td><?php echo htmlspecialchars(sales_unit_label($sale['unit_of_measure'] ?? null)); ?></td><td>₦<?php echo number_format((float)$sale['unit_price'],2); ?></td><td>₦<?php echo number_format($rowTotal,2); ?></td><td><?php echo htmlspecialchars((string)($sale['customer_name']?:'--')); ?></td><td><?php echo htmlspecialchars((string)($sale['remarks']?:'--')); ?></td><td><?php echo htmlspecialchars(transaction_recorded_by_label(
+        transaction_actor_farm_name(
+            $pdo,
+            $tenantFarmId
+        ),
+        $sale['seller'] ?? null,
+        $sale['seller_user_type'] ?? null
+    )); ?></td></tr>
 <?php endforeach; endif; ?></tbody></table>
 </body></html>
 <?php

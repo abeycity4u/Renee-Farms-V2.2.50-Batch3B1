@@ -4,6 +4,7 @@ require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/../includes/pdf/PdfReportService.php');
 require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/../lib/attribution.php');
+require_once(__DIR__ . '/../lib/transaction_actor_display.php');
 requireLogin();
 $pdfRequested = pdf_report_is_requested();
 if ($pdfRequested) { pdf_report_begin(); }
@@ -60,12 +61,12 @@ if ($category !== 'all') {
     $params[] = $category;
 }
 
-$query = "SELECT e.*, u.full_name 
+$query = "SELECT e.*, u.full_name AS recorded_by_name, u.user_type AS recorded_by_user_type
           FROM farm_expenses e
           LEFT JOIN users u ON e.user_id = u.id AND u.farm_id = e.farm_id
           {$whereClause}
           ORDER BY e.expense_date DESC";
-          
+
 $stmt = $pdo->prepare($query);
 $stmt->execute($params);
 $expenses = $stmt->fetchAll();
@@ -93,14 +94,14 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
 </head>
 <body>
     <?php include(__DIR__ . '/../navbar.php'); ?>
-    
+
     <div class="container-fluid mt-4">
         <div class="row">
             <div class="col-12">
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h4>
-                            <i class="bi bi-cash-stack"></i> 
+                            <i class="bi bi-cash-stack"></i>
                             Expense Report - <?php echo htmlspecialchars($periodLabel); ?>
                         </h4>
                         <div class="d-flex gap-2 report-controls">
@@ -141,7 +142,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                             <a class="btn btn-primary<?php echo $reportMode === 'monthly' ? ' d-none' : ''; ?>" id="printYearlyBtn" href="<?php echo htmlspecialchars($pdfReportUrl); ?>" target="_blank"><i class="bi bi-file-earmark-pdf"></i> PDF Yearly</a>
                         </div>
                     </div>
-                    
+
                     <!-- Summary Cards -->
                     <div class="card-body bg-light">
                         <!-- Total Expenses -->
@@ -151,7 +152,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                 <h5>For <?php echo htmlspecialchars($periodLabel); ?></h5>
                             </div>
                         </div>
-                        
+
                         <!-- Breakdown -->
                         <div class="row mb-4">
                             <!-- Farm Type Breakdown -->
@@ -161,15 +162,15 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                         <h6>By Farm Type</h6>
                                     </div>
                                     <div class="card-body">
-                                        <?php foreach ($farmTypeTotals as $type => $total): 
+                                        <?php foreach ($farmTypeTotals as $type => $total):
                                             $percentage = $totalExpenses > 0 ? ($total / $totalExpenses * 100) : 0;
                                         ?>
                                         <div class="mb-3">
                                             <div class="d-flex justify-content-between mb-1">
                                                 <span>
-                                                    <span class="badge bg-<?php 
-                                                        echo $type == 'poultry' ? 'info' : 
-                                                             ($type == 'ruminant' ? 'warning' : 'secondary'); 
+                                                    <span class="badge bg-<?php
+                                                        echo $type == 'poultry' ? 'info' :
+                                                             ($type == 'ruminant' ? 'warning' : 'secondary');
                                                     ?>">
                                                         <?php echo ucfirst($type); ?>
                                                     </span>
@@ -177,9 +178,9 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                                 <span>₦<?php echo number_format($total, 2); ?></span>
                                             </div>
                                             <div class="progress app-progress-h-10">
-                                                <div class="progress-bar bg-<?php 
-                                                    echo $type == 'poultry' ? 'info' : 
-                                                         ($type == 'ruminant' ? 'warning' : 'secondary'); 
+                                                <div class="progress-bar bg-<?php
+                                                    echo $type == 'poultry' ? 'info' :
+                                                         ($type == 'ruminant' ? 'warning' : 'secondary');
                                                 ?> <?php echo app_percent_class($percentage); ?>"></div>
                                             </div>
                                             <small class="text-muted"><?php echo number_format($percentage, 1); ?>%</small>
@@ -188,7 +189,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <!-- Category Breakdown -->
                             <div class="col-md-6">
                                 <div class="card">
@@ -196,13 +197,13 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                         <h6>By Category</h6>
                                     </div>
                                     <div class="card-body">
-                                        <?php foreach ($categoryTotals as $cat => $total): 
+                                        <?php foreach ($categoryTotals as $cat => $total):
                                             $percentage = $totalExpenses > 0 ? ($total / $totalExpenses * 100) : 0;
                                         ?>
                                         <div class="mb-3">
                                             <div class="d-flex justify-content-between mb-1">
                                                 <span>
-                                                    <span class="badge bg-<?php 
+                                                    <span class="badge bg-<?php
                                                         switch($cat) {
                                                             case 'feeds': echo 'primary'; break;
                                                             case 'medication': echo 'success'; break;
@@ -218,7 +219,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                                 <span>₦<?php echo number_format($total, 2); ?></span>
                                             </div>
                                             <div class="progress app-progress-h-10">
-                                                <div class="progress-bar bg-<?php 
+                                                <div class="progress-bar bg-<?php
                                                     switch($cat) {
                                                         case 'feeds': echo 'primary'; break;
                                                         case 'medication': echo 'success'; break;
@@ -236,7 +237,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Detailed Expenses Table -->
                         <div class="table-responsive">
                             <table class="table table-striped table-hover">
@@ -277,16 +278,16 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                                 <strong><?php echo date('d/m/Y', strtotime($expense['expense_date'])); ?></strong>
                                             </td>
                                             <td>
-                                                <span class="badge bg-<?php 
-                                                    echo $expense['farm_type'] == 'poultry' ? 'info' : 
-                                                         ($expense['farm_type'] == 'ruminant' ? 'warning' : 'secondary'); 
+                                                <span class="badge bg-<?php
+                                                    echo $expense['farm_type'] == 'poultry' ? 'info' :
+                                                         ($expense['farm_type'] == 'ruminant' ? 'warning' : 'secondary');
                                                 ?>">
                                                     <?php echo ucfirst($expense['farm_type']); ?>
                                                 </span>
                                             </td>
                                             <td><span class="badge bg-light text-dark border"><?php echo htmlspecialchars(attribution_label($expense['production_type'] ?? null)); ?></span></td>
                                             <td>
-                                                <span class="badge bg-<?php 
+                                                <span class="badge bg-<?php
                                                     switch($expense['category']) {
                                                         case 'feeds': echo 'primary'; break;
                                                         case 'medication': echo 'success'; break;
@@ -312,7 +313,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                                 <?php echo app_html($expense['description'] ?: '--'); ?>
                                             </td>
                                             <td>
-                                                <small><?php echo app_html($expense['full_name']); ?></small>
+                                                <small><?php echo app_html(transaction_recorded_by_label_from_row($pdo, $tenantFarmId, $expense)); ?></small>
                                             </td>
                                             <?php if ($canManageExpenses): ?>
                                             <td>

@@ -15,6 +15,7 @@ if (!function_exists('isPlatformOwner') || !isPlatformOwner()) return;
 if (!isset($pdo) || !($pdo instanceof PDO)) return;
 
 require_once __DIR__ . '/platform_owner_tenant_view.php';
+require_once dirname(__DIR__) . '/lib/transaction_actor_display.php';
 
 $subscriptionHistoryTenant = platform_owner_tenant_from_request($pdo, 'farm_id');
 $subscriptionHistoryTenantId = $subscriptionHistoryTenant ? (int)$subscriptionHistoryTenant['id'] : 0;
@@ -37,7 +38,7 @@ if ($subscriptionHistoryTenantId > 0 && $subscriptionHistoryReady) {
     if ($userIds) {
         $placeholders = implode(',', array_fill(0, count($userIds), '?'));
         $stmt = $pdo->prepare(
-            "SELECT id, username, full_name
+            "SELECT id, username, full_name, user_type
              FROM users
              WHERE id IN ({$placeholders})"
         );
@@ -134,13 +135,35 @@ if ($subscriptionHistoryTenantId > 0) {
                     $extras = $subscriptionHistoryExtras($row['seat_addons_snapshot'] ?? '{}');
                     $recordedById = (int)($row['recorded_by_user_id'] ?? 0);
                     $recordedBy = $subscriptionHistoryUsers[$recordedById] ?? null;
-                    $recordedByLabel = 'System';
+                    $recordedByName = null;
+                    $recordedByType = null;
+
                     if ($recordedBy) {
-                        $recordedByLabel = trim((string)($recordedBy['full_name'] ?? ''));
-                        if ($recordedByLabel === '') $recordedByLabel = (string)($recordedBy['username'] ?? ('User #' . $recordedById));
+                        $recordedByName = trim(
+                            (string)($recordedBy['full_name'] ?? '')
+                        );
+
+                        if ($recordedByName === '') {
+                            $recordedByName =
+                                (string)($recordedBy['username'] ?? '');
+                        }
+
+                        $recordedByType =
+                            $recordedBy['user_type'] ?? null;
                     } elseif ($recordedById > 0) {
-                        $recordedByLabel = 'User #' . $recordedById;
+                        $recordedByName =
+                            'User #' . $recordedById;
                     }
+
+                    $recordedByLabel =
+                        transaction_recorded_by_label(
+                            (string)(
+                                $subscriptionHistoryTenant['name']
+                                ?? 'Farm'
+                            ),
+                            $recordedByName,
+                            $recordedByType
+                        );
                     $status = strtolower((string)($row['status'] ?? ''));
                 ?>
                     <tr>

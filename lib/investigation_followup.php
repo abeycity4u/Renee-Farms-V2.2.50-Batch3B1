@@ -10,16 +10,16 @@ function investigation_followup_episode_key(string $type,string $issue,string $f
  return substr(hash('sha256',$type.'|'.$issue.'|'.$fromDate.'|'.$toDate),0,48);
 }
 function investigation_followup_get(PDO $pdo,int $farmId,string $type,int $subjectId,string $issue,string $episodeKey): ?array {
- $s=$pdo->prepare('SELECT f.*,u.username recorded_by_name,ru.username resolved_by_name FROM management_investigation_followups f LEFT JOIN users u ON u.id=f.recorded_by LEFT JOIN users ru ON ru.id=f.resolved_by WHERE f.farm_id=? AND f.investigation_type=? AND f.subject_id=? AND f.issue_type=? AND f.episode_key=? LIMIT 1');
+ $s=$pdo->prepare('SELECT f.*,COALESCE(NULLIF(u.full_name,\'\'),u.username) recorded_by_name,u.user_type recorded_by_user_type,COALESCE(NULLIF(ru.full_name,\'\'),ru.username) resolved_by_name,ru.user_type resolved_by_user_type FROM management_investigation_followups f LEFT JOIN users u ON u.id=f.recorded_by LEFT JOIN users ru ON ru.id=f.resolved_by WHERE f.farm_id=? AND f.investigation_type=? AND f.subject_id=? AND f.issue_type=? AND f.episode_key=? LIMIT 1');
  $s->execute([$farmId,$type,$subjectId,$issue,$episodeKey]); return $s->fetch(PDO::FETCH_ASSOC)?:null;
 }
 function investigation_followup_latest_prior(PDO $pdo,int $farmId,string $type,int $subjectId,string $issue,string $asOf,string $excludeEpisode=''): ?array {
- $sql='SELECT f.*,u.username recorded_by_name,ru.username resolved_by_name FROM management_investigation_followups f LEFT JOIN users u ON u.id=f.recorded_by LEFT JOIN users ru ON ru.id=f.resolved_by WHERE f.farm_id=? AND f.investigation_type=? AND f.subject_id=? AND f.issue_type=? AND f.as_of_date<=?';
+ $sql='SELECT f.*,COALESCE(NULLIF(u.full_name,\'\'),u.username) recorded_by_name,u.user_type recorded_by_user_type,COALESCE(NULLIF(ru.full_name,\'\'),ru.username) resolved_by_name,ru.user_type resolved_by_user_type FROM management_investigation_followups f LEFT JOIN users u ON u.id=f.recorded_by LEFT JOIN users ru ON ru.id=f.resolved_by WHERE f.farm_id=? AND f.investigation_type=? AND f.subject_id=? AND f.issue_type=? AND f.as_of_date<=?';
  $args=[$farmId,$type,$subjectId,$issue,$asOf]; if($excludeEpisode!==''){ $sql.=' AND f.episode_key<>?'; $args[]=$excludeEpisode; }
  $sql.=' ORDER BY f.as_of_date DESC,f.id DESC LIMIT 1'; $s=$pdo->prepare($sql);$s->execute($args);return $s->fetch(PDO::FETCH_ASSOC)?:null;
 }
 function investigation_followup_prior_history(PDO $pdo,int $farmId,string $type,int $subjectId,string $issue,string $asOf,string $excludeEpisode='',int $limit=20): array {
- $sql='SELECT f.*,u.username recorded_by_name,ru.username resolved_by_name FROM management_investigation_followups f LEFT JOIN users u ON u.id=f.recorded_by LEFT JOIN users ru ON ru.id=f.resolved_by WHERE f.farm_id=? AND f.investigation_type=? AND f.subject_id=? AND f.issue_type=? AND f.as_of_date<=?';
+ $sql='SELECT f.*,COALESCE(NULLIF(u.full_name,\'\'),u.username) recorded_by_name,u.user_type recorded_by_user_type,COALESCE(NULLIF(ru.full_name,\'\'),ru.username) resolved_by_name,ru.user_type resolved_by_user_type FROM management_investigation_followups f LEFT JOIN users u ON u.id=f.recorded_by LEFT JOIN users ru ON ru.id=f.resolved_by WHERE f.farm_id=? AND f.investigation_type=? AND f.subject_id=? AND f.issue_type=? AND f.as_of_date<=?';
  $args=[$farmId,$type,$subjectId,$issue,$asOf]; if($excludeEpisode!==''){ $sql.=' AND f.episode_key<>?'; $args[]=$excludeEpisode; }
  $sql.=' ORDER BY f.as_of_date DESC,f.id DESC LIMIT '.max(1,min(100,$limit)); $st=$pdo->prepare($sql);$st->execute($args);return $st->fetchAll(PDO::FETCH_ASSOC);
 }
@@ -59,7 +59,7 @@ function investigation_followup_annotate_signals(PDO $pdo, int $farmId, array $s
     }
     if(!$targets) return $signals;
 
-    $stmt=$pdo->prepare("SELECT f.*,u.username recorded_by_name,ru.username resolved_by_name
+    $stmt=$pdo->prepare("SELECT f.*,COALESCE(NULLIF(u.full_name,\'\'),u.username) recorded_by_name,u.user_type recorded_by_user_type,COALESCE(NULLIF(ru.full_name,\'\'),ru.username) resolved_by_name,ru.user_type resolved_by_user_type
         FROM management_investigation_followups f
         LEFT JOIN users u ON u.id=f.recorded_by
         LEFT JOIN users ru ON ru.id=f.resolved_by

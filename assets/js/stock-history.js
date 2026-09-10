@@ -90,7 +90,7 @@ function renderTable(transactions) {
             <td>${escapeHtml(attributionText(tx))}</td>
             <td>${tx.cycle_code ? '<strong>' + escapeHtml(tx.cycle_code) + '</strong>' : '<span class="text-muted">Shared / No specific cycle</span>'}</td>
             <td>${tx.remarks ? escapeHtml(tx.remarks) : ''}</td>
-            <td>${tx.full_name ? escapeHtml(tx.full_name) : 'N/A'}</td>
+            <td>${tx.recorded_by_label ? escapeHtml(tx.recorded_by_label) : 'N/A'}</td>
             <td>${Number(tx.is_reversed) === 1 ? '<span class="badge bg-secondary">Reversed</span>' : (tx.reversal_of_id ? '<span class="badge bg-info text-dark">Restoration</span>' : '<span class="badge bg-success">Active</span>')}</td>
             <td>${tx.created_at ? new Date(tx.created_at.replace(' ', 'T') + 'Z').toLocaleString() : 'N/A'}</td>
         `;
