@@ -25,35 +25,101 @@ if (!in_array($mode, ['--preflight', '--apply'], true)) {
     exit(1);
 }
 
-$bootstrapOverride = trim(
-    (string)(getenv('RENEE_MIGRATION_CONFIG') ?: '')
+$bootstrapMode = trim(
+    (string)(
+        getenv('RENEE_MIGRATION_DB_BOOTSTRAP')
+        ?: 'config'
+    )
 );
 
-$configPath = $bootstrapOverride !== ''
-    ? $bootstrapOverride
-    : dirname(__DIR__) . '/config.php';
-
-if (!is_file($configPath) || !is_readable($configPath)) {
+if (!in_array(
+    $bootstrapMode,
+    ['config', 'env'],
+    true
+)) {
     fwrite(
         STDERR,
-        "FAIL: migration database bootstrap is unavailable.\n"
+        "FAIL: unsupported migration database bootstrap mode.\n"
     );
     exit(1);
 }
 
-if (empty($_SERVER['DOCUMENT_ROOT'])) {
-    $_SERVER['DOCUMENT_ROOT'] = dirname($configPath);
-}
+if ($bootstrapMode === 'env') {
+    $requiredDbEnv = [
+        'DB_HOST',
+        'DB_USER',
+        'DB_PASS',
+        'DB_NAME',
+    ];
 
-require_once $configPath;
+    foreach ($requiredDbEnv as $name) {
+        $value = getenv($name);
 
-if (!isset($pdo) || !($pdo instanceof PDO)) {
-    fwrite(
-        STDERR,
-        "FAIL: migration database bootstrap did not provide PDO.\n"
+        if ($value === false || $value === '') {
+            fwrite(
+                STDERR,
+                "FAIL: required migration database environment is incomplete.\n"
+            );
+            exit(1);
+        }
+    }
+
+    try {
+        $pdo = new PDO(
+            'mysql:host='
+            . getenv('DB_HOST')
+            . ';dbname='
+            . getenv('DB_NAME'),
+            getenv('DB_USER'),
+            getenv('DB_PASS')
+        );
+
+        $pdo->setAttribute(
+            PDO::ATTR_ERRMODE,
+            PDO::ERRMODE_EXCEPTION
+        );
+    } catch (Throwable $e) {
+        fwrite(
+            STDERR,
+            "FAIL: migration database environment connection failed.\n"
+        );
+        exit(1);
+    }
+} else {
+    $bootstrapOverride = trim(
+        (string)(getenv('RENEE_MIGRATION_CONFIG') ?: '')
     );
-    exit(1);
+
+    $configPath = $bootstrapOverride !== ''
+        ? $bootstrapOverride
+        : dirname(__DIR__) . '/config.php';
+
+    if (!is_file($configPath)
+        || !is_readable($configPath)) {
+        fwrite(
+            STDERR,
+            "FAIL: migration database bootstrap is unavailable.\n"
+        );
+        exit(1);
+    }
+
+    if (empty($_SERVER['DOCUMENT_ROOT'])) {
+        $_SERVER['DOCUMENT_ROOT'] =
+            dirname($configPath);
+    }
+
+    require_once $configPath;
+
+    if (!isset($pdo)
+        || !($pdo instanceof PDO)) {
+        fwrite(
+            STDERR,
+            "FAIL: migration database bootstrap did not provide PDO.\n"
+        );
+        exit(1);
+    }
 }
+
 
 $migrationName =
     '046_billing_seat_quote_snapshot.sql';

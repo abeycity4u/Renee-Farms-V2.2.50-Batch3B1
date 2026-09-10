@@ -305,10 +305,11 @@ $check(
 );
 
 $check(
-    strpos(
-        $runner,
-        "\$_SERVER['DOCUMENT_ROOT'] = dirname(\$configPath)"
-    ) !== false,
+    preg_match(
+        '/\$_SERVER\s*\[\s*[\'"]DOCUMENT_ROOT[\'"]\s*\]'
+        . '\s*=\s*dirname\s*\(\s*\$configPath\s*\)\s*;/',
+        $runner
+    ) === 1,
     'CLI bootstrap supplies a document root without altering config.php'
 );
 
@@ -319,6 +320,80 @@ $check(
     ) !== false,
     'runner fails closed unless bootstrap provides a PDO connection'
 );
+
+$check(
+    strpos(
+        $runner,
+        "getenv('RENEE_MIGRATION_DB_BOOTSTRAP')"
+    ) !== false
+    && preg_match(
+        "/\\['config',\\s*'env'\\]/",
+        $runner
+    ) === 1,
+    'runner supports explicit config or environment database bootstrap'
+);
+
+$requiredDbEnvContract =
+    preg_match(
+        '/\$requiredDbEnv\s*=\s*\[[\s\S]*?'
+        . "'DB_HOST'[\s\S]*?"
+        . "'DB_USER'[\s\S]*?"
+        . "'DB_PASS'[\s\S]*?"
+        . "'DB_NAME'[\s\S]*?"
+        . '\];/',
+        $runner
+    ) === 1;
+
+$requiredDbEnvLoop =
+    preg_match(
+        '/foreach\s*\(\s*\$requiredDbEnv\s+'
+        . 'as\s+\$name\s*\)/',
+        $runner
+    ) === 1;
+
+$check(
+    $requiredDbEnvContract
+    && $requiredDbEnvLoop,
+    'environment bootstrap requires the complete DB environment contract'
+);
+
+$check(
+    strpos(
+        $runner,
+        'migration database environment connection failed'
+    ) !== false
+    && preg_match(
+        '/catch\s*\(Throwable\s+\$e\)[\s\S]*?'
+        . "exit\\(1\\)/",
+        $runner
+    ) === 1,
+    'environment bootstrap fails with nonzero status on PDO connection failure'
+);
+
+$check(
+    strpos(
+        $runner,
+        'PDO::ATTR_ERRMODE'
+    ) !== false
+    && strpos(
+        $runner,
+        'PDO::ERRMODE_EXCEPTION'
+    ) !== false,
+    'environment bootstrap enables PDO exception mode'
+);
+
+$check(
+    strpos(
+        $runner,
+        "?: 'config'"
+    ) !== false
+    && strpos(
+        $runner,
+        "getenv('RENEE_MIGRATION_CONFIG')"
+    ) !== false,
+    'existing config bootstrap remains the default compatibility path'
+);
+
 
 echo PHP_EOL;
 echo 'Checks: ' . $checks . PHP_EOL;
