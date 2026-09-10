@@ -5,6 +5,7 @@ require_once(__DIR__ . '/../lib/stock_transaction_display.php');
 require_once(__DIR__ . '/../lib/stock_reporting.php');
 require_once(__DIR__ . '/../lib/attribution.php');
 require_once(__DIR__ . '/../lib/manual_feed_transactions.php');
+require_once(__DIR__ . '/../lib/transaction_actor_display.php');
 requireLogin();
 
 // Check access
@@ -15,6 +16,7 @@ if (!checkAccess('poultry') && !$isOwner) {
 }
 
 $tenantFarmId = requireCurrentFarmId();
+$recordedFarmName = farmBrandName();
 $month = $_GET['month'] ?? date('Y-m');
 $yearMonth = date('Y-m', strtotime($month));
 $ledgerView = (($_GET['ledger_view'] ?? 'operational') === 'audit') ? 'audit' : 'operational';
@@ -23,7 +25,7 @@ $startDate = date('Y-m-01', strtotime($yearMonth));
 $endDate = date('Y-m-t', strtotime($yearMonth));
 
 // Get feed transactions for the month
-$query = "SELECT t.*, s.item_name, s.unit, u.full_name, pc.cycle_code, pc.production_type AS cycle_production_type
+$query = "SELECT t.*, s.item_name, s.unit, u.full_name, u.user_type AS recorded_user_type, pc.cycle_code, pc.production_type AS cycle_production_type
           FROM stock_transactions t
           JOIN stock_items s ON t.stock_item_id = s.id
           LEFT JOIN production_cycles pc ON pc.id=t.cycle_id AND pc.farm_id=t.farm_id
@@ -104,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_transaction'])
         if (!$transaction) throw new RuntimeException('Transaction not found.');
         delete_manual_feed_transaction($pdo, $tenantFarmId, $transactionId, (int)$_SESSION['user_id'], 'poultry');
         $pdo->commit();
-        $_SESSION['success'] = 'Transaction deleted and stock restored successfully.';
+        $_SESSION['success'] = 'Transaction reversed and stock restored successfully.';
         $redirectMonth = date('Y-m', strtotime($transaction['transaction_date']));
         header("Location: broiler_feeds.php?month={$redirectMonth}");
         exit();
@@ -130,7 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_transaction']) &
     $dateObject = DateTime::createFromFormat('Y-m-d', $newDate);
     $redirectMonth = $dateObject ? $dateObject->format('Y-m') : date('Y-m');
     try {
-        if ($newItemId <= 0 || $newQuantity <= 0 || !in_array($newType, ['received','used'], true) || !$dateObject || $dateObject->format('Y-m-d') !== $newDate) {
+        if ($newItemId <= 0 || $newQuantity <= 0 || $newType !== 'used' || !$dateObject || $dateObject->format('Y-m-d') !== $newDate) {
             throw new RuntimeException('Please provide a valid feed item, transaction type, positive quantity, and date.');
         }
         $pdo->beginTransaction();
@@ -253,7 +255,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_transaction']) &
 
                         <!-- Transactions Table -->
                         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-                            <div><h5 class="mb-0">Monthly Transactions</h5><div class="small text-muted feed-view-note">Operational View shows current valid activity. Full Audit includes reversed originals and restoration rows.</div></div>
+                            <div><h5 class="mb-0">Monthly Transactions</h5><div class="small text-muted feed-view-note">Operational View shows current valid activity. Full Audit is read-only and includes reversed originals and restoration rows.</div></div>
                             <div class="btn-group btn-group-sm feed-audit-toggle" role="group" aria-label="Transaction view"><a class="btn <?php echo $ledgerView==='operational'?'btn-primary active':'btn-outline-primary'; ?>" href="?month=<?php echo urlencode($yearMonth); ?>&ledger_view=operational">Operational View</a><a class="btn <?php echo $ledgerView==='audit'?'btn-primary active':'btn-outline-primary'; ?>" href="?month=<?php echo urlencode($yearMonth); ?>&ledger_view=audit">Full Audit</a></div>
                         </div>
                         <div class="table-responsive">
@@ -272,7 +274,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_transaction']) &
                                         <th>Remarks</th>
                                         <th>Origin</th>
                                         <th>Recorded By</th>
-                                        <?php if ($isOwner): ?>
+                                        <?php if ($isOwner && $ledgerView === 'operational'): ?>
                                             <th>Actions</th>
                                         <?php endif; ?>
                                     </tr>
@@ -280,7 +282,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_transaction']) &
                                 <tbody>
                                     <?php if (empty($displayTransactions)): ?>
                                     <tr>
-                                        <td colspan="<?php echo $isOwner ? '11' : '10'; ?>" class="text-center text-muted py-4">
+                                        <td colspan="<?php echo ($isOwner && $ledgerView === 'operational') ? '13' : '12'; ?>" class="text-center text-muted py-4">
                                             <i class="bi bi-inbox display-4 d-block mb-2"></i>
                                             No transactions recorded for this month
                                         </td>
@@ -318,40 +320,99 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_transaction']) &
                                                 <span class="text-muted">--</span>
                                                 <?php endif; ?>
                                             </td>
-                                            <td><?php if (!empty($trans['source_type']) && str_starts_with((string)$trans['source_type'], 'daily_')): ?><span class="badge bg-primary">Daily Record</span><?php else: ?><span class="badge bg-secondary">Stock / Manual</span><?php endif; ?></td>
+                                            <td><span class="badge bg-secondary"><?php echo htmlspecialchars(manual_feed_transaction_origin_label($trans)); ?></span></td>
                                             <td>
-                                                <small><?php echo htmlspecialchars($trans['full_name'] ?? 'System'); ?></small>
+                                                <small><?php echo htmlspecialchars(transaction_recorded_by_label($recordedFarmName, $trans['full_name'] ?? null, $trans['recorded_user_type'] ?? null)); ?></small>
                                             </td>
-                                            <?php if ($isOwner): ?>
+                                            <?php if ($isOwner && $ledgerView === 'operational'): ?>
                                             <td>
                                                 <div class="d-flex gap-2 align-items-center">
-                                                    <?php if (!empty($trans['is_reversed'])): ?>
-                                                        <span class="badge bg-light text-secondary border" title="This Daily Record movement has been reversed and is kept for audit history.">Reversed — Daily Record</span>
-                                                    <?php elseif (!empty($trans['reversal_of_id'])): ?>
-                                                        <span class="badge bg-light text-info border" title="This is an automatic restoration linked to a Daily Record edit or deletion.">Restoration — Daily Record</span>
-                                                    <?php elseif (!empty($trans['source_type']) && str_starts_with((string)$trans['source_type'], 'daily_')): ?>
-                                                        <span class="badge bg-light text-primary border" title="Managed from the daily record">Managed by Daily Record</span>
-                                                    <?php else: ?>
-                                                    <button
-                                                        type="button"
-                                                        class="btn btn-sm btn-outline-primary edit-transaction"
-                                                        data-id="<?php echo $trans['id']; ?>"
-                                                        data-date="<?php echo date('Y-m-d', strtotime($trans['transaction_date'])); ?>"
-                                                        data-item="<?php echo $trans['stock_item_id']; ?>"
-                                                        data-type="<?php echo $trans['transaction_type']; ?>"
-                                                        data-cycle="<?php echo (int)($trans['cycle_id'] ?? 0); ?>"
-                                                        data-quantity="<?php echo number_format((float)$trans['quantity'], 2); ?>"
-                                                        data-remarks="<?php echo htmlspecialchars($trans['remarks'], ENT_QUOTES); ?>"
-                                                    >
-                                                        <i class="bi bi-pencil-square"></i>
-                                                    </button>
-                                                    <form method="POST" data-confirm="Delete this transaction? This action cannot be undone." data-confirm-title="Delete feed transaction?" data-confirm-button="Delete">
-                                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>">
-                                                        <input type="hidden" name="transaction_id" value="<?php echo $trans['id']; ?>">
-                                                        <button type="submit" name="delete_transaction" class="btn btn-sm btn-outline-danger">
-                                                            <i class="bi bi-trash"></i>
+                                                    <?php
+                                                    $feedActionState =
+                                                        manual_feed_transaction_action_state($trans);
+                                                    ?>
+
+                                                    <?php if ($feedActionState === 'reversed'): ?>
+                                                        <span
+                                                            class="badge bg-light text-secondary border"
+                                                            title="The original movement has been reversed and remains in Full Audit."
+                                                        >
+                                                            Reversed — retained in audit
+                                                        </span>
+
+                                                    <?php elseif ($feedActionState === 'restoration'): ?>
+                                                        <span
+                                                            class="badge bg-light text-info border"
+                                                            title="This is an automatic restoration or correction ledger row."
+                                                        >
+                                                            Restoration / Correction
+                                                        </span>
+
+                                                    <?php elseif ($feedActionState === 'daily_record'): ?>
+                                                        <span
+                                                            class="badge bg-light text-primary border"
+                                                            title="Correct this movement from its Daily Record."
+                                                        >
+                                                            Managed by Daily Record
+                                                        </span>
+
+                                                    <?php elseif ($feedActionState === 'inventory'): ?>
+                                                        <span
+                                                            class="badge bg-light text-success border"
+                                                            title="Correct this movement from Inventory so receipt costing remains accurate."
+                                                        >
+                                                            Managed by Inventory
+                                                        </span>
+
+                                                    <?php elseif ($feedActionState === 'manual_editable'): ?>
+                                                        <button
+                                                            type="button"
+                                                            class="btn btn-sm btn-outline-primary edit-transaction"
+                                                            title="Edit manual feed usage"
+                                                            data-id="<?php echo (int)$trans['id']; ?>"
+                                                            data-date="<?php echo date('Y-m-d', strtotime($trans['transaction_date'])); ?>"
+                                                            data-item="<?php echo (int)$trans['stock_item_id']; ?>"
+                                                            data-cycle="<?php echo (int)($trans['cycle_id'] ?? 0); ?>"
+                                                            data-quantity="<?php echo number_format((float)$trans['quantity'], 2, '.', ''); ?>"
+                                                            data-remarks="<?php echo htmlspecialchars((string)$trans['remarks'], ENT_QUOTES); ?>"
+                                                        >
+                                                            <i class="bi bi-pencil-square"></i>
                                                         </button>
-                                                    </form>
+
+                                                        <form
+                                                            method="POST"
+                                                            class="d-inline"
+                                                            data-confirm="Reverse this manual feed-use transaction? The original entry will remain in Full Audit and the stock movement will be restored."
+                                                            data-confirm-title="Reverse feed transaction?"
+                                                            data-confirm-button="Reverse Transaction"
+                                                        >
+                                                            <input
+                                                                type="hidden"
+                                                                name="csrf_token"
+                                                                value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>"
+                                                            >
+                                                            <input
+                                                                type="hidden"
+                                                                name="transaction_id"
+                                                                value="<?php echo (int)$trans['id']; ?>"
+                                                            >
+                                                            <button
+                                                                type="submit"
+                                                                name="delete_transaction"
+                                                                class="btn btn-sm btn-outline-danger"
+                                                                title="Reverse manual feed transaction"
+                                                            >
+                                                                <i class="bi bi-arrow-counterclockwise"></i>
+                                                            </button>
+                                                        </form>
+
+                                                    <?php else: ?>
+                                                        <span
+                                                            class="badge bg-light text-secondary border"
+                                                            title="This ledger entry is read-only from the Feed Record."
+                                                        >
+                                                            Read-only
+                                                        </span>
                                                     <?php endif; ?>
                                                 </div>
                                             </td>
@@ -411,9 +472,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_transaction']) &
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label>Transaction Type</label>
-                                <select name="transaction_type" id="editTransactionType" class="form-select" required>
-                                    <option value="used">⬇ Used Stock (-)</option>
+                                <select id="editTransactionType" class="form-select" disabled>
+                                    <option selected>⬇ Used Stock (-)</option>
                                 </select>
+                                <input
+                                    type="hidden"
+                                    name="transaction_type"
+                                    value="used"
+                                >
+                                <small class="text-muted">
+                                    Received feed stock is managed from Inventory
+                                    so receipt costing remains accurate.
+                                </small>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label>Quantity</label>

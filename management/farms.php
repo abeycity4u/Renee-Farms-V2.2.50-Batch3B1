@@ -289,8 +289,8 @@ $editRoleLimits = loadRoleLimits($pdo, (int)($editFarm['id'] ?? 0));
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($error) && isset($roleLimits)) $editRoleLimits = $roleLimits;
 $moduleLabels = farm_entitlement_module_labels();
 ?>
-<!doctype html><html lang="en"><head><?php include dirname(__DIR__) . '/navbar_head.php'; ?><title>Platform farms</title></head><body><?php include dirname(__DIR__) . '/navbar.php'; ?>
-<main class="container py-4"><div class="d-flex justify-content-between app-responsive-toolbar"><h1 class="h3">Platform farms</h1><span class="badge bg-dark">Owner / Developer</span></div>
+<!doctype html><html lang="en"><head><?php include dirname(__DIR__) . '/navbar_head.php'; ?><title>Farms &amp; Tenants</title></head><body><?php include dirname(__DIR__) . '/navbar.php'; ?>
+<main class="container py-4"><div class="d-flex justify-content-between app-responsive-toolbar"><h1 class="h3">Farms &amp; Tenants</h1><span class="badge bg-dark">Owner / Developer</span></div>
 <?php if (!empty($error)): ?><?php renderNotification('error', $error, 'Farm action could not be completed.'); ?><?php endif; ?>
 <?php if ($ownerNeedsRepair): ?><?php renderNotification('warning', 'This farm was only partially created and has no admin account. Complete the username, password, name, and subscribed modules below; saving will create and link its admin safely.', 'Farm setup needs attention.'); ?><?php endif; ?>
 <div class="card my-3"><div class="card-body"><h2 class="h5"><?php echo $editFarm ? 'Edit Farm' : 'Add New Farm'; ?></h2><form method="post" enctype="multipart/form-data" class="row g-3" id="farmAccountForm" novalidate><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token()); ?>"><?php if ($editFarm): ?><input type="hidden" name="farm_id" value="<?php echo (int)$editFarm['id']; ?>"><?php endif; ?>

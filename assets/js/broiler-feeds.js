@@ -33,12 +33,11 @@ $(document).ready(function() {
         
         // Show messages
 
-        $('.edit-transaction').on('click', function() {
+        $('#feedsTable').on('click', '.edit-transaction', function() {
             const button = $(this);
             $('#editTransactionId').val(button.data('id'));
             $('#editTransactionDate').val(button.data('date'));
             $('#editFeedItem').val(button.data('item'));
-            $('#editTransactionType').val(button.data('type'));
             $('#editCycleId').val(button.data('cycle') || 0);
             $('#editQuantity').val(button.data('quantity'));
             $('#editRemarks').val(button.data('remarks'));

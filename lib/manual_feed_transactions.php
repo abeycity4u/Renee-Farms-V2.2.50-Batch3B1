@@ -2,6 +2,84 @@
 require_once __DIR__ . '/stock_service.php';
 
 /**
+ * Canonical feed-ledger action classification.
+ *
+ * Corrections are deliberately origin-aware:
+ * - manual feed usage: correct from Feed Record
+ * - Inventory movement/receipt: correct from Inventory
+ * - Daily Record movement: correct from Daily Record
+ * - reversals/restorations: immutable audit evidence
+ */
+function manual_feed_transaction_action_state(array $transaction): string
+{
+    if (!empty($transaction['is_reversed'])) {
+        return 'reversed';
+    }
+
+    if (!empty($transaction['reversal_of_id'])) {
+        return 'restoration';
+    }
+
+    $sourceType = trim((string)($transaction['source_type'] ?? ''));
+    $transactionType = strtolower(
+        trim((string)($transaction['transaction_type'] ?? ''))
+    );
+
+    if (
+        $sourceType !== '' &&
+        str_starts_with($sourceType, 'daily_')
+    ) {
+        return 'daily_record';
+    }
+
+    if (
+        $sourceType === 'inventory_api' ||
+        $transactionType === 'received'
+    ) {
+        return 'inventory';
+    }
+
+    if (
+        $sourceType === 'manual_feed' &&
+        $transactionType === 'used'
+    ) {
+        return 'manual_editable';
+    }
+
+    return 'readonly';
+}
+
+function manual_feed_transaction_origin_label(array $transaction): string
+{
+    $sourceType = trim((string)($transaction['source_type'] ?? ''));
+
+    if (!empty($transaction['reversal_of_id'])) {
+        return 'Ledger Correction';
+    }
+
+    if (
+        $sourceType !== '' &&
+        str_starts_with($sourceType, 'daily_')
+    ) {
+        return 'Daily Record';
+    }
+
+    if ($sourceType === 'inventory_api') {
+        return 'Inventory';
+    }
+
+    if ($sourceType === 'manual_feed') {
+        return 'Manual Feed';
+    }
+
+    if (strpos($sourceType, 'reversal') !== false) {
+        return 'Ledger Correction';
+    }
+
+    return 'Stock Ledger';
+}
+
+/**
  * Create a manual feed transaction (feed-record pages). Usage is currently
  * the normal manual action; received movements are still supported for
  * future/admin use.
