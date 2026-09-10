@@ -125,7 +125,7 @@ $pdfReportUrl = pdf_report_current_url();
                         <div class="d-flex flex-wrap gap-2">
                             <input type="date" class="form-control js-calendar-input app-month-selector" id="monthSelector"
                                    value="<?php echo $monthSelectorDate; ?>">
-                            <a class="btn btn-outline-primary" href="<?php echo htmlspecialchars($pdfReportUrl); ?>" target="_blank"><i class="bi bi-file-earmark-pdf"></i> PDF Report</a>
+                            <a class="btn btn-light" href="<?php echo htmlspecialchars($pdfReportUrl); ?>" target="_blank"><i class="bi bi-file-earmark-pdf"></i> PDF Report</a>
                             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addExpenseModal">
                                 <i class="bi bi-plus-circle"></i> Add Expense
                             </button>

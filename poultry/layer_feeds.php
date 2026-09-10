@@ -6,6 +6,8 @@ require_once(__DIR__ . '/../lib/stock_reporting.php');
 require_once(__DIR__ . '/../lib/attribution.php');
 require_once(__DIR__ . '/../lib/manual_feed_transactions.php');
 require_once(__DIR__ . '/../lib/transaction_actor_display.php');
+require_once(__DIR__ . '/../includes/pdf/PdfReportService.php');
+require_once(__DIR__ . '/../includes/pdf/FeedTransactionReport.php');
 requireLogin();
 
 // Check access
@@ -39,6 +41,18 @@ $stmt->execute([$tenantFarmId, $tenantFarmId, $startDate, $endDate]);
 $transactions = $stmt->fetchAll();
 enrichStockTransactionDisplaySnapshots($pdo, $tenantFarmId, $transactions);
 $displayTransactions = $ledgerView === 'audit' ? $transactions : array_values(array_filter($transactions, static fn($tx) => empty($tx['is_reversed']) && empty($tx['reversal_of_id'])));
+
+if (pdf_report_is_requested()) {
+    stream_feed_transaction_report_pdf(
+        $displayTransactions,
+        $recordedFarmName,
+        $yearMonth,
+        $ledgerView,
+        'Layer'
+    );
+}
+
+$feedPdfUrl = pdf_report_current_url();
 
 // Get current poultry feed stock
 $stockQuery = "SELECT * FROM stock_items
@@ -257,7 +271,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_transaction']) &
                         <!-- Transactions Table -->
                         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
                             <div><h5 class="mb-0">Monthly Transactions</h5><div class="small text-muted feed-view-note">Operational View shows current valid activity. Full Audit is read-only and includes reversed originals and restoration rows.</div></div>
-                            <div class="btn-group btn-group-sm feed-audit-toggle" role="group" aria-label="Transaction view"><a class="btn <?php echo $ledgerView==='operational'?'btn-primary active':'btn-outline-primary'; ?>" href="?month=<?php echo urlencode($yearMonth); ?>&ledger_view=operational">Operational View</a><a class="btn <?php echo $ledgerView==='audit'?'btn-primary active':'btn-outline-primary'; ?>" href="?month=<?php echo urlencode($yearMonth); ?>&ledger_view=audit">Full Audit</a></div>
+                            <div class="d-flex flex-wrap gap-2 align-items-center">
+                                <a
+                                    class="btn btn-sm btn-primary"
+                                    href="<?php echo htmlspecialchars($feedPdfUrl); ?>"
+                                    target="_blank"
+                                >
+                                    <i class="bi bi-file-earmark-pdf"></i> PDF Report
+                                </a>
+                                <div class="btn-group btn-group-sm feed-audit-toggle" role="group" aria-label="Transaction view"><a class="btn <?php echo $ledgerView==='operational'?'btn-primary active':'btn-outline-primary'; ?>" href="?month=<?php echo urlencode($yearMonth); ?>&ledger_view=operational">Operational View</a><a class="btn <?php echo $ledgerView==='audit'?'btn-primary active':'btn-outline-primary'; ?>" href="?month=<?php echo urlencode($yearMonth); ?>&ledger_view=audit">Full Audit</a></div>
+                            </div>
                         </div>
                         <div class="table-responsive">
                             <table id="feedsTable" class="table table-striped table-hover align-middle poultry-table">
