@@ -25,7 +25,35 @@ if (!in_array($mode, ['--preflight', '--apply'], true)) {
     exit(1);
 }
 
-require_once dirname(__DIR__) . '/config.php';
+$bootstrapOverride = trim(
+    (string)(getenv('RENEE_MIGRATION_CONFIG') ?: '')
+);
+
+$configPath = $bootstrapOverride !== ''
+    ? $bootstrapOverride
+    : dirname(__DIR__) . '/config.php';
+
+if (!is_file($configPath) || !is_readable($configPath)) {
+    fwrite(
+        STDERR,
+        "FAIL: migration database bootstrap is unavailable.\n"
+    );
+    exit(1);
+}
+
+if (empty($_SERVER['DOCUMENT_ROOT'])) {
+    $_SERVER['DOCUMENT_ROOT'] = dirname($configPath);
+}
+
+require_once $configPath;
+
+if (!isset($pdo) || !($pdo instanceof PDO)) {
+    fwrite(
+        STDERR,
+        "FAIL: migration database bootstrap did not provide PDO.\n"
+    );
+    exit(1);
+}
 
 $migrationName =
     '046_billing_seat_quote_snapshot.sql';

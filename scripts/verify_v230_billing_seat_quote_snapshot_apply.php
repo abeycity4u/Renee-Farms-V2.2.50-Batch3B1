@@ -263,6 +263,51 @@ $check(
     'preflight validates parent key types before any DDL executes'
 );
 
+$check(
+    strpos(
+        $runner,
+        "getenv('RENEE_MIGRATION_CONFIG')"
+    ) !== false,
+    'runner supports an explicit migration config bootstrap override'
+);
+
+$check(
+    preg_match(
+        "/bootstrapOverride\\s*!==\\s*''[\\s\\S]*?"
+        . "dirname\\(__DIR__\\)\\s*\\.\\s*'\\/config\\.php'/",
+        $runner
+    ) === 1,
+    'runner retains repository config as the default bootstrap'
+);
+
+$check(
+    strpos(
+        $runner,
+        'is_file($configPath)'
+    ) !== false
+    && strpos(
+        $runner,
+        'is_readable($configPath)'
+    ) !== false,
+    'runner refuses an unavailable bootstrap path'
+);
+
+$check(
+    strpos(
+        $runner,
+        "\$_SERVER['DOCUMENT_ROOT'] = dirname(\$configPath)"
+    ) !== false,
+    'CLI bootstrap supplies a document root without altering config.php'
+);
+
+$check(
+    strpos(
+        $runner,
+        '!($pdo instanceof PDO)'
+    ) !== false,
+    'runner fails closed unless bootstrap provides a PDO connection'
+);
+
 echo PHP_EOL;
 echo 'Checks: ' . $checks . PHP_EOL;
 echo 'Failures: ' . $failures . PHP_EOL;
