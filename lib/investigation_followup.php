@@ -59,7 +59,7 @@ function investigation_followup_annotate_signals(PDO $pdo, int $farmId, array $s
     }
     if(!$targets) return $signals;
 
-    $stmt=$pdo->prepare("SELECT f.*,COALESCE(NULLIF(u.full_name,\'\'),u.username) recorded_by_name,u.user_type recorded_by_user_type,COALESCE(NULLIF(ru.full_name,\'\'),ru.username) resolved_by_name,ru.user_type resolved_by_user_type
+    $stmt=$pdo->prepare("SELECT f.*,COALESCE(NULLIF(u.full_name,''),u.username) recorded_by_name,u.user_type recorded_by_user_type,COALESCE(NULLIF(ru.full_name,''),ru.username) resolved_by_name,ru.user_type resolved_by_user_type
         FROM management_investigation_followups f
         LEFT JOIN users u ON u.id=f.recorded_by
         LEFT JOIN users ru ON ru.id=f.resolved_by

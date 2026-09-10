@@ -219,6 +219,26 @@ rb_check(
     'Investigation queries load Recorded By roles'
 );
 
+$annotatorSqlExpected = <<<'SQL'
+$stmt=$pdo->prepare("SELECT f.*,COALESCE(NULLIF(u.full_name,''),u.username)
+SQL;
+
+$annotatorSqlBad = <<<'SQL'
+$stmt=$pdo->prepare("SELECT f.*,COALESCE(NULLIF(u.full_name,\'
+SQL;
+
+rb_check(
+    strpos(
+        $investigationLib,
+        $annotatorSqlExpected
+    ) !== false &&
+    strpos(
+        $investigationLib,
+        $annotatorSqlBad
+    ) === false,
+    'Investigation signal annotator uses valid empty-name SQL literals'
+);
+
 
 echo "\n=== STOCK HISTORY ===\n";
 
