@@ -20,7 +20,7 @@ if (!function_exists('billing_payment_required_columns')) {
     {
         return [
             'billing_payment_attempts' => [
-                'id', 'farm_id', 'status', 'provider', 'provider_reference',
+                'id', 'farm_id', 'purpose', 'status', 'provider', 'provider_reference',
                 'provider_transaction_id', 'provider_subscription_id', 'plan_code',
                 'billing_interval', 'amount', 'currency', 'modules_snapshot',
                 'seat_addons_snapshot', 'quote_hash', 'initiated_by_user_id',
@@ -124,6 +124,35 @@ if (!function_exists('billing_payment_foundation_ready')) {
             && billing_payment_table_ready($pdo, 'billing_provider_events')
             && billing_payment_foundation_transactional($pdo)
             && billing_payment_foreign_keys_ready($pdo);
+    }
+}
+
+if (!function_exists('billing_payment_purposes')) {
+    function billing_payment_purposes(): array
+    {
+        return ['subscription', 'seat_topup'];
+    }
+}
+
+if (!function_exists('billing_payment_normalize_purpose')) {
+    function billing_payment_normalize_purpose(string $purpose): string
+    {
+        $purpose = strtolower(trim($purpose));
+
+        if (!in_array($purpose, billing_payment_purposes(), true)) {
+            throw new InvalidArgumentException('Unsupported billing payment purpose.');
+        }
+
+        return $purpose;
+    }
+}
+
+if (!function_exists('billing_payment_attempt_purpose')) {
+    function billing_payment_attempt_purpose(array $attempt): string
+    {
+        return billing_payment_normalize_purpose(
+            (string)($attempt['purpose'] ?? 'subscription')
+        );
     }
 }
 
@@ -294,7 +323,8 @@ if (!function_exists('billing_payment_attempt_create')) {
         string $currency,
         array $modules,
         array $seatAddOns = [],
-        ?int $initiatedByUserId = null
+        ?int $initiatedByUserId = null,
+        string $purpose = 'subscription'
     ): array {
         if (!billing_payment_foundation_ready($pdo)) {
             throw new RuntimeException('Billing payment storage is not transactionally ready. Apply migrations 042 and 043 first.');
@@ -305,6 +335,7 @@ if (!function_exists('billing_payment_attempt_create')) {
         $farmStmt->execute([$farmId]);
         if (!$farmStmt->fetchColumn()) throw new RuntimeException('Tenant farm could not be found for billing.');
 
+        $purpose = billing_payment_normalize_purpose($purpose);
         $provider = billing_payment_normalize_provider($provider);
         $providerReference = billing_payment_normalize_reference($providerReference);
         $built = billing_payment_build_quote($planCode, $billingInterval, $amount, $currency, $modules, $seatAddOns);
@@ -316,21 +347,28 @@ if (!function_exists('billing_payment_attempt_create')) {
             if (!hash_equals((string)$existing['quote_hash'], $quoteHash)) {
                 throw new RuntimeException('Provider reference already belongs to a different billing quote.');
             }
+
+            $existingPurpose = billing_payment_attempt_purpose($existing);
+            if (!hash_equals($existingPurpose, $purpose)) {
+                throw new RuntimeException('Provider reference already belongs to a different billing payment purpose.');
+            }
+
             return ['inserted' => false, 'id' => (int)$existing['id'], 'quote_hash' => $quoteHash, 'attempt' => $existing];
         }
 
         $initiatedByUserId = ($initiatedByUserId !== null && $initiatedByUserId > 0) ? $initiatedByUserId : null;
         $stmt = $pdo->prepare(
             'INSERT INTO billing_payment_attempts (
-                farm_id, status, provider, provider_reference, plan_code,
+                farm_id, purpose, status, provider, provider_reference, plan_code,
                 billing_interval, amount, currency, modules_snapshot,
                 seat_addons_snapshot, quote_hash, initiated_by_user_id
-             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
 
         try {
             $stmt->execute([
                 $farmId,
+                $purpose,
                 'initialized',
                 $provider,
                 $providerReference,
@@ -350,6 +388,12 @@ if (!function_exists('billing_payment_attempt_create')) {
             if (!$existing || !hash_equals((string)$existing['quote_hash'], $quoteHash)) {
                 throw new RuntimeException('Provider reference collision detected while creating the billing attempt.', 0, $e);
             }
+
+            $existingPurpose = billing_payment_attempt_purpose($existing);
+            if (!hash_equals($existingPurpose, $purpose)) {
+                throw new RuntimeException('Provider reference collision detected across billing payment purposes.', 0, $e);
+            }
+
             return ['inserted' => false, 'id' => (int)$existing['id'], 'quote_hash' => $quoteHash, 'attempt' => $existing];
         }
 
