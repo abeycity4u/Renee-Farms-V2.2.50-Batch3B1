@@ -250,6 +250,99 @@ function v230_046_parent_id_column(
     return $row ?: null;
 }
 
+
+function v230_046_snapshot_column_matches(
+    PDO $pdo,
+    string $column
+): bool {
+    $row = v230_046_column(
+        $pdo,
+        $column
+    );
+
+    if ($row === null
+        || strtoupper(
+            (string)$row['is_nullable']
+        ) !== 'YES') {
+        return false;
+    }
+
+    $dataType = strtolower(
+        (string)$row['data_type']
+    );
+
+    $columnType = strtolower(
+        (string)$row['column_type']
+    );
+
+    if (in_array(
+        $column,
+        [
+            'quoted_at',
+            'lineage_start_at',
+            'segment_start_at',
+            'segment_end_at',
+        ],
+        true
+    )) {
+        return $dataType === 'datetime';
+    }
+
+    if ($column === 'pricing_version') {
+        return $dataType === 'varchar'
+            && (int)$row[
+                'character_maximum_length'
+            ] === 80;
+    }
+
+    if ($column === 'pricing_hash') {
+        return $dataType === 'char'
+            && (int)$row[
+                'character_maximum_length'
+            ] === 64;
+    }
+
+    if (in_array(
+        $column,
+        [
+            'unit_amount',
+            'partial_unit_amount',
+            'per_seat_amount',
+        ],
+        true
+    )) {
+        return $dataType === 'decimal'
+            && (int)$row['numeric_precision'] === 12
+            && (int)$row['numeric_scale'] === 2;
+    }
+
+    if ($column === 'future_full_periods') {
+        return $dataType === 'int'
+            && strpos(
+                $columnType,
+                'unsigned'
+            ) !== false;
+    }
+
+    if ($column === 'latest_paid_subscription_id') {
+        return $dataType === 'int'
+            && strpos(
+                $columnType,
+                'unsigned'
+            ) === false;
+    }
+
+    if ($column === 'latest_paid_attempt_id') {
+        return $dataType === 'bigint'
+            && strpos(
+                $columnType,
+                'unsigned'
+            ) !== false;
+    }
+
+    return false;
+}
+
 $requiredTables = [
     'schema_migrations',
     'billing_payment_attempts',
@@ -378,6 +471,8 @@ $alreadyApplied =
         $migrationName
     );
 
+$preflightSchemaState = 'UNAVAILABLE';
+
 if (!$alreadyApplied) {
     if ($before['billing_seat_change_requests'] !== 0) {
         v230_046_fail(
@@ -431,17 +526,47 @@ if (!$alreadyApplied) {
         );
     }
 
+    $presentSnapshotColumns = [];
+
     foreach ($snapshotColumns as $column) {
         if (v230_046_column(
             $pdo,
             $column
         ) !== null) {
-            v230_046_fail(
-                'migration 046 partial schema artifact exists: column '
-                . $column
-                . '.'
-            );
+            $presentSnapshotColumns[] =
+                $column;
         }
+    }
+
+    $presentSnapshotCount =
+        count($presentSnapshotColumns);
+
+    if ($presentSnapshotCount === 0) {
+        $preflightSchemaState =
+            'CLEAN';
+    } elseif (
+        $presentSnapshotCount
+        === count($snapshotColumns)
+    ) {
+        foreach ($snapshotColumns as $column) {
+            if (!v230_046_snapshot_column_matches(
+                $pdo,
+                $column
+            )) {
+                v230_046_fail(
+                    'migration 046 recovery column has unexpected definition: '
+                    . $column
+                    . '.'
+                );
+            }
+        }
+
+        $preflightSchemaState =
+            'RECOVERABLE_COLUMNS_ONLY';
+    } else {
+        v230_046_fail(
+            'migration 046 has an unsupported mixed snapshot-column state.'
+        );
     }
 
     foreach ([
@@ -491,6 +616,9 @@ echo 'CURRENT_PAYMENT_FK_DELETE_RULE: '
         (string)$paymentFk['delete_rule']
     )
     . PHP_EOL;
+echo 'PREFLIGHT_SCHEMA_STATE: '
+    . $preflightSchemaState
+    . PHP_EOL;
 
 foreach ($before as $table => $count) {
     echo 'ROWS '
@@ -507,7 +635,7 @@ if ($alreadyApplied) {
 }
 
 if ($mode === '--preflight') {
-    echo "PASS: migration 046 preflight baseline is clean and read-only.\n";
+    echo "PASS: migration 046 preflight state is approved and read-only.\n";
     exit(0);
 }
 

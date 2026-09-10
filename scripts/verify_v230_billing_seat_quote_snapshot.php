@@ -199,20 +199,39 @@ $check(
     'migration upgrades durable request payment identity from SET NULL to RESTRICT'
 );
 
-$atomicPaymentFkUpgrade =
+$paymentFkDropPresent =
     preg_match(
         '/ALTER TABLE\s+billing_seat_change_requests\s+'
-        . 'DROP FOREIGN KEY\s+fk_billing_seat_change_payment_attempt\s*,\s*'
-        . 'ADD CONSTRAINT\s+fk_billing_seat_change_payment_attempt\s+'
+        . 'DROP FOREIGN KEY\s+'
+        . 'fk_billing_seat_change_payment_attempt/i',
+        $migration
+    ) === 1;
+
+$paymentFkAddPresent =
+    preg_match(
+        '/ALTER TABLE\s+billing_seat_change_requests\s+'
+        . 'ADD CONSTRAINT\s+'
+        . 'fk_billing_seat_change_payment_attempt\s+'
         . 'FOREIGN KEY\s*\(payment_attempt_id\)\s+'
         . 'REFERENCES\s+billing_payment_attempts\s*\(id\)\s+'
         . 'ON DELETE\s+RESTRICT/i',
         $migration
     ) === 1;
 
+$sameSymbolAtomicReadd =
+    preg_match(
+        '/DROP FOREIGN KEY\s+'
+        . 'fk_billing_seat_change_payment_attempt\s*,\s*'
+        . 'ADD CONSTRAINT\s+'
+        . 'fk_billing_seat_change_payment_attempt/i',
+        $migration
+    ) === 1;
+
 $check(
-    $atomicPaymentFkUpgrade,
-    'existing non-RESTRICT payment FK is replaced atomically in one ALTER statement'
+    $paymentFkDropPresent
+    && $paymentFkAddPresent
+    && !$sameSymbolAtomicReadd,
+    'payment FK replacement is MariaDB-compatible and retryable'
 );
 
 $check(

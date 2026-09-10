@@ -209,7 +209,7 @@ $markerGuardPos = strpos(
 
 $preflightPassPos = strpos(
     $runner,
-    'preflight baseline is clean and read-only'
+    'preflight state is approved and read-only'
 );
 
 $check(
@@ -230,9 +230,21 @@ $check(
 $check(
     strpos(
         $runner,
-        'migration 046 partial schema artifact exists: column '
+        'RECOVERABLE_COLUMNS_ONLY'
     ) !== false
     && strpos(
+        $runner,
+        'unsupported mixed snapshot-column state'
+    ) !== false
+    && strpos(
+        $runner,
+        'recovery column has unexpected definition'
+    ) !== false,
+    'preflight permits only clean or fully validated columns-only recovery state'
+);
+
+$check(
+    strpos(
         $runner,
         'migration 046 partial schema artifact exists: foreign key '
     ) !== false
@@ -240,7 +252,7 @@ $check(
         $runner,
         'migration 046 partial schema artifact exists: index '
     ) !== false,
-    'preflight fails closed on partial migration-046 schema artifacts'
+    'preflight still rejects unsupported partial FK or index artifacts'
 );
 
 $check(

@@ -233,8 +233,10 @@ DEALLOCATE PREPARE v230_046_stmt;
 -- immutable request hash binds. Migration 045 used SET NULL; upgrade that
 -- relationship to RESTRICT before paid seat changes are exposed.
 --
--- When an existing FK has the old delete rule, replace it in one ALTER
--- statement so there is no intermediate schema state without the FK.
+-- MariaDB/InnoDB can reject dropping and re-adding the same FK symbol in one
+-- ALTER TABLE with errno 121. Use two guarded, idempotent DDL steps instead.
+-- The controlled runner requires an empty seat-change request table before
+-- this migration and stops for schema inspection after any DDL failure.
 
 SET @v230_046_payment_fk_rule = (
     SELECT delete_rule
@@ -248,7 +250,7 @@ SET @v230_046_payment_fk_rule = (
 SET @v230_046_sql = IF(
     @v230_046_payment_fk_rule IS NOT NULL
     AND UPPER(@v230_046_payment_fk_rule) <> 'RESTRICT',
-    'ALTER TABLE billing_seat_change_requests DROP FOREIGN KEY fk_billing_seat_change_payment_attempt, ADD CONSTRAINT fk_billing_seat_change_payment_attempt FOREIGN KEY (payment_attempt_id) REFERENCES billing_payment_attempts(id) ON DELETE RESTRICT',
+    'ALTER TABLE billing_seat_change_requests DROP FOREIGN KEY fk_billing_seat_change_payment_attempt',
     'SELECT 1'
 );
 
