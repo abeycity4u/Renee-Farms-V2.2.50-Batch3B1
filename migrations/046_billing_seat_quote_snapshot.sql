@@ -232,6 +232,9 @@ DEALLOCATE PREPARE v230_046_stmt;
 -- A durable seat-change request must retain the payment identity that its
 -- immutable request hash binds. Migration 045 used SET NULL; upgrade that
 -- relationship to RESTRICT before paid seat changes are exposed.
+--
+-- When an existing FK has the old delete rule, replace it in one ALTER
+-- statement so there is no intermediate schema state without the FK.
 
 SET @v230_046_payment_fk_rule = (
     SELECT delete_rule
@@ -245,7 +248,7 @@ SET @v230_046_payment_fk_rule = (
 SET @v230_046_sql = IF(
     @v230_046_payment_fk_rule IS NOT NULL
     AND UPPER(@v230_046_payment_fk_rule) <> 'RESTRICT',
-    'ALTER TABLE billing_seat_change_requests DROP FOREIGN KEY fk_billing_seat_change_payment_attempt',
+    'ALTER TABLE billing_seat_change_requests DROP FOREIGN KEY fk_billing_seat_change_payment_attempt, ADD CONSTRAINT fk_billing_seat_change_payment_attempt FOREIGN KEY (payment_attempt_id) REFERENCES billing_payment_attempts(id) ON DELETE RESTRICT',
     'SELECT 1'
 );
 
