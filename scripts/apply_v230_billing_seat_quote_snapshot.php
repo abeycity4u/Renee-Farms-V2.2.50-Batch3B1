@@ -164,6 +164,64 @@ function v230_046_column(
     return $row ?: null;
 }
 
+
+function v230_046_index_exists(
+    PDO $pdo,
+    string $name
+): bool {
+    $stmt = $pdo->prepare(
+        'SELECT COUNT(DISTINCT index_name)
+         FROM information_schema.statistics
+         WHERE table_schema = DATABASE()
+           AND table_name = ?
+           AND index_name = ?'
+    );
+
+    $stmt->execute([
+        'billing_seat_change_requests',
+        $name,
+    ]);
+
+    return (int)$stmt->fetchColumn() === 1;
+}
+
+function v230_046_parent_id_column(
+    PDO $pdo,
+    string $table
+): ?array {
+    $allowed = [
+        'subscriptions',
+        'billing_payment_attempts',
+    ];
+
+    if (!in_array($table, $allowed, true)) {
+        throw new InvalidArgumentException(
+            'Unexpected migration parent table.'
+        );
+    }
+
+    $stmt = $pdo->prepare(
+        'SELECT
+             data_type,
+             column_type,
+             is_nullable
+         FROM information_schema.columns
+         WHERE table_schema = DATABASE()
+           AND table_name = ?
+           AND column_name = ?
+         LIMIT 1'
+    );
+
+    $stmt->execute([
+        $table,
+        'id',
+    ]);
+
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    return $row ?: null;
+}
+
 $requiredTables = [
     'schema_migrations',
     'billing_payment_attempts',
@@ -252,6 +310,21 @@ if (!$paymentFk
     );
 }
 
+$snapshotColumns = [
+    'quoted_at',
+    'lineage_start_at',
+    'segment_start_at',
+    'segment_end_at',
+    'pricing_version',
+    'pricing_hash',
+    'unit_amount',
+    'partial_unit_amount',
+    'future_full_periods',
+    'per_seat_amount',
+    'latest_paid_subscription_id',
+    'latest_paid_attempt_id',
+];
+
 $protectedTables = [
     'billing_payment_attempts',
     'billing_provider_events',
@@ -277,6 +350,105 @@ $alreadyApplied =
         $migrationName
     );
 
+if (!$alreadyApplied) {
+    if ($before['billing_seat_change_requests'] !== 0) {
+        v230_046_fail(
+            'seat-change request storage is not empty before migration 046.'
+        );
+    }
+
+    if (strtoupper(
+        (string)$paymentFk['delete_rule']
+    ) !== 'SET NULL') {
+        v230_046_fail(
+            'migration 045 payment-attempt foreign key must begin with ON DELETE SET NULL.'
+        );
+    }
+
+    $subscriptionId =
+        v230_046_parent_id_column(
+            $pdo,
+            'subscriptions'
+        );
+
+    if (!$subscriptionId
+        || strtolower(
+            (string)$subscriptionId['data_type']
+        ) !== 'int'
+        || stripos(
+            (string)$subscriptionId['column_type'],
+            'unsigned'
+        ) !== false) {
+        v230_046_fail(
+            'subscriptions.id must be signed INT before migration 046.'
+        );
+    }
+
+    $paymentAttemptId =
+        v230_046_parent_id_column(
+            $pdo,
+            'billing_payment_attempts'
+        );
+
+    if (!$paymentAttemptId
+        || strtolower(
+            (string)$paymentAttemptId['data_type']
+        ) !== 'bigint'
+        || stripos(
+            (string)$paymentAttemptId['column_type'],
+            'unsigned'
+        ) === false) {
+        v230_046_fail(
+            'billing_payment_attempts.id must be unsigned BIGINT before migration 046.'
+        );
+    }
+
+    foreach ($snapshotColumns as $column) {
+        if (v230_046_column(
+            $pdo,
+            $column
+        ) !== null) {
+            v230_046_fail(
+                'migration 046 partial schema artifact exists: column '
+                . $column
+                . '.'
+            );
+        }
+    }
+
+    foreach ([
+        'fk_billing_seat_change_latest_subscription',
+        'fk_billing_seat_change_latest_attempt',
+    ] as $fkName) {
+        if (v230_046_fk(
+            $pdo,
+            $fkName
+        ) !== null) {
+            v230_046_fail(
+                'migration 046 partial schema artifact exists: foreign key '
+                . $fkName
+                . '.'
+            );
+        }
+    }
+
+    foreach ([
+        'idx_billing_seat_change_latest_paid_subscription',
+        'idx_billing_seat_change_latest_paid_attempt',
+    ] as $indexName) {
+        if (v230_046_index_exists(
+            $pdo,
+            $indexName
+        )) {
+            v230_046_fail(
+                'migration 046 partial schema artifact exists: index '
+                . $indexName
+                . '.'
+            );
+        }
+    }
+}
+
 echo "MODE: {$mode}\n";
 echo 'MIGRATION: ' . $migrationName . PHP_EOL;
 echo 'MIGRATION_SHA256: '
@@ -300,15 +472,15 @@ foreach ($before as $table => $count) {
         . PHP_EOL;
 }
 
-if ($mode === '--preflight') {
-    echo "PASS: migration 046 preflight is read-only and complete.\n";
-    exit(0);
-}
-
 if ($alreadyApplied) {
     v230_046_fail(
         'migration 046 is already marked as applied; refusing a second apply.'
     );
+}
+
+if ($mode === '--preflight') {
+    echo "PASS: migration 046 preflight baseline is clean and read-only.\n";
+    exit(0);
 }
 
 $sql = file_get_contents(
@@ -359,21 +531,6 @@ try {
 
     exit(1);
 }
-
-$snapshotColumns = [
-    'quoted_at',
-    'lineage_start_at',
-    'segment_start_at',
-    'segment_end_at',
-    'pricing_version',
-    'pricing_hash',
-    'unit_amount',
-    'partial_unit_amount',
-    'future_full_periods',
-    'per_seat_amount',
-    'latest_paid_subscription_id',
-    'latest_paid_attempt_id',
-];
 
 $columns = [];
 

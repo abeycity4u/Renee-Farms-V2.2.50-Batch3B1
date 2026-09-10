@@ -202,6 +202,67 @@ $check(
     'runner does not target protected migration 003'
 );
 
+$markerGuardPos = strpos(
+    $runner,
+    'refusing a second apply'
+);
+
+$preflightPassPos = strpos(
+    $runner,
+    'preflight baseline is clean and read-only'
+);
+
+$check(
+    $markerGuardPos !== false
+    && $preflightPassPos !== false
+    && $markerGuardPos < $preflightPassPos,
+    'already-applied marker is rejected before preflight can report PASS'
+);
+
+$check(
+    strpos(
+        $runner,
+        'seat-change request storage is not empty before migration 046.'
+    ) !== false,
+    'first migration-046 apply requires empty seat-change request storage'
+);
+
+$check(
+    strpos(
+        $runner,
+        'migration 046 partial schema artifact exists: column '
+    ) !== false
+    && strpos(
+        $runner,
+        'migration 046 partial schema artifact exists: foreign key '
+    ) !== false
+    && strpos(
+        $runner,
+        'migration 046 partial schema artifact exists: index '
+    ) !== false,
+    'preflight fails closed on partial migration-046 schema artifacts'
+);
+
+$check(
+    strpos(
+        $runner,
+        'migration 045 payment-attempt foreign key must begin with ON DELETE SET NULL.'
+    ) !== false,
+    'preflight requires the expected migration-045 payment FK baseline'
+);
+
+$check(
+    strpos(
+        $runner,
+        'subscriptions.id must be signed INT before migration 046.'
+    ) !== false
+    && strpos(
+        $runner,
+        'billing_payment_attempts.id must be unsigned BIGINT before migration 046.'
+    ) !== false,
+    'preflight validates parent key types before any DDL executes'
+);
+
 echo PHP_EOL;
 echo 'Checks: ' . $checks . PHP_EOL;
 echo 'Failures: ' . $failures . PHP_EOL;
