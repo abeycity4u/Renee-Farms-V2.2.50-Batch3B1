@@ -96,9 +96,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $events = poultry_health_list($pdo, $farmId, $productionFilter ?: null, $cycleFilter > 0 ? $cycleFilter : null);
-require_once(__DIR__ . '/../navbar_head.php');
-require_once(__DIR__ . '/../navbar.php');
 ?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<?php require_once(__DIR__ . '/../navbar_head.php'); ?>
+<title>Poultry Health &amp; Treatment</title>
+</head>
+<body>
+<?php require_once(__DIR__ . '/../navbar.php'); ?>
 <div class="container-fluid py-3 app-content-max-1500">
   <div class="d-flex justify-content-between align-items-start mb-3 gap-3 app-responsive-toolbar">
     <div>
