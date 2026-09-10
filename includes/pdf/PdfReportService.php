@@ -30,6 +30,24 @@ function pdf_report_current_url(): string
     return $path . '?' . http_build_query($params);
 }
 
+/**
+ * Resolve the tenant brand once for every application-generated PDF.
+ *
+ * Tenant-facing reports must identify the current farm, never a hard-coded
+ * platform farm name. farmBrandName() is the canonical current-farm resolver.
+ */
+function pdf_report_tenant_brand_name(): string
+{
+    if (function_exists('farmBrandName')) {
+        $farmName = trim((string) farmBrandName());
+        if ($farmName !== '') {
+            return $farmName;
+        }
+    }
+
+    return 'Farm Operations';
+}
+
 final class PdfReportService
 {
     private string $root;
@@ -44,9 +62,15 @@ final class PdfReportService
         require_once $autoload;
     }
 
-    public function renderHtml(string $html, string $orientation = 'portrait', string $title = 'Renee Farms Report'): string
+    public function renderHtml(string $html, string $orientation = 'portrait', string $title = 'Farm Report'): string
     {
         $orientation = strtolower($orientation) === 'landscape' ? 'landscape' : 'portrait';
+        $farmName = pdf_report_tenant_brand_name();
+        $documentTitle = htmlspecialchars(
+            $farmName . ' - ' . $title,
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        );
 
         // Scripts and icon-font tags are unnecessary for PDF output and can cause malformed glyphs.
         $html = preg_replace('#<script\b[^>]*>.*?</script>#is', '', $html) ?? $html;
@@ -54,9 +78,36 @@ final class PdfReportService
 
         $style = $this->documentCss($orientation);
         if (stripos($html, '</head>') !== false) {
-            $html = preg_replace('#</head>#i', '<meta charset="UTF-8"><style>' . $style . '</style></head>', $html, 1) ?? $html;
+            if (preg_match('#<title\\b[^>]*>.*?</title>#is', $html)) {
+                $html = preg_replace(
+                    '#<title\\b[^>]*>.*?</title>#is',
+                    '<title>' . $documentTitle . '</title>',
+                    $html,
+                    1
+                ) ?? $html;
+            } else {
+                $html = preg_replace(
+                    '#</head>#i',
+                    '<title>' . $documentTitle . '</title></head>',
+                    $html,
+                    1
+                ) ?? $html;
+            }
+
+            $html = preg_replace(
+                '#</head>#i',
+                '<meta charset="UTF-8"><style>' . $style . '</style></head>',
+                $html,
+                1
+            ) ?? $html;
         } else {
-            $html = '<!doctype html><html><head><meta charset="UTF-8"><style>' . $style . '</style></head><body>' . $html . '</body></html>';
+            $html = '<!doctype html><html><head><meta charset="UTF-8"><title>'
+                . $documentTitle
+                . '</title><style>'
+                . $style
+                . '</style></head><body>'
+                . $html
+                . '</body></html>';
         }
 
         $options = new Options();
@@ -74,17 +125,45 @@ final class PdfReportService
         $dompdf->render();
 
         $canvas = $dompdf->getCanvas();
-        $font = $dompdf->getFontMetrics()->getFont('DejaVu Sans', 'normal');
-        $canvas->page_text(28, $canvas->get_height() - 22, 'Renee Farms • ' . $title, $font, 7, [0.25, 0.25, 0.25]);
-        $canvas->page_text($canvas->get_width() - 110, $canvas->get_height() - 22, 'Page {PAGE_NUM} of {PAGE_COUNT}', $font, 7, [0.25, 0.25, 0.25]);
+        $fontMetrics = $dompdf->getFontMetrics();
+        $font = $fontMetrics->getFont('DejaVu Sans', 'normal');
+        $fontBold = $fontMetrics->getFont('DejaVu Sans', 'bold');
+
+        // Tenant identity is repeated on every page as the report's primary brand.
+        $canvas->page_text(
+            28,
+            15,
+            $farmName,
+            $fontBold,
+            10,
+            [0.12, 0.18, 0.15]
+        );
+
+        $canvas->page_text(
+            28,
+            $canvas->get_height() - 22,
+            $farmName . ' • ' . $title,
+            $font,
+            7,
+            [0.25, 0.25, 0.25]
+        );
+
+        $canvas->page_text(
+            $canvas->get_width() - 110,
+            $canvas->get_height() - 22,
+            'Page {PAGE_NUM} of {PAGE_COUNT}',
+            $font,
+            7,
+            [0.25, 0.25, 0.25]
+        );
 
         return $dompdf->output();
     }
 
-    public function streamHtml(string $html, string $filename, string $orientation = 'portrait', string $title = 'Renee Farms Report'): never
+    public function streamHtml(string $html, string $filename, string $orientation = 'portrait', string $title = 'Farm Report'): never
     {
         $pdf = $this->renderHtml($html, $orientation, $title);
-        $safe = preg_replace('/[^A-Za-z0-9._-]+/', '-', $filename) ?: 'renee-farms-report.pdf';
+        $safe = preg_replace('/[^A-Za-z0-9._-]+/', '-', $filename) ?: 'farm-report.pdf';
         if (!str_ends_with(strtolower($safe), '.pdf')) {
             $safe .= '.pdf';
         }
@@ -134,7 +213,7 @@ CSS;
     }
 }
 
-function pdf_report_finish(string $filename, string $orientation = 'portrait', string $title = 'Renee Farms Report'): never
+function pdf_report_finish(string $filename, string $orientation = 'portrait', string $title = 'Farm Report'): never
 {
     $html = ob_get_clean();
     if ($html === false) {
