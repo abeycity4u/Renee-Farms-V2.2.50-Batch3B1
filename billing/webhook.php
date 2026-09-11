@@ -17,6 +17,7 @@ require_once dirname(__DIR__) . '/includes/billing_provider_selection.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_adapters.php';
 require_once dirname(__DIR__) . '/includes/billing_route_request.php';
 require_once dirname(__DIR__) . '/includes/billing_payment_audit_state.php';
+require_once dirname(__DIR__) . '/includes/billing_seat_change_request.php';
 require_once dirname(__DIR__) . '/includes/billing_paid_attempt_dispatcher.php';
 
 if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'POST') {
@@ -90,6 +91,12 @@ try {
             throw new RuntimeException('Billing payment attempt changed during webhook processing.');
         }
         $updated = billing_audit_apply_verification($pdo, (int)$locked['id'], $verification);
+
+        billing_seat_change_reconcile_terminal_payment(
+            $pdo,
+            (int)$locked['id']
+        );
+
         if ((string)($updated['status'] ?? '') === 'paid') {
             billing_paid_attempt_dispatch($pdo, (int)$locked['id']);
         }
