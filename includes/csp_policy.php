@@ -18,6 +18,13 @@ if (!function_exists('app_csp_policy')) {
     }
 }
 
+if (!function_exists('app_csp_report_only_policy')) {
+    function app_csp_report_only_policy(): string
+    {
+        return app_csp_policy();
+    }
+}
+
 if (!function_exists('app_emit_csp_header')) {
     function app_emit_csp_header(): void
     {
@@ -27,5 +34,12 @@ if (!function_exists('app_emit_csp_header')) {
                 . app_csp_policy()
             );
         }
+    }
+}
+
+if (!function_exists('app_emit_csp_report_only_header')) {
+    function app_emit_csp_report_only_header(): void
+    {
+        app_emit_csp_header();
     }
 }

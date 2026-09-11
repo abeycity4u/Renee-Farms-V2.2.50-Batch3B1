@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/includes/csp_policy.php';
-app_emit_csp_header();
+app_emit_csp_report_only_header();
 
 $homepageSlideshowFile = __DIR__ . '/assets/js/homepage-slideshow.js';
 $homepageSlideshowVersion = is_file($homepageSlideshowFile)

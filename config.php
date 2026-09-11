@@ -54,9 +54,9 @@ if (!headers_sent()) {
     header('Referrer-Policy: strict-origin-when-cross-origin');
     header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
 
-    // V2.3 CSP enforcement: Report-Only observation completed cleanly.
-    // Enforce the same centralized policy while retaining same-origin reporting.
-    app_emit_csp_header();
+    // V2.3 CSP enforcement rollout: retain the legacy emitter call temporarily.
+    // The centralized alias emits enforcing CSP and protects mixed OPcache generations.
+    app_emit_csp_report_only_header();
 
     header('Cache-Control: private, no-store, max-age=0');
     if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {

@@ -109,6 +109,30 @@ $check(
 );
 
 $check(
+    strpos(
+        $policy,
+        "function app_emit_csp_report_only_header(): void"
+    ) !== false,
+    'legacy CSP emitter alias exists for OPcache-compatible rollout'
+);
+
+$check(
+    strpos(
+        $policy,
+        'app_emit_csp_header();'
+    ) !== false,
+    'legacy CSP emitter alias delegates to enforcing emitter'
+);
+
+$check(
+    strpos(
+        $policy,
+        "function app_csp_report_only_policy(): string"
+    ) !== false,
+    'legacy CSP policy alias exists for rollout compatibility'
+);
+
+$check(
     strpos($combined, "'unsafe-inline'") === false,
     'policy does not allow unsafe-inline'
 );
@@ -129,9 +153,9 @@ $check(
 $check(
     substr_count(
         $config,
-        'app_emit_csp_header();'
+        'app_emit_csp_report_only_header();'
     ) === 1,
-    'config.php emits centralized enforcing policy exactly once'
+    'config.php uses OPcache-compatible CSP enforcement emitter exactly once'
 );
 
 $check(
@@ -145,9 +169,9 @@ $check(
 $check(
     substr_count(
         $index,
-        'app_emit_csp_header();'
+        'app_emit_csp_report_only_header();'
     ) === 1,
-    'public homepage emits enforcing policy exactly once'
+    'public homepage uses OPcache-compatible CSP enforcement emitter exactly once'
 );
 
 $check(
