@@ -121,13 +121,13 @@ $check(
 $check(
     strpos(
         $helper,
-        "['failed', 'cancelled']"
+        "['failed', 'cancelled', 'refunded']"
     ) !== false
     && strpos(
         $helper,
         'billing_seat_change_mark_payment_failed('
     ) !== false,
-    'failed terminal outcome delegates to the existing proven failed-payment transition'
+    'failed, cancelled and refunded seat-top-up outcomes enter centralized reconciliation'
 );
 
 $check(
@@ -139,7 +139,48 @@ $check(
         $helper,
         'must be provider verified'
     ) !== false,
-    'cancelled seat-top-up reconciliation requires provider verification'
+    'cancelled and refunded seat-top-up reconciliation requires provider verification'
+);
+
+$refundGuardStart = strpos(
+    $helper,
+    "if (\$paymentStatus === 'refunded'"
+);
+
+$refundGuardEnd = $refundGuardStart === false
+    ? false
+    : strpos(
+        $helper,
+        "if (\$requestState['status'] === 'cancelled')",
+        $refundGuardStart
+    );
+
+$refundGuardSource =
+    $refundGuardStart !== false
+    && $refundGuardEnd !== false
+    && $refundGuardEnd > $refundGuardStart
+        ? substr(
+            $helper,
+            $refundGuardStart,
+            $refundGuardEnd - $refundGuardStart
+        )
+        : '';
+
+$check(
+    $refundGuardSource !== ''
+    && strpos(
+        $refundGuardSource,
+        "['applied', 'failed', 'cancelled']"
+    ) !== false
+    && strpos(
+        $refundGuardSource,
+        "'changed' => false"
+    ) !== false
+    && strpos(
+        $refundGuardSource,
+        "'payment_status' => 'refunded'"
+    ) !== false,
+    'refunded top-up preserves already-applied or already-terminal seat requests'
 );
 
 $check(

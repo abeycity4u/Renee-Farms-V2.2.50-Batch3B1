@@ -1345,10 +1345,13 @@ if (!function_exists('billing_seat_change_reconcile_terminal_payment')) {
         }
 
         // Paid seat top-ups are handled by the paid-attempt dispatcher.
-        // Pending/refunded states require no terminal request cleanup here.
+        // Pending states require no terminal request cleanup here.
+        // A refunded attempt is reconciled only far enough to release an
+        // unapplied awaiting-payment request; applied entitlement is never
+        // reversed automatically here.
         if (!in_array(
             $paymentStatus,
-            ['failed', 'cancelled'],
+            ['failed', 'cancelled', 'refunded'],
             true
         )) {
             return [
@@ -1373,13 +1376,13 @@ if (!function_exists('billing_seat_change_reconcile_terminal_payment')) {
             return $result;
         }
 
-        // Cancellation is a provider-verified terminal outcome.
-        // Initialization failure is represented as failed, not cancelled.
+        // Cancellation and refund are provider-verified terminal outcomes.
+        // Initialization failure is represented as failed instead.
         if (trim((string)(
             $attempt['verified_at'] ?? ''
         )) === '') {
             throw new RuntimeException(
-                'Cancelled seat-top-up payment must be provider verified before request reconciliation.'
+                'Cancelled or refunded seat-top-up payment must be provider verified before request reconciliation.'
             );
         }
 
@@ -1417,8 +1420,26 @@ if (!function_exists('billing_seat_change_reconcile_terminal_payment')) {
                     ?? 0
             )) {
             throw new RuntimeException(
-                'Cancelled payment does not match the durable seat-add request.'
+                'Terminal payment does not match the durable seat-add request.'
             );
+        }
+
+        // A refund observed after paid application must not silently remove
+        // purchased capacity. Refund entitlement reversal is a separate
+        // commercial workflow. Already-terminal requests also need no change.
+        if ($paymentStatus === 'refunded'
+            && in_array(
+                $requestState['status'],
+                ['applied', 'failed', 'cancelled'],
+                true
+            )) {
+            return [
+                'handled' => true,
+                'changed' => false,
+                'idempotent' => true,
+                'payment_status' => 'refunded',
+                'request' => $requestState,
+            ];
         }
 
         if ($requestState['status'] === 'cancelled') {
@@ -1426,7 +1447,7 @@ if (!function_exists('billing_seat_change_reconcile_terminal_payment')) {
                 'handled' => true,
                 'changed' => false,
                 'idempotent' => true,
-                'payment_status' => 'cancelled',
+                'payment_status' => $paymentStatus,
                 'request' => $requestState,
             ];
         }
@@ -1491,7 +1512,7 @@ if (!function_exists('billing_seat_change_reconcile_terminal_payment')) {
             'handled' => true,
             'changed' => true,
             'idempotent' => false,
-            'payment_status' => 'cancelled',
+            'payment_status' => $paymentStatus,
             'request' => $cancelledState,
         ];
     }
