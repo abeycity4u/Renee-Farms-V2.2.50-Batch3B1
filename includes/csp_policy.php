@@ -1,7 +1,7 @@
 <?php
 
-if (!function_exists('app_csp_report_only_policy')) {
-    function app_csp_report_only_policy(): string
+if (!function_exists('app_csp_policy')) {
+    function app_csp_policy(): string
     {
         return "default-src 'self'; "
             . "base-uri 'self'; "
@@ -18,13 +18,13 @@ if (!function_exists('app_csp_report_only_policy')) {
     }
 }
 
-if (!function_exists('app_emit_csp_report_only_header')) {
-    function app_emit_csp_report_only_header(): void
+if (!function_exists('app_emit_csp_header')) {
+    function app_emit_csp_header(): void
     {
         if (!headers_sent()) {
             header(
-                'Content-Security-Policy-Report-Only: '
-                . app_csp_report_only_policy()
+                'Content-Security-Policy: '
+                . app_csp_policy()
             );
         }
     }

@@ -54,17 +54,17 @@ $check = static function (bool $ok, string $message) use (&$failures): void {
 $check(
     substr_count(
         $policy,
-        'Content-Security-Policy-Report-Only:'
+        'Content-Security-Policy:'
     ) === 1,
-    'central policy defines exactly one CSP Report-Only header'
+    'central policy defines exactly one enforcing CSP header'
 );
 
 $check(
-    preg_match(
-        '/["\']Content-Security-Policy:\s*/i',
-        $combined
-    ) !== 1,
-    'no enforcing Content-Security-Policy header is defined'
+    strpos(
+        $combined,
+        'Content-Security-Policy-Report-Only:'
+    ) === false,
+    'no CSP Report-Only header is defined'
 );
 
 $requiredDirectives = [
@@ -90,7 +90,7 @@ foreach ($requiredDirectives as $directive) {
 
 $check(
     strpos($policy, 'report-uri /csp-report.php') !== false,
-    'Report-Only policy sends violations to same-origin CSP collector'
+    'enforcing policy sends violations to same-origin CSP collector'
 );
 
 $check(
@@ -129,9 +129,9 @@ $check(
 $check(
     substr_count(
         $config,
-        'app_emit_csp_report_only_header();'
+        'app_emit_csp_header();'
     ) === 1,
-    'config.php emits centralized Report-Only policy exactly once'
+    'config.php emits centralized enforcing policy exactly once'
 );
 
 $check(
@@ -145,9 +145,9 @@ $check(
 $check(
     substr_count(
         $index,
-        'app_emit_csp_report_only_header();'
+        'app_emit_csp_header();'
     ) === 1,
-    'public homepage emits Report-Only policy exactly once'
+    'public homepage emits enforcing policy exactly once'
 );
 
 $check(
@@ -161,10 +161,10 @@ $check(
 );
 
 if ($failures) {
-    echo "\nCSP REPORT-ONLY CONTRACT FAILED: "
+    echo "\nCSP ENFORCEMENT CONTRACT FAILED: "
         . count($failures)
         . " failure(s)\n";
     exit(1);
 }
 
-echo "\nCSP REPORT-ONLY CONTRACT PASSED\n";
+echo "\nCSP ENFORCEMENT CONTRACT PASSED\n";
