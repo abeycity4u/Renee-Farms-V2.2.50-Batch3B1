@@ -1291,6 +1291,213 @@ if (!function_exists('billing_seat_change_mark_payment_failed')) {
 }
 
 
+if (!function_exists('billing_seat_change_reconcile_terminal_payment')) {
+    function billing_seat_change_reconcile_terminal_payment(
+        PDO $pdo,
+        int $paymentAttemptId
+    ): array {
+        if ($paymentAttemptId < 1) {
+            throw new InvalidArgumentException(
+                'A valid billing payment attempt is required for seat-change reconciliation.'
+            );
+        }
+
+        if (!$pdo->inTransaction()) {
+            throw new RuntimeException(
+                'Seat-change terminal-payment reconciliation requires an active database transaction.'
+            );
+        }
+
+        // Preserve the commercial lock order:
+        // payment attempt first, then durable seat-change request.
+        $attempt =
+            billing_audit_attempt_by_id(
+                $pdo,
+                $paymentAttemptId,
+                true
+            );
+
+        if (!$attempt) {
+            throw new RuntimeException(
+                'Billing payment attempt could not be found for seat-change reconciliation.'
+            );
+        }
+
+        $purpose =
+            billing_payment_attempt_purpose(
+                $attempt
+            );
+
+        $paymentStatus = strtolower(trim(
+            (string)($attempt['status'] ?? '')
+        ));
+
+        // This reconciler is safe to call from shared payment routes.
+        // Subscription and other payment purposes remain untouched.
+        if ($purpose !== 'seat_topup') {
+            return [
+                'handled' => false,
+                'changed' => false,
+                'idempotent' => true,
+                'payment_status' => $paymentStatus,
+                'request' => null,
+            ];
+        }
+
+        // Paid seat top-ups are handled by the paid-attempt dispatcher.
+        // Pending/refunded states require no terminal request cleanup here.
+        if (!in_array(
+            $paymentStatus,
+            ['failed', 'cancelled'],
+            true
+        )) {
+            return [
+                'handled' => false,
+                'changed' => false,
+                'idempotent' => true,
+                'payment_status' => $paymentStatus,
+                'request' => null,
+            ];
+        }
+
+        if ($paymentStatus === 'failed') {
+            $result =
+                billing_seat_change_mark_payment_failed(
+                    $pdo,
+                    $paymentAttemptId
+                );
+
+            $result['handled'] = true;
+            $result['payment_status'] = 'failed';
+
+            return $result;
+        }
+
+        // Cancellation is a provider-verified terminal outcome.
+        // Initialization failure is represented as failed, not cancelled.
+        if (trim((string)(
+            $attempt['verified_at'] ?? ''
+        )) === '') {
+            throw new RuntimeException(
+                'Cancelled seat-top-up payment must be provider verified before request reconciliation.'
+            );
+        }
+
+        $requestRow =
+            billing_seat_change_request_by_payment(
+                $pdo,
+                $paymentAttemptId,
+                true
+            );
+
+        if (!$requestRow) {
+            throw new RuntimeException(
+                'Cancelled seat-top-up payment has no durable seat-change request.'
+            );
+        }
+
+        $requestState =
+            billing_seat_change_row_contract(
+                $requestRow
+            );
+
+        $contract = $requestState['contract'];
+
+        if (($contract['change_kind'] ?? '')
+                !== 'add'
+            || (int)(
+                $contract['payment_attempt_id']
+                    ?? 0
+            ) !== $paymentAttemptId
+            || (int)(
+                $contract['farm_id']
+                    ?? 0
+            ) !== (int)(
+                $attempt['farm_id']
+                    ?? 0
+            )) {
+            throw new RuntimeException(
+                'Cancelled payment does not match the durable seat-add request.'
+            );
+        }
+
+        if ($requestState['status'] === 'cancelled') {
+            return [
+                'handled' => true,
+                'changed' => false,
+                'idempotent' => true,
+                'payment_status' => 'cancelled',
+                'request' => $requestState,
+            ];
+        }
+
+        if ($requestState['status']
+            !== 'awaiting_payment') {
+            throw new RuntimeException(
+                'Only an awaiting-payment seat-add request can be cancelled by its payment outcome.'
+            );
+        }
+
+        $cancelledAt = date('Y-m-d H:i:s');
+
+        $update = $pdo->prepare(
+            "UPDATE billing_seat_change_requests
+             SET status = 'cancelled',
+                 cancelled_at = ?
+             WHERE id = ?
+               AND status = 'awaiting_payment'"
+        );
+
+        $update->execute([
+            $cancelledAt,
+            (int)$requestState['id'],
+        ]);
+
+        if ($update->rowCount() !== 1) {
+            throw new RuntimeException(
+                'Seat-change request could not be cancelled exactly once.'
+            );
+        }
+
+        $cancelledRow =
+            billing_seat_change_request_by_id(
+                $pdo,
+                (int)$requestState['id'],
+                false
+            );
+
+        if (!$cancelledRow) {
+            throw new RuntimeException(
+                'Cancelled seat-change request could not be reloaded.'
+            );
+        }
+
+        $cancelledState =
+            billing_seat_change_row_contract(
+                $cancelledRow
+            );
+
+        if ($cancelledState['status'] !== 'cancelled'
+            || trim((string)(
+                $cancelledState['cancelled_at']
+                    ?? ''
+            )) === '') {
+            throw new RuntimeException(
+                'Cancelled seat-change request could not be verified.'
+            );
+        }
+
+        return [
+            'handled' => true,
+            'changed' => true,
+            'idempotent' => false,
+            'payment_status' => 'cancelled',
+            'request' => $cancelledState,
+        ];
+    }
+}
+
+
 if (!function_exists('billing_seat_change_attempt_modules')) {
     function billing_seat_change_attempt_modules(
         $raw
