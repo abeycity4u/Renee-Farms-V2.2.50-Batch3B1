@@ -27,6 +27,28 @@ if ($source === false) {
     exit(1);
 }
 
+$routePath =
+    $root
+    . '/billing/seat_reduction_schedule.php';
+
+if (!is_file($routePath)) {
+    fwrite(
+        STDERR,
+        "FAIL: missing customer seat-reduction route.\n"
+    );
+    exit(1);
+}
+
+$route = file_get_contents($routePath);
+
+if ($route === false) {
+    fwrite(
+        STDERR,
+        "FAIL: unable to read customer seat-reduction route.\n"
+    );
+    exit(1);
+}
+
 $compact = preg_replace('/\s+/', '', $source);
 $checks = 0;
 $failures = 0;
@@ -269,6 +291,114 @@ $check(
         'curl_'
     ) === false,
     'scheduled reduction performs no provider or network work'
+);
+
+
+$check(
+    strpos(
+        $route,
+        'billing_require_farm_admin_actor('
+    ) !== false
+    && strpos(
+        $route,
+        '$pdo,'
+    ) !== false
+    && strpos(
+        $route,
+        'false'
+    ) !== false,
+    'customer reduction route requires a normal Farm Admin billing actor'
+);
+
+$check(
+    strpos(
+        $route,
+        "REQUEST_METHOD"
+    ) !== false
+    && strpos(
+        $route,
+        "!== 'POST'"
+    ) !== false
+    && strpos(
+        $route,
+        'require_valid_csrf_post();'
+    ) !== false,
+    'customer reduction route is POST-only and CSRF protected'
+);
+
+$check(
+    strpos(
+        $route,
+        "'role_code'"
+    ) !== false
+    && strpos(
+        $route,
+        "'quantity'"
+    ) !== false
+    && strpos(
+        $route,
+        "'schedule_seat_reduction'"
+    ) !== false
+    && strpos(
+        $route,
+        "\$_POST['farm_id']"
+    ) === false
+    && strpos(
+        $route,
+        "\$_POST['amount']"
+    ) === false
+    && strpos(
+        $route,
+        "\$_POST['currency']"
+    ) === false,
+    'browser reduction request cannot select tenant, amount or currency'
+);
+
+$check(
+    strpos(
+        $route,
+        'billing_seat_reduction_schedule('
+    ) !== false
+    && strpos(
+        $route,
+        'billing_seat_change_request_insert('
+    ) === false,
+    'customer route delegates mutation only to centralized reduction scheduling'
+);
+
+$check(
+    strpos(
+        $route,
+        'Current paid-term seat limits stay available until then; no refund is created.'
+    ) !== false
+    && strpos(
+        $route,
+        'No current seat allowance was changed.'
+    ) !== false,
+    'customer route communicates deferred no-refund semantics'
+);
+
+$routeForbidden = [
+    'UPDATE farms',
+    'INSERT INTO subscriptions',
+    'UPDATE farm_subscription_seat_addons',
+    'INSERT INTO billing_payment_attempts',
+    'billing_provider_',
+    'curl_',
+];
+
+$routeHasForbiddenMutation = false;
+
+foreach ($routeForbidden as $needle) {
+    if (stripos($route, $needle) !== false) {
+        $routeHasForbiddenMutation = true;
+        break;
+    }
+}
+
+$check(
+    !$routeHasForbiddenMutation,
+    'customer reduction route performs no direct entitlement, payment or provider work'
 );
 
 echo "\nChecks: {$checks}\n";

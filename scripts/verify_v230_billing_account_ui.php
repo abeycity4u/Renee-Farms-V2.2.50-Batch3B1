@@ -21,6 +21,7 @@ $currentProduct = billing_account_source('includes/billing_current_product.php')
 $helper = billing_account_source('includes/billing_account_overview.php');
 $page = billing_account_source('billing/account.php');
 $checkout = billing_account_source('billing/checkout.php');
+$seatReductionRoute = billing_account_source('billing/seat_reduction_schedule.php');
 $navBridge = billing_account_source('includes/platform_owner_nav_discoverability.php');
 $init = billing_account_source('init.php');
 
@@ -51,14 +52,14 @@ verify_billing_account(
 );
 verify_billing_account(
     str_contains(
-        $page,
-        'billing_seat_change_ready($pdo)'
+        $helper,
+        "'seat_change_ready' => \$seatChangeReady"
     )
     && str_contains(
         $page,
         "\$status === 'active'"
     ),
-    'seat-topup UI is gated by canonical seat-change readiness and active subscription state'
+    'seat-change UI is gated by read-model storage readiness and active subscription state'
 );
 verify_billing_account(
     str_contains(
@@ -83,10 +84,83 @@ verify_billing_account(
     'seat-topup UI explains that commercial pricing remains server authoritative'
 );
 verify_billing_account(str_contains($page, 'csrf_field()'), 'renewal and seat-topup checkout forms include centralized CSRF protection');
+verify_billing_account(
+    str_contains(
+        $helper,
+        "require_once __DIR__ . '/billing_renewal_seat_target.php';"
+    )
+    && str_contains(
+        $helper,
+        'billing_renewal_seat_target('
+    )
+    && str_contains(
+        $helper,
+        "'renewal_seat_target' => \$renewalSeatTarget"
+    ),
+    'billing read model exposes integrity-checked next-renewal seat targeting for active tenants'
+);
+verify_billing_account(
+    $seatReductionRoute !== ''
+    && str_contains(
+        $page,
+        "BASE_URL . '/billing/seat_reduction_schedule.php'"
+    )
+    && str_contains(
+        $page,
+        'name="schedule_seat_reduction"'
+    ),
+    'billing workspace exposes scheduled seat reduction through its dedicated route'
+);
+verify_billing_account(
+    str_contains(
+        $page,
+        'Current paid-term seat limits stay unchanged and no refund is created.'
+    )
+    && str_contains(
+        $page,
+        'assigned users and paid-period end'
+    ),
+    'seat-reduction UI explains no-refund timing and server-side future-capacity validation'
+);
+verify_billing_account(
+    str_contains(
+        $page,
+        '$scheduledReductions'
+    )
+    && str_contains(
+        $page,
+        "'renewal_extra'"
+    )
+    && str_contains(
+        $page,
+        "'current_period_ends_at'"
+    ),
+    'billing workspace displays scheduled renewal reductions without changing current seat summary'
+);
 verify_billing_account(!str_contains($page, 'name="farm_id"') && !str_contains($page, 'name="amount"') && !str_contains($page, 'name="currency"'), 'browser checkout form cannot control tenant, amount or currency');
 verify_billing_account(!str_contains($page, "\$_GET['farm_id']") && !str_contains($page, "\$_POST['farm_id']"), 'billing page has no browser-selected tenant scope');
-verify_billing_account(str_contains($checkout, 'billing_current_product_assert_selection') && str_contains($checkout, 'billing_current_product_normal_statuses()'), 'normal Farm Admin checkout rejects plan, interval, module and seat tampering');
-verify_billing_account(str_contains($checkout, "\$pricedQuote = \$currentProduct['payment_quote'];"), 'checkout uses the canonical current-product payment quote after validation');
+verify_billing_account(
+    str_contains(
+        $checkout,
+        'billing_commercial_attempt_reconcile_terminal_candidates_for_replacement('
+    )
+    && str_contains(
+        $checkout,
+        'billing_subscription_checkout_prepare('
+    )
+    && str_contains(
+        $checkout,
+        'billing_current_product_normal_statuses()'
+    ),
+    'normal Farm Admin checkout reconciles prior attempts then delegates authoritative renewal preparation'
+);
+verify_billing_account(
+    str_contains(
+        $checkout,
+        "\$prepared['payment_quote']"
+    ),
+    'checkout consumes the payment quote returned by centralized preparation'
+);
 verify_billing_account(!str_contains($checkout, 'billing_pricing_build_payment_quote('), 'checkout does not rebuild a browser-selected product after current-product validation');
 verify_billing_account(!str_contains($helper, 'UPDATE farms') && !str_contains($helper, 'INSERT INTO subscriptions') && !str_contains($helper, 'DELETE FROM'), 'account read model performs no commercial-state DML');
 verify_billing_account(!str_contains($page, 'UPDATE farms') && !str_contains($page, 'INSERT INTO subscriptions') && !str_contains($page, 'billing_payment_attempt_create'), 'billing UI performs no direct commercial or payment-attempt DML');

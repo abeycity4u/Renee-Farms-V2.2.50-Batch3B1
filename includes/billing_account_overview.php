@@ -15,6 +15,7 @@ require_once __DIR__ . '/billing_payment_foundation.php';
 require_once __DIR__ . '/billing_current_product.php';
 require_once __DIR__ . '/subscription_record.php';
 require_once __DIR__ . '/subscription_seat_policy.php';
+require_once __DIR__ . '/billing_renewal_seat_target.php';
 
 if (!function_exists('billing_account_payment_attempts')) {
     function billing_account_payment_attempts(PDO $pdo, int $farmId, int $limit = 20): array
@@ -72,6 +73,22 @@ if (!function_exists('billing_account_overview')) {
         $modules = $current['modules'];
         $seatAddOns = $current['seat_addons'];
 
+        $seatChangeReady =
+            billing_seat_change_ready($pdo);
+
+        $renewalSeatTarget = null;
+
+        if (($current['status'] ?? '') === 'active'
+            && $seatChangeReady) {
+            $renewalSeatTarget =
+                billing_renewal_seat_target(
+                    $pdo,
+                    $farmId,
+                    false,
+                    ['active']
+                );
+        }
+
         return [
             'farm' => $farm,
             'latest_subscription' => $current['latest_subscription'],
@@ -79,6 +96,8 @@ if (!function_exists('billing_account_overview')) {
             'modules' => $modules,
             'seat_addons' => $seatAddOns,
             'seat_summary' => billing_account_seat_summary($pdo, $farmId, $modules, $seatAddOns),
+            'seat_change_ready' => $seatChangeReady,
+            'renewal_seat_target' => $renewalSeatTarget,
             'pricing' => $current['pricing'],
             'subscription_history' => subscription_record_history($pdo, $farmId, 12),
             'payment_attempts' => billing_account_payment_attempts($pdo, $farmId, 20),
