@@ -20,7 +20,8 @@ require_once dirname(__DIR__) . '/includes/billing_provider_readiness.php';
 require_once dirname(__DIR__) . '/includes/billing_payment_audit_state.php';
 require_once dirname(__DIR__) . '/includes/billing_tenant_actor.php';
 require_once dirname(__DIR__) . '/includes/billing_current_product.php';
-require_once dirname(__DIR__) . '/includes/billing_reactivation_quote.php';
+require_once dirname(__DIR__) . '/includes/billing_commercial_attempt_reconciliation_launcher.php';
+require_once dirname(__DIR__) . '/includes/billing_subscription_checkout_initiation.php';
 
 $actor = billing_require_farm_admin_actor($pdo, true, subscription_recovery_target_statuses());
 $farmId = (int)$actor['farm_id'];
@@ -34,67 +35,169 @@ if (!$pdo instanceof PDO || !billing_payment_foundation_ready($pdo)) {
 try {
     $selection = billing_route_normalize_checkout_input($_POST);
 
-    // Every customer-facing checkout is a same-product renewal until a dedicated
-    // server-authorized product-change workflow exists. Browser plan/interval/
-    // module/seat fields are assertions only and cannot change commercial state.
-    if (billing_tenant_actor_is_recovery($actor)) {
-        $currentProduct = billing_reactivation_assert_selection($pdo, $farmId, $selection);
-    } else {
-        $currentProduct = billing_current_product_assert_selection(
+    $allowedStatuses =
+        billing_tenant_actor_is_recovery($actor)
+            ? subscription_recovery_target_statuses()
+            : billing_current_product_normal_statuses();
+
+    /*
+     * Before creating a replacement checkout, re-verify every commercially
+     * eligible terminal subscription attempt within the bounded canonical
+     * reconciliation flow. Provider/network work remains outside DB
+     * transactions inside that launcher.
+     */
+    $reconciliation =
+        billing_commercial_attempt_reconcile_terminal_candidates_for_replacement(
             $pdo,
             $farmId,
-            $selection,
-            billing_current_product_normal_statuses()
+            (int)$actor['user_id']
+        );
+
+    $stoppedReason =
+        (string)(
+            $reconciliation['stopped_reason']
+                ?? ''
+        );
+
+    if ($stoppedReason === 'paid_applied') {
+        /*
+         * The earlier checkout has now been authoritatively verified paid and
+         * applied. Never open another provider checkout in this request.
+         */
+        if (billing_tenant_actor_is_recovery(
+            $actor
+        )) {
+            subscription_recovery_promote_to_login(
+                $pdo
+            );
+        }
+
+        $_SESSION['success'] =
+            'An earlier payment was verified and your subscription is active. No replacement checkout was started.';
+
+        header(
+            'Location: ' . BASE_URL . '/dashboard.php',
+            true,
+            303
+        );
+        exit();
+    }
+
+    if ($stoppedReason === 'pending_blocked') {
+        http_response_code(409);
+        exit(
+            'An earlier subscription payment is still pending verification. No new checkout was started.'
         );
     }
 
-    billing_provider_assert_new_checkout_allowed();
-    $provider = billing_provider_readiness_resolve_checkout($selection['provider']);
-    billing_provider_register_configured_adapters($provider);
-
-    $farm = $currentProduct['farm'];
-    if (!$farm || (int)($farm['id'] ?? 0) !== $farmId) {
-        throw new RuntimeException('Current tenant farm could not be resolved for billing.');
-    }
-    $customerEmail = strtolower(trim((string)($farm['contact_email'] ?? '')));
-    if (!filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) {
-        throw new RuntimeException('A valid farm contact email is required before subscription checkout.');
+    if ($stoppedReason !== 'exhausted'
+        || (
+            $reconciliation[
+                'terminal_candidates_exhausted'
+            ] ?? false
+        ) !== true) {
+        throw new RuntimeException(
+            'Replacement checkout reconciliation did not reach a safe terminal state.'
+        );
     }
 
-    $returnUrl = billing_route_public_url('/billing/return.php', ['provider' => $provider]);
+    /*
+     * Only after prior-attempt reconciliation is safely exhausted do we
+     * validate the customer's selected provider for a brand-new checkout.
+     * The reconciliation launcher independently registers each historical
+     * attempt's own provider before verifying it.
+     */
+    $provider =
+        billing_provider_readiness_resolve_checkout(
+            $selection['provider']
+        );
+
+    billing_provider_register_configured_adapters(
+        $provider
+    );
+
+    /*
+     * Contact information is preflighted before the centralized prepare
+     * transaction creates a fresh attempt. Commercial product fields are not
+     * resolved here; prepare() remains the final server-authoritative gate.
+     */
+    $farm =
+        billing_tenant_actor_farm(
+            $pdo,
+            $actor
+        );
+
+    if (!is_array($farm)
+        || (int)($farm['id'] ?? 0)
+            !== $farmId) {
+        throw new RuntimeException(
+            'Current tenant farm could not be resolved for billing.'
+        );
+    }
+
+    $customerEmail =
+        strtolower(trim(
+            (string)(
+                $farm['contact_email']
+                    ?? ''
+            )
+        ));
+
+    if (!filter_var(
+        $customerEmail,
+        FILTER_VALIDATE_EMAIL
+    )) {
+        throw new RuntimeException(
+            'A valid farm contact email is required before subscription checkout.'
+        );
+    }
+
+    $returnUrl =
+        billing_route_public_url(
+            '/billing/return.php',
+            ['provider' => $provider]
+        );
+
     $context = [
-        'customer_email' => $customerEmail,
-        'customer_name' => trim((string)($farm['name'] ?? '')) ?: 'Farm Customer',
-        'callback_url' => $returnUrl,
-        'redirect_url' => $returnUrl,
+        'customer_email' =>
+            $customerEmail,
+        'customer_name' =>
+            trim((string)(
+                $farm['name'] ?? ''
+            )) ?: 'Farm Customer',
+        'callback_url' =>
+            $returnUrl,
+        'redirect_url' =>
+            $returnUrl,
     ];
 
-    $pricedQuote = $currentProduct['payment_quote'];
-    $pricing = $currentProduct['pricing'];
-    $providerReference = billing_route_provider_reference($farmId, $provider);
+    $providerReference =
+        billing_route_provider_reference(
+            $farmId,
+            $provider
+        );
 
-    $pdo->beginTransaction();
-    try {
-        $created = billing_payment_attempt_create(
+    /*
+     * This service owns farm serialization, authoritative renewal resolution,
+     * browser-field assertion, frozen quote creation and fresh attempt
+     * persistence. It commits before any provider/network initialization.
+     */
+    $prepared =
+        billing_subscription_checkout_prepare(
             $pdo,
             $farmId,
             $provider,
             $providerReference,
-            $pricing['plan_code'],
-            $pricing['billing_interval'],
-            $pricing['amount'],
-            $pricing['currency'],
-            $pricing['modules'],
-            $pricing['seat_addons'],
-            (int)$actor['user_id']
+            $selection,
+            (int)$actor['user_id'],
+            $allowedStatuses
         );
-        $pdo->commit();
-    } catch (Throwable $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
-        throw $e;
-    }
 
-    $attemptId = (int)$created['id'];
+    $attemptId =
+        (int)$prepared['attempt_id'];
+
+    $pricedQuote =
+        $prepared['payment_quote'];
 
     try {
         $checkout = billing_provider_initialize_checkout(

@@ -27,6 +27,28 @@ if ($source === false) {
     exit(1);
 }
 
+$routePath =
+    $root
+    . '/billing/checkout.php';
+
+if (!is_file($routePath)) {
+    fwrite(
+        STDERR,
+        "FAIL: missing subscription checkout route.\n"
+    );
+    exit(1);
+}
+
+$route = file_get_contents($routePath);
+
+if ($route === false) {
+    fwrite(
+        STDERR,
+        "FAIL: unable to read subscription checkout route.\n"
+    );
+    exit(1);
+}
+
 $compact = preg_replace('/\s+/', '', $source);
 $checks = 0;
 $failures = 0;
@@ -317,6 +339,208 @@ $check(
         'curl_'
     ) === false,
     'checkout initiation performs no provider or network work'
+);
+
+
+$routeReconcilePos = strpos(
+    $route,
+    'billing_commercial_attempt_reconcile_terminal_candidates_for_replacement('
+);
+
+$routePaidAppliedPos = strpos(
+    $route,
+    '$stoppedReason === \'paid_applied\''
+);
+
+$routePendingBlockedPos = strpos(
+    $route,
+    '$stoppedReason === \'pending_blocked\''
+);
+
+$routeExhaustionPos = strpos(
+    $route,
+    '$stoppedReason !== \'exhausted\''
+);
+
+$routeProviderResolvePos = strpos(
+    $route,
+    'billing_provider_readiness_resolve_checkout('
+);
+
+$routeProviderRegisterPos = strpos(
+    $route,
+    'billing_provider_register_configured_adapters('
+);
+
+$routePreparePos = strpos(
+    $route,
+    'billing_subscription_checkout_prepare('
+);
+
+$routeProviderInitializePos = strpos(
+    $route,
+    'billing_provider_initialize_checkout('
+);
+
+$check(
+    strpos(
+        $route,
+        'billing_commercial_attempt_reconciliation_launcher.php'
+    ) !== false
+    && strpos(
+        $route,
+        'billing_subscription_checkout_initiation.php'
+    ) !== false,
+    'checkout route reuses centralized reconciliation and subscription checkout preparation'
+);
+
+$check(
+    $routeReconcilePos !== false
+    && $routePaidAppliedPos !== false
+    && $routePendingBlockedPos !== false
+    && $routeExhaustionPos !== false
+    && $routeProviderResolvePos !== false
+    && $routeProviderRegisterPos !== false
+    && $routePreparePos !== false
+    && $routeProviderInitializePos !== false
+    && $routeReconcilePos < $routePaidAppliedPos
+    && $routePaidAppliedPos < $routePendingBlockedPos
+    && $routePendingBlockedPos < $routeExhaustionPos
+    && $routeExhaustionPos < $routeProviderResolvePos
+    && $routeProviderResolvePos < $routeProviderRegisterPos
+    && $routeProviderRegisterPos < $routePreparePos
+    && $routePreparePos < $routeProviderInitializePos,
+    'prior-attempt reconciliation and stop outcomes precede replacement-provider validation, preparation and initialization'
+);
+
+$paidAppliedBranch = '';
+
+if ($routePaidAppliedPos !== false
+    && $routePendingBlockedPos !== false
+    && $routePaidAppliedPos < $routePendingBlockedPos) {
+    $paidAppliedBranch = substr(
+        $route,
+        $routePaidAppliedPos,
+        $routePendingBlockedPos - $routePaidAppliedPos
+    );
+}
+
+$check(
+    $paidAppliedBranch !== ''
+    && strpos(
+        $paidAppliedBranch,
+        'subscription_recovery_promote_to_login('
+    ) !== false
+    && strpos(
+        $paidAppliedBranch,
+        'No replacement checkout was started.'
+    ) !== false
+    && strpos(
+        $paidAppliedBranch,
+        'header('
+    ) !== false
+    && strpos(
+        $paidAppliedBranch,
+        'exit();'
+    ) !== false,
+    'a reconciled paid prior checkout stops replacement and safely restores recovery access'
+);
+
+$pendingBranch = '';
+
+if ($routePendingBlockedPos !== false
+    && $routePreparePos !== false
+    && $routePendingBlockedPos < $routePreparePos) {
+    $pendingBranch = substr(
+        $route,
+        $routePendingBlockedPos,
+        $routePreparePos - $routePendingBlockedPos
+    );
+}
+
+$check(
+    $pendingBranch !== ''
+    && strpos(
+        $pendingBranch,
+        'http_response_code(409)'
+    ) !== false
+    && strpos(
+        $pendingBranch,
+        'No new checkout was started.'
+    ) !== false
+    && strpos(
+        $pendingBranch,
+        'exit('
+    ) !== false,
+    'a reconciled pending prior payment blocks replacement checkout explicitly'
+);
+
+$check(
+    strpos(
+        $route,
+        'terminal_candidates_exhausted'
+    ) !== false
+    && strpos(
+        $route,
+        "'exhausted'"
+    ) !== false
+    && strpos(
+        $route,
+        'did not reach a safe terminal state'
+    ) !== false,
+    'checkout route requires terminal reconciliation exhaustion before fresh preparation'
+);
+
+$check(
+    strpos(
+        $route,
+        'billing_payment_attempt_create('
+    ) === false
+    && strpos(
+        $route,
+        'billing_current_product_assert_selection('
+    ) === false
+    && strpos(
+        $route,
+        'billing_reactivation_assert_selection('
+    ) === false,
+    'checkout route no longer duplicates payment-attempt creation or product assertion services'
+);
+
+$check(
+    strpos(
+        $route,
+        'billing_tenant_actor_farm('
+    ) !== false
+    && strpos(
+        $route,
+        'FILTER_VALIDATE_EMAIL'
+    ) !== false
+    && strpos(
+        $route,
+        '$prepared[\'attempt_id\']'
+    ) !== false
+    && strpos(
+        $route,
+        '$prepared[\'payment_quote\']'
+    ) !== false,
+    'route preflights customer contact and consumes the centralized prepared attempt and quote'
+);
+
+$check(
+    strpos(
+        $route,
+        'subscription_recovery_target_statuses()'
+    ) !== false
+    && strpos(
+        $route,
+        'billing_current_product_normal_statuses()'
+    ) !== false
+    && strpos(
+        $route,
+        '$allowedStatuses'
+    ) !== false,
+    'checkout preparation receives the correct normal or recovery subscription-status scope'
 );
 
 echo "\nChecks: {$checks}\n";
