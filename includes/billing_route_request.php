@@ -144,6 +144,117 @@ if (!function_exists('billing_route_normalize_checkout_input')) {
     }
 }
 
+if (!function_exists('billing_route_allowed_seat_topup_keys')) {
+    function billing_route_allowed_seat_topup_keys(): array
+    {
+        return [
+            'csrf_token',
+            'role_code',
+            'quantity',
+            'provider',
+        ];
+    }
+}
+
+if (!function_exists('billing_route_normalize_seat_topup_input')) {
+    function billing_route_normalize_seat_topup_input(
+        array $input
+    ): array {
+        foreach (array_keys($input) as $key) {
+            $key = (string)$key;
+
+            if (in_array(
+                $key,
+                billing_route_reserved_billing_keys(),
+                true
+            )) {
+                throw new InvalidArgumentException(
+                    'Billing-sensitive seat-top-up values are server controlled.'
+                );
+            }
+
+            if (!in_array(
+                $key,
+                billing_route_allowed_seat_topup_keys(),
+                true
+            )) {
+                throw new InvalidArgumentException(
+                    'Unsupported seat-top-up field.'
+                );
+            }
+        }
+
+        if (!function_exists('subscription_seat_roles')) {
+            throw new RuntimeException(
+                'Subscription seat policy is unavailable.'
+            );
+        }
+
+        $roleCode = strtolower(trim(
+            (string)($input['role_code'] ?? '')
+        ));
+
+        if (!array_key_exists(
+            $roleCode,
+            subscription_seat_roles()
+        )) {
+            throw new InvalidArgumentException(
+                'Unknown extra-seat role.'
+            );
+        }
+
+        $quantityRaw = $input['quantity'] ?? null;
+
+        if (is_string($quantityRaw)) {
+            $quantityRaw = trim($quantityRaw);
+        }
+
+        $quantity = filter_var(
+            $quantityRaw,
+            FILTER_VALIDATE_INT,
+            [
+                'options' => [
+                    'min_range' => 1,
+                    'max_range' => 500,
+                ],
+            ]
+        );
+
+        if ($quantity === false) {
+            throw new InvalidArgumentException(
+                'Extra-seat quantity must be a whole number between 1 and 500.'
+            );
+        }
+
+        $provider = trim(
+            (string)($input['provider'] ?? '')
+        );
+
+        if ($provider !== '') {
+            if (!function_exists(
+                'billing_provider_selection_normalize'
+            )) {
+                throw new RuntimeException(
+                    'Billing provider selection is unavailable.'
+                );
+            }
+
+            $provider =
+                billing_provider_selection_normalize(
+                    $provider
+                );
+        } else {
+            $provider = null;
+        }
+
+        return [
+            'role_code' => $roleCode,
+            'quantity' => (int)$quantity,
+            'provider' => $provider,
+        ];
+    }
+}
+
 if (!function_exists('billing_route_provider_reference')) {
     function billing_route_provider_reference(int $farmId, string $provider): string
     {
