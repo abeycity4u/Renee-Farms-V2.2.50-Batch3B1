@@ -67,10 +67,26 @@ $check(
 
 $check(
     strpos(
-        $compact,
-        "billing_current_product(\$pdo,\$farmId,['active'])"
+        $source,
+        "array \$allowedStatuses = ['active']"
+    ) !== false
+    && strpos(
+        $source,
+        'At least one subscription status is required for renewal seat targeting.'
+    ) !== false
+    && strpos(
+        $source,
+        'Unsupported subscription status for renewal seat targeting.'
     ) !== false,
-    'renewal seat targeting is restricted to the authoritative active product'
+    'renewal seat targeting defaults to active and rejects empty or unknown status scopes'
+);
+
+$check(
+    strpos(
+        $compact,
+        'billing_current_product($pdo,$farmId,$allowedStatuses)'
+    ) !== false,
+    'renewal seat targeting delegates its explicit status scope to the authoritative current product'
 );
 
 $check(

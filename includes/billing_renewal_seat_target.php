@@ -22,12 +22,51 @@ if (!function_exists('billing_renewal_seat_target')) {
     function billing_renewal_seat_target(
         PDO $pdo,
         int $farmId,
-        bool $forUpdate = false
+        bool $forUpdate = false,
+        array $allowedStatuses = ['active']
     ): array {
         if ($farmId < 1) {
             throw new InvalidArgumentException(
                 'A valid tenant farm is required for renewal seat targeting.'
             );
+        }
+
+        $allowedStatuses = array_values(array_unique(array_map(
+            static fn($value): string =>
+                strtolower(trim((string)$value)),
+            $allowedStatuses
+        )));
+
+        $allowedStatuses = array_values(array_filter(
+            $allowedStatuses,
+            static fn(string $value): bool =>
+                $value !== ''
+        ));
+
+        if (!$allowedStatuses) {
+            throw new InvalidArgumentException(
+                'At least one subscription status is required for renewal seat targeting.'
+            );
+        }
+
+        $supportedStatuses = [
+            'trial',
+            'active',
+            'past_due',
+            'suspended',
+            'cancelled',
+        ];
+
+        foreach ($allowedStatuses as $status) {
+            if (!in_array(
+                $status,
+                $supportedStatuses,
+                true
+            )) {
+                throw new InvalidArgumentException(
+                    'Unsupported subscription status for renewal seat targeting.'
+                );
+            }
         }
 
         if ($forUpdate && !$pdo->inTransaction()) {
@@ -45,7 +84,7 @@ if (!function_exists('billing_renewal_seat_target')) {
         $current = billing_current_product(
             $pdo,
             $farmId,
-            ['active']
+            $allowedStatuses
         );
 
         $farm = $current['farm'] ?? null;
