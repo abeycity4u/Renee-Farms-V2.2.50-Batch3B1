@@ -141,6 +141,89 @@ $check(
 
 $check(
     strpos(
+        $route,
+        'billing_seat_topup_reconciliation_launcher.php'
+    ) !== false
+    && strpos(
+        $routeTokens,
+        'billing_seat_topup_reconcile_open_candidates_for_replacement($pdo,$farmId)'
+    ) !== false,
+    'checkout route delegates prior top-up handling to the tenant-wide reconciliation launcher'
+);
+
+$normalizePos = strpos(
+    $routeTokens,
+    'billing_route_normalize_seat_topup_input($_POST)'
+);
+
+$reconciliationPos = strpos(
+    $routeTokens,
+    'billing_seat_topup_reconcile_open_candidates_for_replacement('
+);
+
+$providerResolvePos = strpos(
+    $routeTokens,
+    'billing_provider_readiness_resolve_checkout('
+);
+
+$prepareOrderPos = strpos(
+    $routeTokens,
+    'billing_seat_topup_prepare('
+);
+
+$check(
+    $normalizePos !== false
+    && $reconciliationPos !== false
+    && $providerResolvePos !== false
+    && $prepareOrderPos !== false
+    && $normalizePos < $reconciliationPos
+    && $reconciliationPos < $providerResolvePos
+    && $providerResolvePos < $prepareOrderPos,
+    'prior top-up reconciliation completes before new provider resolution and durable preparation'
+);
+
+$check(
+    strpos(
+        $routeTokens,
+        "'paid_applied'"
+    ) !== false
+    && strpos(
+        $routeTokens,
+        "'initialized_blocked'"
+    ) !== false
+    && strpos(
+        $routeTokens,
+        "'pending_blocked'"
+    ) !== false
+    && strpos(
+        $routeTokens,
+        "'replacement_allowed'"
+    ) !== false
+    && strpos(
+        $routeTokens,
+        "'exhausted'"
+    ) !== false,
+    'paid, initialized and pending prior attempts stop safely while only exhausted reconciliation permits replacement'
+);
+
+$check(
+    strpos(
+        $routeTokens,
+        "'/billing/account.php'"
+    ) !== false
+    && strpos(
+        $routeTokens,
+        '$_SESSION[\'success\']'
+    ) !== false
+    && strpos(
+        $routeTokens,
+        '$_SESSION[\'error\']'
+    ) !== false,
+    'reconciliation stop outcomes return Farm Admin to billing with a customer-facing notification'
+);
+
+$check(
+    strpos(
         $routeTokens,
         'billing_tenant_actor_farm($pdo,$actor)'
     ) !== false
@@ -187,7 +270,7 @@ $pendingPos = strpos(
     'billing_audit_mark_pending('
 );
 
-$redirectPos = strpos(
+$redirectPos = strrpos(
     $routeTokens,
     'header('
 );

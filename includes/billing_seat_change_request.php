@@ -2097,6 +2097,33 @@ if (!function_exists('billing_seat_change_request_insert')) {
                     $contract
                 );
 
+            /*
+             * Paid seat additions freeze the tenant's complete target
+             * seat-add-on snapshot. Serialize unresolved paid additions
+             * tenant-wide while the farm lock is held so two different roles
+             * cannot create competing immutable target snapshots.
+             */
+            if ($contract['change_kind'] === 'add') {
+                $openTopupStmt = $pdo->prepare(
+                    "SELECT id
+                     FROM billing_seat_change_requests
+                     WHERE farm_id = ?
+                       AND change_kind = 'add'
+                       AND status = 'awaiting_payment'
+                     LIMIT 1"
+                );
+
+                $openTopupStmt->execute([
+                    $contract['farm_id'],
+                ]);
+
+                if ($openTopupStmt->fetchColumn()) {
+                    throw new RuntimeException(
+                        'Another pending seat top-up already exists for this farm.'
+                    );
+                }
+            }
+
             $openStmt = $pdo->prepare(
                 "SELECT id
                  FROM billing_seat_change_requests

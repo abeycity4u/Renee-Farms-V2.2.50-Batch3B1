@@ -35,6 +35,8 @@ require_once dirname(__DIR__)
 require_once dirname(__DIR__)
     . '/includes/billing_tenant_actor.php';
 require_once dirname(__DIR__)
+    . '/includes/billing_seat_topup_reconciliation_launcher.php';
+require_once dirname(__DIR__)
     . '/includes/billing_seat_topup_initiation.php';
 
 $actor = billing_require_farm_admin_actor(
@@ -61,6 +63,79 @@ try {
             $_POST
         );
 
+    /*
+     * A seat-top-up payment freezes the tenant's complete target seat
+     * snapshot. Before preparing another checkout, reconcile any earlier
+     * unresolved top-up for this tenant across all seat roles.
+     *
+     * Historical provider verification remains inside the centralized
+     * launcher and outside database transactions.
+     */
+    $reconciliation =
+        billing_seat_topup_reconcile_open_candidates_for_replacement(
+            $pdo,
+            $farmId
+        );
+
+    $stoppedReason =
+        (string)(
+            $reconciliation['stopped_reason']
+                ?? ''
+        );
+
+    if ($stoppedReason === 'paid_applied') {
+        $_SESSION['success'] =
+            'An earlier seat top-up payment was verified and the additional seats were applied. No new checkout was started.';
+
+        header(
+            'Location: '
+                . BASE_URL
+                . '/billing/account.php',
+            true,
+            303
+        );
+        exit();
+    }
+
+    if (in_array(
+        $stoppedReason,
+        [
+            'initialized_blocked',
+            'pending_blocked',
+        ],
+        true
+    )) {
+        $_SESSION['error'] =
+            $stoppedReason === 'initialized_blocked'
+                ? 'An earlier seat top-up checkout is still being prepared. No new checkout was started.'
+                : 'An earlier seat top-up payment is still pending verification. No new checkout was started.';
+
+        header(
+            'Location: '
+                . BASE_URL
+                . '/billing/account.php',
+            true,
+            303
+        );
+        exit();
+    }
+
+    if ($stoppedReason !== 'exhausted'
+        || (
+            $reconciliation[
+                'replacement_allowed'
+            ] ?? false
+        ) !== true) {
+        throw new RuntimeException(
+            'Seat-top-up replacement reconciliation did not reach a safe state.'
+        );
+    }
+
+    /*
+     * Resolve the provider selected for the new checkout only after historical
+     * seat-top-up reconciliation is safely exhausted. Historical attempts may
+     * belong to a different configured provider.
+     */
     $provider =
         billing_provider_readiness_resolve_checkout(
             $selection['provider']

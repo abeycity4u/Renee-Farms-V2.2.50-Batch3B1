@@ -504,6 +504,26 @@ $check(
 $check(
     strpos(
         $source,
+        "if (\$contract['change_kind'] === 'add')"
+    ) !== false
+    && strpos(
+        $source,
+        "AND change_kind = 'add'"
+    ) !== false
+    && strpos(
+        $source,
+        "AND status = 'awaiting_payment'"
+    ) !== false
+    && strpos(
+        $source,
+        'Another pending seat top-up already exists for this farm.'
+    ) !== false,
+    'unresolved paid seat additions are serialized tenant-wide under the farm lock'
+);
+
+$check(
+    strpos(
+        $source,
         'LIMIT 1' . "\n" . '                 FOR UPDATE'
     ) !== false
     && strpos(
