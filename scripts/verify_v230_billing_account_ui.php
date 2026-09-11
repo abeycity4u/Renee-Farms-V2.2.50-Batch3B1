@@ -42,7 +42,47 @@ verify_billing_account(str_contains($page, 'billing_require_farm_admin_actor($pd
 verify_billing_account(!str_contains($page, 'subscription_recovery_') && !str_contains($page, 'allowRecovery'), 'billing account does not accept restricted recovery authentication');
 verify_billing_account(str_contains($page, 'billing_provider_selection_codes()') && str_contains($page, 'billing_provider_readiness_status'), 'provider choices come from canonical provider selection/readiness');
 verify_billing_account(str_contains($page, "BASE_URL . '/billing/checkout.php'"), 'renewal delegates to the canonical checkout route');
-verify_billing_account(str_contains($page, 'csrf_field()'), 'renewal checkout form includes centralized CSRF protection');
+verify_billing_account(
+    str_contains(
+        $page,
+        "BASE_URL . '/billing/seat_topup_checkout.php'"
+    ),
+    'seat allowance UI delegates extra-seat purchase to the dedicated seat-topup checkout route'
+);
+verify_billing_account(
+    str_contains(
+        $page,
+        'billing_seat_change_ready($pdo)'
+    )
+    && str_contains(
+        $page,
+        "\$status === 'active'"
+    ),
+    'seat-topup UI is gated by canonical seat-change readiness and active subscription state'
+);
+verify_billing_account(
+    str_contains(
+        $page,
+        'name="role_code"'
+    )
+    && str_contains(
+        $page,
+        'name="quantity"'
+    )
+    && str_contains(
+        $page,
+        'max="500"'
+    ),
+    'seat-topup UI submits only an explicit role and bounded positive quantity'
+);
+verify_billing_account(
+    str_contains(
+        $page,
+        'final prorated price is calculated securely on the server'
+    ),
+    'seat-topup UI explains that commercial pricing remains server authoritative'
+);
+verify_billing_account(str_contains($page, 'csrf_field()'), 'renewal and seat-topup checkout forms include centralized CSRF protection');
 verify_billing_account(!str_contains($page, 'name="farm_id"') && !str_contains($page, 'name="amount"') && !str_contains($page, 'name="currency"'), 'browser checkout form cannot control tenant, amount or currency');
 verify_billing_account(!str_contains($page, "\$_GET['farm_id']") && !str_contains($page, "\$_POST['farm_id']"), 'billing page has no browser-selected tenant scope');
 verify_billing_account(str_contains($checkout, 'billing_current_product_assert_selection') && str_contains($checkout, 'billing_current_product_normal_statuses()'), 'normal Farm Admin checkout rejects plan, interval, module and seat tampering');

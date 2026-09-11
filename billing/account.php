@@ -11,6 +11,7 @@
 require_once dirname(__DIR__) . '/init.php';
 require_once dirname(__DIR__) . '/includes/billing_tenant_actor.php';
 require_once dirname(__DIR__) . '/includes/billing_account_overview.php';
+require_once dirname(__DIR__) . '/includes/billing_seat_change_request.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_selection.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_readiness.php';
 require_once dirname(__DIR__) . '/includes/farm_contact_email.php';
@@ -57,9 +58,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $pageError = null;
 $overview = null;
 $providers = [];
+$seatTopupStorageReady = false;
 
 try {
     $overview = billing_account_overview($pdo, $farmId);
+    $seatTopupStorageReady = billing_seat_change_ready($pdo);
     foreach (billing_provider_selection_codes() as $provider) {
         $status = billing_provider_readiness_status($provider, false);
         if (($status['ready'] ?? false) !== true) continue;
@@ -90,6 +93,12 @@ $checkoutReady = $overview !== null
     && ($overview['payment_foundation_ready'] ?? false) === true
     && !empty($providers)
     && filter_var($contactEmail, FILTER_VALIDATE_EMAIL);
+
+$seatTopupReady = $checkoutReady
+    && $seatTopupStorageReady
+    && $status === 'active'
+    && !empty($overview['seat_summary']);
+
 $buttonLabel = match ($status) {
     'trial' => 'Start paid subscription',
     'past_due' => 'Resolve subscription payment',
@@ -249,6 +258,119 @@ $decodeModules = static function ($json): string {
                     <?php endforeach; ?>
                     </tbody>
                 </table>
+            </div>
+
+            <div class="card-footer bg-transparent border-0 px-3 pb-3">
+                <div class="border rounded-3 p-3">
+                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+                        <div>
+                            <h3 class="h6 mb-1">Add extra seats</h3>
+                            <div class="small text-muted">
+                                Buy additional seats for the remaining paid subscription period.
+                            </div>
+                        </div>
+                    </div>
+
+                    <?php if ($status !== 'active'): ?>
+                        <div class="alert alert-info mb-0">
+                            Seat top-up is available while the paid subscription is active.
+                        </div>
+                    <?php elseif (!filter_var($contactEmail, FILTER_VALIDATE_EMAIL)): ?>
+                        <div class="alert alert-warning mb-0">
+                            Save a valid billing contact email above to enable seat top-up checkout.
+                        </div>
+                    <?php elseif (!$seatTopupStorageReady): ?>
+                        <div class="alert alert-warning mb-0">
+                            Seat top-up service is temporarily unavailable. Please try again later.
+                        </div>
+                    <?php elseif (!$providers): ?>
+                        <div class="alert alert-warning mb-0">
+                            No payment provider is currently available. Please try again later.
+                        </div>
+                    <?php elseif (empty($overview['seat_summary'])): ?>
+                        <div class="alert alert-info mb-0">
+                            No additional seat roles are available for the current livestock bundle.
+                        </div>
+                    <?php else: ?>
+                        <form
+                            method="post"
+                            action="<?= htmlspecialchars(BASE_URL . '/billing/seat_topup_checkout.php', ENT_QUOTES, 'UTF-8') ?>"
+                            class="row g-3 align-items-end"
+                        >
+                            <?= csrf_field() ?>
+
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold" for="seatTopupRole">
+                                    Role
+                                </label>
+                                <select
+                                    id="seatTopupRole"
+                                    class="form-select"
+                                    name="role_code"
+                                    required
+                                >
+                                    <?php foreach ($overview['seat_summary'] as $seat): ?>
+                                        <option value="<?= htmlspecialchars((string)$seat['role'], ENT_QUOTES, 'UTF-8') ?>">
+                                            <?= htmlspecialchars((string)$seat['label'], ENT_QUOTES, 'UTF-8') ?>
+                                            · currently <?= (int)$seat['limit'] ?> allowed
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold" for="seatTopupQuantity">
+                                    Extra seats
+                                </label>
+                                <input
+                                    id="seatTopupQuantity"
+                                    class="form-control"
+                                    type="number"
+                                    name="quantity"
+                                    min="1"
+                                    max="500"
+                                    step="1"
+                                    value="1"
+                                    inputmode="numeric"
+                                    required
+                                >
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold" for="seatTopupProvider">
+                                    Payment provider
+                                </label>
+                                <select
+                                    id="seatTopupProvider"
+                                    class="form-select"
+                                    name="provider"
+                                    required
+                                >
+                                    <?php foreach ($providers as $provider): ?>
+                                        <option value="<?= htmlspecialchars($provider['code'], ENT_QUOTES, 'UTF-8') ?>">
+                                            <?= htmlspecialchars($provider['label'], ENT_QUOTES, 'UTF-8') ?>
+                                            <?= $provider['role'] === 'primary' ? ' · Primary' : '' ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+
+                            <div class="col-md-2">
+                                <button
+                                    type="submit"
+                                    class="btn btn-success w-100 fw-semibold"
+                                    <?= $seatTopupReady ? '' : 'disabled' ?>
+                                >
+                                    Buy seats
+                                </button>
+                            </div>
+                        </form>
+
+                        <div class="form-text mt-2">
+                            The final prorated price is calculated securely on the server from the current plan and remaining paid period. This form never sends an amount, currency or tenant id.
+                        </div>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
 
