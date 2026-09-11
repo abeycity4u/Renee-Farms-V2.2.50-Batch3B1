@@ -14,6 +14,7 @@
 require_once __DIR__ . '/subscription_plan_catalog.php';
 require_once __DIR__ . '/subscription_seat_policy.php';
 require_once __DIR__ . '/billing_payment_foundation.php';
+require_once __DIR__ . '/billing_payment_audit_state.php';
 require_once __DIR__ . '/billing_pricing_contract.php';
 require_once __DIR__ . '/billing_current_product.php';
 require_once __DIR__ . '/billing_seat_proration.php';
@@ -1135,6 +1136,157 @@ if (!function_exists('billing_seat_change_request_by_payment')) {
 
         return $stmt->fetch(PDO::FETCH_ASSOC)
             ?: null;
+    }
+}
+
+
+if (!function_exists('billing_seat_change_mark_payment_failed')) {
+    function billing_seat_change_mark_payment_failed(
+        PDO $pdo,
+        int $paymentAttemptId
+    ): array {
+        if ($paymentAttemptId < 1) {
+            throw new InvalidArgumentException(
+                'A valid seat-top-up payment attempt is required.'
+            );
+        }
+
+        if (!$pdo->inTransaction()) {
+            throw new RuntimeException(
+                'Seat-change payment failure transition requires an active database transaction.'
+            );
+        }
+
+        // Preserve the same lock order used by paid application:
+        // payment attempt first, then durable seat-change request.
+        $attempt =
+            billing_audit_attempt_by_id(
+                $pdo,
+                $paymentAttemptId,
+                true
+            );
+
+        if (!$attempt) {
+            throw new RuntimeException(
+                'Failed seat-top-up payment attempt could not be found.'
+            );
+        }
+
+        if (billing_payment_attempt_purpose(
+            $attempt
+        ) !== 'seat_topup') {
+            throw new RuntimeException(
+                'Only a seat_topup payment can fail an awaiting seat-change request.'
+            );
+        }
+
+        if (strtolower(trim(
+            (string)($attempt['status'] ?? '')
+        )) !== 'failed') {
+            throw new RuntimeException(
+                'Seat-change request can be failed only after its payment attempt is failed.'
+            );
+        }
+
+        $requestRow =
+            billing_seat_change_request_by_payment(
+                $pdo,
+                $paymentAttemptId,
+                true
+            );
+
+        if (!$requestRow) {
+            throw new RuntimeException(
+                'Failed seat-top-up payment has no durable seat-change request.'
+            );
+        }
+
+        $requestState =
+            billing_seat_change_row_contract(
+                $requestRow
+            );
+
+        $contract = $requestState['contract'];
+
+        if (($contract['change_kind'] ?? '')
+                !== 'add'
+            || (int)(
+                $contract['payment_attempt_id']
+                    ?? 0
+            ) !== $paymentAttemptId
+            || (int)(
+                $contract['farm_id']
+                    ?? 0
+            ) !== (int)(
+                $attempt['farm_id']
+                    ?? 0
+            )) {
+            throw new RuntimeException(
+                'Failed payment does not match the durable seat-add request.'
+            );
+        }
+
+        if ($requestState['status'] === 'failed') {
+            return [
+                'changed' => false,
+                'idempotent' => true,
+                'request' => $requestState,
+            ];
+        }
+
+        if ($requestState['status']
+            !== 'awaiting_payment') {
+            throw new RuntimeException(
+                'Only an awaiting-payment seat-add request can be failed.'
+            );
+        }
+
+        $update = $pdo->prepare(
+            "UPDATE billing_seat_change_requests
+             SET status = 'failed'
+             WHERE id = ?
+               AND status = 'awaiting_payment'"
+        );
+
+        $update->execute([
+            (int)$requestState['id'],
+        ]);
+
+        if ($update->rowCount() !== 1) {
+            throw new RuntimeException(
+                'Seat-change request could not be failed exactly once.'
+            );
+        }
+
+        $failedRow =
+            billing_seat_change_request_by_id(
+                $pdo,
+                (int)$requestState['id'],
+                false
+            );
+
+        if (!$failedRow) {
+            throw new RuntimeException(
+                'Failed seat-change request could not be reloaded.'
+            );
+        }
+
+        $failedState =
+            billing_seat_change_row_contract(
+                $failedRow
+            );
+
+        if ($failedState['status'] !== 'failed') {
+            throw new RuntimeException(
+                'Failed seat-change request could not be verified.'
+            );
+        }
+
+        return [
+            'changed' => true,
+            'idempotent' => false,
+            'request' => $failedState,
+        ];
     }
 }
 

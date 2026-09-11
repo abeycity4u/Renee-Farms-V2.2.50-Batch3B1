@@ -658,6 +658,120 @@ $check(
     'request foundation performs no provider or network call'
 );
 
+$check(
+    function_exists(
+        'billing_seat_change_mark_payment_failed'
+    ),
+    'request foundation exposes one centralized failed-payment workflow transition'
+);
+
+$failureHelperStart = strpos(
+    $source,
+    'function billing_seat_change_mark_payment_failed('
+);
+
+$failureHelperEnd = $failureHelperStart === false
+    ? false
+    : strpos(
+        $source,
+        "if (!function_exists('billing_seat_change_attempt_modules'))",
+        $failureHelperStart
+    );
+
+$failureHelperSource =
+    $failureHelperStart !== false
+    && $failureHelperEnd !== false
+    && $failureHelperEnd > $failureHelperStart
+        ? substr(
+            $source,
+            $failureHelperStart,
+            $failureHelperEnd - $failureHelperStart
+        )
+        : '';
+
+$check(
+    $failureHelperSource !== ''
+    && strpos(
+        $failureHelperSource,
+        'inTransaction()'
+    ) !== false
+    && strpos(
+        $failureHelperSource,
+        'requires an active database transaction'
+    ) !== false,
+    'failed-payment cleanup requires the caller transaction'
+);
+
+$attemptLockPos = strpos(
+    $failureHelperSource,
+    'billing_audit_attempt_by_id('
+);
+
+$requestLockPos = strpos(
+    $failureHelperSource,
+    'billing_seat_change_request_by_payment('
+);
+
+$check(
+    $attemptLockPos !== false
+    && $requestLockPos !== false
+    && $attemptLockPos < $requestLockPos
+    && preg_match(
+        '/billing_audit_attempt_by_id\\s*\\('
+        . '[\\s\\S]*?\\$paymentAttemptId\\s*,\\s*true\\s*\\)/',
+        $failureHelperSource
+    ) === 1
+    && preg_match(
+        '/billing_seat_change_request_by_payment\\s*\\('
+        . '[\\s\\S]*?\\$paymentAttemptId\\s*,\\s*true\\s*\\)/',
+        $failureHelperSource
+    ) === 1,
+    'failed-payment cleanup locks payment attempt before its durable seat request'
+);
+
+$check(
+    strpos(
+        $failureHelperSource,
+        "billing_payment_attempt_purpose("
+    ) !== false
+    && strpos(
+        $failureHelperSource,
+        "!== 'seat_topup'"
+    ) !== false
+    && strpos(
+        $failureHelperSource,
+        "!== 'failed'"
+    ) !== false,
+    'failed-payment cleanup requires a failed seat_topup payment attempt'
+);
+
+$check(
+    preg_match(
+        "/UPDATE\\s+billing_seat_change_requests"
+        . "[\\s\\S]*?SET\\s+status\\s*=\\s*'failed'"
+        . "[\\s\\S]*?AND\\s+status\\s*=\\s*'awaiting_payment'/i",
+        $failureHelperSource
+    ) === 1
+    && strpos(
+        $failureHelperSource,
+        '$update->rowCount() !== 1'
+    ) !== false,
+    'failed-payment cleanup transitions awaiting_payment to failed exactly once'
+);
+
+$check(
+    preg_match(
+        '/\$requestState\s*\[\s*[\'"]status[\'"]\s*\]'
+        . '\s*===\s*[\'"]failed[\'"]/',
+        $failureHelperSource
+    ) === 1
+    && preg_match(
+        '/[\'"]idempotent[\'"]\s*=>\s*true/',
+        $failureHelperSource
+    ) === 1,
+    'repeated failed-payment cleanup returns idempotently'
+);
+
 echo "\nChecks: {$checks}\n";
 echo "Failures: {$failures}\n";
 
