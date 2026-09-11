@@ -90,21 +90,43 @@ try {
     }
 
     $status = (string)($updated['status'] ?? 'pending');
+    $purpose = billing_payment_attempt_purpose($updated);
     $recoveryMode = billing_tenant_actor_is_recovery($actor);
     $target = $recoveryMode ? '/billing/recover.php' : '/dashboard.php';
 
+    if ($purpose === 'subscription') {
+        $messages = [
+            'paid' => 'Payment verified and subscription activated successfully.',
+            'refunded' => 'This payment has been recorded as refunded.',
+            'failed' => 'Payment was not completed. You can start a new checkout when ready.',
+            'pending' => 'Payment verification is still pending. No subscription change has been applied.',
+        ];
+    } elseif ($purpose === 'seat_topup') {
+        $messages = [
+            'paid' => 'Seat top-up payment verified and additional seats applied successfully.',
+            'refunded' => 'This seat top-up payment has been recorded as refunded.',
+            'failed' => 'Seat top-up payment was not completed. You can start a new seat top-up when ready.',
+            'pending' => 'Seat top-up payment verification is still pending. No seat change has been applied.',
+        ];
+    } else {
+        throw new RuntimeException(
+            'Unsupported billing payment purpose for return messaging.'
+        );
+    }
+
     if ($status === 'paid') {
-        if ($recoveryMode) {
+        if ($purpose === 'subscription' && $recoveryMode) {
             subscription_recovery_promote_to_login($pdo);
             $target = '/dashboard.php';
         }
-        $_SESSION['success'] = 'Payment verified and subscription activated successfully.';
+
+        $_SESSION['success'] = $messages['paid'];
     } elseif ($status === 'refunded') {
-        $_SESSION['error'] = 'This payment has been recorded as refunded.';
+        $_SESSION['error'] = $messages['refunded'];
     } elseif (in_array($status, ['failed', 'cancelled'], true)) {
-        $_SESSION['error'] = 'Payment was not completed. You can start a new checkout when ready.';
+        $_SESSION['error'] = $messages['failed'];
     } else {
-        $_SESSION['success'] = 'Payment verification is still pending. No subscription change has been applied.';
+        $_SESSION['success'] = $messages['pending'];
     }
 
     header('Location: ' . BASE_URL . $target, true, 303);
