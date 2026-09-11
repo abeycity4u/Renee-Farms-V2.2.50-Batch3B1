@@ -263,6 +263,105 @@ $check(
     'launcher contains no direct billing, entitlement or subscription-state DML'
 );
 
+
+$batchStart = strpos(
+    $source,
+    'function billing_commercial_attempt_reconcile_terminal_candidates_for_replacement('
+);
+
+$batchSource = $batchStart === false
+    ? ''
+    : substr(
+        $source,
+        $batchStart
+    );
+
+$check(
+    $batchStart !== false
+    && strpos(
+        $batchSource,
+        'int $maxAttempts = 25'
+    ) !== false
+    && strpos(
+        $batchSource,
+        '$maxAttempts < 1'
+    ) !== false
+    && strpos(
+        $batchSource,
+        '$maxAttempts > 25'
+    ) !== false,
+    'bounded replacement reconciliation has an explicit finite safety limit'
+);
+
+$check(
+    $batchSource !== ''
+    && strpos(
+        $batchSource,
+        'billing_commercial_attempt_reconcile_next_for_replacement('
+    ) !== false
+    && strpos(
+        $batchSource,
+        'billing_provider_verify_payment('
+    ) === false
+    && strpos(
+        $batchSource,
+        '$pdo->beginTransaction();'
+    ) === false,
+    'bounded orchestration delegates each provider reconciliation to the proven one-attempt launcher'
+);
+
+$check(
+    strpos(
+        $batchSource,
+        '$seenAttemptIds'
+    ) !== false
+    && strpos(
+        $batchSource,
+        'Replacement reconciliation repeated the same payment attempt.'
+    ) !== false,
+    'bounded orchestration fails closed if a candidate repeats'
+);
+
+$check(
+    strpos(
+        $batchSource,
+        "'pending_blocked'"
+    ) !== false
+    && strpos(
+        $batchSource,
+        "'paid_applied'"
+    ) !== false
+    && strpos(
+        $batchSource,
+        "'stopped_reason'"
+    ) !== false
+    && strpos(
+        $batchSource,
+        'Never continue into a'
+    ) !== false,
+    'pending verification and newly applied prior payment stop replacement checkout orchestration'
+);
+
+$check(
+    strpos(
+        $batchSource,
+        "'superseded'"
+    ) !== false
+    && strpos(
+        $batchSource,
+        "'refunded_settled'"
+    ) !== false
+    && strpos(
+        $batchSource,
+        'billing_commercial_attempt_reconciliation_candidate('
+    ) !== false
+    && strpos(
+        $batchSource,
+        'bounded attempt limit before terminal candidates were exhausted'
+    ) !== false,
+    'only settled terminal outcomes continue and the safety bound is revalidated before exhaustion is claimed'
+);
+
 echo "\nChecks: {$checks}\n";
 echo "Failures: {$failures}\n";
 

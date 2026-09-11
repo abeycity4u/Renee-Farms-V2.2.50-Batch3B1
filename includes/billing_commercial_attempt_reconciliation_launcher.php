@@ -288,4 +288,228 @@ if (!function_exists(
         ];
     }
 }
+
+if (!function_exists(
+    'billing_commercial_attempt_reconcile_terminal_candidates_for_replacement'
+)) {
+    function billing_commercial_attempt_reconcile_terminal_candidates_for_replacement(
+        PDO $pdo,
+        int $farmId,
+        int $actorUserId,
+        int $maxAttempts = 25
+    ): array {
+        if ($farmId < 1) {
+            throw new InvalidArgumentException(
+                'A valid tenant farm is required for bounded replacement reconciliation.'
+            );
+        }
+
+        if ($actorUserId < 1) {
+            throw new InvalidArgumentException(
+                'A valid user is required for bounded replacement reconciliation.'
+            );
+        }
+
+        if ($maxAttempts < 1
+            || $maxAttempts > 25) {
+            throw new InvalidArgumentException(
+                'Replacement reconciliation attempt limit must be between 1 and 25.'
+            );
+        }
+
+        if ($pdo->inTransaction()) {
+            throw new RuntimeException(
+                'Bounded replacement reconciliation must start outside a database transaction.'
+            );
+        }
+
+        $reconciliations = [];
+        $seenAttemptIds = [];
+
+        for (
+            $iteration = 0;
+            $iteration < $maxAttempts;
+            $iteration++
+        ) {
+            $result =
+                billing_commercial_attempt_reconcile_next_for_replacement(
+                    $pdo,
+                    $farmId,
+                    $actorUserId
+                );
+
+            if ($pdo->inTransaction()) {
+                throw new RuntimeException(
+                    'Replacement reconciliation unexpectedly left a database transaction open.'
+                );
+            }
+
+            $attemptFound =
+                ($result['attempt_found'] ?? false)
+                === true;
+
+            if (!$attemptFound) {
+                if ((string)($result['outcome'] ?? '')
+                    !== 'none') {
+                    throw new RuntimeException(
+                        'Replacement reconciliation returned an invalid empty-candidate outcome.'
+                    );
+                }
+
+                return [
+                    'farm_id' => $farmId,
+                    'reconciled_count' =>
+                        count($reconciliations),
+                    'terminal_candidates_exhausted' =>
+                        true,
+                    'stopped_reason' => 'exhausted',
+                    'stopped_attempt_id' => null,
+                    'stopped_reconciliation' => null,
+                    'reconciliations' =>
+                        $reconciliations,
+                ];
+            }
+
+            $attemptId =
+                (int)($result['attempt_id'] ?? 0);
+
+            if ($attemptId < 1) {
+                throw new RuntimeException(
+                    'Replacement reconciliation returned an invalid payment-attempt identity.'
+                );
+            }
+
+            if (isset($seenAttemptIds[$attemptId])) {
+                throw new RuntimeException(
+                    'Replacement reconciliation repeated the same payment attempt.'
+                );
+            }
+
+            $seenAttemptIds[$attemptId] = true;
+            $reconciliations[] = $result;
+
+            $outcome =
+                (string)($result['outcome'] ?? '');
+
+            $blocking =
+                $result['blocking'] ?? null;
+
+            if (!in_array(
+                $outcome,
+                [
+                    'superseded',
+                    'paid_applied',
+                    'refunded_settled',
+                    'pending_blocked',
+                ],
+                true
+            )
+                || !is_bool($blocking)) {
+                throw new RuntimeException(
+                    'Replacement reconciliation returned an unsupported canonical outcome.'
+                );
+            }
+
+            if ($outcome === 'pending_blocked') {
+                if ($blocking !== true) {
+                    throw new RuntimeException(
+                        'Pending replacement reconciliation did not remain blocking.'
+                    );
+                }
+
+                return [
+                    'farm_id' => $farmId,
+                    'reconciled_count' =>
+                        count($reconciliations),
+                    'terminal_candidates_exhausted' =>
+                        false,
+                    'stopped_reason' =>
+                        'pending_blocked',
+                    'stopped_attempt_id' =>
+                        $attemptId,
+                    'stopped_reconciliation' =>
+                        $result,
+                    'reconciliations' =>
+                        $reconciliations,
+                ];
+            }
+
+            if ($blocking !== false) {
+                throw new RuntimeException(
+                    'Settled replacement reconciliation unexpectedly remained blocking.'
+                );
+            }
+
+            if ($outcome === 'paid_applied') {
+                /*
+                 * An earlier checkout has now been proven paid and its
+                 * subscription application persisted. Never continue into a
+                 * replacement checkout in the same request.
+                 */
+                return [
+                    'farm_id' => $farmId,
+                    'reconciled_count' =>
+                        count($reconciliations),
+                    'terminal_candidates_exhausted' =>
+                        false,
+                    'stopped_reason' =>
+                        'paid_applied',
+                    'stopped_attempt_id' =>
+                        $attemptId,
+                    'stopped_reconciliation' =>
+                        $result,
+                    'reconciliations' =>
+                        $reconciliations,
+                ];
+            }
+
+            /*
+             * Only terminal supersession or a verified refund may continue
+             * toward the next historical terminal candidate.
+             */
+            if (!in_array(
+                $outcome,
+                [
+                    'superseded',
+                    'refunded_settled',
+                ],
+                true
+            )) {
+                throw new RuntimeException(
+                    'Replacement reconciliation cannot continue after this canonical outcome.'
+                );
+            }
+        }
+
+        /*
+         * Exactly maxAttempts may have exhausted the finite candidate set.
+         * Re-check without provider work before declaring the safety bound hit.
+         */
+        $remaining =
+            billing_commercial_attempt_reconciliation_candidate(
+                $pdo,
+                $farmId
+            );
+
+        if ($remaining !== null) {
+            throw new RuntimeException(
+                'Replacement reconciliation reached its bounded attempt limit before terminal candidates were exhausted.'
+            );
+        }
+
+        return [
+            'farm_id' => $farmId,
+            'reconciled_count' =>
+                count($reconciliations),
+            'terminal_candidates_exhausted' =>
+                true,
+            'stopped_reason' => 'exhausted',
+            'stopped_attempt_id' => null,
+            'stopped_reconciliation' => null,
+            'reconciliations' =>
+                $reconciliations,
+        ];
+    }
+}
+
 ?>
