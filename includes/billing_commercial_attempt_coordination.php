@@ -13,6 +13,7 @@
  */
 
 require_once __DIR__ . '/billing_payment_foundation.php';
+require_once __DIR__ . '/billing_commercial_attempt_disposition.php';
 
 if (!function_exists('billing_commercial_attempt_coordination')) {
     function billing_commercial_attempt_coordination(
@@ -31,9 +32,12 @@ if (!function_exists('billing_commercial_attempt_coordination')) {
             );
         }
 
-        if (!billing_payment_foundation_ready($pdo)) {
+        if (!billing_payment_foundation_ready($pdo)
+            || !billing_commercial_attempt_disposition_storage_ready(
+                $pdo
+            )) {
             throw new RuntimeException(
-                'Billing payment storage is not transactionally ready for commercial coordination.'
+                'Billing payment and commercial disposition storage are not transactionally ready for commercial coordination.'
             );
         }
 
@@ -69,6 +73,11 @@ if (!function_exists('billing_commercial_attempt_coordination')) {
                 farm_id,
                 purpose,
                 status,
+                commercial_disposition,
+                commercial_superseded_at,
+                commercial_supersession_verified_at,
+                commercial_superseded_by_user_id,
+                commercial_supersession_reason,
                 provider,
                 provider_reference,
                 applied_subscription_record_id,
@@ -132,9 +141,28 @@ if (!function_exists('billing_commercial_attempt_coordination')) {
                 );
             }
 
+            $dispositionState =
+                billing_commercial_attempt_disposition_state(
+                    $row
+                );
+
+            $disposition =
+                (string)(
+                    $dispositionState['disposition']
+                    ?? ''
+                );
+
             $classification = null;
 
-            if (in_array(
+            if ($disposition === 'superseded') {
+                /*
+                 * Provider status remains an audit fact and may continue to
+                 * change after supersession. Commercially superseded attempts
+                 * are nevertheless permanently ineligible to affect the
+                 * tenant, so they do not block a replacement checkout.
+                 */
+                $classification = null;
+            } elseif (in_array(
                 $status,
                 ['initialized', 'pending'],
                 true
@@ -146,9 +174,10 @@ if (!function_exists('billing_commercial_attempt_coordination')) {
                 true
             )) {
                 /*
-                 * Current audit policy permits a later verified provider fact
-                 * to move these states to paid. They therefore cannot yet be
-                 * treated as safely superseded.
+                 * Eligible failed/cancelled attempts can still become paid
+                 * after another provider verification. They remain blocking
+                 * until the reconciliation flow either proves payment or
+                 * records a durable commercial supersession.
                  */
                 $classification = 'reconciliation_required';
             } elseif ($status === 'paid'
@@ -160,6 +189,22 @@ if (!function_exists('billing_commercial_attempt_coordination')) {
                 'id' => (int)($row['id'] ?? 0),
                 'status' => $status,
                 'classification' => $classification,
+                'commercial_disposition' => $disposition,
+                'commercial_superseded_at' =>
+                    $dispositionState['superseded_at']
+                    ?? null,
+                'commercial_supersession_verified_at' =>
+                    $dispositionState[
+                        'supersession_verified_at'
+                    ] ?? null,
+                'commercial_superseded_by_user_id' =>
+                    $dispositionState[
+                        'superseded_by_user_id'
+                    ] ?? null,
+                'commercial_supersession_reason' =>
+                    $dispositionState[
+                        'supersession_reason'
+                    ] ?? null,
                 'provider' => strtolower(trim(
                     (string)($row['provider'] ?? '')
                 )),

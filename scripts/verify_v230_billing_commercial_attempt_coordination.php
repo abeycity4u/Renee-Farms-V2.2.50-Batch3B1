@@ -198,6 +198,74 @@ $check(
     'fail-closed assertion has one centralized customer-safe boundary'
 );
 
+$check(
+    strpos(
+        $source,
+        "billing_commercial_attempt_disposition.php"
+    ) !== false
+    && strpos(
+        $source,
+        'billing_commercial_attempt_disposition_storage_ready('
+    ) !== false,
+    'coordination requires the commercial disposition foundation and migration readiness'
+);
+
+$check(
+    strpos(
+        $paymentSelect,
+        'commercial_disposition'
+    ) !== false
+    && strpos(
+        $paymentSelect,
+        'commercial_superseded_at'
+    ) !== false
+    && strpos(
+        $paymentSelect,
+        'commercial_supersession_verified_at'
+    ) !== false,
+    'coordination reads the commercial disposition audit evidence with each subscription attempt'
+);
+
+$dispositionStatePos = strpos(
+    $source,
+    'billing_commercial_attempt_disposition_state('
+);
+
+$supersededBranchPos = strpos(
+    $source,
+    "\$disposition === 'superseded'"
+);
+
+$openCheckoutPos = strpos(
+    $source,
+    "'open_checkout'"
+);
+
+$check(
+    $dispositionStatePos !== false
+    && $supersededBranchPos !== false
+    && $openCheckoutPos !== false
+    && $dispositionStatePos < $supersededBranchPos
+    && $supersededBranchPos < $openCheckoutPos,
+    'valid superseded attempts are normalized before ordinary blocking classification and become non-blocking'
+);
+
+$check(
+    strpos(
+        $source,
+        "'commercial_disposition' => \$disposition"
+    ) !== false
+    && strpos(
+        $source,
+        "'commercial_supersession_verified_at'"
+    ) !== false
+    && strpos(
+        $source,
+        "'commercial_supersession_reason'"
+    ) !== false,
+    'coordination exposes normalized supersession evidence for settled-attempt diagnostics'
+);
+
 $forbiddenDml = [
     'UPDATE billing_payment_attempts',
     'INSERT INTO billing_payment_attempts',

@@ -17,6 +17,7 @@
 
 require_once __DIR__ . '/billing_payment_foundation.php';
 require_once __DIR__ . '/billing_payment_audit_state.php';
+require_once __DIR__ . '/billing_commercial_attempt_disposition.php';
 require_once __DIR__ . '/billing_subscription_application.php';
 require_once __DIR__ . '/billing_seat_topup_application.php';
 
@@ -70,6 +71,39 @@ if (!function_exists('billing_paid_attempt_dispatch')) {
         }
 
         if ($purpose === 'subscription') {
+            if (!billing_commercial_attempt_disposition_storage_ready(
+                $pdo
+            )) {
+                throw new RuntimeException(
+                    'Commercial payment-attempt disposition storage is unavailable for paid subscription dispatch.'
+                );
+            }
+
+            $disposition =
+                billing_commercial_attempt_disposition_state(
+                    $attempt
+                );
+
+            if (($disposition['disposition'] ?? '')
+                === 'superseded') {
+                /*
+                 * The provider payment remains fully audited as paid, but an
+                 * explicitly superseded checkout must never overwrite newer
+                 * tenant commercial state.
+                 */
+                return [
+                    'applied' => false,
+                    'idempotent' => true,
+                    'audit_only' => true,
+                    'attempt_id' => (int)$attempt['id'],
+                    'farm_id' =>
+                        (int)($attempt['farm_id'] ?? 0),
+                    'purpose' => 'subscription',
+                    'commercial_disposition' =>
+                        'superseded',
+                ];
+            }
+
             return billing_subscription_apply_paid_attempt(
                 $pdo,
                 $attemptId

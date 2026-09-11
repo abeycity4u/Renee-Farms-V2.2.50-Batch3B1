@@ -135,6 +135,54 @@ $check(
     'dispatcher resolves purpose through the canonical payment-purpose contract'
 );
 
+$check(
+    strpos(
+        $dispatcher,
+        'billing_commercial_attempt_disposition.php'
+    ) !== false
+    && strpos(
+        $dispatcher,
+        'billing_commercial_attempt_disposition_storage_ready('
+    ) !== false
+    && strpos(
+        $dispatcher,
+        'billing_commercial_attempt_disposition_state('
+    ) !== false,
+    'subscription dispatch requires and validates commercial disposition state'
+);
+
+$dispositionPos = strpos(
+    $dispatcher,
+    'billing_commercial_attempt_disposition_state('
+);
+
+$auditOnlyPos = strpos(
+    $dispatcher,
+    "'audit_only' => true"
+);
+
+$subscriptionApplyGuardPos = strpos(
+    $dispatcher,
+    'billing_subscription_apply_paid_attempt('
+);
+
+$check(
+    $dispositionPos !== false
+    && $auditOnlyPos !== false
+    && $subscriptionApplyGuardPos !== false
+    && $dispositionPos < $auditOnlyPos
+    && $auditOnlyPos < $subscriptionApplyGuardPos
+    && strpos(
+        $dispatcher,
+        "'commercial_disposition' =>"
+    ) !== false
+    && strpos(
+        $dispatcher,
+        "'superseded'"
+    ) !== false,
+    'superseded paid subscription attempts return audit-only before subscription application can run'
+);
+
 $subscriptionPos = preg_match(
     '/\$purpose\s*===\s*[\'"]subscription[\'"]/',
     $dispatcher,
