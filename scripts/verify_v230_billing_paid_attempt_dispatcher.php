@@ -259,6 +259,66 @@ $check(
     'dispatcher itself contains no provider call or direct commercial-state DML'
 );
 
+$returnAuditOnlyPos = strpos(
+    $return,
+    '$paidAuditOnly ='
+);
+
+$returnAuditOnlyBranchPos = strpos(
+    $return,
+    'if ($paidAuditOnly) {'
+);
+
+$returnAuditOnlyMessagePos = strpos(
+    $return,
+    '$messages[\'superseded_paid\']'
+);
+
+$returnRecoveryPromotionPos = strpos(
+    $return,
+    'subscription_recovery_promote_to_login('
+);
+
+$returnPaidSuccessPos = strpos(
+    $return,
+    '$_SESSION[\'success\']'
+);
+
+$check(
+    $returnAuditOnlyPos !== false
+    && strpos(
+        $return,
+        '($application[\'audit_only\'] ?? false)'
+    ) !== false
+    && strpos(
+        $return,
+        "'commercial_disposition'"
+    ) !== false
+    && strpos(
+        $return,
+        "'superseded'"
+    ) !== false,
+    'return route recognizes dispatcher-declared superseded subscription audit-only results'
+);
+
+$check(
+    $returnAuditOnlyBranchPos !== false
+    && $returnAuditOnlyMessagePos !== false
+    && $returnRecoveryPromotionPos !== false
+    && $returnPaidSuccessPos !== false
+    && $returnAuditOnlyBranchPos
+        < $returnAuditOnlyMessagePos
+    && $returnAuditOnlyMessagePos
+        < $returnRecoveryPromotionPos
+    && $returnRecoveryPromotionPos
+        < $returnPaidSuccessPos
+    && strpos(
+        $return,
+        'this checkout had already been replaced'
+    ) !== false,
+    'audit-only late payment cannot promote recovery auth or claim subscription activation'
+);
+
 foreach ([
     'return' => $return,
     'webhook' => $webhook,

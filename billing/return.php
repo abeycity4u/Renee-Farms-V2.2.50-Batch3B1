@@ -94,9 +94,39 @@ try {
     $recoveryMode = billing_tenant_actor_is_recovery($actor);
     $target = $recoveryMode ? '/billing/recover.php' : '/dashboard.php';
 
+    $paidAuditOnly = false;
+
+    if ($status === 'paid') {
+        if (!is_array($application)) {
+            throw new RuntimeException(
+                'Verified paid billing return is missing its application result.'
+            );
+        }
+
+        $paidAuditOnly =
+            ($application['audit_only'] ?? false)
+            === true;
+
+        if ($paidAuditOnly
+            && (
+                ($application['purpose'] ?? '')
+                    !== 'subscription'
+                || (
+                    $application[
+                        'commercial_disposition'
+                    ] ?? ''
+                ) !== 'superseded'
+            )) {
+            throw new RuntimeException(
+                'Audit-only paid billing return has an invalid commercial disposition.'
+            );
+        }
+    }
+
     if ($purpose === 'subscription') {
         $messages = [
             'paid' => 'Payment verified and subscription activated successfully.',
+            'superseded_paid' => 'Payment was verified, but this checkout had already been replaced. No subscription change was applied. Please contact support if this payment needs review.',
             'refunded' => 'This payment has been recorded as refunded.',
             'failed' => 'Payment was not completed. You can start a new checkout when ready.',
             'pending' => 'Payment verification is still pending. No subscription change has been applied.',
@@ -115,12 +145,21 @@ try {
     }
 
     if ($status === 'paid') {
-        if ($purpose === 'subscription' && $recoveryMode) {
-            subscription_recovery_promote_to_login($pdo);
-            $target = '/dashboard.php';
-        }
+        if ($paidAuditOnly) {
+            $_SESSION['error'] =
+                $messages['superseded_paid'];
+        } else {
+            if ($purpose === 'subscription'
+                && $recoveryMode) {
+                subscription_recovery_promote_to_login(
+                    $pdo
+                );
+                $target = '/dashboard.php';
+            }
 
-        $_SESSION['success'] = $messages['paid'];
+            $_SESSION['success'] =
+                $messages['paid'];
+        }
     } elseif ($status === 'refunded') {
         $_SESSION['error'] = $messages['refunded'];
     } elseif (in_array($status, ['failed', 'cancelled'], true)) {
