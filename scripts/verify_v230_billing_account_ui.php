@@ -124,18 +124,46 @@ verify_billing_account(
 );
 verify_billing_account(
     str_contains(
+        $helper,
+        "'scheduled_reductions' =>"
+    )
+    && str_contains(
+        $helper,
+        "'request_id' =>"
+    )
+    && str_contains(
+        $helper,
+        "'from_extra_seats' =>"
+    )
+    && str_contains(
+        $helper,
+        "'to_extra_seats' =>"
+    )
+    && str_contains(
+        $helper,
+        "'effective_at' =>"
+    )
+    && str_contains(
         $page,
         '$scheduledReductions'
     )
     && str_contains(
         $page,
-        "'renewal_extra'"
+        "['from_extra_seats']"
     )
     && str_contains(
         $page,
-        "'current_period_ends_at'"
+        "['to_extra_seats']"
+    )
+    && str_contains(
+        $page,
+        "['effective_at']"
+    )
+    && str_contains(
+        $page,
+        "['request_id']"
     ),
-    'billing workspace displays scheduled renewal reductions without changing current seat summary'
+    'billing workspace displays centralized scheduled renewal reductions without changing current seat summary'
 );
 verify_billing_account(!str_contains($page, 'name="farm_id"') && !str_contains($page, 'name="amount"') && !str_contains($page, 'name="currency"'), 'browser checkout form cannot control tenant, amount or currency');
 verify_billing_account(!str_contains($page, "\$_GET['farm_id']") && !str_contains($page, "\$_POST['farm_id']"), 'billing page has no browser-selected tenant scope');

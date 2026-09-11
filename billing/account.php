@@ -119,7 +119,14 @@ $renewalExtras =
         ]
         : [];
 
-$scheduledReductions = [];
+$scheduledReductions =
+    is_array(
+        $overview['scheduled_reductions']
+            ?? null
+    )
+        ? $overview['scheduled_reductions']
+        : [];
+
 $reductionCandidates = [];
 
 foreach (($overview['seat_summary'] ?? []) as $seat) {
@@ -141,15 +148,6 @@ foreach (($overview['seat_summary'] ?? []) as $seat) {
             : $currentExtra;
 
     if ($renewalExtra < $currentExtra) {
-        $seat['renewal_extra'] =
-            $renewalExtra;
-
-        $seat['removal_quantity'] =
-            $currentExtra - $renewalExtra;
-
-        $scheduledReductions[] =
-            $seat;
-
         continue;
     }
 
@@ -451,24 +449,48 @@ $decodeModules = static function ($json): string {
                     <div class="alert alert-info">
                         <div class="fw-semibold mb-2">Scheduled for next renewal</div>
                         <?php foreach ($scheduledReductions as $seat): ?>
-                            <div class="d-flex justify-content-between gap-3 flex-wrap">
+                            <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-2">
                                 <span>
                                     <?= htmlspecialchars((string)$seat['label'], ENT_QUOTES, 'UTF-8') ?>:
                                     purchased extra
-                                    <?= (int)$seat['extra'] ?>
-                                    → <?= (int)$seat['renewal_extra'] ?>
+                                    <?= (int)$seat['from_extra_seats'] ?>
+                                    → <?= (int)$seat['to_extra_seats'] ?>
                                 </span>
-                                <span class="text-nowrap">
-                                    Effective
-                                    <?= htmlspecialchars(
-                                        $formatDate(
-                                            $renewalSeatTarget['current_period_ends_at']
-                                                ?? null
-                                        ),
-                                        ENT_QUOTES,
-                                        'UTF-8'
-                                    ) ?>
-                                </span>
+
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <span class="text-nowrap">
+                                        Effective
+                                        <?= htmlspecialchars(
+                                            $formatDate(
+                                                $seat['effective_at']
+                                                    ?? null
+                                            ),
+                                            ENT_QUOTES,
+                                            'UTF-8'
+                                        ) ?>
+                                    </span>
+
+                                    <form
+                                        method="post"
+                                        action="<?= htmlspecialchars(BASE_URL . '/billing/seat_reduction_cancel.php', ENT_QUOTES, 'UTF-8') ?>"
+                                        class="d-inline"
+                                    >
+                                        <?= csrf_field() ?>
+                                        <input
+                                            type="hidden"
+                                            name="request_id"
+                                            value="<?= (int)$seat['request_id'] ?>"
+                                        >
+                                        <button
+                                            type="submit"
+                                            name="cancel_seat_reduction"
+                                            value="1"
+                                            class="btn btn-sm btn-outline-secondary"
+                                        >
+                                            Cancel reduction
+                                        </button>
+                                    </form>
+                                </div>
                             </div>
                         <?php endforeach; ?>
                     </div>

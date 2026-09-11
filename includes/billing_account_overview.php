@@ -60,6 +60,128 @@ if (!function_exists('billing_account_seat_summary')) {
     }
 }
 
+if (!function_exists(
+    'billing_account_scheduled_reductions'
+)) {
+    function billing_account_scheduled_reductions(
+        PDO $pdo,
+        int $farmId,
+        ?array $renewalSeatTarget
+    ): array {
+        if ($farmId < 1
+            || !is_array($renewalSeatTarget)) {
+            return [];
+        }
+
+        $requestIds =
+            is_array(
+                $renewalSeatTarget[
+                    'scheduled_request_ids'
+                ] ?? null
+            )
+                ? $renewalSeatTarget[
+                    'scheduled_request_ids'
+                ]
+                : [];
+
+        if (!$requestIds) {
+            return [];
+        }
+
+        $roleLabels =
+            subscription_seat_roles();
+
+        $scheduled = [];
+
+        foreach ($requestIds as $requestId) {
+            $requestId = (int)$requestId;
+
+            if ($requestId < 1) {
+                throw new RuntimeException(
+                    'Scheduled seat reduction has an invalid request id.'
+                );
+            }
+
+            $row =
+                billing_seat_change_request_by_id(
+                    $pdo,
+                    $requestId,
+                    false
+                );
+
+            if (!$row) {
+                throw new RuntimeException(
+                    'Scheduled seat reduction could not be loaded for billing display.'
+                );
+            }
+
+            $state =
+                billing_seat_change_row_contract(
+                    $row
+                );
+
+            $contract =
+                is_array(
+                    $state['contract'] ?? null
+                )
+                    ? $state['contract']
+                    : [];
+
+            $role =
+                (string)(
+                    $contract['role_code']
+                        ?? ''
+                );
+
+            if (($state['status'] ?? '')
+                    !== 'scheduled'
+                || ($contract[
+                    'change_kind'
+                ] ?? '') !== 'remove'
+                || (int)(
+                    $contract['farm_id']
+                        ?? 0
+                ) !== $farmId
+                || !array_key_exists(
+                    $role,
+                    $roleLabels
+                )) {
+                throw new RuntimeException(
+                    'Scheduled seat reduction is invalid for billing display.'
+                );
+            }
+
+            $scheduled[] = [
+                'request_id' =>
+                    $requestId,
+                'role' =>
+                    $role,
+                'label' =>
+                    (string)$roleLabels[$role],
+                'from_extra_seats' =>
+                    (int)(
+                        $contract[
+                            'from_extra_seats'
+                        ] ?? 0
+                    ),
+                'to_extra_seats' =>
+                    (int)(
+                        $contract[
+                            'to_extra_seats'
+                        ] ?? 0
+                    ),
+                'effective_at' =>
+                    (string)(
+                        $contract[
+                            'effective_at'
+                        ] ?? ''
+                    ),
+            ];
+        }
+
+        return $scheduled;
+    }
+}
 if (!function_exists('billing_account_overview')) {
     function billing_account_overview(PDO $pdo, int $farmId): array
     {
@@ -98,6 +220,12 @@ if (!function_exists('billing_account_overview')) {
             'seat_summary' => billing_account_seat_summary($pdo, $farmId, $modules, $seatAddOns),
             'seat_change_ready' => $seatChangeReady,
             'renewal_seat_target' => $renewalSeatTarget,
+            'scheduled_reductions' =>
+                billing_account_scheduled_reductions(
+                    $pdo,
+                    $farmId,
+                    $renewalSeatTarget
+                ),
             'pricing' => $current['pricing'],
             'subscription_history' => subscription_record_history($pdo, $farmId, 12),
             'payment_attempts' => billing_account_payment_attempts($pdo, $farmId, 20),
