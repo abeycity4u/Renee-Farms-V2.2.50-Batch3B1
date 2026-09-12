@@ -182,6 +182,11 @@ $escape = static function ($value): string {
     );
 };
 
+$receiptPlatformName = 'MyFarms';
+$receiptIssuerName = 'Renee Farms Limited';
+$receiptIssuerBrand =
+    $receiptPlatformName . ' by ' . $receiptIssuerName;
+
 $pdfRequested = pdf_report_is_requested();
 
 $pdfUrl = BASE_URL
@@ -241,7 +246,15 @@ if ($pdfRequested) {
             <td>Paid</td>
         </tr>
         <tr>
-            <th>Farm</th>
+            <th>Issued by</th>
+            <td><?= $escape($receiptIssuerName) ?></td>
+        </tr>
+        <tr>
+            <th>Platform</th>
+            <td><?= $escape($receiptPlatformName) ?></td>
+        </tr>
+        <tr>
+            <th>Customer / Farm</th>
             <td><?= $escape($farmName) ?></td>
         </tr>
         <tr>
@@ -300,7 +313,8 @@ if ($pdfRequested) {
     pdf_report_finish(
         'payment-receipt-' . $receiptNumber . '.pdf',
         'portrait',
-        'Payment Receipt ' . $receiptNumber
+        'Payment Receipt ' . $receiptNumber,
+        $receiptIssuerBrand
     );
 }
 ?>
@@ -332,6 +346,10 @@ if ($pdfRequested) {
                         Farm Admin · Billing
                     </div>
                     <h1 class="h3 mb-2">Payment receipt</h1>
+                    <p class="mb-1 opacity-75">
+                        <?= $escape($receiptPlatformName) ?>
+                        by <?= $escape($receiptIssuerName) ?>
+                    </p>
                     <p class="mb-0 opacity-75">
                         Payment recorded for <?= $escape($farmName) ?>.
                     </p>
@@ -386,7 +404,21 @@ if ($pdfRequested) {
             <div class="row g-4">
 
                 <div class="col-md-6">
-                    <div class="metric-label">Farm</div>
+                    <div class="metric-label">Issued by</div>
+                    <div class="metric-value mt-1">
+                        <?= $escape($receiptIssuerName) ?>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="metric-label">Platform</div>
+                    <div class="metric-value mt-1">
+                        <?= $escape($receiptPlatformName) ?>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="metric-label">Customer / Farm</div>
                     <div class="metric-value mt-1">
                         <?= $escape($farmName) ?>
                     </div>

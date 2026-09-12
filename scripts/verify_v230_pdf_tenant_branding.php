@@ -47,8 +47,23 @@ $check(
 );
 
 $check(
-    str_contains($service, '$farmName = pdf_report_tenant_brand_name();'),
-    'every rendered PDF resolves the current tenant brand centrally'
+    str_contains(
+        $service,
+        '$farmName = trim((string)$brandName);'
+    )
+    && str_contains(
+        $service,
+        '$farmName = pdf_report_tenant_brand_name();'
+    ),
+    'PDF service uses explicit brand override when supplied and otherwise resolves current tenant brand'
+);
+
+$check(
+    str_contains(
+        $service,
+        '?string $brandName = null'
+    ),
+    'central PDF service supports an optional caller-specific brand override'
 );
 
 $check(

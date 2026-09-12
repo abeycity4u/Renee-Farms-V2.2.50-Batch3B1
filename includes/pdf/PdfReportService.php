@@ -62,10 +62,21 @@ final class PdfReportService
         require_once $autoload;
     }
 
-    public function renderHtml(string $html, string $orientation = 'portrait', string $title = 'Farm Report'): string
-    {
-        $orientation = strtolower($orientation) === 'landscape' ? 'landscape' : 'portrait';
-        $farmName = pdf_report_tenant_brand_name();
+    public function renderHtml(
+        string $html,
+        string $orientation = 'portrait',
+        string $title = 'Farm Report',
+        ?string $brandName = null
+    ): string {
+        $orientation = strtolower($orientation) === 'landscape'
+            ? 'landscape'
+            : 'portrait';
+
+        $farmName = trim((string)$brandName);
+
+        if ($farmName === '') {
+            $farmName = pdf_report_tenant_brand_name();
+        }
         $documentTitle = htmlspecialchars(
             $farmName . ' - ' . $title,
             ENT_QUOTES | ENT_SUBSTITUTE,
@@ -160,9 +171,19 @@ final class PdfReportService
         return $dompdf->output();
     }
 
-    public function streamHtml(string $html, string $filename, string $orientation = 'portrait', string $title = 'Farm Report'): never
-    {
-        $pdf = $this->renderHtml($html, $orientation, $title);
+    public function streamHtml(
+        string $html,
+        string $filename,
+        string $orientation = 'portrait',
+        string $title = 'Farm Report',
+        ?string $brandName = null
+    ): never {
+        $pdf = $this->renderHtml(
+            $html,
+            $orientation,
+            $title,
+            $brandName
+        );
         $safe = preg_replace('/[^A-Za-z0-9._-]+/', '-', $filename) ?: 'farm-report.pdf';
         if (!str_ends_with(strtolower($safe), '.pdf')) {
             $safe .= '.pdf';
@@ -213,15 +234,25 @@ CSS;
     }
 }
 
-function pdf_report_finish(string $filename, string $orientation = 'portrait', string $title = 'Farm Report'): never
-{
+function pdf_report_finish(
+    string $filename,
+    string $orientation = 'portrait',
+    string $title = 'Farm Report',
+    ?string $brandName = null
+): never {
     $html = ob_get_clean();
     if ($html === false) {
         $html = '';
     }
     try {
         $service = new PdfReportService();
-        $service->streamHtml($html, $filename, $orientation, $title);
+        $service->streamHtml(
+            $html,
+            $filename,
+            $orientation,
+            $title,
+            $brandName
+        );
     } catch (Throwable $e) {
         while (ob_get_level() > 0) {
             ob_end_clean();

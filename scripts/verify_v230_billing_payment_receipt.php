@@ -187,6 +187,58 @@ $check(
 $check(
     str_contains(
         $route,
+        "\$receiptPlatformName = 'MyFarms';"
+    )
+    && str_contains(
+        $route,
+        "\$receiptIssuerName = 'Renee Farms Limited';"
+    )
+    && str_contains(
+        $route,
+        "\$receiptIssuerBrand ="
+    ),
+    'billing receipt defines platform and legal issuer separately from tenant customer'
+);
+
+$check(
+    str_contains(
+        $route,
+        '<th>Issued by</th>'
+    )
+    && str_contains(
+        $route,
+        '<th>Platform</th>'
+    )
+    && str_contains(
+        $route,
+        '<th>Customer / Farm</th>'
+    )
+    && str_contains(
+        $route,
+        '<div class="metric-label">Issued by</div>'
+    )
+    && str_contains(
+        $route,
+        '<div class="metric-label">Customer / Farm</div>'
+    ),
+    'HTML and PDF receipts identify issuer and tenant customer explicitly'
+);
+
+$check(
+    str_contains(
+        $route,
+        "'Payment Receipt ' . \$receiptNumber,"
+    )
+    && str_contains(
+        $route,
+        '$receiptIssuerBrand'
+    ),
+    'billing receipt passes issuer-brand override to centralized PDF service'
+);
+
+$check(
+    str_contains(
+        $route,
         "'payment-receipt-' . \$receiptNumber . '.pdf'"
     )
     && str_contains(
