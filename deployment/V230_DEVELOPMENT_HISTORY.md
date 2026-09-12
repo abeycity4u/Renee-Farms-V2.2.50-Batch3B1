@@ -1,19 +1,27 @@
 # Renee Farms Platform V2.3 Development History
 
-Audit snapshot: 2026-09-10
+Audit snapshot: 2026-09-12
 
 ## Authoritative source
 
 - Repository: `abeycity4u/Renee-Farms-V2.2.50-Batch3B1`
 - Branch: `v230-commercial-hardening-saas-readiness`
-- Production runtime HEAD: `3bba1dcb2407e96746330888ae86a761d644c20e`
+- Production runtime HEAD: `60b4e89f837ed424f8de025f130613e587effc14`
 - Production: `https://reneefarms.com`
 - Server checkout: `~/renee-deploy`
 - Live root: `~/public_html`
 
 ## Current deployment position
 
-Production runtime is now carried forward through commit `3bba1dc`. The 2026-09-10 runtime sequence includes the Recorded By/feed-origin closure, homepage/browser reliability fixes, same-origin CSP Report-Only reporting, vendor-console cleanup, Dashboard tooltip/Popper correction, tenant-aware PDF branding, Feed transaction-history PDFs and Expense PDF button visibility refinement. Targeted deployments used zero-drift pre-flight guards, rollback backups, live/source hash checks and PHP lint. Production-specific `config.php` and `.htaccess` remain protected and are not blindly overwritten.
+Production runtime is now carried forward through commit `60b4e89`. The 2026-09-11 to 2026-09-12 sequence completed commercial billing coordination and seat-change hardening, Stage 2I TEST/SANDBOX end-to-end payment proof, CSP Report-Only observation, production CSP enforcement, legacy/manual billing-period resilience and subscription-history date clarification.
+
+CSP is now enforcing in production. The clean Report-Only observation and owner approval were followed by an initial enforcement attempt that failed safely because mixed OPcache generations allowed new `config.php` code to call a newer CSP emitter while an older cached policy file remained loaded. That attempt was rolled back. Commit `59f6e63` made the rollout OPcache-compatible, and the subsequent policy-only deployment passed repeated unauthenticated probes, authenticated browser smoke and post-smoke log observation.
+
+Commercial payment execution remains TEST/SANDBOX only. Stage 2I sandbox proof is closed and its temporary launch gates were removed. Seat top-up, scheduled seat reduction/cancellation, farm-wide pending-attempt coordination and terminal reconciliation were completed and tested without approving live production payment processing.
+
+Farm A LLC billing is resilient when legacy/manual commercial history has no authoritative paid-period lineage. Commit `a84e7ad` keeps the Billing workspace available while paid-period-dependent seat changes remain disabled. Commit `60b4e89` separates administrative `subscription_ends_at` from authoritative `current_period_ends_at` in Subscription History so a manually entered expiry cannot be mistaken for a paid billing period.
+
+Targeted deployments continue to use zero-drift pre-flight guards, rollback backups, live/source hash checks and PHP lint. Production-specific `config.php` and `.htaccess` remain protected and are not blindly overwritten.
 
 Development-only files such as scripts, tests, migrations, notes and deployment documentation are kept in source control but are not required inside the public web runtime.
 
@@ -108,6 +116,52 @@ Documentation-only commits may therefore exist after the production runtime HEAD
 | 83 | `3b710ab` | Dashboard Popper regression correction | Remove Dashboard Popper tooltip trigger | Current HEAD ancestor |
 | 84 | `70ab9d1` | Tenant-aware generated PDF branding | Brand generated PDFs with tenant farm name | Current HEAD ancestor |
 | 85 | `3bba1dc` | Feed transaction PDFs / Expense PDF button visibility | Add feed history PDFs and improve expense PDF buttons | Production runtime checkpoint |
+| 86 | `c1049f5` | Update V2.3 commercial hardening history | Update V2.3 commercial hardening history | Current HEAD ancestor |
+| 87 | `4f6bfd3` | Add billing seat-change foundation | Add billing seat-change foundation | Current HEAD ancestor |
+| 88 | `ce8025d` | Add billing payment purpose support | Add billing payment purpose support | Current HEAD ancestor |
+| 89 | `a0cc7f4` | Add billing seat proration service | Add billing seat proration service | Current HEAD ancestor |
+| 90 | `315af72` | Gate subscription application by payment purpose | Gate subscription application by payment purpose | Current HEAD ancestor |
+| 91 | `79540c5` | Add authoritative billing seat-change request foundation | Add authoritative billing seat-change request foundation | Current HEAD ancestor |
+| 92 | `80953b2` | Keep tenant purge compatible with billing seat changes | Keep tenant purge compatible with billing seat changes | Current HEAD ancestor |
+| 93 | `f854aeb` | Harden billing seat quote migration FK upgrade | Harden billing seat quote migration FK upgrade | Current HEAD ancestor |
+| 94 | `7fc0aaa` | Add guarded billing seat quote migration runner | Add guarded billing seat quote migration runner | Current HEAD ancestor |
+| 95 | `94b84a0` | Harden billing seat quote migration preflight | Harden billing seat quote migration preflight | Current HEAD ancestor |
+| 96 | `2368b18` | Support explicit billing migration database bootstrap | Support explicit billing migration database bootstrap | Current HEAD ancestor |
+| 97 | `2d271dd` | Make billing seat quote migration recoverable on MariaDB | Make billing seat quote migration recoverable on MariaDB | Current HEAD ancestor |
+| 98 | `e7aa6a2` | Harden billing migration environment bootstrap | Harden billing migration environment bootstrap | Current HEAD ancestor |
+| 99 | `eae6b99` | Drain billing migration dynamic result sets | Drain billing migration dynamic result sets | Current HEAD ancestor |
+| 100 | `e5897ad` | Add paid-purpose billing dispatcher | Add paid-purpose billing dispatcher | Current HEAD ancestor |
+| 101 | `946c98e` | Add verified seat-top-up application service | Add verified seat-top-up application service | Current HEAD ancestor |
+| 102 | `f66dbf0` | Wire seat top-up into paid dispatcher | Wire seat top-up into paid dispatcher | Current HEAD ancestor |
+| 103 | `862e64d` | Add failed seat-top-up request cleanup | Add failed seat-top-up request cleanup | Current HEAD ancestor |
+| 104 | `b871487` | Add seat top-up initiation foundation | Add seat top-up initiation foundation | Current HEAD ancestor |
+| 105 | `88b3cbb` | Add seat top-up route request contract | Add seat top-up route request contract | Current HEAD ancestor |
+| 106 | `662dbb0` | Add seat top-up checkout route | Add seat top-up checkout route | Current HEAD ancestor |
+| 107 | `89ee95b` | Add seat top-up terminal reconciliation | Add seat top-up terminal reconciliation | Current HEAD ancestor |
+| 108 | `f84bcbe` | Handle refunded seat top-up reconciliation | Handle refunded seat top-up reconciliation | Current HEAD ancestor |
+| 109 | `4f6e6b3` | Wire terminal seat payment reconciliation | Wire terminal seat payment reconciliation | Current HEAD ancestor |
+| 110 | `7904b20` | Make billing return purpose aware | Make billing return purpose aware | Current HEAD ancestor |
+| 111 | `929036e` | Expose seat top-up in billing account | Expose seat top-up in billing account | Current HEAD ancestor |
+| 112 | `0e12e23` | Add renewal seat target foundation | Add renewal seat target foundation | Current HEAD ancestor |
+| 113 | `e185254` | Generalize renewal seat target status scope | Generalize renewal seat target status scope | Current HEAD ancestor |
+| 114 | `ae1b3c8` | Add renewal seat application foundation | Add renewal seat application foundation | Current HEAD ancestor |
+| 115 | `3890766` | Add commercial attempt coordination foundation | Add commercial attempt coordination foundation | Current HEAD ancestor |
+| 116 | `4cae8a7` | Add scheduled seat reduction foundation | Add scheduled seat reduction foundation | Current HEAD ancestor |
+| 117 | `10fef2e` | Add subscription checkout initiation foundation | Add subscription checkout initiation foundation | Current HEAD ancestor |
+| 118 | `69b276c` | Add commercial attempt disposition foundation | Add commercial attempt disposition foundation | Current HEAD ancestor |
+| 119 | `e55c906` | Enforce commercial attempt disposition | Enforce commercial attempt disposition | Current HEAD ancestor |
+| 120 | `32948cd` | Add commercial attempt reconciliation foundation | Add commercial attempt reconciliation foundation | Current HEAD ancestor |
+| 121 | `99c7710` | Add commercial reconciliation launcher | Add commercial reconciliation launcher | Current HEAD ancestor |
+| 122 | `51f34e7` | Protect superseded paid return handling | Protect superseded paid return handling | Current HEAD ancestor |
+| 123 | `2401cf7` | Add bounded commercial reconciliation orchestration | Add bounded commercial reconciliation orchestration | Current HEAD ancestor |
+| 124 | `dead6d2` | Wire safe subscription replacement checkout | Wire safe subscription replacement checkout | Current HEAD ancestor |
+| 125 | `3cf1aea` | Add scheduled seat reduction customer flow | Add scheduled seat reduction customer flow | Current HEAD ancestor |
+| 126 | `2454926` | Add scheduled seat reduction cancellation flow | Add scheduled seat reduction cancellation flow | Current HEAD ancestor |
+| 127 | `a103e05` | Harden seat top-up replacement checkout | Harden seat top-up replacement checkout | Current HEAD ancestor |
+| 128 | `0139675` | Enforce CSP after clean Report-Only observation | Enforce CSP after clean Report-Only observation | Current HEAD ancestor |
+| 129 | `59f6e63` | Make CSP enforcement rollout OPcache compatible | Make CSP enforcement rollout OPcache compatible | Current HEAD ancestor |
+| 130 | `a84e7ad` | Keep billing available without paid period lineage | Keep billing available without paid period lineage | Current HEAD ancestor |
+| 131 | `60b4e89` | Clarify subscription history date semantics | Clarify subscription history date semantics | Production runtime checkpoint |
 
 ## 2026-09-10 feed audit and Recorded By closure
 
@@ -134,6 +188,22 @@ Documentation-only commits may therefore exist after the production runtime HEAD
 - Live Feed PDF QA passed for Operational View and Full Audit, and the three Expense-page PDF controls passed browser QA.
 - No CSP enforcement, payment-mode change, financial formula change or database migration was introduced by these runtime refinements.
 
+## 2026-09-11 to 2026-09-12 CSP enforcement and commercial billing closure
+
+- CSP Report-Only observation completed cleanly. The earlier reminder to inspect `[CSP_REPORT]` entries before deciding whether to enable enforcement is superseded; that decision and rollout are already complete.
+- Commit `0139675` introduced enforcement after the clean observation and owner approval.
+- The first production enforcement attempt exposed an OPcache mixed-generation compatibility problem and was safely rolled back. It did not become the final production state.
+- Commit `59f6e63` (`Make CSP enforcement rollout OPcache compatible`) retained `app_emit_csp_report_only_header()` as a compatibility shim and enabled an OPcache-safe policy-only rollout.
+- Production CSP enforcement then passed repeated route probes and authenticated browser smoke. The post-smoke CSP log contained the previously known synthetic collector trace and no real browser CSP violations. Production CSP mode is now ENFORCING and the Report-Only phase is CLOSED.
+- CSP enforcement rollback backup: `/home/renee/renee-deploy-backups/csp-enforcement-runtime-20260911-123734/includes/csp_policy.php`.
+- Stage 2I TEST/SANDBOX billing proof completed successfully and its temporary sandbox gates were removed. The successful payment proof must not be repeated merely for reassurance.
+- Commercial seat top-up, scheduled seat reduction, cancellation, farm-wide pending-attempt coordination and reconciliation were completed and tested. Migration 046 and migration 047 are CLOSED/PASS and must not be rerun without actual regression evidence.
+- Commit `a84e7ad` (`Keep billing available without paid period lineage`) prevents legacy/manual active tenants from losing the Billing workspace when the latest commercial history has no `current_period_ends_at`. Paid-period-dependent seat top-up and reduction remain unavailable until a real paid period exists.
+- Farm A LLC browser QA passed after that deployment. Billing resilience backup: `/home/renee/renee-deploy-backups/billing-legacy-period-runtime-20260912-122352`.
+- Read-only lineage inspection proved Farm A LLC has zero payment attempts, zero applied paid subscription records and zero non-null `current_period_ends_at` history rows. Its historical `18 Sep 2026` value exists only as `subscription_ends_at` on a `platform_owner_update` snapshot, so no paid-period date was fabricated or backfilled and immutable history was preserved.
+- Commit `60b4e89` (`Clarify subscription history date semantics`) changed Subscription History to show separate `Subscription end` and `Paid period end` columns. Production browser QA confirmed the old `18 Sep 2026` value appears only under Subscription end while Paid period end remains `—`.
+- Subscription-history clarification backup: `/home/renee/renee-deploy-backups/billing-history-date-semantics-20260912-124518`.
+- No database rewrite, historical-row deletion, paid-period backfill, payment-provider production activation or CSP rollback was performed during the Farm A billing/history closure.
 ## Important interpretation
 
 A checkpoint being in the current lineage means its committed work was carried forward into later commits. Later commits may legitimately modify the same files, so production should use the latest descendant version rather than an old intermediate snapshot.
@@ -152,14 +222,18 @@ The numbered CSP verifier filename series ends at Batch 68. Working development 
 
 ## Current roadmap position
 
-1. Current production runtime deployment through `3bba1dc`: COMPLETE.
+1. Current production runtime lineage through `60b4e89`: COMPLETE.
 2. Feed audit / platform-wide Recorded By targeted production QA: COMPLETE.
 3. Homepage, Poultry Health, vendor-console, Dashboard Popper, tenant PDF branding and Feed PDF targeted production QA: COMPLETE.
-4. CSP Report-Only collector deployment and browser smoke observation: COMPLETE.
-5. Longer CSP report-collector observation window: PENDING REVIEW.
-6. Fix any genuine reported CSP violation centrally without `unsafe-inline` or `unsafe-eval`.
-7. Enforce CSP only after the Report-Only observation remains clean and the owner explicitly proceeds.
-8. Continue remaining V2.3 commercial/SaaS hardening and commercial QA.
+4. CSP Report-Only observation: COMPLETE / CLOSED.
+5. Production CSP enforcement and authenticated browser smoke: COMPLETE / LIVE.
+6. Stage 2I TEST/SANDBOX billing end-to-end proof and temporary-gate removal: COMPLETE / CLOSED.
+7. Commercial seat top-up, scheduled reduction/cancellation, coordination and reconciliation hardening: COMPLETE / CLOSED.
+8. Migration 046 and migration 047 production verification: COMPLETE / CLOSED. Do not rerun absent regression evidence.
+9. Farm A LLC legacy/manual billing-period resilience: COMPLETE / CLOSED.
+10. Subscription-history `Subscription end` versus `Paid period end` clarification: COMPLETE / CLOSED.
+11. Continue remaining V2.3 commercial/SaaS hardening and commercial QA: NEXT.
+12. Production payment processing remains NOT APPROVED; keep provider execution TEST/SANDBOX until explicit owner approval.
 
 ## Safety rules
 
@@ -168,7 +242,10 @@ The numbered CSP verifier filename series ends at Batch 68. Working development 
 - Never use `rsync --delete`.
 - Preserve production `.htaccess`.
 - Treat production `config.php` surgically.
-- Payment remains TEST until explicit owner approval.
+- Payment/provider execution remains TEST/SANDBOX until explicit owner approval for production processing.
+- CSP enforcement is already live; do not revert to Report-Only or weaken policy without actual regression evidence and a controlled review.
+- Migration 046 and migration 047 are CLOSED/PASS; do not rerun them absent actual regression evidence.
+- Do not repeat the completed Stage 2I sandbox payment proof merely for reassurance.
 - Preserve protected QA/billing evidence.
 - Prefer shared helpers/services and thin routes.
 - Add focused verifiers for important contracts.
