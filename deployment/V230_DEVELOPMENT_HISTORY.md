@@ -13,7 +13,7 @@ Audit snapshot: 2026-09-12
 
 ## Current deployment position
 
-Production runtime is now carried forward through commit `60b4e89`. The 2026-09-11 to 2026-09-12 sequence completed commercial billing coordination and seat-change hardening, Stage 2I TEST/SANDBOX end-to-end payment proof, CSP Report-Only observation, production CSP enforcement, legacy/manual billing-period resilience and subscription-history date clarification.
+Production runtime is now carried forward through commit `754711e`. The 2026-09-11 to 2026-09-12 sequence completed commercial billing coordination and seat-change hardening, Stage 2I TEST/SANDBOX end-to-end payment proof, CSP Report-Only observation, production CSP enforcement, legacy/manual billing-period resilience, subscription-history date clarification and the first tenant-facing paid-payment receipt milestone.
 
 CSP is now enforcing in production. The clean Report-Only observation and owner approval were followed by an initial enforcement attempt that failed safely because mixed OPcache generations allowed new `config.php` code to call a newer CSP emitter while an older cached policy file remained loaded. That attempt was rolled back. Commit `59f6e63` made the rollout OPcache-compatible, and the subsequent policy-only deployment passed repeated unauthenticated probes, authenticated browser smoke and post-smoke log observation.
 
@@ -161,7 +161,8 @@ Documentation-only commits may therefore exist after the production runtime HEAD
 | 128 | `0139675` | Enforce CSP after clean Report-Only observation | Enforce CSP after clean Report-Only observation | Current HEAD ancestor |
 | 129 | `59f6e63` | Make CSP enforcement rollout OPcache compatible | Make CSP enforcement rollout OPcache compatible | Current HEAD ancestor |
 | 130 | `a84e7ad` | Keep billing available without paid period lineage | Keep billing available without paid period lineage | Current HEAD ancestor |
-| 131 | `60b4e89` | Clarify subscription history date semantics | Clarify subscription history date semantics | Production runtime checkpoint |
+| 131 | `60b4e89` | Clarify subscription history date semantics | Clarify subscription history date semantics | Production runtime ancestor |
+| 132 | `754711e` | Tenant paid-payment receipts | Add tenant billing payment receipts | Production runtime checkpoint |
 
 ## 2026-09-10 feed audit and Recorded By closure
 
@@ -204,6 +205,12 @@ Documentation-only commits may therefore exist after the production runtime HEAD
 - Commit `60b4e89` (`Clarify subscription history date semantics`) changed Subscription History to show separate `Subscription end` and `Paid period end` columns. Production browser QA confirmed the old `18 Sep 2026` value appears only under Subscription end while Paid period end remains `—`.
 - Subscription-history clarification backup: `/home/renee/renee-deploy-backups/billing-history-date-semantics-20260912-124518`.
 - No database rewrite, historical-row deletion, paid-period backfill, payment-provider production activation or CSP rollback was performed during the Farm A billing/history closure.
+- Commit `754711e` (`Add tenant billing payment receipts`) completed the first tenant-facing paid-payment receipt increment. Billing > Recent payments exposes `View receipt` only for paid attempts; failed/non-paid attempts do not receive a receipt action.
+- Receipt lookup is read-only and tenant-pinned by authenticated Farm Admin `farm_id`, payment-attempt id and `status = paid`. General payment history continues to hide provider references and transaction identifiers; those identifiers are exposed only inside the tenant-pinned receipt detail.
+- Remote GitHub semantic review passed for `47ec39b` -> `754711e`. Production runtime deployment and hash/lint verification passed for `billing/account.php`, `billing/receipt.php` and `includes/billing_payment_receipt.php`.
+- Production receipt rollback backup: `/home/renee/renee-deploy-backups/billing-payment-receipt-runtime-20260912-133733`.
+- Authenticated browser QA passed with X2 Farm: failed rows displayed no receipt action, existing paid rows displayed `View receipt`, receipt details rendered correctly, and `Back to Billing` returned normally to Farm Admin Billing.
+- This receipt milestone performed no database mutation, migration, payment-provider call, `.htaccess`, config or CSP change. It does not approve production payment processing. Printable/PDF receipt polish and broader invoicing remain outside this first increment.
 
 ## Important interpretation
 
@@ -214,6 +221,7 @@ The numbered CSP verifier filename series ends at Batch 68. Working development 
 ## Major closed areas from hand-off
 
 - Commercial billing lifecycle and recovery hardening
+- Tenant paid-payment receipt / proof-of-payment visibility
 - Tenant and permission hardening
 - Receivables, upfront-cash and overpayment protections
 - CSRF, session, login, redirect, CORS, IDOR, SQL injection, XSS/output encoding, SSRF and path/file hardening
@@ -223,7 +231,7 @@ The numbered CSP verifier filename series ends at Batch 68. Working development 
 
 ## Current roadmap position
 
-1. Current production runtime lineage through `60b4e89`: COMPLETE.
+1. Current production runtime lineage through `754711e`: COMPLETE.
 2. Feed audit / platform-wide Recorded By targeted production QA: COMPLETE.
 3. Homepage, Poultry Health, vendor-console, Dashboard Popper, tenant PDF branding and Feed PDF targeted production QA: COMPLETE.
 4. CSP Report-Only observation: COMPLETE / CLOSED.
@@ -233,8 +241,9 @@ The numbered CSP verifier filename series ends at Batch 68. Working development 
 8. Migration 046 and migration 047 production verification: COMPLETE / CLOSED. Do not rerun absent regression evidence.
 9. Farm A LLC legacy/manual billing-period resilience: COMPLETE / CLOSED.
 10. Subscription-history `Subscription end` versus `Paid period end` clarification: COMPLETE / CLOSED.
-11. Continue remaining V2.3 commercial/SaaS hardening and commercial QA: NEXT.
-12. Production payment processing remains NOT APPROVED; keep provider execution TEST/SANDBOX until explicit owner approval.
+11. Tenant paid-payment receipt / proof-of-payment visibility: COMPLETE / CLOSED. HTML receipt milestone only; do not repeat payment execution for QA.
+12. Continue remaining V2.3 commercial/SaaS hardening and commercial QA: NEXT.
+13. Production payment processing remains NOT APPROVED; keep provider execution TEST/SANDBOX until explicit owner approval.
 
 ## Safety rules
 
@@ -247,6 +256,7 @@ The numbered CSP verifier filename series ends at Batch 68. Working development 
 - CSP enforcement is already live; do not revert to Report-Only or weaken policy without actual regression evidence and a controlled review.
 - Migration 046 and migration 047 are CLOSED/PASS; do not rerun them absent actual regression evidence.
 - Do not repeat the completed Stage 2I sandbox payment proof merely for reassurance.
+- Do not reopen or repeat tenant payment-receipt QA absent actual regression evidence.
 - Preserve protected QA/billing evidence.
 - Prefer shared helpers/services and thin routes.
 - Add focused verifiers for important contracts.
