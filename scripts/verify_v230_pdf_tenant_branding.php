@@ -85,6 +85,29 @@ $check(
 );
 
 $check(
+    preg_match(
+        '/page_text\\s*\\(\\s*28\\s*,\\s*15\\s*,\\s*\\$farmName\\s*,\\s*\\$fontBold\\s*,\\s*16\\s*,/s',
+        $service
+    ) === 1,
+    'primary PDF brand is rendered prominently at 16pt'
+);
+
+$check(
+    str_contains(
+        $service,
+        '@page { size: A4 {$orientation}; margin: 16mm 9mm 14mm; }'
+    ),
+    'PDF reserves sufficient top space for prominent branding'
+);
+
+$check(
+    str_contains($service, 'h1 { font-size: 14pt !important;')
+    && str_contains($service, 'h2 { font-size: 12.5pt !important;')
+    && str_contains($service, 'h3 { font-size: 11pt !important;'),
+    'PDF report headings remain visually subordinate to the primary brand'
+);
+
+$check(
     str_contains($service, "\$farmName . ' • ' . \$title"),
     'tenant farm name is rendered in the bottom-left report footer'
 );

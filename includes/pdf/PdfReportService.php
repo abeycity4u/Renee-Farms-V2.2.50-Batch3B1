@@ -146,7 +146,7 @@ final class PdfReportService
             15,
             $farmName,
             $fontBold,
-            10,
+            16,
             [0.12, 0.18, 0.15]
         );
 
@@ -202,7 +202,7 @@ final class PdfReportService
     private function documentCss(string $orientation): string
     {
         return <<<CSS
-@page { size: A4 {$orientation}; margin: 10mm 9mm 14mm; }
+@page { size: A4 {$orientation}; margin: 16mm 9mm 14mm; }
 html, body { background: #fff !important; color: #1f2937 !important; font-family: 'DejaVu Sans', sans-serif !important; font-size: 9pt; }
 body { margin: 0 !important; padding: 0 !important; }
 nav, .navbar, #appNavbar, .no-print, .report-controls, button, .btn, .modal, .offcanvas,
@@ -215,7 +215,16 @@ nav, .navbar, #appNavbar, .no-print, .report-controls, button, .btn, .modal, .of
 .card { border: 1px solid #d1d5db !important; margin-bottom: 8px !important; }
 .card-header { border-bottom: 1px solid #d1d5db !important; padding: 7px 9px !important; }
 .card-body { padding: 8px 9px !important; }
-h1, h2, h3, h4, h5, h6 { color: #111827 !important; margin-top: 0; }
+h1, h2, h3, h4, h5, h6 {
+  color: #111827 !important;
+  margin-top: 0 !important;
+  font-weight: 700 !important;
+  line-height: 1.25 !important;
+}
+h1 { font-size: 14pt !important; margin-bottom: 8px !important; }
+h2 { font-size: 12.5pt !important; margin-bottom: 7px !important; }
+h3 { font-size: 11pt !important; margin-bottom: 6px !important; }
+h4, h5, h6 { font-size: 10pt !important; margin-bottom: 5px !important; }
 .text-success, .text-info { color: #087f5b !important; }
 .text-danger { color: #b42318 !important; }
 .table-responsive { overflow: visible !important; width: 100% !important; }
