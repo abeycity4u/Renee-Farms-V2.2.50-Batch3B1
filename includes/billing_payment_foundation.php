@@ -95,21 +95,35 @@ if (!function_exists('billing_payment_foreign_keys_ready')) {
     function billing_payment_foreign_keys_ready(PDO $pdo): bool
     {
         $expected = [
-            'fk_billing_attempt_farm' => ['billing_payment_attempts', 'farms'],
-            'fk_billing_attempt_subscription_record' => ['billing_payment_attempts', 'subscriptions'],
-            'fk_billing_event_attempt' => ['billing_provider_events', 'billing_payment_attempts'],
+            'fk_billing_attempt_farm' => [
+                'billing_payment_attempts',
+                'farms',
+                ['RESTRICT', 'NO ACTION'],
+            ],
+            'fk_billing_attempt_subscription_record' => [
+                'billing_payment_attempts',
+                'subscriptions',
+                ['SET NULL'],
+            ],
+            'fk_billing_event_attempt' => [
+                'billing_provider_events',
+                'billing_payment_attempts',
+                ['SET NULL'],
+            ],
         ];
         $stmt = $pdo->prepare(
-            "SELECT table_name, referenced_table_name
+            "SELECT table_name, referenced_table_name, delete_rule
              FROM information_schema.referential_constraints
              WHERE constraint_schema = DATABASE() AND constraint_name = ? LIMIT 1"
         );
-        foreach ($expected as $constraint => [$table, $parent]) {
+        foreach ($expected as $constraint => [$table, $parent, $deleteRules]) {
             $stmt->execute([$constraint]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+            $deleteRule = $row ? strtoupper(trim((string)($row['delete_rule'] ?? ''))) : '';
             if (!$row
                 || (string)$row['table_name'] !== $table
-                || (string)$row['referenced_table_name'] !== $parent) {
+                || (string)$row['referenced_table_name'] !== $parent
+                || !in_array($deleteRule, $deleteRules, true)) {
                 return false;
             }
         }

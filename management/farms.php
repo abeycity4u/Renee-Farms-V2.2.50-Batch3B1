@@ -60,6 +60,12 @@ function tableHasFarmId(PDO $pdo, string $table): bool {
     $stmt->execute([$table]);
     return (int)$stmt->fetchColumn() > 0;
 }
+function farmHasBillingPaymentHistory(PDO $pdo, int $farmId): bool {
+    if ($farmId < 1 || !tableExists($pdo, 'billing_payment_attempts')) return false;
+    $stmt = $pdo->prepare('SELECT 1 FROM billing_payment_attempts WHERE farm_id = ? LIMIT 1');
+    $stmt->execute([$farmId]);
+    return $stmt->fetchColumn() !== false;
+}
 function saveRoleLimits(PDO $pdo, int $farmId, array $limits): void {
     if (!tableExists($pdo, 'farm_role_limits')) return;
     $stmt=$pdo->prepare('INSERT INTO farm_role_limits (farm_id,role_code,max_users) VALUES (?,?,?) ON DUPLICATE KEY UPDATE max_users=VALUES(max_users)');
@@ -77,6 +83,10 @@ function deleteFarmRows(PDO $pdo, string $table, int $farmId): void {
     $pdo->prepare("DELETE FROM {$table} WHERE farm_id = ?")->execute([$farmId]);
 }
 function deleteFarmData(PDO $pdo, int $farmId): void {
+    if (farmHasBillingPaymentHistory($pdo, $farmId)) {
+        throw new RuntimeException('Farm account with billing payment history cannot be permanently deleted.');
+    }
+
     // Tenant purge is intentionally explicit and ordered. V2.2 financial allocation
     // tables must be cleared before their parent sales/expense/cycle rows or old
     // RESTRICT foreign keys will reject the farm deletion.
@@ -118,6 +128,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['delete_farm'], $_POST['farm_id'])) {
         $farm = editableFarm($pdo, $farmId);
         if (!$farm) { $_SESSION['error'] = 'The platform workspace cannot be deleted.'; redirectFarms(); }
+        if (farmHasBillingPaymentHistory($pdo, $farmId)) {
+            $_SESSION['error'] = 'This farm has billing/payment history and cannot be permanently deleted. Suspend the farm instead to preserve the financial audit trail.';
+            redirectFarms();
+        }
         $logoPath = $farm['logo_path'] ?? null;
         try { $pdo->beginTransaction(); deleteFarmData($pdo, $farmId); $pdo->commit();
             if ($logoPath && preg_match('#^/uploads/farms/[a-zA-Z0-9._-]+$#', $logoPath)) @unlink(dirname(__DIR__) . $logoPath);
