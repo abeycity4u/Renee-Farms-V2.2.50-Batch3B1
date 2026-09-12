@@ -592,9 +592,9 @@ $decodeModules = static function ($json): string {
             <div class="card-header bg-transparent border-0 pt-3 px-3"><h2 class="h5 mb-0">Recent payments</h2><div class="small text-muted">Provider-neutral payment attempts for this farm only.</div></div>
             <div class="table-responsive">
                 <table class="table table-hover mb-0">
-                    <thead><tr><th>Date</th><th>Provider</th><th>Plan</th><th>Interval</th><th>Amount</th><th>Status</th></tr></thead>
+                    <thead><tr><th>Date</th><th>Provider</th><th>Plan</th><th>Interval</th><th>Amount</th><th>Status</th><th>Receipt</th></tr></thead>
                     <tbody>
-                    <?php if (!$overview['payment_attempts']): ?><tr><td colspan="6" class="empty-state">No payment attempts have been recorded yet.</td></tr><?php endif; ?>
+                    <?php if (!$overview['payment_attempts']): ?><tr><td colspan="7" class="empty-state">No payment attempts have been recorded yet.</td></tr><?php endif; ?>
                     <?php foreach ($overview['payment_attempts'] as $attempt): $attemptStatus = strtolower((string)($attempt['status'] ?? '')); ?>
                         <tr>
                             <td class="text-nowrap"><?= htmlspecialchars($formatDate($attempt['created_at'] ?? null), ENT_QUOTES, 'UTF-8') ?></td>
@@ -603,6 +603,13 @@ $decodeModules = static function ($json): string {
                             <td class="text-capitalize"><?= htmlspecialchars((string)($attempt['billing_interval'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></td>
                             <td><?= htmlspecialchars((string)($attempt['currency'] ?? ''), ENT_QUOTES, 'UTF-8') ?> <?= number_format((float)($attempt['amount'] ?? 0), 2) ?></td>
                             <td><span class="badge text-bg-<?= htmlspecialchars($statusClass($attemptStatus), ENT_QUOTES, 'UTF-8') ?> text-capitalize"><?= htmlspecialchars(str_replace('_', ' ', $attemptStatus ?: 'unknown'), ENT_QUOTES, 'UTF-8') ?></span></td>
+                            <td class="text-nowrap">
+                                <?php if ($attemptStatus === 'paid'): ?>
+                                    <a class="btn btn-sm btn-outline-secondary" href="<?= htmlspecialchars(BASE_URL . '/billing/receipt.php?id=' . (int)$attempt['id'], ENT_QUOTES, 'UTF-8') ?>">View receipt</a>
+                                <?php else: ?>
+                                    <span class="text-muted">—</span>
+                                <?php endif; ?>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>
