@@ -6,7 +6,7 @@ Audit snapshot: 2026-09-12
 
 - Repository: `abeycity4u/Renee-Farms-V2.2.50-Batch3B1`
 - Branch: `v230-commercial-hardening-saas-readiness`
-- Production runtime HEAD: `60b4e89f837ed424f8de025f130613e587effc14`
+- Production runtime HEAD: `754711e5797654dd3f53922ca53025b90cf2f58f`
 - Production: `https://reneefarms.com`
 - Server checkout: `~/renee-deploy`
 - Live root: `~/public_html`
