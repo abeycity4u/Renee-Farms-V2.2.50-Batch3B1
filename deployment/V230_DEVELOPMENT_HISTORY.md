@@ -277,6 +277,21 @@ Documentation-only commits may therefore exist after the production runtime HEAD
 - Production payment processing remains NOT APPROVED. Provider execution remains TEST/SANDBOX only until explicit owner approval.
 - The initialized-reference provider-absence edge remains fail-closed. Preserving HTTP evidence is infrastructure only; authoritative provider-specific absence semantics must be proven before any recovery logic is allowed to unblock or supersede an `initialized` attempt.
 
+## 2026-09-13 production web-exposure and Composer vendor closure
+
+- A read-only production exposure audit confirmed the existing protected development surfaces remain fail-closed: `scripts/` and `migrations/` return HTTP 403, while `deployment/`, `tests/` and `notes/` are absent from the public production tree.
+- Root-level sensitive-artifact review found no deployed `.git`, `.env`, `.env.local`, `.env.production`, PHPUnit configuration, README or backup/archive artifacts outside the intentionally deployed SQL migration/schema files. `composer.json` and `composer.lock` return HTTP 403.
+- Root `database_schema.sql` is intentionally present but protected by the production root `.htaccess`; an HTTPS GET returned HTTP 403 and the live file hash matched source.
+- Production `config.php` returned HTTP 200 only because PHP executed it; the response body was exactly 0 bytes with no PHP-source or sensitive-data markers. The root `error_log` returned HTTP 403.
+- A genuine exposure gap was found under the Composer dependency directory: `/vendor/` returned HTTP 200 with a directory listing while `/vendor/autoload.php` executed with an empty body.
+- Source dependency review confirmed browser-facing third-party assets use the separate `/assets/vendor/` tree. Composer `/vendor/` is server-side only, with application usage through `vendor/autoload.php`.
+- Commit `ac132e5` (`Deny public access to Composer vendor dependencies`) added the narrowly scoped `vendor/.htaccess` rule `Require all denied`.
+- Remote GitHub semantic review passed after push. Branch `v230-commercial-hardening-saas-readiness` pointed exactly to `ac132e53d70099b782e3391272271bda161f8a67`, whose parent is `94bed617ab3b1c37ea712c2e6d0da6e2410d1d89`, with only `vendor/.htaccess` changed.
+- Production deployment was limited to `public_html/vendor/.htaccess`. Source and live hashes matched at `7b025e2cffa6b71ed8b898ebb9cf04731354e07108f41c9c4a2a745dad7f796a`; live mode/owner was `644 renee:renee`.
+- Post-deployment HTTPS verification passed: `/vendor/` returned HTTP 403, `/vendor/autoload.php` returned HTTP 403, and the legitimate browser asset `/assets/vendor/jquery/jquery.min.js` remained HTTP 200.
+- No database migration, database mutation, provider execution, payment-mode change, root `.htaccess` replacement, CSP change, Farm A mutation or Farm 15 mutation occurred.
+- This production web-exposure / Composer vendor milestone is COMPLETE / CLOSED.
+
 ## Important interpretation
 
 A checkpoint being in the current lineage means its committed work was carried forward into later commits. Later commits may legitimately modify the same files, so production should use the latest descendant version rather than an old intermediate snapshot.
@@ -297,7 +312,7 @@ The numbered CSP verifier filename series ends at Batch 68. Working development 
 
 ## Current roadmap position
 
-1. Current production runtime lineage through `61ddad9`: COMPLETE.
+1. Current production runtime lineage through `ac132e5`: COMPLETE.
 2. Feed audit / platform-wide Recorded By targeted production QA: COMPLETE.
 3. Homepage, Poultry Health, vendor-console, Dashboard Popper, tenant PDF branding and Feed PDF targeted production QA: COMPLETE.
 4. CSP Report-Only observation: COMPLETE / CLOSED.
@@ -311,8 +326,9 @@ The numbered CSP verifier filename series ends at Batch 68. Working development 
 12. Management Sales Records terminology cleanup: COMPLETE / CLOSED. UI wording only; routes, filenames, database identifiers, functions and URLs remain unchanged.
 13. Initialized subscription-attempt recovery through `be054da`: DEPLOYED / STRUCTURALLY VERIFIED / CLOSED. Provider-facing recovery execution remains deferred while payment mode is disabled; do not activate production billing merely to repeat QA.
 14. Billing-provider typed HTTP error evidence through `61ddad9`: DEPLOYED / VERIFIED / CLOSED. This preserves non-2xx evidence only and does not yet classify provider-specific reference absence.
-15. Continue remaining V2.3 commercial/SaaS hardening and commercial QA: NEXT.
-16. Production payment processing remains NOT APPROVED; keep provider execution TEST/SANDBOX until explicit owner approval.
+15. Production web-exposure and Composer `/vendor/` hardening through `ac132e5`: DEPLOYED / VERIFIED / CLOSED.
+16. Continue remaining V2.3 commercial/SaaS hardening and commercial QA: NEXT.
+17. Production payment processing remains NOT APPROVED; keep provider execution TEST/SANDBOX until explicit owner approval.
 
 ## Safety rules
 
