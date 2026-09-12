@@ -21,6 +21,7 @@ require_once dirname(__DIR__) . '/includes/billing_payment_audit_state.php';
 require_once dirname(__DIR__) . '/includes/billing_tenant_actor.php';
 require_once dirname(__DIR__) . '/includes/billing_current_product.php';
 require_once dirname(__DIR__) . '/includes/billing_commercial_attempt_reconciliation_launcher.php';
+require_once dirname(__DIR__) . '/includes/billing_initialized_attempt_recovery.php';
 require_once dirname(__DIR__) . '/includes/billing_subscription_checkout_initiation.php';
 
 $actor = billing_require_farm_admin_actor($pdo, true, subscription_recovery_target_statuses());
@@ -39,6 +40,112 @@ try {
         billing_tenant_actor_is_recovery($actor)
             ? subscription_recovery_target_statuses()
             : billing_current_product_normal_statuses();
+
+    /*
+     * First recover any subscription attempt that was durably persisted as
+     * initialized but whose provider result was not safely recorded.
+     *
+     * Provider verification occurs outside database transactions inside the
+     * recovery helper. Ambiguous provider/network failure remains blocking;
+     * it is never guessed to mean declined, cancelled or absent.
+     */
+    $initializedRecovery =
+        billing_initialized_attempt_recover_next(
+            $pdo,
+            $farmId,
+            (int)$actor['user_id']
+        );
+
+    $initializedOutcome =
+        (string)(
+            $initializedRecovery['outcome']
+                ?? ''
+        );
+
+    $initializedFound =
+        ($initializedRecovery['attempt_found'] ?? false)
+        === true;
+
+    if (!$initializedFound) {
+        if ($initializedOutcome !== 'none'
+            || array_key_exists(
+                'blocking',
+                $initializedRecovery
+            )
+                && $initializedRecovery['blocking']
+                    !== null) {
+            throw new RuntimeException(
+                'Initialized checkout recovery returned an invalid empty-candidate result.'
+            );
+        }
+    } elseif (!in_array(
+        $initializedOutcome,
+        [
+            'initialized_blocked',
+            'pending_blocked',
+            'paid_applied',
+            'superseded',
+            'refunded_settled',
+        ],
+        true
+    )) {
+        throw new RuntimeException(
+            'Initialized checkout recovery returned an unsupported outcome.'
+        );
+    }
+
+    if ($initializedOutcome === 'paid_applied') {
+        /*
+         * The interrupted checkout has now been authoritatively verified paid
+         * and applied. Never create another payment in this request.
+         */
+        if (billing_tenant_actor_is_recovery(
+            $actor
+        )) {
+            subscription_recovery_promote_to_login(
+                $pdo
+            );
+        }
+
+        $_SESSION['success'] =
+            'An earlier payment was verified and your subscription is active. No replacement checkout was started.';
+
+        header(
+            'Location: ' . BASE_URL . '/dashboard.php',
+            true,
+            303
+        );
+        exit();
+    }
+
+    if ($initializedOutcome === 'pending_blocked') {
+        http_response_code(409);
+        exit(
+            'An earlier subscription payment is still pending verification. No new checkout was started.'
+        );
+    }
+
+    if ($initializedOutcome === 'initialized_blocked') {
+        http_response_code(409);
+        exit(
+            'An earlier subscription checkout could not yet be verified safely. No new checkout was started.'
+        );
+    }
+
+    if (in_array(
+        $initializedOutcome,
+        [
+            'superseded',
+            'refunded_settled',
+        ],
+        true
+    )
+        && ($initializedRecovery['blocking'] ?? null)
+            !== false) {
+        throw new RuntimeException(
+            'Settled initialized checkout recovery unexpectedly remained blocking.'
+        );
+    }
 
     /*
      * Before creating a replacement checkout, re-verify every commercially
