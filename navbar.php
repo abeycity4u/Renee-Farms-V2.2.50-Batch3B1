@@ -161,7 +161,7 @@ $showManagementMenu = $canViewSales || $canViewExpenseReport || $canViewReports 
             <li><h6 class="dropdown-header">Reports <span class="dropdown-section-badge">Live</span></h6></li>
             <?php endif; ?>
             <?php if ($canViewSales): ?>
-            <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/management/sales_records.php"><i class="bi bi-graph-up menu-icon me-2"></i> Sales Report</a></li>
+            <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/management/sales_records.php"><i class="bi bi-graph-up menu-icon me-2"></i> Sales Records</a></li>
             <?php endif; ?>
             <?php if ($canViewExpenseReport): ?>
             <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/management/expenses.php"><i class="bi bi-cash-stack menu-icon me-2"></i> Expense Report</a></li>

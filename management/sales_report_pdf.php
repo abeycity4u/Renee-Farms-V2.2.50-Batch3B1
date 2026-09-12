@@ -105,8 +105,8 @@ if ($selectedCustomer !== '') {
 
 ob_start();
 ?>
-<!doctype html><html lang="en"><head><meta charset="UTF-8"><title>Sales Report - Renee Farms</title></head><body>
-<h2>Sales Report - <?php echo htmlspecialchars($periodLabel); ?></h2>
+<!doctype html><html lang="en"><head><meta charset="UTF-8"><title>Sales Records - Renee Farms</title></head><body>
+<h2>Sales Records - <?php echo htmlspecialchars($periodLabel); ?></h2>
 <table class="table" style="margin-bottom:12px">
 <thead><tr><th>Total Sales</th><th>Transactions</th><th>Farm Scope</th><th>Production Type</th></tr></thead>
 <tbody><tr><td>₦<?php echo number_format($totalSales,2); ?></td><td><?php echo $transactionCount; ?></td><td><?php echo htmlspecialchars($farmType==='all'?'All Farms':ucfirst($farmType)); ?></td><td><?php echo htmlspecialchars($productionType==='all'?'All Production Types':ucfirst($productionType)); ?></td></tr></tbody>
@@ -146,4 +146,4 @@ ob_start();
 <?php
 $html = ob_get_clean() ?: '';
 $service = new PdfReportService();
-$service->streamHtml($html, 'sales-report-' . strtolower(str_replace(' ','-',$periodLabel)) . '.pdf', 'landscape', 'Sales Report - '.$periodLabel);
+$service->streamHtml($html, 'sales-report-' . strtolower(str_replace(' ','-',$periodLabel)) . '.pdf', 'landscape', 'Sales Records - '.$periodLabel);

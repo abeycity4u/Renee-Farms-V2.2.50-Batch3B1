@@ -605,7 +605,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
     <?php include(__DIR__ . '/../navbar_head.php'); ?>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sales Report - Renee Farms</title>
+    <title>Sales Records - Renee Farms</title>
 </head>
 <body>
     <?php include(__DIR__ . '/../navbar.php'); ?>
@@ -618,7 +618,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h4>
                             <i class="bi bi-graph-up"></i> 
-                            Sales Report - <?php echo htmlspecialchars($periodLabel); ?>
+                            Sales Records - <?php echo htmlspecialchars($periodLabel); ?>
                         </h4>
                         <div class="d-flex gap-2 report-controls">
                             <select class="form-select app-width-150" id="farmTypeFilter">
@@ -1412,6 +1412,6 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
 </html>
 <?php
 if ($pdfRequested) {
-    pdf_report_finish('sales-report-' . preg_replace('/[^0-9A-Za-z-]+/', '-', strtolower($periodLabel)) . '.pdf', 'landscape', 'Sales Report - ' . $periodLabel);
+    pdf_report_finish('sales-report-' . preg_replace('/[^0-9A-Za-z-]+/', '-', strtolower($periodLabel)) . '.pdf', 'landscape', 'Sales Records - ' . $periodLabel);
 }
 ?>
