@@ -614,9 +614,9 @@ $decodeModules = static function ($json): string {
             <div class="card-header bg-transparent border-0 pt-3 px-3"><h2 class="h5 mb-0">Subscription history</h2><div class="small text-muted">Recent immutable commercial snapshots for this farm.</div></div>
             <div class="table-responsive">
                 <table class="table table-hover mb-0">
-                    <thead><tr><th>Date</th><th>Plan</th><th>Status</th><th>Interval</th><th>Modules</th><th>Period end</th></tr></thead>
+                    <thead><tr><th>Date</th><th>Plan</th><th>Status</th><th>Interval</th><th>Modules</th><th>Subscription end</th><th>Paid period end</th></tr></thead>
                     <tbody>
-                    <?php if (!$overview['subscription_history']): ?><tr><td colspan="6" class="empty-state">No commercial subscription history has been recorded yet.</td></tr><?php endif; ?>
+                    <?php if (!$overview['subscription_history']): ?><tr><td colspan="7" class="empty-state">No commercial subscription history has been recorded yet.</td></tr><?php endif; ?>
                     <?php foreach ($overview['subscription_history'] as $history): $historyStatus = strtolower((string)($history['status'] ?? '')); ?>
                         <tr>
                             <td class="text-nowrap"><?= htmlspecialchars($formatDate($history['created_at'] ?? null), ENT_QUOTES, 'UTF-8') ?></td>
@@ -624,7 +624,8 @@ $decodeModules = static function ($json): string {
                             <td><span class="badge text-bg-<?= htmlspecialchars($statusClass($historyStatus), ENT_QUOTES, 'UTF-8') ?> text-capitalize"><?= htmlspecialchars(str_replace('_', ' ', $historyStatus ?: 'unknown'), ENT_QUOTES, 'UTF-8') ?></span></td>
                             <td class="text-capitalize"><?= htmlspecialchars((string)($history['billing_interval'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></td>
                             <td><?= htmlspecialchars($decodeModules($history['modules_snapshot'] ?? '[]'), ENT_QUOTES, 'UTF-8') ?></td>
-                            <td class="text-nowrap"><?= htmlspecialchars($formatDate($history['subscription_ends_at'] ?? ($history['current_period_ends_at'] ?? null)), ENT_QUOTES, 'UTF-8') ?></td>
+                            <td class="text-nowrap"><?= htmlspecialchars($formatDate($history['subscription_ends_at'] ?? null), ENT_QUOTES, 'UTF-8') ?></td>
+                            <td class="text-nowrap"><?= htmlspecialchars($formatDate($history['current_period_ends_at'] ?? null), ENT_QUOTES, 'UTF-8') ?></td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>

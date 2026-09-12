@@ -225,6 +225,21 @@ verify_billing_account(
     'billing UI disables paid-period seat changes without hiding the overall billing workspace'
 );
 
+verify_billing_account(
+    str_contains(
+        $page,
+        '<th>Subscription end</th><th>Paid period end</th>'
+    )
+    && str_contains(
+        $page,
+        "\$history['subscription_ends_at'] ?? null"
+    )
+    && str_contains(
+        $page,
+        "\$history['current_period_ends_at'] ?? null"
+    ),
+    'subscription history distinguishes administrative subscription end from authoritative paid-period end'
+);
 echo "\n{$checks} checks, {$failures} failure(s).\n";
 if ($failures > 0) exit(1);
 echo "PASS: V2.3 tenant Billing & Subscription UI is tenant-pinned, same-product enforced, read-model driven and checkout-delegating.\n";
