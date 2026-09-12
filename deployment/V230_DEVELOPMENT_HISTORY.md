@@ -6,14 +6,14 @@ Audit snapshot: 2026-09-12
 
 - Repository: `abeycity4u/Renee-Farms-V2.2.50-Batch3B1`
 - Branch: `v230-commercial-hardening-saas-readiness`
-- Production runtime HEAD: `540b4877a78853c604f4dd674eb87b0e912d083c`
+- Production runtime HEAD: `0791e98067a5b4fc6598d91eaf4fe9182fe37cbe`
 - Production: `https://reneefarms.com`
 - Server checkout: `~/renee-deploy`
 - Live root: `~/public_html`
 
 ## Current deployment position
 
-Production runtime is now carried forward through commit `540b487`. The 2026-09-11 to 2026-09-12 sequence completed commercial billing coordination and seat-change hardening, Stage 2I TEST/SANDBOX end-to-end payment proof, CSP Report-Only observation, production CSP enforcement, legacy/manual billing-period resilience, subscription-history date clarification and the first tenant-facing paid-payment receipt milestone.
+Production runtime is now carried forward through commit `0791e98`, including the completed tenant payment-receipt PDF export, Renee AgriSuite receipt branding, global PDF brand hierarchy and final receipt-title alignment. The 2026-09-11 to 2026-09-12 sequence completed commercial billing coordination and seat-change hardening, Stage 2I TEST/SANDBOX end-to-end payment proof, CSP Report-Only observation, production CSP enforcement, legacy/manual billing-period resilience, subscription-history date clarification and the first tenant-facing paid-payment receipt milestone.
 
 CSP is now enforcing in production. The clean Report-Only observation and owner approval were followed by an initial enforcement attempt that failed safely because mixed OPcache generations allowed new `config.php` code to call a newer CSP emitter while an older cached policy file remained loaded. That attempt was rolled back. Commit `59f6e63` made the rollout OPcache-compatible, and the subsequent policy-only deployment passed repeated unauthenticated probes, authenticated browser smoke and post-smoke log observation.
 
@@ -211,12 +211,31 @@ Documentation-only commits may therefore exist after the production runtime HEAD
 - Remote GitHub semantic review passed for `47ec39b` -> `754711e`. Production runtime deployment and hash/lint verification passed for `billing/account.php`, `billing/receipt.php` and `includes/billing_payment_receipt.php`.
 - Production receipt rollback backup: `/home/renee/renee-deploy-backups/billing-payment-receipt-runtime-20260912-133733`.
 - Authenticated browser QA passed with X2 Farm: failed rows displayed no receipt action, existing paid rows displayed `View receipt`, receipt details rendered correctly, and `Back to Billing` returned normally to Farm Admin Billing.
-- This receipt milestone performed no database mutation, migration, payment-provider call, `.htaccess`, config or CSP change. It does not approve production payment processing. Printable/PDF receipt polish and broader invoicing remain outside this first increment.
+- The initial HTML receipt milestone performed no database mutation, migration, payment-provider call, `.htaccess`, config or CSP change and did not approve production payment processing. The subsequent PDF receipt and branding work is now also COMPLETE / CLOSED; broader invoicing remains outside the receipt milestone.
 - Commit `540b487` (`Rename Sales Report UI to Sales Records`) completed the Management sales-workspace terminology cleanup. Tenant-facing Management navigation, Sales Records page headings and PDF display titles now use `Sales Records`.
 - The terminology change was deliberately UI-only: `/management/sales_records.php`, `sales_report_pdf.php`, `sales-report-` PDF filename prefixes, database identifiers, functions and URLs were preserved.
 - Production deployment passed source/live hash verification and PHP lint for `navbar.php`, `management/sales_records.php` and `management/sales_report_pdf.php`. Rollback backup: `/home/renee/renee-deploy-backups/sales-records-terminology-runtime-20260912-141346`.
 - Authenticated browser QA passed for the Management `Sales Records` menu label, Sales Records workspace heading and Sales Records PDF wording. This terminology milestone is COMPLETE / CLOSED.
 
+## 2026-09-12 tenant payment receipt PDF and branding closure
+
+- Commit `1b74066` added authenticated tenant payment-receipt PDF export through the existing centralized `PdfReportService`; no parallel receipt route was introduced.
+- Receipt PDF access remains GET-only, Farm Admin authenticated, tenant-pinned and paid-only. Viewing a receipt remains read-only and payment-provider passive.
+- Final product/platform branding is `Renee AgriSuite`.
+- `Renee Farms Limited` remains the legal issuer.
+- The authenticated tenant/farm remains the customer and is shown separately as `Customer / Farm`.
+- Operational PDFs remain tenant-branded through the centralized farm-name resolver. The billing receipt is the deliberate exception and passes the Renee AgriSuite platform brand explicitly.
+- Commit `15e321a` replaced the temporary receipt platform name with `Renee AgriSuite` while preserving issuer and customer separation.
+- Commit `e5f0aaf` completed the centralized PDF visual hierarchy: the primary farm/platform brand is 16pt, report headings are subordinate and the page reserves sufficient top space.
+- Commit `0791e98` completed the receipt-specific PDF title refinement so `Payment receipt` is smaller than `Renee AgriSuite` and visually aligned with the primary brand.
+- Authenticated browser QA passed for the existing X2 Farm paid receipt. No new payment was executed for this verification.
+- Existing operational PDF examples, including Sales Records and Ruminant Feed Transaction History, passed visual QA after the centralized hierarchy update.
+- Final production rollback backups for this closure include:
+  - `/home/renee/renee-deploy-backups/pdf-brand-hierarchy-runtime-20260912-153438`
+  - `/home/renee/renee-deploy-backups/payment-receipt-title-runtime-20260912-155018`
+- This closure required no database mutation, migration, payment-provider execution, config change, `.htaccess` change or CSP change.
+- Production payment processing remains NOT APPROVED. Provider execution stays TEST/SANDBOX until explicit owner approval.
+- Broader invoicing is not part of this closed payment-receipt milestone.
 ## Important interpretation
 
 A checkpoint being in the current lineage means its committed work was carried forward into later commits. Later commits may legitimately modify the same files, so production should use the latest descendant version rather than an old intermediate snapshot.
@@ -247,7 +266,7 @@ The numbered CSP verifier filename series ends at Batch 68. Working development 
 8. Migration 046 and migration 047 production verification: COMPLETE / CLOSED. Do not rerun absent regression evidence.
 9. Farm A LLC legacy/manual billing-period resilience: COMPLETE / CLOSED.
 10. Subscription-history `Subscription end` versus `Paid period end` clarification: COMPLETE / CLOSED.
-11. Tenant paid-payment receipt / proof-of-payment visibility: COMPLETE / CLOSED. HTML receipt milestone only; do not repeat payment execution for QA.
+11. Tenant paid-payment receipt / proof-of-payment visibility, PDF export and final branding hierarchy: COMPLETE / CLOSED. Do not repeat payment execution for QA.
 12. Management Sales Records terminology cleanup: COMPLETE / CLOSED. UI wording only; routes, filenames, database identifiers, functions and URLs remain unchanged.
 13. Continue remaining V2.3 commercial/SaaS hardening and commercial QA: NEXT.
 14. Production payment processing remains NOT APPROVED; keep provider execution TEST/SANDBOX until explicit owner approval.
