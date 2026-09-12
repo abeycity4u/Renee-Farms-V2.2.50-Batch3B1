@@ -95,6 +95,7 @@ $check(
 );
 
 $pdfCallers = [
+    'billing/receipt.php',
     'management/debt_history_pdf.php',
     'management/expense_report_pdf.php',
     'management/expenses.php',

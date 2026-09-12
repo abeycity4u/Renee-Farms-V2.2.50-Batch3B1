@@ -13,6 +13,7 @@ require_once dirname(__DIR__) . '/init.php';
 require_once dirname(__DIR__) . '/includes/billing_tenant_actor.php';
 require_once dirname(__DIR__) . '/includes/billing_payment_receipt.php';
 require_once dirname(__DIR__) . '/includes/subscription_plan_catalog.php';
+require_once dirname(__DIR__) . '/includes/pdf/PdfReportService.php';
 
 if (
     strtoupper(
@@ -180,6 +181,128 @@ $escape = static function ($value): string {
         'UTF-8'
     );
 };
+
+$pdfRequested = pdf_report_is_requested();
+
+$pdfUrl = BASE_URL
+    . '/billing/receipt.php?'
+    . http_build_query([
+        'id' => $attemptId,
+        'pdf' => '1',
+    ]);
+
+$supersededWarning =
+    'This payment was received, but the checkout had already '
+    . 'been replaced. This receipt confirms the payment record '
+    . 'only; it does not indicate that a subscription change '
+    . 'was applied.';
+
+$passiveNote =
+    'This receipt is generated from the payment record stored '
+    . 'by the platform. Viewing it does not contact the payment '
+    . 'provider or change the farm subscription, seats or '
+    . 'payment state.';
+
+if ($pdfRequested) {
+    pdf_report_begin();
+    ?>
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Payment Receipt <?= $escape($receiptNumber) ?></title>
+</head>
+<body>
+
+<h1>Payment receipt</h1>
+
+<p>
+    <strong>Receipt:</strong>
+    <?= $escape($receiptNumber) ?>
+</p>
+
+<?php if ($isSuperseded): ?>
+    <p>
+        <strong>Important:</strong>
+        <?= $escape($supersededWarning) ?>
+    </p>
+<?php endif; ?>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Field</th>
+            <th>Details</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <th>Status</th>
+            <td>Paid</td>
+        </tr>
+        <tr>
+            <th>Farm</th>
+            <td><?= $escape($farmName) ?></td>
+        </tr>
+        <tr>
+            <th>Paid on</th>
+            <td><?= $escape($formatDateTime($paidAt)) ?></td>
+        </tr>
+        <tr>
+            <th>Amount</th>
+            <td>
+                <?= $escape($currency) ?>
+                <?= $escape(
+                    number_format(
+                        (float)($receipt['amount'] ?? 0),
+                        2
+                    )
+                ) ?>
+            </td>
+        </tr>
+        <tr>
+            <th>Provider</th>
+            <td><?= $escape($providerLabel) ?></td>
+        </tr>
+        <tr>
+            <th>Payment type</th>
+            <td><?= $escape($purposeLabel) ?></td>
+        </tr>
+        <tr>
+            <th>Plan</th>
+            <td><?= $escape($planLabel) ?></td>
+        </tr>
+        <tr>
+            <th>Billing interval</th>
+            <td><?= $escape($interval ?: '—') ?></td>
+        </tr>
+        <tr>
+            <th>Receipt reference</th>
+            <td><?= $escape($receiptNumber) ?></td>
+        </tr>
+        <tr>
+            <th>Provider reference</th>
+            <td><?= $escape($providerReference ?: '—') ?></td>
+        </tr>
+        <tr>
+            <th>Provider transaction ID</th>
+            <td><?= $escape($providerTransactionId ?: '—') ?></td>
+        </tr>
+    </tbody>
+</table>
+
+<p><?= $escape($passiveNote) ?></p>
+
+</body>
+</html>
+<?php
+
+    pdf_report_finish(
+        'payment-receipt-' . $receiptNumber . '.pdf',
+        'portrait',
+        'Payment Receipt ' . $receiptNumber
+    );
+}
 ?>
 <!doctype html>
 <html lang="en">
@@ -214,23 +337,30 @@ $escape = static function ($value): string {
                     </p>
                 </div>
 
-                <a
-                    class="btn btn-light fw-semibold"
-                    href="<?= $escape(BASE_URL . '/billing/account.php') ?>"
-                >
-                    <i class="bi bi-arrow-left me-1"></i>
-                    Back to Billing
-                </a>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a
+                        class="btn btn-outline-light fw-semibold"
+                        href="<?= $escape($pdfUrl) ?>"
+                    >
+                        <i class="bi bi-file-earmark-pdf me-1"></i>
+                        View PDF receipt
+                    </a>
+
+                    <a
+                        class="btn btn-light fw-semibold"
+                        href="<?= $escape(BASE_URL . '/billing/account.php') ?>"
+                    >
+                        <i class="bi bi-arrow-left me-1"></i>
+                        Back to Billing
+                    </a>
+                </div>
             </div>
         </div>
     </div>
 
     <?php if ($isSuperseded): ?>
         <div class="alert alert-warning">
-            This payment was received, but the checkout had already
-            been replaced. This receipt confirms the payment record
-            only; it does not indicate that a subscription change
-            was applied.
+            <?= $escape($supersededWarning) ?>
         </div>
     <?php endif; ?>
 
@@ -336,10 +466,7 @@ $escape = static function ($value): string {
             </div>
 
             <div class="billing-note mt-4">
-                This receipt is generated from the payment record
-                stored by the platform. Viewing it does not contact
-                the payment provider or change the farm subscription,
-                seats or payment state.
+                <?= $escape($passiveNote) ?>
             </div>
         </div>
     </div>

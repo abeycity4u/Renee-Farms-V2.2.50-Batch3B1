@@ -128,6 +128,90 @@ $check(
     'receipt delegates to tenant-pinned lookup'
 );
 
+$authPos = strpos(
+    $route,
+    'billing_require_farm_admin_actor('
+);
+
+$lookupPos = strpos(
+    $route,
+    'billing_payment_receipt_find('
+);
+
+$pdfRenderPos = strpos(
+    $route,
+    'if ($pdfRequested)'
+);
+
+$check(
+    $authPos !== false
+    && $lookupPos !== false
+    && $pdfRenderPos !== false
+    && $authPos < $lookupPos
+    && $lookupPos < $pdfRenderPos,
+    'receipt PDF renders only after authenticated tenant-pinned lookup'
+);
+
+$check(
+    str_contains(
+        $route,
+        'PdfReportService.php'
+    )
+    && str_contains(
+        $route,
+        'pdf_report_is_requested()'
+    )
+    && str_contains(
+        $route,
+        'pdf_report_begin()'
+    )
+    && str_contains(
+        $route,
+        'pdf_report_finish('
+    ),
+    'receipt PDF export uses centralized PDF service'
+);
+
+$check(
+    str_contains(
+        $route,
+        "'pdf' => '1'"
+    )
+    && str_contains(
+        $route,
+        'View PDF receipt'
+    ),
+    'receipt page exposes canonical PDF receipt action'
+);
+
+$check(
+    str_contains(
+        $route,
+        "'payment-receipt-' . \$receiptNumber . '.pdf'"
+    )
+    && str_contains(
+        $route,
+        "'portrait'"
+    )
+    && str_contains(
+        $route,
+        "'Payment Receipt ' . \$receiptNumber"
+    ),
+    'receipt PDF uses deterministic receipt filename and title'
+);
+
+$check(
+    substr_count(
+        $route,
+        '$supersededWarning'
+    ) >= 3
+    && substr_count(
+        $route,
+        '$passiveNote'
+    ) >= 3,
+    'HTML and PDF receipt share commercial-state messaging'
+);
+
 $check(
     str_contains(
         $route,
@@ -268,5 +352,5 @@ if ($failures > 0) {
     return;
 }
 
-echo "PASS: V2.3 tenant payment receipt is paid-only, tenant-pinned, read-only and provider-passive.\n";
+echo "PASS: V2.3 tenant payment receipt is paid-only, tenant-pinned, read-only, provider-passive and centrally PDF-exportable.\n";
 ?>
