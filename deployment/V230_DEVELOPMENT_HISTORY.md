@@ -180,7 +180,7 @@ Documentation-only commits may therefore exist after the production runtime HEAD
 
 - Homepage runtime was stabilized through `cccc969`, `cb3fb9d` and `87b74ca`; targeted browser QA closed the path/preload/image warning investigation without broad asset replacement.
 - Poultry Health returned to standards mode through `bf6c0e2`.
-- `1b770ab` deployed the same-origin CSP Report-Only collector. Enforcing CSP is still intentionally paused until the longer report-observation window is reviewed.
+- `1b770ab` deployed the same-origin CSP Report-Only collector. At that 2026-09-10 checkpoint, CSP enforcement remained intentionally paused pending the longer report-observation review; that later review subsequently completed cleanly and enforcement is now live as recorded below.
 - `55971dd` and `cc78e73` removed stale vendor-console/source-map noise without changing Bootstrap/Chart.js executable behavior.
 - `36d81d1` and `3b710ab` closed the Dashboard tooltip/Popper regression; Smart Stock Control browser retest passed.
 - `70ab9d1` centralized tenant-aware generated PDF branding. Live proof passed with Farm A LLC and Farm B LTD.
@@ -204,6 +204,7 @@ Documentation-only commits may therefore exist after the production runtime HEAD
 - Commit `60b4e89` (`Clarify subscription history date semantics`) changed Subscription History to show separate `Subscription end` and `Paid period end` columns. Production browser QA confirmed the old `18 Sep 2026` value appears only under Subscription end while Paid period end remains `—`.
 - Subscription-history clarification backup: `/home/renee/renee-deploy-backups/billing-history-date-semantics-20260912-124518`.
 - No database rewrite, historical-row deletion, paid-period backfill, payment-provider production activation or CSP rollback was performed during the Farm A billing/history closure.
+
 ## Important interpretation
 
 A checkpoint being in the current lineage means its committed work was carried forward into later commits. Later commits may legitimately modify the same files, so production should use the latest descendant version rather than an old intermediate snapshot.
@@ -218,7 +219,7 @@ The numbered CSP verifier filename series ends at Batch 68. Working development 
 - CSRF, session, login, redirect, CORS, IDOR, SQL injection, XSS/output encoding, SSRF and path/file hardening
 - CSP inline-handler, inline-script, inline-style and style-attribute reduction
 - Same-origin/vendored browser dependency hardening
-- CSP Report-Only baseline
+- CSP Report-Only observation and production CSP enforcement
 
 ## Current roadmap position
 
