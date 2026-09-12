@@ -187,7 +187,7 @@ $check(
 $check(
     str_contains(
         $route,
-        "\$receiptPlatformName = 'MyFarms';"
+        "\$receiptPlatformName = 'Renee AgriSuite';"
     )
     && str_contains(
         $route,
@@ -195,9 +195,21 @@ $check(
     )
     && str_contains(
         $route,
-        "\$receiptIssuerBrand ="
+        '$receiptIssuerBrand = $receiptPlatformName;'
     ),
-    'billing receipt defines platform and legal issuer separately from tenant customer'
+    'billing receipt defines Renee AgriSuite as header brand while keeping legal issuer separate from tenant customer'
+);
+
+$check(
+    !str_contains(
+        $route,
+        '$receiptPlatformName . \' by \' . $receiptIssuerName'
+    )
+    && !str_contains(
+        $route,
+        'by <?= $escape($receiptIssuerName) ?>'
+    ),
+    'receipt header does not repeat legal issuer beside Renee AgriSuite branding'
 );
 
 $check(

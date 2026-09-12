@@ -182,10 +182,9 @@ $escape = static function ($value): string {
     );
 };
 
-$receiptPlatformName = 'MyFarms';
+$receiptPlatformName = 'Renee AgriSuite';
 $receiptIssuerName = 'Renee Farms Limited';
-$receiptIssuerBrand =
-    $receiptPlatformName . ' by ' . $receiptIssuerName;
+$receiptIssuerBrand = $receiptPlatformName;
 
 $pdfRequested = pdf_report_is_requested();
 
@@ -348,7 +347,6 @@ if ($pdfRequested) {
                     <h1 class="h3 mb-2">Payment receipt</h1>
                     <p class="mb-1 opacity-75">
                         <?= $escape($receiptPlatformName) ?>
-                        by <?= $escape($receiptIssuerName) ?>
                     </p>
                     <p class="mb-0 opacity-75">
                         Payment recorded for <?= $escape($farmName) ?>.
