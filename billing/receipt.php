@@ -215,10 +215,18 @@ if ($pdfRequested) {
 <head>
     <meta charset="utf-8">
     <title>Payment Receipt <?= $escape($receiptNumber) ?></title>
+    <style>
+        .receipt-pdf-title {
+            margin-left: 2.5pt !important;
+            font-size: 12pt !important;
+            line-height: 1.25 !important;
+            margin-bottom: 8px !important;
+        }
+    </style>
 </head>
 <body>
 
-<h1>Payment receipt</h1>
+<h1 class="receipt-pdf-title">Payment receipt</h1>
 
 <p>
     <strong>Receipt:</strong>

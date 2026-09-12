@@ -215,6 +215,22 @@ $check(
 $check(
     str_contains(
         $route,
+        '<h1 class="receipt-pdf-title">Payment receipt</h1>'
+    )
+    && str_contains(
+        $route,
+        'margin-left: 2.5pt !important;'
+    )
+    && str_contains(
+        $route,
+        'font-size: 12pt !important;'
+    ),
+    'PDF receipt title aligns with the primary brand and remains visually subordinate'
+);
+
+$check(
+    str_contains(
+        $route,
         '<th>Issued by</th>'
     )
     && str_contains(
