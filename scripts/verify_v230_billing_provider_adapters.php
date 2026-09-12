@@ -90,6 +90,43 @@ try {
 $check($plainHttpRejected,
     'plain HTTP provider endpoint is rejected');
 
+$typedHttpError = billing_http_non_success_exception(
+    404,
+    json_encode([
+        'status' => false,
+        'message' => 'Reference was not found',
+    ], JSON_UNESCAPED_SLASHES)
+);
+
+$check(
+    $typedHttpError instanceof BillingHttpResponseException
+    && $typedHttpError instanceof RuntimeException
+    && $typedHttpError->httpStatus() === 404
+    && ($typedHttpError->responseJson()['status'] ?? null) === false
+    && ($typedHttpError->responseJson()['message'] ?? null) === 'Reference was not found',
+    'non-2xx billing HTTP responses preserve status and valid JSON in a RuntimeException subtype'
+);
+
+$opaqueHttpError = billing_http_non_success_exception(
+    503,
+    '<html>upstream unavailable</html>'
+);
+
+$check(
+    $opaqueHttpError->httpStatus() === 503
+    && $opaqueHttpError->responseJson() === null
+    && $opaqueHttpError->getMessage() === 'Billing provider returned HTTP 503.',
+    'non-JSON non-2xx responses preserve HTTP status without exposing an untrusted body'
+);
+
+$check(
+    str_contains(
+        $source['transport'],
+        'throw billing_http_non_success_exception($status, $responseBody);'
+    ),
+    'billing transport routes non-2xx responses through the typed fail-closed exception'
+);
+
 $context = billing_provider_sanitize_checkout_context([
     'customer_email' => ' Billing.QA@Example.Test ',
     'customer_name' => 'Stage 2E Farm',

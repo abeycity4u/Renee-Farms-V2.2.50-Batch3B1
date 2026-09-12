@@ -12,6 +12,65 @@
  * - JSON only.
  */
 
+if (!class_exists('BillingHttpResponseException')) {
+    final class BillingHttpResponseException extends RuntimeException
+    {
+        private int $httpStatus;
+        private ?array $responseJson;
+
+        public function __construct(int $httpStatus, ?array $responseJson = null)
+        {
+            if ($httpStatus < 100 || $httpStatus > 599) {
+                throw new InvalidArgumentException('Billing HTTP response status is invalid.');
+            }
+
+            $this->httpStatus = $httpStatus;
+            $this->responseJson = $responseJson;
+
+            parent::__construct('Billing provider returned HTTP ' . $httpStatus . '.');
+        }
+
+        public function httpStatus(): int
+        {
+            return $this->httpStatus;
+        }
+
+        public function responseJson(): ?array
+        {
+            return $this->responseJson;
+        }
+    }
+}
+
+if (!function_exists('billing_http_non_success_exception')) {
+    function billing_http_non_success_exception(
+        int $status,
+        string $responseBody
+    ): BillingHttpResponseException {
+        $decoded = null;
+
+        if ($responseBody !== '') {
+            try {
+                $candidate = json_decode(
+                    $responseBody,
+                    true,
+                    64,
+                    JSON_THROW_ON_ERROR | JSON_BIGINT_AS_STRING
+                );
+
+                if (is_array($candidate)) {
+                    $decoded = $candidate;
+                }
+            } catch (JsonException $e) {
+                // Non-2xx provider bodies are optional evidence only.
+                // Invalid JSON must not hide the authoritative HTTP status.
+            }
+        }
+
+        return new BillingHttpResponseException($status, $decoded);
+    }
+}
+
 if (!function_exists('billing_http_allowed_hosts')) {
     function billing_http_allowed_hosts(): array
     {
@@ -156,8 +215,11 @@ if (!function_exists('billing_http_json_request')) {
         if ($ok === false || $errno !== 0) {
             throw new RuntimeException('Billing provider network request failed.');
         }
+        if ($status < 100 || $status > 599) {
+            throw new RuntimeException('Billing provider returned an invalid HTTP status.');
+        }
         if ($status < 200 || $status >= 300) {
-            throw new RuntimeException('Billing provider returned HTTP ' . $status . '.');
+            throw billing_http_non_success_exception($status, $responseBody);
         }
         if ($responseBody === '') {
             throw new RuntimeException('Billing provider returned an empty response.');
