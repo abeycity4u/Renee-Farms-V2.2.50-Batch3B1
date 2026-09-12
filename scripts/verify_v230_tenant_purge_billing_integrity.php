@@ -155,13 +155,17 @@ $assert(
 $assert(
     strpos(
         $migration048,
-        'DROP FOREIGN KEY fk_billing_attempt_farm'
-    ) !== false
-    && strpos(
-        $migration048,
-        'fk_billing_attempt_farm FOREIGN KEY (farm_id) REFERENCES farms(id) ON DELETE RESTRICT'
+        'DROP FOREIGN KEY fk_billing_attempt_farm, ADD CONSTRAINT fk_billing_attempt_farm FOREIGN KEY (farm_id) REFERENCES farms(id) ON DELETE RESTRICT'
     ) !== false,
-    'migration 048 replaces destructive farm cascade semantics with RESTRICT.'
+    'migration 048 replaces destructive CASCADE semantics with RESTRICT in one ALTER TABLE.'
+);
+
+$assert(
+    strpos(
+        $migration048,
+        'ALTER TABLE billing_payment_attempts ADD CONSTRAINT fk_billing_attempt_farm FOREIGN KEY (farm_id) REFERENCES farms(id) ON DELETE RESTRICT'
+    ) !== false,
+    'migration 048 can restore the protected farm foreign key when it is absent.'
 );
 
 $assert(
