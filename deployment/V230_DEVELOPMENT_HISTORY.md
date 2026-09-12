@@ -6,14 +6,14 @@ Audit snapshot: 2026-09-12
 
 - Repository: `abeycity4u/Renee-Farms-V2.2.50-Batch3B1`
 - Branch: `v230-commercial-hardening-saas-readiness`
-- Production runtime HEAD: `be054dae6096b61d152bdc9e7402d16739260a5e`
+- Production runtime HEAD: `61ddad930b87fb5bba372958d00d0d249c891e68`
 - Production: `https://reneefarms.com`
 - Server checkout: `~/renee-deploy`
 - Live root: `~/public_html`
 
 ## Current deployment position
 
-Production runtime is now carried forward through commit `be054da`, including the completed tenant payment-receipt PDF export and branding closure plus initialized subscription-attempt recovery for interrupted checkout execution. The 2026-09-11 to 2026-09-12 sequence completed commercial billing coordination and seat-change hardening, Stage 2I TEST/SANDBOX end-to-end payment proof, CSP Report-Only observation, production CSP enforcement, legacy/manual billing-period resilience, subscription-history date clarification, tenant-facing paid-payment receipts and fail-closed recovery of provider-known initialized attempts.
+Production runtime is now carried forward through commit `61ddad9`, including the completed tenant payment-receipt PDF export and branding closure, initialized subscription-attempt recovery for interrupted checkout execution, and typed preservation of non-2xx billing-provider HTTP evidence without changing provider-status interpretation. The 2026-09-11 to 2026-09-12 sequence completed commercial billing coordination and seat-change hardening, Stage 2I TEST/SANDBOX end-to-end payment proof, CSP Report-Only observation, production CSP enforcement, legacy/manual billing-period resilience, subscription-history date clarification, tenant-facing paid-payment receipts and fail-closed recovery of provider-known initialized attempts.
 
 CSP is now enforcing in production. The clean Report-Only observation and owner approval were followed by an initial enforcement attempt that failed safely because mixed OPcache generations allowed new `config.php` code to call a newer CSP emitter while an older cached policy file remained loaded. That attempt was rolled back. Commit `59f6e63` made the rollout OPcache-compatible, and the subsequent policy-only deployment passed repeated unauthenticated probes, authenticated browser smoke and post-smoke log observation.
 
@@ -258,6 +258,25 @@ Documentation-only commits may therefore exist after the production runtime HEAD
 - No database migration, production payment, payment-mode activation, config change, `.htaccess` change, protected Farm A mutation or Farm 15 mutation occurred during this closure.
 - Production payment processing remains NOT APPROVED. Provider execution remains TEST/SANDBOX only until explicit owner approval.
 
+## 2026-09-12 billing-provider HTTP error evidence closure
+
+- Commit `61ddad9` (`Preserve billing provider HTTP error evidence`) adds a typed `BillingHttpResponseException` that remains a `RuntimeException` for compatibility with existing fail-closed callers.
+- Provider network failures remain generic failures. For completed HTTP responses, non-2xx status codes are now preserved together with valid decoded JSON when available; invalid or non-JSON bodies remain opaque.
+- This milestone does NOT classify HTTP 404, 503 or any other non-2xx response as payment failure, cancellation, reference absence or commercial supersession. Provider-specific interpretation remains a separate evidence-gated step.
+- No Paystack or Flutterwave payment/provider request was executed for this change.
+- Focused verification passed before commit: provider-adapter verifier 45 checks / 0 failures, SSRF/outbound-control verifier 10 checks / 0 failures, PHP lint clean and `git diff --check` clean.
+- Remote GitHub semantic review passed after push. Branch `v230-commercial-hardening-saas-readiness` pointed exactly to `61ddad930b87fb5bba372958d00d0d249c891e68`, one commit ahead and zero behind parent `aab63c927848fb35e19222ab4760228823248df3`, with only the transport and its verifier changed.
+- Production deployment was limited to `includes/billing_http_transport.php`.
+- Production rollback backup: `/home/renee/renee-deploy-backups/billing-http-typed-error-20260912-191546`.
+- Previous production transport hash: `a51fc50c3abc59885e2fbd74f8054d716a898c855aed75200aebc1a1964c3fe8`.
+- Deployed production transport hash: `4b0e828a2cc53051212932d2a41414fea3ee42aec1ffb419a6bb2a0d1ea897c2`, matching the reviewed source exactly.
+- Production lint passed. Offline live contract smoke passed all five typed-error checks with `LIVE_TRANSPORT_SMOKE_FAILURES=0`.
+- Unauthenticated billing checkout smoke returned HTTP `303` with `Location: /login.php` and `CURL_RC=0`; no 5xx regression was observed.
+- Preflight found an existing production copy of `scripts/verify_v230_billing_provider_adapters.php`. This deployment did not copy, modify or delete that pre-existing verifier. Any cleanup of development-only files must be handled separately with evidence.
+- No database migration, database mutation, payment-mode change, provider execution, config change, `.htaccess` change, Farm A mutation or Farm 15 mutation occurred.
+- Production payment processing remains NOT APPROVED. Provider execution remains TEST/SANDBOX only until explicit owner approval.
+- The initialized-reference provider-absence edge remains fail-closed. Preserving HTTP evidence is infrastructure only; authoritative provider-specific absence semantics must be proven before any recovery logic is allowed to unblock or supersede an `initialized` attempt.
+
 ## Important interpretation
 
 A checkpoint being in the current lineage means its committed work was carried forward into later commits. Later commits may legitimately modify the same files, so production should use the latest descendant version rather than an old intermediate snapshot.
@@ -278,7 +297,7 @@ The numbered CSP verifier filename series ends at Batch 68. Working development 
 
 ## Current roadmap position
 
-1. Current production runtime lineage through `be054da`: COMPLETE.
+1. Current production runtime lineage through `61ddad9`: COMPLETE.
 2. Feed audit / platform-wide Recorded By targeted production QA: COMPLETE.
 3. Homepage, Poultry Health, vendor-console, Dashboard Popper, tenant PDF branding and Feed PDF targeted production QA: COMPLETE.
 4. CSP Report-Only observation: COMPLETE / CLOSED.
@@ -291,8 +310,9 @@ The numbered CSP verifier filename series ends at Batch 68. Working development 
 11. Tenant paid-payment receipt / proof-of-payment visibility, PDF export and final branding hierarchy: COMPLETE / CLOSED. Do not repeat payment execution for QA.
 12. Management Sales Records terminology cleanup: COMPLETE / CLOSED. UI wording only; routes, filenames, database identifiers, functions and URLs remain unchanged.
 13. Initialized subscription-attempt recovery through `be054da`: DEPLOYED / STRUCTURALLY VERIFIED / CLOSED. Provider-facing recovery execution remains deferred while payment mode is disabled; do not activate production billing merely to repeat QA.
-14. Continue remaining V2.3 commercial/SaaS hardening and commercial QA: NEXT.
-15. Production payment processing remains NOT APPROVED; keep provider execution TEST/SANDBOX until explicit owner approval.
+14. Billing-provider typed HTTP error evidence through `61ddad9`: DEPLOYED / VERIFIED / CLOSED. This preserves non-2xx evidence only and does not yet classify provider-specific reference absence.
+15. Continue remaining V2.3 commercial/SaaS hardening and commercial QA: NEXT.
+16. Production payment processing remains NOT APPROVED; keep provider execution TEST/SANDBOX until explicit owner approval.
 
 ## Safety rules
 
@@ -306,6 +326,7 @@ The numbered CSP verifier filename series ends at Batch 68. Working development 
 - Migration 046 and migration 047 are CLOSED/PASS; do not rerun them absent actual regression evidence.
 - Do not repeat the completed Stage 2I sandbox payment proof merely for reassurance.
 - Do not enable production payment mode merely to exercise initialized-attempt recovery QA; provider-facing recovery proof must use an explicitly approved TEST/SANDBOX environment.
+- Do not interpret a preserved provider HTTP status or error body as authoritative reference absence without provider-specific verified semantics; ambiguous responses remain fail-closed.
 - Do not reopen or repeat tenant payment-receipt QA absent actual regression evidence.
 - Preserve the Sales Records terminology change as UI-only; do not rename its routes, filenames, database identifiers, functions or URLs merely for wording consistency.
 - Preserve protected QA/billing evidence.
