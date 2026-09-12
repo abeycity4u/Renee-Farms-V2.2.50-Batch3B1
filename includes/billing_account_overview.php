@@ -198,10 +198,29 @@ if (!function_exists('billing_account_overview')) {
         $seatChangeReady =
             billing_seat_change_ready($pdo);
 
+        $latestSubscription =
+            is_array(
+                $current['latest_subscription']
+                    ?? null
+            )
+                ? $current['latest_subscription']
+                : null;
+
+        $seatChangePeriodReady =
+            $latestSubscription !== null
+            && trim(
+                (string)(
+                    $latestSubscription[
+                        'current_period_ends_at'
+                    ] ?? ''
+                )
+            ) !== '';
+
         $renewalSeatTarget = null;
 
         if (($current['status'] ?? '') === 'active'
-            && $seatChangeReady) {
+            && $seatChangeReady
+            && $seatChangePeriodReady) {
             $renewalSeatTarget =
                 billing_renewal_seat_target(
                     $pdo,
@@ -219,6 +238,8 @@ if (!function_exists('billing_account_overview')) {
             'seat_addons' => $seatAddOns,
             'seat_summary' => billing_account_seat_summary($pdo, $farmId, $modules, $seatAddOns),
             'seat_change_ready' => $seatChangeReady,
+            'seat_change_period_ready' =>
+                $seatChangePeriodReady,
             'renewal_seat_target' => $renewalSeatTarget,
             'scheduled_reductions' =>
                 billing_account_scheduled_reductions(

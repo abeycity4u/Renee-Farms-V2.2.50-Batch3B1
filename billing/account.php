@@ -95,8 +95,13 @@ $checkoutReady = $overview !== null
     && !empty($providers)
     && filter_var($contactEmail, FILTER_VALIDATE_EMAIL);
 
+$seatChangePeriodReady =
+    ($overview['seat_change_period_ready'] ?? false)
+    === true;
+
 $seatTopupReady = $checkoutReady
     && $seatTopupStorageReady
+    && $seatChangePeriodReady
     && $status === 'active'
     && !empty($overview['seat_summary']);
 
@@ -160,6 +165,7 @@ foreach (($overview['seat_summary'] ?? []) as $seat) {
 $seatReductionReady =
     $status === 'active'
     && $seatTopupStorageReady
+    && $seatChangePeriodReady
     && !empty($reductionCandidates);
 
 $buttonLabel = match ($status) {
@@ -346,6 +352,10 @@ $decodeModules = static function ($json): string {
                         <div class="alert alert-warning mb-0">
                             Seat top-up service is temporarily unavailable. Please try again later.
                         </div>
+                    <?php elseif (!$seatChangePeriodReady): ?>
+                        <div class="alert alert-info mb-0">
+                            Extra-seat purchases become available after a paid subscription period has been established.
+                        </div>
                     <?php elseif (!$providers): ?>
                         <div class="alert alert-warning mb-0">
                             No payment provider is currently available. Please try again later.
@@ -503,6 +513,10 @@ $decodeModules = static function ($json): string {
                 <?php elseif (!$seatTopupStorageReady): ?>
                     <div class="alert alert-warning mb-0">
                         Seat-change service is temporarily unavailable. Please try again later.
+                    </div>
+                <?php elseif (!$seatChangePeriodReady): ?>
+                    <div class="alert alert-info mb-0">
+                        Seat reductions become available after a paid subscription period has been established.
                     </div>
                 <?php elseif (!$reductionCandidates): ?>
                     <div class="alert alert-light border mb-0">

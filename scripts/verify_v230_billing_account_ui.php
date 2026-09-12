@@ -197,6 +197,34 @@ verify_billing_account($navBridge !== '' && str_contains($init, "require_once __
 verify_billing_account(str_contains($navBridge, '$showBillingAccount = !$showPlatformTenantView') && str_contains($navBridge, "hasRole('farm_admin')"), 'Billing & Subscription navigation is limited to non-owner Farm Admin sessions');
 verify_billing_account(str_contains($navBridge, '/billing/account.php') && str_contains($navBridge, 'Billing &amp; Subscription'), 'Farm Admin Account menu exposes the canonical billing workspace');
 
+verify_billing_account(
+    str_contains(
+        $helper,
+        "'seat_change_period_ready' =>"
+    )
+    && str_contains(
+        $helper,
+        '&& $seatChangePeriodReady'
+    ),
+    'billing read model keeps legacy/manual active tenants viewable when no paid commercial period exists'
+);
+
+verify_billing_account(
+    str_contains(
+        $page,
+        '$seatChangePeriodReady'
+    )
+    && str_contains(
+        $page,
+        'Extra-seat purchases become available after a paid subscription period has been established.'
+    )
+    && str_contains(
+        $page,
+        'Seat reductions become available after a paid subscription period has been established.'
+    ),
+    'billing UI disables paid-period seat changes without hiding the overall billing workspace'
+);
+
 echo "\n{$checks} checks, {$failures} failure(s).\n";
 if ($failures > 0) exit(1);
 echo "PASS: V2.3 tenant Billing & Subscription UI is tenant-pinned, same-product enforced, read-model driven and checkout-delegating.\n";
