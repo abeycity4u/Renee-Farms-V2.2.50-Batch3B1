@@ -9,6 +9,11 @@ requireLogin(); require_http_method('POST'); require_csrf_token(); require_rate_
 $id=$_POST['id']??null;
 if(!$id || !ctype_digit((string)$id)) send_json(['success'=>false,'error'=>'A valid record ID is required.'],400);
 $farmId=requireCurrentFarmId();
+$permissionScope=trim((string)($_POST['permission_scope']??'operational'));
+if(!in_array($permissionScope,['operational','expense_report'],true)) {
+ send_json(['success'=>false,'error'=>'Invalid expense permission scope.'],400);
+}
+$expensePrivileged=isPlatformOwner()||hasRole('farm_admin');
 try {
  $pdo->beginTransaction();
  $find=$pdo->prepare('SELECT * FROM farm_expenses WHERE id=? AND farm_id=? FOR UPDATE');
@@ -16,8 +21,19 @@ try {
  if(!$row) { $pdo->rollBack(); send_json(['success'=>false,'error'=>'Record not found.'],404); }
  $requiredPermission=permission_catalog_expense_action_code($row,'delete');
  $viewPermission=$requiredPermission ? preg_replace('/_delete$/','',$requiredPermission) : null;
- if (!isPlatformOwner() && !hasRole('farm_admin') && (!$requiredPermission || !$viewPermission || !hasPermission(getUserType(), $viewPermission) || !hasPermission(getUserType(), $requiredPermission))) {
-  $pdo->rollBack(); send_json(['success'=>false,'error'=>'You do not have permission to delete this expense record.'],403);
+ if(!$expensePrivileged) {
+  if($permissionScope==='expense_report') {
+   if(!hasPermission(getUserType(),'expenses')
+      || !hasPermission(getUserType(),'expenses_delete')
+      || !permission_catalog_expense_report_row_accessible($row)) {
+    $pdo->rollBack(); send_json(['success'=>false,'error'=>'You do not have permission to delete this Expense Report record.'],403);
+   }
+  } elseif(!$requiredPermission
+      || !$viewPermission
+      || !hasPermission(getUserType(),$viewPermission)
+      || !hasPermission(getUserType(),$requiredPermission)) {
+   $pdo->rollBack(); send_json(['success'=>false,'error'=>'You do not have permission to delete this expense record.'],403);
+  }
  }
  audit_log_event('delete','expense',$id,['before'=>$row]);
  $stmt=$pdo->prepare('DELETE FROM farm_expenses WHERE id=? AND farm_id=?'); $stmt->execute([(int)$id,$farmId]);

@@ -12,6 +12,8 @@ const canManageExpenses =
 const csrfToken =
     expensesConfigElement?.dataset.csrfToken || '';
 
+const expensePermissionScope = 'expense_report';
+
 // Filter change
     function applyFilters() {
         const farmType = $('#farmTypeFilter').val();
@@ -69,6 +71,7 @@ const csrfToken =
         e.preventDefault();
         const formData = new FormData(this);
         formData.append('csrf_token', csrfToken);
+        formData.append('permission_scope', expensePermissionScope);
 
         try {
             const response = await fetch('../api/update_expense.php', {
@@ -90,7 +93,11 @@ const csrfToken =
     
     function deleteExpense(expenseId) {
         AppConfirm.ask('Are you sure you want to delete this expense record?', {title:'Delete expense record?', confirmText:'Delete'}).then(function(confirmed){ if (confirmed) {
-            const params = new URLSearchParams({ id: expenseId, csrf_token: csrfToken });
+            const params = new URLSearchParams({
+                id: expenseId,
+                csrf_token: csrfToken,
+                permission_scope: expensePermissionScope
+            });
             fetch('../api/delete_expense.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

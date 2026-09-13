@@ -22,6 +22,7 @@ $expenseDeleteCss = $read('assets/css/prepaint-expense-delete-readonly.css');
 $runtimeJs = $read('assets/js/permission-runtime.js');
 $runtimePhp = $read('includes/permission_runtime.php');
 $navbar = $read('navbar_head.php');
+$managementExpensesJs = $read('assets/js/management-expenses.js');
 $animal = $read('ruminant/animal_registry.php');
 $catalog = $read('includes/permission_catalog.php');
 $appBehaviors = $read('assets/js/app-behaviors.js');
@@ -145,6 +146,44 @@ $check(
     'View-only livestock expense pages suppress legacy Actions column'
 );
 
+$check(
+    str_contains($navbar, "hasPermission(getUserType(), 'expenses_edit')")
+    && str_contains($navbar, "hasPermission(getUserType(), 'expenses_delete')")
+    && str_contains(
+        $navbar,
+        '$canEditExpenseRow = $canEditExpenseReport;'
+    )
+    && str_contains(
+        $navbar,
+        '$canDeleteExpenseRow = $canDeleteExpenseReport;'
+    ),
+    'Management Expense Report UI uses its own independent Edit/Delete permissions'
+);
+
+$check(
+    str_contains(
+        $managementExpensesJs,
+        "const expensePermissionScope = 'expense_report';"
+    )
+    && str_contains(
+        $managementExpensesJs,
+        "formData.append('permission_scope', expensePermissionScope);"
+    )
+    && str_contains(
+        $managementExpensesJs,
+        'permission_scope: expensePermissionScope'
+    ),
+    'Management Expense Report sends explicit expense_report authorization scope'
+);
+
+$check(
+    str_contains(
+        $catalog,
+        'permission_catalog_expense_report_row_accessible'
+    ),
+    'Expense Report API scope preserves report row visibility boundaries'
+);
+
 foreach ([
     'ruminant_animals_add',
     'ruminant_animals_edit',
@@ -233,17 +272,27 @@ $check(
 
 $check(
     str_contains($updateExpenseApi, '$existingViewPermission')
-    && str_contains($updateExpenseApi, '$existingPermission'),
-    'Expense update API still requires row View/Edit authority'
+    && str_contains($updateExpenseApi, '$existingPermission')
+    && str_contains(
+        $updateExpenseApi,
+        "\$permissionScope === 'expense_report'"
+    )
+    && str_contains($updateExpenseApi, "'expenses_edit'"),
+    'Expense update API separates Expense Report Edit from operational row Edit'
 );
 
 $check(
     str_contains($deleteExpenseApi, 'permission_catalog_expense_action_code')
     && str_contains(
         $deleteExpenseApi,
+        "\$permissionScope==='expense_report'"
+    )
+    && str_contains($deleteExpenseApi, "'expenses_delete'")
+    && str_contains(
+        $deleteExpenseApi,
         'permission to delete this expense record'
     ),
-    'Expense delete API remains exact row-permission gated'
+    'Expense delete API separates Expense Report Delete from operational row Delete'
 );
 
 echo PHP_EOL

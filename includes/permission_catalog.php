@@ -112,6 +112,50 @@ function permission_catalog_applicable(string $role, string $code): bool
 }
 }
 
+if (!function_exists('permission_catalog_expense_report_row_accessible')) {
+function permission_catalog_expense_report_row_accessible(array $expense): bool
+{
+    if (isPlatformOwner() || hasRole('farm_admin') || hasRole('sales_rep')) {
+        return true;
+    }
+
+    $rowFarmType = strtolower(trim((string)($expense['farm_type'] ?? '')));
+    $userFarmType = strtolower(trim((string)getUserFarmType()));
+
+    if ($userFarmType === '') {
+        $hasPoultry = hasRole('poultry_manager');
+        $hasRuminant = hasRole('ruminant_manager');
+
+        if ($hasPoultry && $hasRuminant) {
+            $userFarmType = 'both';
+        } elseif ($hasPoultry) {
+            $userFarmType = 'poultry';
+        } elseif ($hasRuminant) {
+            $userFarmType = 'ruminant';
+        }
+    }
+
+    if ($rowFarmType === 'both') {
+        return in_array(
+            $userFarmType,
+            ['poultry', 'ruminant', 'both'],
+            true
+        );
+    }
+
+    if ($userFarmType === 'both') {
+        return in_array(
+            $rowFarmType,
+            ['poultry', 'ruminant', 'both'],
+            true
+        );
+    }
+
+    return in_array($rowFarmType, ['poultry', 'ruminant'], true)
+        && $rowFarmType === $userFarmType;
+}
+}
+
 if (!function_exists('permission_catalog_expense_action_code')) {
 function permission_catalog_expense_action_code(array $expense, string $action): ?string
 {

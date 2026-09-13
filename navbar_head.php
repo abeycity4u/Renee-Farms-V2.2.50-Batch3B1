@@ -65,25 +65,25 @@ if (($headPath === '/management/sales_records.php' || str_ends_with($headPath, '
     $canManageLedger = $canEditLedger || $canDeleteLedger;
 }
 
-// The consolidated Expense & Cost Report contains Layer, Broiler, Ruminant and
-// general rows. Its legacy page uses one broad Actions flag, while the APIs
-// already enforce the exact row permission. Mirror that canonical mapping here
-// so only the Edit/Delete controls authorized for each rendered row are visible.
+// The consolidated Expense Report has its own View/Edit/Delete permission
+// family. Those permissions are deliberately independent from the operational
+// Layer/Broiler/Ruminant expense pages.
 $managementExpenseActionPermissions = [];
 if (($headPath === '/management/expenses.php' || str_ends_with($headPath, '/management/expenses.php')) && isset($expenses, $canManageExpenses) && is_array($expenses)) {
-    require_once __DIR__ . '/includes/permission_catalog.php';
     $expensePrivileged = isPlatformOwner() || hasRole('farm_admin');
-    $canManageAnyExpenseAction = false;
+    $canViewExpenseReport = $expensePrivileged || hasPermission(getUserType(), 'expenses');
+    $canEditExpenseReport = $canViewExpenseReport
+        && ($expensePrivileged || hasPermission(getUserType(), 'expenses_edit'));
+    $canDeleteExpenseReport = $canViewExpenseReport
+        && ($expensePrivileged || hasPermission(getUserType(), 'expenses_delete'));
+    $canManageAnyExpenseAction = $canEditExpenseReport || $canDeleteExpenseReport;
 
     foreach ($expenses as $expenseRow) {
         $expenseId = (int)($expenseRow['id'] ?? 0);
         if ($expenseId <= 0) continue;
 
-        $editPermission = permission_catalog_expense_action_code($expenseRow, 'edit');
-        $deletePermission = permission_catalog_expense_action_code($expenseRow, 'delete');
-        $canEditExpenseRow = $expensePrivileged || ($editPermission && hasPermission(getUserType(), $editPermission));
-        $canDeleteExpenseRow = $expensePrivileged || ($deletePermission && hasPermission(getUserType(), $deletePermission));
-        $canManageAnyExpenseAction = $canManageAnyExpenseAction || $canEditExpenseRow || $canDeleteExpenseRow;
+        $canEditExpenseRow = $canEditExpenseReport;
+        $canDeleteExpenseRow = $canDeleteExpenseReport;
 
         $managementExpenseActionPermissions[$expenseId] = [
             'edit' => $canEditExpenseRow,
@@ -91,8 +91,8 @@ if (($headPath === '/management/expenses.php' || str_ends_with($headPath, '/mana
         ];
     }
 
-    // If none of the visible rows carries an authorized action, let the legacy
-    // template omit its Actions column and edit modal completely.
+    // View alone stays read-only. Edit/Delete independently expose only their
+    // corresponding report actions.
     $canManageExpenses = $canManageAnyExpenseAction;
 }
 ?>
