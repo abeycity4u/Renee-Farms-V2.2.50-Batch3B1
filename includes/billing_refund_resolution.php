@@ -7,13 +7,18 @@
  * - billing_payment_attempts.status='refunded' is provider/audit fact;
  * - billing_refund_resolutions records what commercial review must do next.
  *
- * This foundation deliberately performs no provider call and no entitlement,
- * subscription, seat-limit or payment-state mutation.
+ * Provider calls remain forbidden here. Explicit commercial review may
+ * preserve or compensate already-applied entitlement, but provider/payment
+ * audit fact is never rewritten by this service.
  */
 
 require_once __DIR__ . '/billing_payment_foundation.php';
 require_once __DIR__ . '/billing_payment_audit_state.php';
 require_once __DIR__ . '/billing_seat_change_request.php';
+require_once __DIR__ . '/subscription_plan_catalog.php';
+require_once __DIR__ . '/farm_entitlements.php';
+require_once __DIR__ . '/subscription_seat_policy.php';
+require_once __DIR__ . '/subscription_record.php';
 
 if (!function_exists(
     'billing_refund_resolution_statuses'
@@ -54,6 +59,7 @@ if (!function_exists(
             'refund_verified_at',
             'applied_subscription_record_id',
             'seat_change_request_id',
+            'reversal_subscription_record_id',
             'resolved_at',
             'resolved_by_user_id',
             'resolution_reason',
@@ -158,6 +164,10 @@ if (!function_exists(
                 'billing_refund_resolutions',
                 'billing_seat_change_requests',
             ],
+            'fk_billing_refund_reversal_subscription' => [
+                'billing_refund_resolutions',
+                'subscriptions',
+            ],
         ];
 
         $stmt = $pdo->prepare(
@@ -248,14 +258,15 @@ if (!function_exists(
         $stmt = $pdo->prepare(
             "SELECT COUNT(*)
              FROM schema_migrations
-             WHERE filename = ?"
+             WHERE filename IN (?, ?)"
         );
 
         $stmt->execute([
             '050_billing_refund_resolution.sql',
+            '052_billing_refund_reversal_history_link.sql',
         ]);
 
-        return (int)$stmt->fetchColumn() === 1;
+        return (int)$stmt->fetchColumn() === 2;
     }
 }
 
@@ -416,6 +427,12 @@ if (!function_exists(
                 ?? 0
             );
 
+        $reversalSubscriptionRecordId =
+            (int)(
+                $row['reversal_subscription_record_id']
+                ?? 0
+            );
+
         if ($purpose === 'subscription') {
             if ($subscriptionRecordId < 1
                 || $seatChangeRequestId > 0) {
@@ -455,7 +472,8 @@ if (!function_exists(
             if ($actionRaw !== ''
                 || $resolvedAt !== null
                 || $resolvedByUserId > 0
-                || $reasonRaw !== '') {
+                || $reasonRaw !== ''
+                || $reversalSubscriptionRecordId > 0) {
                 throw new RuntimeException(
                     'Pending refund resolution contains resolved metadata.'
                 );
@@ -473,6 +491,24 @@ if (!function_exists(
                 || $resolvedByUserId < 1) {
                 throw new RuntimeException(
                     'Resolved refund resolution is missing audit evidence.'
+                );
+            }
+
+            if (
+                $action === 'preserve_entitlement'
+                && $reversalSubscriptionRecordId > 0
+            ) {
+                throw new RuntimeException(
+                    'Preserved refund resolution cannot reference compensating subscription history.'
+                );
+            }
+
+            if (
+                $action === 'reverse_entitlement'
+                && $reversalSubscriptionRecordId < 1
+            ) {
+                throw new RuntimeException(
+                    'Reversed refund resolution is missing compensating subscription history.'
                 );
             }
 
@@ -497,6 +533,10 @@ if (!function_exists(
             'seat_change_request_id' =>
                 $seatChangeRequestId > 0
                     ? $seatChangeRequestId
+                    : null,
+            'reversal_subscription_record_id' =>
+                $reversalSubscriptionRecordId > 0
+                    ? $reversalSubscriptionRecordId
                     : null,
             'resolved_at' => $resolvedAt,
             'resolved_by_user_id' =>
@@ -1353,6 +1393,629 @@ if (!function_exists(
                 'preserve_entitlement',
             'resolution' => $resolved,
             'lineage' => $lineage,
+        ];
+    }
+}
+
+if (!function_exists(
+    'billing_refund_resolution_resolve_reverse'
+)) {
+    /**
+     * Resolve a captured post-application SUBSCRIPTION refund by
+     * compensating the still-current applied commercial state back to
+     * its immediate immutable predecessor.
+     *
+     * Safety contract:
+     * - payment/provider fact remains untouched;
+     * - payment attempt -> refund resolution -> farm is the lock order;
+     * - the refunded applied history must still be the tenant's latest row;
+     * - current runtime snapshot must still equal that applied history;
+     * - the immediate same-tenant predecessor must exist and pass capacity;
+     * - current runtime is restored only through shared entitlement/seat helpers;
+     * - one new immutable compensating subscriptions row is appended;
+     * - the refund resolution durably links that exact compensating row;
+     * - repeated calls after successful reversal are idempotent;
+     * - seat_topup reversal is deliberately unsupported here and fails closed.
+     */
+    function billing_refund_resolution_resolve_reverse(
+        PDO $pdo,
+        int $paymentAttemptId,
+        int $resolvedByUserId,
+        string $reason
+    ): array {
+        if ($paymentAttemptId < 1) {
+            throw new InvalidArgumentException(
+                'A valid billing payment attempt is required for refund reversal.'
+            );
+        }
+
+        if ($resolvedByUserId < 1) {
+            throw new InvalidArgumentException(
+                'A valid resolving user is required for refund reversal.'
+            );
+        }
+
+        $reason =
+            billing_refund_resolution_reason(
+                $reason
+            );
+
+        if (!$pdo->inTransaction()) {
+            throw new RuntimeException(
+                'Refund reversal requires an active database transaction.'
+            );
+        }
+
+        if (!billing_refund_resolution_ready($pdo)) {
+            throw new RuntimeException(
+                'Refund-resolution storage is not ready.'
+            );
+        }
+
+        /*
+         * Canonical lock order begins with provider/payment audit fact.
+         */
+        $attempt =
+            billing_audit_attempt_by_id(
+                $pdo,
+                $paymentAttemptId,
+                true
+            );
+
+        if (!$attempt) {
+            throw new RuntimeException(
+                'Billing payment attempt could not be found for refund reversal.'
+            );
+        }
+
+        $purpose =
+            billing_payment_attempt_purpose(
+                $attempt
+            );
+
+        /*
+         * Seat-top-up reversal has a different targeted commercial proof:
+         * request role/from/to seats + its durable application-history link.
+         * Do not reuse subscription rollback semantics for it.
+         */
+        if ($purpose !== 'subscription') {
+            throw new RuntimeException(
+                'Seat-top-up refund reversal is not enabled by the subscription reversal contract.'
+            );
+        }
+
+        /*
+         * Second lock: durable refund review.
+         */
+        $resolution =
+            billing_refund_resolution_by_payment(
+                $pdo,
+                $paymentAttemptId,
+                true
+            );
+
+        if ($resolution === null) {
+            throw new RuntimeException(
+                'No captured refund review exists for this payment attempt.'
+            );
+        }
+
+        $lineage =
+            billing_refund_resolution_assert_locked_lineage(
+                $pdo,
+                $attempt,
+                $resolution
+            );
+
+        $contract =
+            $lineage['resolution_contract'];
+
+        $farmId =
+            (int)$lineage['farm_id'];
+
+        $appliedSubscriptionRecordId =
+            (int)(
+                $lineage[
+                    'applied_subscription_record_id'
+                ] ?? 0
+            );
+
+        if (
+            $farmId < 1
+            || $appliedSubscriptionRecordId < 1
+        ) {
+            throw new RuntimeException(
+                'Refund reversal subscription lineage is invalid.'
+            );
+        }
+
+        /*
+         * A completed reverse action is idempotent even if newer commercial
+         * history has subsequently been appended. Never replay old reversal.
+         */
+        if ((string)$contract['status'] === 'resolved') {
+            if (
+                (string)(
+                    $contract[
+                        'resolution_action'
+                    ] ?? ''
+                ) !== 'reverse_entitlement'
+            ) {
+                throw new RuntimeException(
+                    'Refund resolution was already completed with a different commercial action.'
+                );
+            }
+
+            $reversalSubscriptionRecordId =
+                (int)(
+                    $contract[
+                        'reversal_subscription_record_id'
+                    ] ?? 0
+                );
+
+            if ($reversalSubscriptionRecordId < 1) {
+                throw new RuntimeException(
+                    'Resolved refund reversal is missing its compensating history identity.'
+                );
+            }
+
+            $reversalSource =
+                subscription_record_history_source_contract(
+                    $pdo,
+                    $farmId,
+                    $reversalSubscriptionRecordId
+                );
+
+            return [
+                'resolved' => false,
+                'idempotent' => true,
+                'reason' => 'already_reversed',
+                'resolution' => $resolution,
+                'lineage' => $lineage,
+                'reversal_subscription_record_id' =>
+                    $reversalSubscriptionRecordId,
+                'reversal_snapshot_hash' =>
+                    $reversalSource['snapshot_hash'],
+            ];
+        }
+
+        if ((string)$contract['status'] !== 'pending_review') {
+            throw new RuntimeException(
+                'Refund resolution is not pending review.'
+            );
+        }
+
+        /*
+         * Third lock: current tenant runtime anchor.
+         * All current-state checks and compensation happen while farm is locked.
+         */
+        $farmStmt =
+            $pdo->prepare(
+                "SELECT
+                     id,
+                     slug,
+                     subscription_plan,
+                     subscription_status,
+                     subscription_starts_at,
+                     subscription_ends_at
+                 FROM farms
+                 WHERE id = ?
+                   AND slug <> 'owner'
+                 LIMIT 1
+                 FOR UPDATE"
+            );
+
+        $farmStmt->execute([
+            $farmId,
+        ]);
+
+        $farm =
+            $farmStmt->fetch(PDO::FETCH_ASSOC)
+            ?: null;
+
+        if (!is_array($farm)) {
+            throw new RuntimeException(
+                'Tenant farm could not be locked for refund reversal.'
+            );
+        }
+
+        /*
+         * Refuse reversal through newer commercial history.
+         */
+        $latestStmt =
+            $pdo->prepare(
+                "SELECT id
+                 FROM subscriptions
+                 WHERE farm_id = ?
+                 ORDER BY id DESC
+                 LIMIT 1
+                 FOR UPDATE"
+            );
+
+        $latestStmt->execute([
+            $farmId,
+        ]);
+
+        $latestSubscriptionRecordId =
+            (int)$latestStmt->fetchColumn();
+
+        if (
+            $latestSubscriptionRecordId
+            !== $appliedSubscriptionRecordId
+        ) {
+            throw new RuntimeException(
+                'Refund reversal is stale because newer tenant commercial history exists.'
+            );
+        }
+
+        $appliedSource =
+            subscription_record_history_source_contract(
+                $pdo,
+                $farmId,
+                $appliedSubscriptionRecordId
+            );
+
+        $runtimeBefore =
+            subscription_record_build_snapshot(
+                $pdo,
+                $farmId
+            );
+
+        $runtimeBeforeHash =
+            (string)(
+                $runtimeBefore['snapshot_hash']
+                ?? ''
+            );
+
+        if (
+            $runtimeBeforeHash === ''
+            || !hash_equals(
+                (string)$appliedSource[
+                    'snapshot_hash'
+                ],
+                $runtimeBeforeHash
+            )
+        ) {
+            throw new RuntimeException(
+                'Refund reversal is stale because current tenant commercial state no longer matches the refunded application.'
+            );
+        }
+
+        /*
+         * Immediate same-tenant predecessor only.
+         */
+        $predecessorStmt =
+            $pdo->prepare(
+                "SELECT id
+                 FROM subscriptions
+                 WHERE farm_id = ?
+                   AND id < ?
+                 ORDER BY id DESC
+                 LIMIT 1
+                 FOR UPDATE"
+            );
+
+        $predecessorStmt->execute([
+            $farmId,
+            $appliedSubscriptionRecordId,
+        ]);
+
+        $predecessorSubscriptionRecordId =
+            (int)$predecessorStmt->fetchColumn();
+
+        if ($predecessorSubscriptionRecordId < 1) {
+            throw new RuntimeException(
+                'Refund reversal cannot continue because no immediate predecessor commercial history exists.'
+            );
+        }
+
+        $predecessor =
+            subscription_record_history_source_contract(
+                $pdo,
+                $farmId,
+                $predecessorSubscriptionRecordId
+            );
+
+        $target =
+            $predecessor['snapshot'];
+
+        $targetPlanCode =
+            (string)(
+                $target['plan_code']
+                ?? ''
+            );
+
+        $targetStatus =
+            (string)(
+                $target['status']
+                ?? ''
+            );
+
+        $targetModules =
+            $target['modules']
+            ?? null;
+
+        $targetSeatAddons =
+            $target['seat_addons']
+            ?? null;
+
+        if (
+            $targetPlanCode === ''
+            || $targetStatus === ''
+            || !is_array($targetModules)
+            || !is_array($targetSeatAddons)
+            || !subscription_plan_is_valid(
+                $targetPlanCode
+            )
+        ) {
+            throw new RuntimeException(
+                'Refund reversal predecessor commercial snapshot is invalid.'
+            );
+        }
+
+        /*
+         * Capacity is checked before any current-state mutation.
+         */
+        subscription_seat_assert_capacity(
+            $pdo,
+            $farmId,
+            $targetPlanCode,
+            $targetModules,
+            $targetSeatAddons
+        );
+
+        /*
+         * Restore the predecessor's current commercial snapshot.
+         */
+        $updateFarm =
+            $pdo->prepare(
+                "UPDATE farms
+                 SET subscription_plan = ?,
+                     subscription_status = ?,
+                     subscription_starts_at = ?,
+                     subscription_ends_at = ?
+                 WHERE id = ?
+                   AND slug <> 'owner'"
+            );
+
+        $updateFarm->execute([
+            $targetPlanCode,
+            $targetStatus,
+            $target[
+                'subscription_starts_at'
+            ],
+            $target[
+                'subscription_ends_at'
+            ],
+            $farmId,
+        ]);
+
+        if ($updateFarm->rowCount() > 1) {
+            throw new RuntimeException(
+                'Refund reversal updated an unexpected number of tenant rows.'
+            );
+        }
+
+        sync_farm_entitlements(
+            $pdo,
+            $farmId,
+            $targetModules
+        );
+
+        subscription_seat_save_addons(
+            $pdo,
+            $farmId,
+            $targetSeatAddons
+        );
+
+        $effectiveLimits =
+            subscription_seat_save_effective_limits(
+                $pdo,
+                $farmId,
+                $targetPlanCode,
+                $targetModules,
+                $targetSeatAddons
+            );
+
+        /*
+         * Prove exact restoration before appending compensation history.
+         */
+        $restored =
+            subscription_record_build_snapshot(
+                $pdo,
+                $farmId
+            );
+
+        $restoredHash =
+            (string)(
+                $restored['snapshot_hash']
+                ?? ''
+            );
+
+        if (
+            $restoredHash === ''
+            || !hash_equals(
+                (string)$predecessor[
+                    'snapshot_hash'
+                ],
+                $restoredHash
+            )
+        ) {
+            throw new RuntimeException(
+                'Refund reversal failed to restore the exact predecessor commercial snapshot.'
+            );
+        }
+
+        /*
+         * Foundation 3: append a NEW immutable row whose runtime snapshot and
+         * historical billing/provider metadata come from the exact predecessor.
+         */
+        $compensation =
+            subscription_record_append_from_history_source(
+                $pdo,
+                $farmId,
+                $predecessorSubscriptionRecordId,
+                'billing_refund_reversed',
+                $resolvedByUserId
+            );
+
+        $reversalSubscriptionRecordId =
+            (int)(
+                $compensation['id']
+                ?? 0
+            );
+
+        if ($reversalSubscriptionRecordId < 1) {
+            throw new RuntimeException(
+                'Refund reversal compensating history has no valid identity.'
+            );
+        }
+
+        /*
+         * Resolve review and durably bind the exact compensation history row.
+         */
+        $updateResolution =
+            $pdo->prepare(
+                "UPDATE billing_refund_resolutions
+                 SET status = 'resolved',
+                     resolution_action =
+                         'reverse_entitlement',
+                     reversal_subscription_record_id = ?,
+                     resolved_at = CURRENT_TIMESTAMP,
+                     resolved_by_user_id = ?,
+                     resolution_reason = ?,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ?
+                   AND payment_attempt_id = ?
+                   AND status = 'pending_review'
+                   AND reversal_subscription_record_id
+                       IS NULL"
+            );
+
+        $updateResolution->execute([
+            $reversalSubscriptionRecordId,
+            $resolvedByUserId,
+            $reason,
+            (int)$contract['id'],
+            $paymentAttemptId,
+        ]);
+
+        if ($updateResolution->rowCount() !== 1) {
+            throw new RuntimeException(
+                'Refund reversal could not be resolved exactly once.'
+            );
+        }
+
+        $resolved =
+            billing_refund_resolution_by_payment(
+                $pdo,
+                $paymentAttemptId,
+                false
+            );
+
+        if ($resolved === null) {
+            throw new RuntimeException(
+                'Resolved refund reversal could not be reloaded.'
+            );
+        }
+
+        $resolvedContract =
+            billing_refund_resolution_row_contract(
+                $resolved
+            );
+
+        if (
+            (string)$resolvedContract['status']
+                !== 'resolved'
+            || (string)(
+                $resolvedContract[
+                    'resolution_action'
+                ] ?? ''
+            ) !== 'reverse_entitlement'
+            || (int)(
+                $resolvedContract[
+                    'reversal_subscription_record_id'
+                ] ?? 0
+            ) !== $reversalSubscriptionRecordId
+            || (int)(
+                $resolvedContract[
+                    'resolved_by_user_id'
+                ] ?? 0
+            ) !== $resolvedByUserId
+            || (string)(
+                $resolvedContract[
+                    'resolution_reason'
+                ] ?? ''
+            ) !== $reason
+            || empty(
+                $resolvedContract[
+                    'resolved_at'
+                ]
+            )
+        ) {
+            throw new RuntimeException(
+                'Refund reversal failed its post-write resolution audit contract.'
+            );
+        }
+
+        $reversalSource =
+            subscription_record_history_source_contract(
+                $pdo,
+                $farmId,
+                $reversalSubscriptionRecordId
+            );
+
+        if (
+            !hash_equals(
+                (string)$predecessor[
+                    'snapshot_hash'
+                ],
+                (string)$reversalSource[
+                    'snapshot_hash'
+                ]
+            )
+        ) {
+            throw new RuntimeException(
+                'Refund reversal compensating history does not match its predecessor source.'
+            );
+        }
+
+        $latestAfterStmt =
+            $pdo->prepare(
+                "SELECT id
+                 FROM subscriptions
+                 WHERE farm_id = ?
+                 ORDER BY id DESC
+                 LIMIT 1"
+            );
+
+        $latestAfterStmt->execute([
+            $farmId,
+        ]);
+
+        if (
+            (int)$latestAfterStmt->fetchColumn()
+            !== $reversalSubscriptionRecordId
+        ) {
+            throw new RuntimeException(
+                'Refund reversal compensating history is not the tenant latest commercial record.'
+            );
+        }
+
+        return [
+            'resolved' => true,
+            'idempotent' => false,
+            'reason' => 'reverse_entitlement',
+            'resolution' => $resolved,
+            'lineage' => $lineage,
+            'predecessor_subscription_record_id' =>
+                $predecessorSubscriptionRecordId,
+            'reversal_subscription_record_id' =>
+                $reversalSubscriptionRecordId,
+            'restored_snapshot_hash' =>
+                $restoredHash,
+            'effective_role_limits' =>
+                $effectiveLimits,
         ];
     }
 }
