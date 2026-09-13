@@ -28,6 +28,12 @@ $dashboard = file_get_contents($root . '/dashboard.php');
 $profitability = file_get_contents($root . '/management/profitability.php');
 $reports = file_get_contents($root . '/management/reports.php');
 $ruminantDaily = file_get_contents($root . '/ruminant/ruminant_daily_record.php');
+$ruminantExpenseAllocationJs = (string)file_get_contents(
+    $root . '/assets/js/ruminant-expenses-allocation.js'
+);
+$inventoryJs = (string)file_get_contents(
+    $root . '/assets/js/inventory.js'
+);
 
 $add('Central output-security helper exists', is_file($helperPath));
 $add('HTML text helper exists', str_contains($helper, 'function app_html('));
@@ -97,32 +103,67 @@ $add(
 );
 
 $add(
-    'Sales seller is HTML-escaped',
-    str_contains($sales, "app_html(\$sale['seller'])")
+    'Sales seller attribution is HTML-escaped',
+    str_contains(
+        $sales,
+        'app_html(transaction_recorded_by_label('
+    )
+    && str_contains(
+        $sales,
+        "\$sale['seller'] ?? null"
+    )
+    && str_contains(
+        $sales,
+        "\$sale['seller_user_type'] ?? null"
+    )
 );
 
 $add(
-    'General expense text is HTML-escaped',
-    str_contains($expenses, "app_html(\$expense['description'] ?: '--')")
-    && str_contains($expenses, "app_html(\$expense['full_name'])")
+    'General expense text and actor attribution are HTML-escaped',
+    str_contains(
+        $expenses,
+        "app_html(\$expense['description'] ?: '--')"
+    )
+    && str_contains(
+        $expenses,
+        'app_html(transaction_recorded_by_label_from_row('
+    )
 );
 
 $add(
-    'Layer expense text is HTML-escaped',
-    str_contains($layerExpenses, "app_html(\$expense['description'])")
-    && str_contains($layerExpenses, "app_html(\$expense['full_name'])")
+    'Layer expense text and actor attribution are HTML-escaped',
+    str_contains(
+        $layerExpenses,
+        "app_html(\$expense['description'])"
+    )
+    && str_contains(
+        $layerExpenses,
+        'app_html(transaction_recorded_by_label_from_row('
+    )
 );
 
 $add(
-    'Broiler expense text is HTML-escaped',
-    str_contains($broilerExpenses, "app_html(\$expense['description'] ?: '--')")
-    && str_contains($broilerExpenses, "app_html(\$expense['full_name'])")
+    'Broiler expense text and actor attribution are HTML-escaped',
+    str_contains(
+        $broilerExpenses,
+        "app_html(\$expense['description'] ?: '--')"
+    )
+    && str_contains(
+        $broilerExpenses,
+        'app_html(transaction_recorded_by_label_from_row('
+    )
 );
 
 $add(
-    'Ruminant expense text is HTML-escaped',
-    str_contains($ruminantExpenses, "app_html(\$expense['description'] ?: '--')")
-    && str_contains($ruminantExpenses, "app_html(\$expense['full_name'])")
+    'Ruminant expense text and actor attribution are HTML-escaped',
+    str_contains(
+        $ruminantExpenses,
+        "app_html(\$expense['description'] ?: '--')"
+    )
+    && str_contains(
+        $ruminantExpenses,
+        'app_html(transaction_recorded_by_label_from_row('
+    )
 );
 
 $add(
@@ -194,8 +235,19 @@ $add(
 );
 
 $add(
-    'Dashboard seller is HTML-escaped',
-    str_contains($dashboard, "app_html(\$sale['seller'])")
+    'Dashboard seller attribution is HTML-escaped',
+    str_contains(
+        $dashboard,
+        'app_html(transaction_recorded_by_label('
+    )
+    && str_contains(
+        $dashboard,
+        "\$sale['seller'] ?? null"
+    )
+    && str_contains(
+        $dashboard,
+        "\$sale['seller_user_type'] ?? null"
+    )
 );
 
 $add(
@@ -208,9 +260,23 @@ $add(
 );
 
 $add(
-    'Profitability script data uses central JSON encoding',
-    str_contains($profitability, "app_json_script(\$cycles)")
-    && str_contains($profitability, "app_json_script(\$productionType)")
+    'Profitability dynamic config uses context-safe encoding',
+    str_contains(
+        $profitability,
+        "app_json_script(\$cycles)"
+    )
+    && str_contains(
+        $profitability,
+        'data-production-type='
+    )
+    && str_contains(
+        $profitability,
+        "\$productionType,"
+    )
+    && str_contains(
+        $profitability,
+        'ENT_QUOTES | ENT_SUBSTITUTE'
+    )
 );
 
 $add(
@@ -219,17 +285,43 @@ $add(
 );
 
 $add(
-    'Ruminant daily script data uses central JSON encoding',
+    'Ruminant daily selected-cycle data uses escaped attribute encoding',
     str_contains(
         $ruminantDaily,
-        "app_json_script(\$normalizeAnimalType(\$selectedCycle['production_type'] ?? ''))"
+        'data-selected-cycle-animal-type='
+    )
+    && str_contains(
+        $ruminantDaily,
+        "\$normalizeAnimalType(\$selectedCycle['production_type'] ?? '')"
+    )
+    && str_contains(
+        $ruminantDaily,
+        'ENT_QUOTES | ENT_SUBSTITUTE'
     )
 );
 
 $add(
-    'Ruminant expense script data uses central JSON encoding',
-    str_contains($ruminantExpenses, "app_json_script(\$expenseCycles)")
-    && str_contains($ruminantExpenses, "app_json_script(\$ruminantAnimals)")
+    'Ruminant expense allocation config uses escaped JSON attributes',
+    str_contains(
+        $ruminantExpenses,
+        'data-cycles='
+    )
+    && str_contains(
+        $ruminantExpenses,
+        'app_attr(json_encode($expenseCycles'
+    )
+    && str_contains(
+        $ruminantExpenses,
+        'data-animals='
+    )
+    && str_contains(
+        $ruminantExpenses,
+        'app_attr(json_encode($ruminantAnimals'
+    )
+    && substr_count(
+        $ruminantExpenses,
+        'JSON_INVALID_UTF8_SUBSTITUTE'
+    ) >= 2
 );
 
 $add(
@@ -243,41 +335,91 @@ $add(
 );
 
 $add(
-    'Ruminant expense allocation uses DOM-safe construction',
-    str_contains($ruminantExpenses, "panel.replaceChildren()")
-    && str_contains($ruminantExpenses, "tag.textContent=String(a.tag_no ?? '')")
-    && str_contains($ruminantExpenses, "status.textContent=String(a.status ?? '')")
-    && str_contains($ruminantExpenses, "amount.value=String(old)")
+    'Ruminant expense allocation uses DOM-safe external construction',
+    str_contains(
+        $ruminantExpenses,
+        "versioned_asset('/assets/js/ruminant-expenses-allocation.js')"
+    )
+    && str_contains(
+        $ruminantExpenseAllocationJs,
+        'panel.replaceChildren()'
+    )
+    && str_contains(
+        $ruminantExpenseAllocationJs,
+        "tag.textContent=String(a.tag_no ?? '')"
+    )
+    && str_contains(
+        $ruminantExpenseAllocationJs,
+        "status.textContent=String(a.status ?? '')"
+    )
+    && str_contains(
+        $ruminantExpenseAllocationJs,
+        'amount.value=String(old)'
+    )
 );
 
 $add(
     'Ruminant expense allocation no longer interpolates animal data into innerHTML',
-    !str_contains($ruminantExpenses, '<strong>${a.tag_no}</strong>')
-    && !str_contains($ruminantExpenses, '${a.status}')
-    && !str_contains($ruminantExpenses, 'panel.innerHTML=')
+    !str_contains(
+        $ruminantExpenseAllocationJs,
+        '<strong>${a.tag_no}</strong>'
+    )
+    && !str_contains(
+        $ruminantExpenseAllocationJs,
+        '${a.status}'
+    )
+    && !str_contains(
+        $ruminantExpenseAllocationJs,
+        'panel.innerHTML='
+    )
 );
 
 $add(
-    'Inventory cycle options use DOM-safe Option construction',
-    str_contains($inventory, "cycleSelect.replaceChildren(new Option('No specific cycle / pooled usage', ''))")
-    && str_contains($inventory, "cycleSelect.add(new Option(String(cycle.cycle_code ?? ''), String(cycle.id ?? '')))")
+    'Inventory cycle options use DOM-safe external Option construction',
+    str_contains(
+        $inventory,
+        "versioned_asset('/assets/js/inventory.js')"
+    )
+    && str_contains(
+        $inventoryJs,
+        "cycleSelect.replaceChildren(new Option('No specific cycle / pooled usage', ''))"
+    )
+    && str_contains(
+        $inventoryJs,
+        "cycleSelect.add(new Option(String(cycle.cycle_code ?? ''), String(cycle.id ?? '')))"
+    )
 );
 
 $add(
-    'Inventory item details use textContent',
-    str_contains($inventory, "stockStrong.textContent=String(currentStock ?? '')+' '+String(unit ?? '')")
-    && str_contains($inventory, "itemStrong.textContent=selectedOption.textContent.split(' (Current:')[0].trim()")
+    'Inventory item details use external textContent construction',
+    str_contains(
+        $inventoryJs,
+        "stockStrong.textContent=String(currentStock ?? '')+' '+String(unit ?? '')"
+    )
+    && str_contains(
+        $inventoryJs,
+        "itemStrong.textContent=selectedOption.textContent.split(' (Current:')[0].trim()"
+    )
 );
 
 $add(
-    'Inventory dynamic production options use DOM-safe Option construction',
-    substr_count($inventory, "options.forEach(([value,label]) => select.add(new Option(label, value)))") >= 2
+    'Inventory dynamic production options use DOM-safe external Option construction',
+    substr_count(
+        $inventoryJs,
+        "options.forEach(([value,label]) => select.add(new Option(label, value)))"
+    ) >= 2
 );
 
 $add(
     'Inventory no longer interpolates cycle/item data into innerHTML templates',
-    !str_contains($inventory, '${cycle.cycle_code}')
-    && !str_contains($inventory, 'Current stock: <strong>${currentStock} ${unit}</strong>')
+    !str_contains(
+        $inventoryJs,
+        '${cycle.cycle_code}'
+    )
+    && !str_contains(
+        $inventoryJs,
+        'Current stock: <strong>${currentStock} ${unit}</strong>'
+    )
 );
 
 require_once $helperPath;

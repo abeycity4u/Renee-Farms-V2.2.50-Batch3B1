@@ -9,7 +9,8 @@ $root = dirname(__DIR__);
 $readinessPath = $root . '/includes/billing_provider_readiness.php';
 $checkoutPath = $root . '/billing/checkout.php';
 $adaptersPath = $root . '/includes/billing_provider_adapters.php';
-foreach ([$readinessPath, $checkoutPath, $adaptersPath] as $path) {
+$checkoutInitiationPath = $root . '/includes/billing_subscription_checkout_initiation.php';
+foreach ([$readinessPath, $checkoutPath, $adaptersPath, $checkoutInitiationPath] as $path) {
     if (!is_file($path)) {
         fwrite(STDERR, "FAIL: Stage 2I readiness source is missing.\n");
         exit(1);
@@ -19,6 +20,7 @@ require_once $readinessPath;
 $readinessSource = (string)file_get_contents($readinessPath);
 $checkoutSource = (string)file_get_contents($checkoutPath);
 $adaptersSource = (string)file_get_contents($adaptersPath);
+$checkoutInitiationSource = (string)file_get_contents($checkoutInitiationPath);
 
 $checks = 0;
 $failures = 0;
@@ -200,16 +202,58 @@ try {
         && strpos($readinessSource, 'FLUTTERWAVE_LIVE_SECRET_KEY') !== false,
         'source keeps test and live provider credential slots physically distinct');
 
-    $check(strpos($checkoutSource, 'billing_provider_readiness.php') !== false
-        && strpos($checkoutSource, 'billing_provider_assert_new_checkout_allowed();') !== false,
-        'checkout explicitly loads and invokes the Stage 2I readiness gate');
-    $modePos = strpos($checkoutSource, 'billing_provider_assert_new_checkout_allowed();');
-    $resolvePos = strpos($checkoutSource, 'billing_provider_readiness_resolve_checkout(');
-    $attemptPos = strpos($checkoutSource, 'billing_payment_attempt_create(');
-    $networkPos = strpos($checkoutSource, 'billing_provider_initialize_checkout(');
-    $check($modePos !== false && $resolvePos !== false && $attemptPos !== false && $networkPos !== false
-        && $modePos < $resolvePos && $modePos < $attemptPos && $modePos < $networkPos,
-        'deployment mode is asserted before mode-aware provider resolution, attempt creation and network initialization');
+    $check(
+        strpos($checkoutSource, 'billing_provider_readiness.php') !== false
+        && strpos(
+            $checkoutSource,
+            'billing_provider_readiness_resolve_checkout('
+        ) !== false,
+        'checkout explicitly loads and delegates to the Stage 2I mode-aware readiness resolver'
+    );
+
+    $resolverContract =
+        strpos(
+            $readinessSource,
+            'function billing_provider_readiness_resolve_checkout'
+        ) !== false
+        && strpos(
+            $readinessSource,
+            '$mode = billing_provider_assert_new_checkout_allowed();'
+        ) !== false;
+
+    $resolvePos = strpos(
+        $checkoutSource,
+        'billing_provider_readiness_resolve_checkout('
+    );
+    $preparePos = strpos(
+        $checkoutSource,
+        'billing_subscription_checkout_prepare('
+    );
+    $networkPos = strpos(
+        $checkoutSource,
+        'billing_provider_initialize_checkout('
+    );
+
+    $attemptOwnedByPrepare =
+        strpos(
+            $checkoutInitiationSource,
+            'function billing_subscription_checkout_prepare'
+        ) !== false
+        && strpos(
+            $checkoutInitiationSource,
+            'billing_payment_attempt_create('
+        ) !== false;
+
+    $check(
+        $resolverContract
+        && $attemptOwnedByPrepare
+        && $resolvePos !== false
+        && $preparePos !== false
+        && $networkPos !== false
+        && $resolvePos < $preparePos
+        && $preparePos < $networkPos,
+        'deployment mode is asserted by the canonical resolver before centralized attempt creation and provider initialization'
+    );
     $check(strpos($checkoutSource, 'billing_provider_selection_resolve_checkout(') === false,
         'checkout no longer resolves runtime credentials through the generic Stage 2B readiness path');
     $check(strpos($adaptersSource, 'billing_provider_runtime_credentials($provider, true)') !== false,
