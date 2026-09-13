@@ -66,6 +66,16 @@ function farmHasBillingPaymentHistory(PDO $pdo, int $farmId): bool {
     $stmt->execute([$farmId]);
     return $stmt->fetchColumn() !== false;
 }
+function farmHasSubscriptionHistory(PDO $pdo, int $farmId): bool {
+    if ($farmId < 1 || !tableExists($pdo, 'subscriptions')) return false;
+    $stmt = $pdo->prepare('SELECT 1 FROM subscriptions WHERE farm_id = ? LIMIT 1');
+    $stmt->execute([$farmId]);
+    return $stmt->fetchColumn() !== false;
+}
+function farmHasProtectedCommercialHistory(PDO $pdo, int $farmId): bool {
+    return farmHasBillingPaymentHistory($pdo, $farmId)
+        || farmHasSubscriptionHistory($pdo, $farmId);
+}
 function saveRoleLimits(PDO $pdo, int $farmId, array $limits): void {
     if (!tableExists($pdo, 'farm_role_limits')) return;
     $stmt=$pdo->prepare('INSERT INTO farm_role_limits (farm_id,role_code,max_users) VALUES (?,?,?) ON DUPLICATE KEY UPDATE max_users=VALUES(max_users)');
@@ -83,8 +93,8 @@ function deleteFarmRows(PDO $pdo, string $table, int $farmId): void {
     $pdo->prepare("DELETE FROM {$table} WHERE farm_id = ?")->execute([$farmId]);
 }
 function deleteFarmData(PDO $pdo, int $farmId): void {
-    if (farmHasBillingPaymentHistory($pdo, $farmId)) {
-        throw new RuntimeException('Farm account with billing payment history cannot be permanently deleted.');
+    if (farmHasProtectedCommercialHistory($pdo, $farmId)) {
+        throw new RuntimeException('Farm account with commercial subscription or billing/payment history cannot be permanently deleted.');
     }
 
     // Tenant purge is intentionally explicit and ordered. V2.2 financial allocation
@@ -93,7 +103,7 @@ function deleteFarmData(PDO $pdo, int $farmId): void {
     foreach (['sales_allocations', 'financial_allocations', 'poultry_cycle_acquisitions', 'production_cycle_phases', 'poultry_health_events', 'ruminant_animal_weights', 'ruminant_health_events'] as $table) {
         deleteFarmRows($pdo, $table, $farmId);
     }
-    foreach (['customer_ledger_entries', 'stock_transactions', 'stock_batches', 'layer_daily_records', 'broiler_daily_records', 'ruminant_daily_records', 'ruminant_animals', 'farm_expenses', 'profit_loss_summary', 'sales_records', 'production_cycles', 'stock_items', 'inventory_categories', 'financial_settings', 'permissions', 'farm_subscription_seat_addons', 'farm_role_limits', 'v2_audit_log', 'farm_modules', 'billing_seat_change_requests', 'subscriptions'] as $table) {
+    foreach (['customer_ledger_entries', 'stock_transactions', 'stock_batches', 'layer_daily_records', 'broiler_daily_records', 'ruminant_daily_records', 'ruminant_animals', 'farm_expenses', 'profit_loss_summary', 'sales_records', 'production_cycles', 'stock_items', 'inventory_categories', 'financial_settings', 'permissions', 'farm_subscription_seat_addons', 'farm_role_limits', 'v2_audit_log', 'farm_modules', 'billing_seat_change_requests'] as $table) {
         deleteFarmRows($pdo, $table, $farmId);
     }
     $pdo->prepare('DELETE ur FROM user_roles ur INNER JOIN users u ON u.id = ur.user_id WHERE u.farm_id = ?')->execute([$farmId]);
@@ -128,8 +138,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['delete_farm'], $_POST['farm_id'])) {
         $farm = editableFarm($pdo, $farmId);
         if (!$farm) { $_SESSION['error'] = 'The platform workspace cannot be deleted.'; redirectFarms(); }
-        if (farmHasBillingPaymentHistory($pdo, $farmId)) {
-            $_SESSION['error'] = 'This farm has billing/payment history and cannot be permanently deleted. Suspend the farm instead to preserve the financial audit trail.';
+        if (farmHasProtectedCommercialHistory($pdo, $farmId)) {
+            $_SESSION['error'] = 'This farm has commercial subscription or billing/payment history and cannot be permanently deleted. Suspend the farm instead to preserve the commercial audit trail.';
             redirectFarms();
         }
         $logoPath = $farm['logo_path'] ?? null;
