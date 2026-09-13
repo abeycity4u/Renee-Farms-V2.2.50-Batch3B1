@@ -86,7 +86,8 @@ if (!function_exists('billing_subscription_checkout_policy')) {
             billing_seat_change_normalize_datetime(
                 $target[
                     'current_period_ends_at'
-                ] ?? null
+                ] ?? null,
+                true
             );
 
         $scheduledIds =
@@ -123,10 +124,12 @@ if (!function_exists('billing_subscription_checkout_policy')) {
         );
 
         $periodEndDate =
-            new DateTimeImmutable(
-                $periodEnd,
-                $timezone
-            );
+            $periodEnd === null
+                ? null
+                : new DateTimeImmutable(
+                    $periodEnd,
+                    $timezone
+                );
 
         $now = $now
             ?? new DateTimeImmutable(
@@ -135,6 +138,14 @@ if (!function_exists('billing_subscription_checkout_policy')) {
             );
 
         if ($hasScheduled
+            && $periodEndDate === null) {
+            throw new RuntimeException(
+                'Scheduled seat reduction requires an established paid-period end.'
+            );
+        }
+
+        if ($hasScheduled
+            && $periodEndDate !== null
             && $now < $periodEndDate) {
             throw new RuntimeException(
                 'Subscription renewal cannot start before scheduled seat reductions reach the current paid-period end.'

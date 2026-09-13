@@ -141,10 +141,17 @@ if (!function_exists('billing_renewal_seat_target')) {
             );
         }
 
+        /*
+         * Trial and legacy/manual tenants can legitimately have no paid-period
+         * lineage yet. That must not block their first canonical subscription
+         * checkout. A real period end becomes mandatory only when a scheduled
+         * seat reduction exists.
+         */
         $periodEnd =
             billing_seat_change_normalize_datetime(
                 $latest['current_period_ends_at']
-                    ?? null
+                    ?? null,
+                true
             );
 
         $sql =
@@ -164,6 +171,12 @@ if (!function_exists('billing_renewal_seat_target')) {
 
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC)
             ?: [];
+
+        if ($rows && $periodEnd === null) {
+            throw new RuntimeException(
+                'Scheduled seat reduction requires an established paid-period end.'
+            );
+        }
 
         $targetSeats = $currentSeats;
         $requestIds = [];
