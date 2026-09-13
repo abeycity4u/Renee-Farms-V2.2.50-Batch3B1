@@ -2166,21 +2166,22 @@ if (!function_exists(
     'billing_refund_resolution_resolve_reverse'
 )) {
     /**
-     * Resolve a captured post-application SUBSCRIPTION refund by
-     * compensating the still-current applied commercial state back to
-     * its immediate immutable predecessor.
+     * Resolve a captured post-application subscription or seat-top-up
+     * refund through its purpose-specific compensating reversal.
      *
-     * Safety contract:
+     * Shared safety contract:
      * - payment/provider fact remains untouched;
-     * - payment attempt -> refund resolution -> farm is the lock order;
-     * - the refunded applied history must still be the tenant's latest row;
-     * - current runtime snapshot must still equal that applied history;
+     * - payment attempt -> refund resolution -> purpose lineage is validated
+     *   before current tenant state is compensated;
+     * - the refunded application history must still be current;
+     * - current runtime must exactly match that immutable applied history;
      * - the immediate same-tenant predecessor must exist and pass capacity;
-     * - current runtime is restored only through shared entitlement/seat helpers;
+     * - subscription reversal restores the full predecessor commercial snapshot
+     *   through shared entitlement and seat helpers;
+     * - seat-top-up reversal restores only seat add-ons and effective limits;
      * - one new immutable compensating subscriptions row is appended;
-     * - the refund resolution durably links that exact compensating row;
-     * - repeated calls after successful reversal are idempotent;
-     * - seat_topup reversal is deliberately unsupported here and fails closed.
+     * - the shared finalizer durably links that exact compensating row;
+     * - repeated calls after successful reversal are idempotent.
      */
     function billing_refund_resolution_resolve_reverse(
         PDO $pdo,
