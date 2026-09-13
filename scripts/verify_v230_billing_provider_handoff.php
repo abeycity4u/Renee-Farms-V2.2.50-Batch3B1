@@ -16,6 +16,9 @@ $paths = [
     'script' =>
         $root
         . '/assets/js/billing-provider-handoff.js',
+    'style' =>
+        $root
+        . '/assets/css/billing-provider-handoff.css',
     'checkout' =>
         $root
         . '/billing/checkout.php',
@@ -73,6 +76,7 @@ $check = static function (
 
 $handoff = $source['handoff'];
 $script = $source['script'];
+$style = $source['style'];
 $checkout = $source['checkout'];
 $seatCheckout = $source['seat_checkout'];
 $csp = $source['csp'];
@@ -132,6 +136,60 @@ $check(
         'window.location'
     ) === false,
     'handoff document uses same-origin external JavaScript rather than inline script'
+);
+
+$check(
+    is_string($document)
+    && strpos(
+        $document,
+        '/assets/css/billing-provider-handoff.css'
+    ) !== false
+    && stripos(
+        $document,
+        '<style'
+    ) === false
+    && stripos(
+        $document,
+        ' style='
+    ) === false,
+    'handoff presentation uses same-origin external CSS with no inline style'
+);
+
+$check(
+    is_string($document)
+    && strpos(
+        $document,
+        'class="billing-handoff-card"'
+    ) !== false
+    && strpos(
+        $document,
+        'class="billing-handoff-spinner"'
+    ) !== false
+    && strpos(
+        $document,
+        'Connecting you securely to Paystack.'
+    ) !== false
+    && strpos(
+        $document,
+        'Continue to Paystack'
+    ) !== false,
+    'handoff document exposes polished provider-aware transfer status and fallback action'
+);
+
+$check(
+    strpos(
+        $style,
+        '.billing-handoff-card'
+    ) !== false
+    && strpos(
+        $style,
+        '@keyframes billing-handoff-spin'
+    ) !== false
+    && strpos(
+        $style,
+        'prefers-reduced-motion: reduce'
+    ) !== false,
+    'handoff stylesheet provides card presentation, progress motion and reduced-motion support'
 );
 
 $check(

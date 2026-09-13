@@ -39,12 +39,22 @@ if (!function_exists(
         $checkoutUrl =
             (string)$normalized['checkout_url'];
 
-        $assetPath =
+        $scriptAssetPath =
             '/assets/js/billing-provider-handoff.js';
 
+        $styleAssetPath =
+            '/assets/css/billing-provider-handoff.css';
+
         if (function_exists('versioned_asset')) {
-            $assetPath =
-                versioned_asset($assetPath);
+            $scriptAssetPath =
+                versioned_asset(
+                    $scriptAssetPath
+                );
+
+            $styleAssetPath =
+                versioned_asset(
+                    $styleAssetPath
+                );
         }
 
         $baseUrl =
@@ -53,7 +63,13 @@ if (!function_exists(
                 : '';
 
         $scriptUrl =
-            $baseUrl . $assetPath;
+            $baseUrl . $scriptAssetPath;
+
+        $styleUrl =
+            $baseUrl . $styleAssetPath;
+
+        $providerLabel =
+            ucfirst($provider);
 
         $checkoutUrlHtml = htmlspecialchars(
             $checkoutUrl,
@@ -61,8 +77,20 @@ if (!function_exists(
             'UTF-8'
         );
 
+        $providerLabelHtml = htmlspecialchars(
+            $providerLabel,
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        );
+
         $scriptUrlHtml = htmlspecialchars(
             $scriptUrl,
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        );
+
+        $styleUrlHtml = htmlspecialchars(
+            $styleUrl,
             ENT_QUOTES | ENT_SUBSTITUTE,
             'UTF-8'
         );
@@ -74,20 +102,50 @@ if (!function_exists(
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="referrer" content="no-referrer">
+    <meta name="theme-color" content="#118653">
     <title>Opening secure payment</title>
+    <link rel="stylesheet" href="{$styleUrlHtml}">
 </head>
-<body>
-<main>
-    <h1>Opening secure payment</h1>
-    <p>Your secure payment checkout is ready. You are being transferred to the payment provider.</p>
-    <p>
-        <a id="billing-provider-handoff-link" href="{$checkoutUrlHtml}" rel="noreferrer">
-            Continue to secure payment
+<body class="billing-handoff-page">
+<main class="billing-handoff-shell" aria-labelledby="billing-handoff-title">
+    <section class="billing-handoff-card">
+        <div class="billing-handoff-indicator" aria-hidden="true">
+            <span class="billing-handoff-spinner"></span>
+        </div>
+
+        <p class="billing-handoff-eyebrow">Secure checkout</p>
+
+        <h1 id="billing-handoff-title">
+            Opening secure payment
+        </h1>
+
+        <p class="billing-handoff-lead" aria-live="polite">
+            Connecting you securely to {$providerLabelHtml}. This should only take a moment.
+        </p>
+
+        <a
+            id="billing-provider-handoff-link"
+            class="billing-handoff-button"
+            href="{$checkoutUrlHtml}"
+            rel="noreferrer"
+        >
+            Continue to {$providerLabelHtml}
         </a>
+
+        <p class="billing-handoff-help">
+            If nothing happens automatically, use the secure button above.
+        </p>
+
+        <noscript>
+            <p class="billing-handoff-noscript">
+                JavaScript is disabled. Use the secure button above to continue.
+            </p>
+        </noscript>
+    </section>
+
+    <p class="billing-handoff-footnote">
+        Secure payment handoff
     </p>
-    <noscript>
-        <p>JavaScript is disabled. Use the secure payment link above to continue.</p>
-    </noscript>
 </main>
 <script src="{$scriptUrlHtml}"></script>
 </body>
