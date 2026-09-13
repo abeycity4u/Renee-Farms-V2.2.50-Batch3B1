@@ -28,6 +28,7 @@ $currentProduct = recovery_source('includes/billing_current_product.php');
 $quote = recovery_source('includes/billing_reactivation_quote.php');
 $page = recovery_source('billing/recover.php');
 $checkout = recovery_source('billing/checkout.php');
+$checkoutInitiation = recovery_source('includes/billing_subscription_checkout_initiation.php');
 $return = recovery_source('billing/return.php');
 $config = recovery_source('config.php');
 
@@ -35,7 +36,19 @@ $recoveryCompact = preg_replace('/\\s+/', '', $recovery);
 $checkoutCompact = preg_replace('/\\s+/', '', $checkout);
 $returnCompact = preg_replace('/\\s+/', '', $return);
 
-verify_recovery($login !== '' && $recovery !== '' && $actor !== '' && $currentProduct !== '' && $quote !== '' && $page !== '', 'recovery and shared current-product source files are present');
+verify_recovery(
+    $login !== ''
+    && $recovery !== ''
+    && $actor !== ''
+    && $currentProduct !== ''
+    && $quote !== ''
+    && $page !== ''
+    && $checkout !== ''
+    && $checkoutInitiation !== ''
+    && $return !== ''
+    && $config !== '',
+    'recovery and centralized billing source files are present'
+);
 verify_recovery(str_contains($login, "require __DIR__ . '/sign.php';"), 'normal sign-in remains delegated to the existing sign.php flow');
 verify_recovery(str_contains($login, "require_rate_limit('subscription_recovery_attempt'"), 'recovery credential verification has an independent rate limit');
 verify_recovery(str_contains($login, 'subscription_recovery_status_is_target'), 'login interception is limited to explicit recovery statuses');
@@ -67,7 +80,15 @@ verify_recovery(
     ),
     'checkout explicitly opts into the centralized restricted recovery status contract'
 );
-verify_recovery(str_contains($checkout, 'billing_reactivation_assert_selection'), 'recovery checkout rejects plan/module/seat tampering');
+verify_recovery(
+    str_contains($checkout, 'billing_subscription_checkout_prepare(')
+    && str_contains($checkoutInitiation, 'billing_subscription_checkout_assert_selection(')
+    && str_contains(
+        $checkoutInitiation,
+        'Subscription checkout no longer matches the server-authoritative renewal product.'
+    ),
+    'recovery checkout rejects plan/module/seat tampering through centralized checkout preparation'
+);
 verify_recovery(str_contains($checkout, "(int)\$actor['user_id']"), 'billing attempts record the authenticated actor rather than browser identity');
 verify_recovery(!str_contains($checkout, 'requireLogin();'), 'checkout authorization is centralized in the billing actor helper');
 verify_recovery(str_contains($actor, 'requireLogin();'), 'normal billing actors still pass through canonical requireLogin');
@@ -97,23 +118,23 @@ verify_recovery(
 );
 
 $dispatchPos = strpos(
-    $return,
-    'billing_paid_attempt_dispatch'
+    $returnCompact,
+    "billing_paid_attempt_dispatch(\$pdo,(int)\$locked['id'])"
 );
 
 $commitPos = strpos(
-    $return,
+    $returnCompact,
     '$pdo->commit();'
 );
 
 $promotionGuardPos = strpos(
-    $return,
-    "if (\$purpose === 'subscription' && \$recoveryMode)"
+    $returnCompact,
+    "if(\$purpose==='subscription'&&\$recoveryMode)"
 );
 
 $promotePos = strpos(
-    $return,
-    'subscription_recovery_promote_to_login'
+    $returnCompact,
+    'subscription_recovery_promote_to_login('
 );
 
 verify_recovery(

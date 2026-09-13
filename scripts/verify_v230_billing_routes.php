@@ -11,6 +11,7 @@ $paths = [
     'request' => $root . '/includes/billing_route_request.php',
     'audit' => $root . '/includes/billing_payment_audit_state.php',
     'actor' => $root . '/includes/billing_tenant_actor.php',
+    'checkout_initiation' => $root . '/includes/billing_subscription_checkout_initiation.php',
     'checkout' => $root . '/billing/checkout.php',
     'return' => $root . '/billing/return.php',
     'webhook' => $root . '/billing/webhook.php',
@@ -50,6 +51,7 @@ $check = static function (bool $ok, string $message) use (&$checks, &$failures):
 $request = $source['request'];
 $audit = $source['audit'];
 $actor = $source['actor'];
+$checkoutInitiation = $source['checkout_initiation'];
 $checkout = $source['checkout'];
 $return = $source['return'];
 $webhook = $source['webhook'];
@@ -216,37 +218,85 @@ $check(strpos($checkout, "['contact_email']") !== false
 $check(
     strpos(
         $checkout,
-        'billing_current_product_assert_selection('
+        'billing_subscription_checkout_prepare('
     ) !== false
     && strpos(
-        $checkout,
-        'billing_reactivation_assert_selection('
+        $checkoutInitiation,
+        'billing_subscription_checkout_assert_selection('
     ) !== false
-    && preg_match(
-        '/\$pricing\s*=\s*\$currentProduct\s*\[\s*[\'"]pricing[\'"]\s*\]\s*;/',
-        $checkout
-    ) === 1
     && strpos(
-        $checkout,
+        $checkoutInitiation,
+        'billing_payment_attempt_create('
+    ) !== false
+    && strpos(
+        $checkoutInitiation,
         "\$pricing['amount']"
     ) !== false
     && strpos(
-        $checkout,
+        $checkoutInitiation,
         "\$pricing['currency']"
+    ) !== false
+    && strpos(
+        $checkout,
+        "\$prepared['payment_quote']"
     ) !== false,
-    'attempt amount/currency come from server-authoritative current-product pricing'
+    'attempt amount/currency come from centralized server-authoritative checkout preparation'
 );
-$check(strpos($checkout, 'billing_provider_readiness_resolve_checkout(') !== false
-    && strpos($checkout, 'billing_provider_register_configured_adapters($provider)') !== false,
-    'checkout resolves and registers exactly the selected mode-ready provider');
 
-$callbackPos = strpos($checkout, 'billing_route_public_url(');
-$createPos = strpos($checkout, 'billing_payment_attempt_create(');
-$providerInitPos = strpos($checkout, 'billing_provider_initialize_checkout(');
-$check($callbackPos !== false && $createPos !== false && $callbackPos < $createPos,
-    'callback configuration is resolved before any billing attempt row is created');
-$check($createPos !== false && $providerInitPos !== false && $createPos < $providerInitPos,
-    'billing attempt is frozen before provider checkout initialization');
+$check(
+    preg_match(
+        '/billing_provider_readiness_resolve_checkout\\s*\\(\\s*\\$selection\\s*\\[\\s*[\\x27"]provider[\\x27"]\\s*\\]\\s*\\)/',
+        $checkout
+    ) === 1
+    && preg_match(
+        '/billing_provider_register_configured_adapters\\s*\\(\\s*\\$provider\\s*\\)/',
+        $checkout
+    ) === 1,
+    'checkout resolves and registers exactly the selected mode-ready provider'
+);
+
+$callbackPos = strpos(
+    $checkout,
+    'billing_route_public_url('
+);
+
+$preparePos = strpos(
+    $checkout,
+    'billing_subscription_checkout_prepare('
+);
+
+$providerInitPos = strpos(
+    $checkout,
+    'billing_provider_initialize_checkout('
+);
+
+$createPos = strpos(
+    $checkoutInitiation,
+    'billing_payment_attempt_create('
+);
+
+$prepareCommitPos = strpos(
+    $checkoutInitiation,
+    '$pdo->commit();'
+);
+
+$check(
+    $callbackPos !== false
+    && $preparePos !== false
+    && $callbackPos < $preparePos,
+    'callback configuration is resolved before centralized billing-attempt preparation'
+);
+
+$check(
+    $preparePos !== false
+    && $providerInitPos !== false
+    && $preparePos < $providerInitPos
+    && $createPos !== false
+    && $prepareCommitPos !== false
+    && $createPos < $prepareCommitPos,
+    'billing attempt is frozen and committed by centralized preparation before provider checkout initialization'
+);
+
 $check(strpos($checkout, 'billing_audit_mark_pending(') !== false
     && strpos($checkout, 'billing_audit_mark_initialization_failed(') !== false,
     'checkout records provider initialization success/failure only on the billing attempt');

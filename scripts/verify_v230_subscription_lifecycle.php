@@ -11,6 +11,7 @@ $files = [
     'recovery' => $root . '/includes/subscription_recovery.php',
     'recover_page' => $root . '/billing/recover.php',
     'checkout' => $root . '/billing/checkout.php',
+    'checkout_initiation' => $root . '/includes/billing_subscription_checkout_initiation.php',
     'return' => $root . '/billing/return.php',
     'billing_application' => $root . '/includes/billing_subscription_application.php',
 ];
@@ -34,6 +35,7 @@ $runtime = $content['runtime'];
 $recovery = $content['recovery'];
 $recoverPage = $content['recover_page'];
 $checkout = $content['checkout'];
+$checkoutInitiation = $content['checkout_initiation'];
 $return = $content['return'];
 $billingApplication = $content['billing_application'];
 
@@ -94,18 +96,42 @@ $pass('recovery provider choice remains server-defined',
 $pass('past_due checkout uses centralized recovery target statuses',
     str_contains($checkout, 'billing_require_farm_admin_actor($pdo, true, subscription_recovery_target_statuses())'));
 $pass('recovery checkout remains same-product asserted',
-    str_contains($checkout, 'billing_reactivation_assert_selection($pdo, $farmId, $selection)'));
+    str_contains($checkout, 'billing_subscription_checkout_prepare(')
+    && str_contains($checkoutInitiation, 'billing_subscription_checkout_assert_selection(')
+    && str_contains(
+        $checkoutInitiation,
+        'Subscription checkout no longer matches the server-authoritative renewal product.'
+    ));
 $pass('checkout does not apply subscription state directly',
     !str_contains($checkout, 'billing_subscription_apply_paid_attempt'));
 $pass('return flow includes centralized recovery statuses plus active race state',
     str_contains($return, 'subscription_recovery_target_statuses()')
     && str_contains($return, "['active']"));
-$pass('return verifies provider server-side before applying subscription',
-    str_contains($return, 'billing_provider_verify_payment($provider, $providerReference)')
-    && str_contains($return, 'billing_subscription_apply_paid_attempt($pdo, (int)$locked[\'id\'])'));
-$pass('return promotes recovery actor only after paid state',
-    str_contains($return, 'if ($status === \'paid\')')
-    && str_contains($return, 'subscription_recovery_promote_to_login($pdo)'));
+$returnVerifyPos = strpos($return, 'billing_provider_verify_payment(');
+$returnApplyPos = strpos($return, 'billing_audit_apply_verification(');
+$returnDispatchPos = strpos(
+    $return,
+    "billing_paid_attempt_dispatch(\$pdo, (int)\$locked['id'])"
+);
+$returnCommitPos = strpos($return, '$pdo->commit();');
+$returnPromotePos = strpos($return, 'subscription_recovery_promote_to_login(');
+
+$pass('return verifies provider server-side before committed paid-purpose dispatch',
+    $returnVerifyPos !== false
+    && $returnApplyPos !== false
+    && $returnDispatchPos !== false
+    && $returnCommitPos !== false
+    && $returnVerifyPos < $returnApplyPos
+    && $returnApplyPos < $returnDispatchPos
+    && $returnDispatchPos < $returnCommitPos);
+
+$pass('return promotes recovery actor only after committed paid subscription dispatch',
+    $returnCommitPos !== false
+    && $returnPromotePos !== false
+    && $returnCommitPos < $returnPromotePos
+    && str_contains($return, "\$status === 'paid'")
+    && str_contains($return, "\$purpose === 'subscription'")
+    && str_contains($return, '&& $recoveryMode'));
 $pass('verified paid application restores farm to active',
     str_contains($billingApplication, "subscription_status = 'active'"));
 $pass('billing application remains paid-attempt gated',
