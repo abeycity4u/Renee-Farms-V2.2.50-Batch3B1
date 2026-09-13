@@ -14,6 +14,8 @@ $paths = [
         $root . '/includes/subscription_seat_policy.php',
     'subscription' =>
         $root . '/includes/billing_subscription_application.php',
+    'records' =>
+        $root . '/includes/subscription_record.php',
     'dispatcher' =>
         $root . '/includes/billing_paid_attempt_dispatcher.php',
 ];
@@ -40,6 +42,7 @@ foreach ($paths as $key => $path) {
 $service = $source['service'];
 $policy = $source['policy'];
 $subscription = $source['subscription'];
+$records = $source['records'];
 $dispatcher = $source['dispatcher'];
 
 $checks = 0;
@@ -406,6 +409,105 @@ $check(
         "'seat_topup_payment_applied'"
     ) !== false,
     'applied seat top-up receives a dedicated commercial-history reason'
+);
+
+$historyCallStart = strpos(
+    $service,
+    '$history ='
+);
+
+$historyCallEnd =
+    $historyCallStart !== false
+        ? strpos(
+            $service,
+            '$historyRecordId =',
+            $historyCallStart
+        )
+        : false;
+
+$historyCall =
+    $historyCallStart !== false
+    && $historyCallEnd !== false
+        ? substr(
+            $service,
+            $historyCallStart,
+            $historyCallEnd
+                - $historyCallStart
+        )
+        : '';
+
+$check(
+    strpos(
+        $historyCall,
+        "'billing_interval'"
+    ) !== false
+    && strpos(
+        $historyCall,
+        "'amount'"
+    ) !== false
+    && strpos(
+        $historyCall,
+        "'currency'"
+    ) !== false
+    && strpos(
+        $historyCall,
+        "'provider'"
+    ) !== false
+    && strpos(
+        $historyCall,
+        "'provider_subscription_id'"
+    ) !== false
+    && strpos(
+        $historyCall,
+        '$attemptContract'
+    ) !== false,
+    'seat-top-up history receives explicit paid-attempt billing metadata'
+);
+
+$check(
+    strpos(
+        $service,
+        "'billing_metadata'"
+    ) !== false
+    && strpos(
+        $service,
+        'Recorded commercial history billing metadata does not match the paid seat top-up.'
+    ) !== false
+    && strpos(
+        $service,
+        'Applied seat top-up did not append its own immutable commercial-history record.'
+    ) !== false,
+    'seat-top-up application fails closed when immutable billing metadata is not exact'
+);
+
+$check(
+    strpos(
+        $records,
+        '?array $billingMetadata = null'
+    ) !== false
+    && strpos(
+        $records,
+        "array_key_exists(
+                'amount',
+                $billingMetadata"
+    ) !== false
+    && strpos(
+        $records,
+        "array_key_exists(
+                'currency',
+                $billingMetadata"
+    ) !== false
+    && strpos(
+        $records,
+        "array_key_exists(
+                'provider',
+                $billingMetadata"
+    ) !== false
+    && strpos(
+        $records,
+        "'billing_metadata' => ["
+    ) !== false,
+    'central subscription history service supports explicit billing metadata without breaking existing callers'
 );
 
 $check(

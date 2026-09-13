@@ -695,6 +695,24 @@ if (!function_exists('billing_seat_topup_apply_paid_attempt')) {
                     'seat_topup_payment_applied',
                     $attemptContract[
                         'initiated_by_user_id'
+                    ],
+                    [
+                        'billing_interval' =>
+                            $attemptContract[
+                                'billing_interval'
+                            ],
+                        'amount' =>
+                            $attemptContract['amount'],
+                        'currency' =>
+                            $attemptContract[
+                                'currency'
+                            ],
+                        'provider' =>
+                            $attemptContract[
+                                'provider'
+                            ],
+                        'provider_subscription_id' =>
+                            null,
                     ]
                 );
 
@@ -704,6 +722,69 @@ if (!function_exists('billing_seat_topup_apply_paid_attempt')) {
             if ($historyRecordId < 1) {
                 throw new RuntimeException(
                     'Applied seat top-up did not create a valid immutable commercial-history record.'
+                );
+            }
+
+            if (($history['inserted'] ?? false)
+                !== true) {
+                throw new RuntimeException(
+                    'Applied seat top-up did not append its own immutable commercial-history record.'
+                );
+            }
+
+            $historyBilling =
+                is_array(
+                    $history[
+                        'billing_metadata'
+                    ] ?? null
+                )
+                    ? $history[
+                        'billing_metadata'
+                    ]
+                    : [];
+
+            $historyBillingMatches =
+                (string)(
+                    $historyBilling[
+                        'billing_interval'
+                    ] ?? ''
+                ) ===
+                    $attemptContract[
+                        'billing_interval'
+                    ]
+                && (string)(
+                    $historyBilling[
+                        'amount'
+                    ] ?? ''
+                ) ===
+                    $attemptContract['amount']
+                && strtoupper(
+                    (string)(
+                        $historyBilling[
+                            'currency'
+                        ] ?? ''
+                    )
+                ) ===
+                    $attemptContract[
+                        'currency'
+                    ]
+                && (string)(
+                    $historyBilling[
+                        'provider'
+                    ] ?? ''
+                ) ===
+                    $attemptContract[
+                        'provider'
+                    ]
+                && (
+                    $historyBilling[
+                        'provider_subscription_id'
+                    ] ?? null
+                ) === null;
+
+            if (!$historyBillingMatches) {
+                throw new RuntimeException(
+                    'Recorded commercial history billing metadata does not match the paid seat top-up.'
                 );
             }
 

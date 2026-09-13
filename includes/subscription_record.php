@@ -843,7 +843,8 @@ if (!function_exists('subscription_record_capture')) {
         PDO $pdo,
         int $farmId,
         string $reason = 'platform_owner_update',
-        ?int $recordedByUserId = null
+        ?int $recordedByUserId = null,
+        ?array $billingMetadata = null
     ): array {
         if (!subscription_record_table_ready($pdo)) {
             throw new RuntimeException(
@@ -865,21 +866,157 @@ if (!function_exists('subscription_record_capture')) {
             ];
         }
 
-        $billingInterval = strtolower(trim((string)($latest['billing_interval'] ?? 'monthly')));
-        if (!in_array($billingInterval, ['monthly', 'annual'], true)) $billingInterval = 'monthly';
+        $billingMetadata =
+            $billingMetadata ?? [];
 
-        $amount = isset($latest['amount']) && is_numeric($latest['amount'])
-            ? number_format((float)$latest['amount'], 2, '.', '')
-            : '0.00';
+        $billingIntervalExplicit =
+            array_key_exists(
+                'billing_interval',
+                $billingMetadata
+            );
 
-        $currency = strtoupper(trim((string)($latest['currency'] ?? 'USD')));
-        if (!preg_match('/^[A-Z]{3}$/', $currency)) $currency = 'USD';
+        $billingInterval = strtolower(trim(
+            (string)(
+                $billingIntervalExplicit
+                    ? $billingMetadata[
+                        'billing_interval'
+                    ]
+                    : (
+                        $latest[
+                            'billing_interval'
+                        ] ?? 'monthly'
+                    )
+            )
+        ));
 
-        $provider = trim((string)($latest['provider'] ?? ''));
-        $provider = $provider !== '' ? $provider : null;
-        $providerSubscriptionId = trim((string)($latest['provider_subscription_id'] ?? ''));
-        $providerSubscriptionId = $providerSubscriptionId !== '' ? $providerSubscriptionId : null;
-        $currentPeriodEndsAt = $latest['current_period_ends_at'] ?? null;
+        if (!in_array(
+            $billingInterval,
+            ['monthly', 'annual'],
+            true
+        )) {
+            if ($billingIntervalExplicit) {
+                throw new InvalidArgumentException(
+                    'Explicit commercial-history billing interval is invalid.'
+                );
+            }
+
+            $billingInterval = 'monthly';
+        }
+
+        $amountExplicit =
+            array_key_exists(
+                'amount',
+                $billingMetadata
+            );
+
+        $amountRaw =
+            $amountExplicit
+                ? $billingMetadata['amount']
+                : ($latest['amount'] ?? null);
+
+        if (is_numeric($amountRaw)
+            && (float)$amountRaw >= 0) {
+            $amount = number_format(
+                (float)$amountRaw,
+                2,
+                '.',
+                ''
+            );
+        } elseif ($amountExplicit) {
+            throw new InvalidArgumentException(
+                'Explicit commercial-history amount is invalid.'
+            );
+        } else {
+            $amount = '0.00';
+        }
+
+        $currencyExplicit =
+            array_key_exists(
+                'currency',
+                $billingMetadata
+            );
+
+        $currency = strtoupper(trim(
+            (string)(
+                $currencyExplicit
+                    ? $billingMetadata['currency']
+                    : ($latest['currency'] ?? 'USD')
+            )
+        ));
+
+        if (!preg_match(
+            '/^[A-Z]{3}$/',
+            $currency
+        )) {
+            if ($currencyExplicit) {
+                throw new InvalidArgumentException(
+                    'Explicit commercial-history currency is invalid.'
+                );
+            }
+
+            $currency = 'USD';
+        }
+
+        $providerSource =
+            array_key_exists(
+                'provider',
+                $billingMetadata
+            )
+                ? $billingMetadata['provider']
+                : ($latest['provider'] ?? null);
+
+        $provider =
+            trim(
+                (string)(
+                    $providerSource ?? ''
+                )
+            );
+
+        $provider =
+            $provider !== ''
+                ? $provider
+                : null;
+
+        $providerSubscriptionSource =
+            array_key_exists(
+                'provider_subscription_id',
+                $billingMetadata
+            )
+                ? $billingMetadata[
+                    'provider_subscription_id'
+                ]
+                : (
+                    $latest[
+                        'provider_subscription_id'
+                    ] ?? null
+                );
+
+        $providerSubscriptionId =
+            trim(
+                (string)(
+                    $providerSubscriptionSource
+                    ?? ''
+                )
+            );
+
+        $providerSubscriptionId =
+            $providerSubscriptionId !== ''
+                ? $providerSubscriptionId
+                : null;
+
+        $currentPeriodEndsAt =
+            array_key_exists(
+                'current_period_ends_at',
+                $billingMetadata
+            )
+                ? $billingMetadata[
+                    'current_period_ends_at'
+                ]
+                : (
+                    $latest[
+                        'current_period_ends_at'
+                    ] ?? null
+                );
 
         $reason =
             subscription_record_normalize_reason(
@@ -924,6 +1061,20 @@ if (!function_exists('subscription_record_capture')) {
             'id' => (int)$pdo->lastInsertId(),
             'snapshot_hash' => $hash,
             'snapshot' => $snapshot,
+            'billing_metadata' => [
+                'billing_interval' =>
+                    $billingInterval,
+                'amount' =>
+                    $amount,
+                'currency' =>
+                    $currency,
+                'provider' =>
+                    $provider,
+                'provider_subscription_id' =>
+                    $providerSubscriptionId,
+                'current_period_ends_at' =>
+                    $currentPeriodEndsAt,
+            ],
         ];
     }
 }
