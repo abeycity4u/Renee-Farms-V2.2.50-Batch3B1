@@ -1183,6 +1183,37 @@ if (!function_exists(
             );
         }
 
+        $seatApplicationHistoryId =
+            (int)(
+                $requestState[
+                    'applied_subscription_record_id'
+                ] ?? 0
+            );
+
+        if ($seatApplicationHistoryId < 1) {
+            throw new RuntimeException(
+                'Refunded seat-top-up request is missing its immutable application-history link.'
+            );
+        }
+
+        $seatApplicationSource =
+            subscription_record_history_source_contract(
+                $pdo,
+                $farmId,
+                $seatApplicationHistoryId
+            );
+
+        if (
+            (int)$seatApplicationSource['id']
+                !== $seatApplicationHistoryId
+            || (int)$seatApplicationSource['farm_id']
+                !== $farmId
+        ) {
+            throw new RuntimeException(
+                'Refunded seat-top-up application history is not valid for this tenant.'
+            );
+        }
+
         return [
             'attempt_id' => $attemptId,
             'farm_id' => $farmId,
@@ -1191,6 +1222,10 @@ if (!function_exists(
             'applied_subscription_record_id' => null,
             'seat_change_request_id' =>
                 $seatChangeRequestId,
+            'seat_change_applied_subscription_record_id' =>
+                $seatApplicationHistoryId,
+            'seat_request_contract' =>
+                $requestContract,
         ];
     }
 }
@@ -1398,6 +1433,736 @@ if (!function_exists(
 }
 
 if (!function_exists(
+    'billing_refund_resolution_finalize_reverse'
+)) {
+    /**
+     * Finish one already-proven compensating refund reversal.
+     *
+     * Provider/payment audit fact and original application history
+     * remain untouched. The caller owns the surrounding transaction.
+     */
+    function billing_refund_resolution_finalize_reverse(
+        PDO $pdo,
+        array $resolutionContract,
+        int $paymentAttemptId,
+        int $farmId,
+        int $resolvedByUserId,
+        string $reason,
+        int $reversalSubscriptionRecordId
+    ): array {
+        if (!$pdo->inTransaction()) {
+            throw new RuntimeException(
+                'Refund reversal finalization requires an active database transaction.'
+            );
+        }
+
+        if (
+            $paymentAttemptId < 1
+            || $farmId < 1
+            || $resolvedByUserId < 1
+            || $reversalSubscriptionRecordId < 1
+        ) {
+            throw new RuntimeException(
+                'Refund reversal finalization identity is invalid.'
+            );
+        }
+
+        if (
+            (string)(
+                $resolutionContract['status']
+                ?? ''
+            ) !== 'pending_review'
+        ) {
+            throw new RuntimeException(
+                'Only a pending refund review can be finalized as reversed.'
+            );
+        }
+
+        subscription_record_history_source_contract(
+            $pdo,
+            $farmId,
+            $reversalSubscriptionRecordId
+        );
+
+        $update =
+            $pdo->prepare(
+                "UPDATE billing_refund_resolutions
+                 SET status = 'resolved',
+                     resolution_action =
+                         'reverse_entitlement',
+                     reversal_subscription_record_id = ?,
+                     resolved_at = CURRENT_TIMESTAMP,
+                     resolved_by_user_id = ?,
+                     resolution_reason = ?,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ?
+                   AND payment_attempt_id = ?
+                   AND farm_id = ?
+                   AND status = 'pending_review'
+                   AND reversal_subscription_record_id
+                       IS NULL"
+            );
+
+        $update->execute([
+            $reversalSubscriptionRecordId,
+            $resolvedByUserId,
+            $reason,
+            (int)$resolutionContract['id'],
+            $paymentAttemptId,
+            $farmId,
+        ]);
+
+        if ($update->rowCount() !== 1) {
+            throw new RuntimeException(
+                'Refund reversal could not be resolved exactly once.'
+            );
+        }
+
+        $resolved =
+            billing_refund_resolution_by_payment(
+                $pdo,
+                $paymentAttemptId,
+                false
+            );
+
+        if ($resolved === null) {
+            throw new RuntimeException(
+                'Resolved refund reversal could not be reloaded.'
+            );
+        }
+
+        $resolvedContract =
+            billing_refund_resolution_row_contract(
+                $resolved
+            );
+
+        if (
+            (string)$resolvedContract['status']
+                !== 'resolved'
+            || (string)(
+                $resolvedContract[
+                    'resolution_action'
+                ] ?? ''
+            ) !== 'reverse_entitlement'
+            || (int)(
+                $resolvedContract[
+                    'reversal_subscription_record_id'
+                ] ?? 0
+            ) !== $reversalSubscriptionRecordId
+            || (int)(
+                $resolvedContract[
+                    'resolved_by_user_id'
+                ] ?? 0
+            ) !== $resolvedByUserId
+            || (string)(
+                $resolvedContract[
+                    'resolution_reason'
+                ] ?? ''
+            ) !== $reason
+            || empty(
+                $resolvedContract[
+                    'resolved_at'
+                ]
+            )
+        ) {
+            throw new RuntimeException(
+                'Refund reversal failed its post-write resolution audit contract.'
+            );
+        }
+
+        return $resolved;
+    }
+}
+
+if (!function_exists(
+    'billing_refund_resolution_resolve_reverse_seat_topup_pending'
+)) {
+    /**
+     * Compensate one still-current applied seat-top-up.
+     *
+     * The original payment fact, seat request and application history
+     * remain immutable. Only purchased extra seats and their effective
+     * role limits are restored to the immediate predecessor snapshot.
+     */
+    function billing_refund_resolution_resolve_reverse_seat_topup_pending(
+        PDO $pdo,
+        int $paymentAttemptId,
+        int $resolvedByUserId,
+        string $reason,
+        array $lineage
+    ): array {
+        if (!$pdo->inTransaction()) {
+            throw new RuntimeException(
+                'Seat-top-up refund reversal requires an active database transaction.'
+            );
+        }
+
+        $resolutionContract =
+            $lineage['resolution_contract']
+            ?? null;
+
+        $requestContract =
+            $lineage['seat_request_contract']
+            ?? null;
+
+        if (
+            !is_array($resolutionContract)
+            || !is_array($requestContract)
+            || (string)(
+                $resolutionContract['status']
+                ?? ''
+            ) !== 'pending_review'
+        ) {
+            throw new RuntimeException(
+                'Seat-top-up refund reversal requires a locked pending review contract.'
+            );
+        }
+
+        $farmId =
+            (int)(
+                $lineage['farm_id']
+                ?? 0
+            );
+
+        $seatChangeRequestId =
+            (int)(
+                $lineage[
+                    'seat_change_request_id'
+                ] ?? 0
+            );
+
+        $applicationHistoryId =
+            (int)(
+                $lineage[
+                    'seat_change_applied_subscription_record_id'
+                ] ?? 0
+            );
+
+        if (
+            $farmId < 1
+            || $seatChangeRequestId < 1
+            || $applicationHistoryId < 1
+        ) {
+            throw new RuntimeException(
+                'Seat-top-up refund reversal lineage is incomplete.'
+            );
+        }
+
+        if (
+            (string)(
+                $requestContract[
+                    'change_kind'
+                ] ?? ''
+            ) !== 'add'
+            || (int)(
+                $requestContract[
+                    'payment_attempt_id'
+                ] ?? 0
+            ) !== $paymentAttemptId
+            || (int)(
+                $requestContract[
+                    'farm_id'
+                ] ?? 0
+            ) !== $farmId
+        ) {
+            throw new RuntimeException(
+                'Seat-top-up refund reversal request identity is invalid.'
+            );
+        }
+
+        $roleCode =
+            billing_seat_change_normalize_role(
+                (string)(
+                    $requestContract[
+                        'role_code'
+                    ] ?? ''
+                )
+            );
+
+        $fromExtraSeats =
+            billing_seat_change_normalize_count(
+                $requestContract[
+                    'from_extra_seats'
+                ] ?? null
+            );
+
+        $toExtraSeats =
+            billing_seat_change_normalize_count(
+                $requestContract[
+                    'to_extra_seats'
+                ] ?? null
+            );
+
+        if ($toExtraSeats <= $fromExtraSeats) {
+            throw new RuntimeException(
+                'Seat-top-up refund reversal request is not an increase.'
+            );
+        }
+
+        /*
+         * Canonical lock order has already locked:
+         * payment attempt -> refund resolution -> seat request.
+         * Current tenant runtime is locked next.
+         */
+        $farmStmt =
+            $pdo->prepare(
+                "SELECT id
+                 FROM farms
+                 WHERE id = ?
+                   AND slug <> 'owner'
+                 LIMIT 1
+                 FOR UPDATE"
+            );
+
+        $farmStmt->execute([
+            $farmId,
+        ]);
+
+        if (!$farmStmt->fetchColumn()) {
+            throw new RuntimeException(
+                'Tenant farm could not be locked for seat-top-up refund reversal.'
+            );
+        }
+
+        /*
+         * The exact history created by the paid top-up must still
+         * be this tenant's latest immutable commercial row.
+         */
+        $latestStmt =
+            $pdo->prepare(
+                "SELECT
+                     id,
+                     change_reason
+                 FROM subscriptions
+                 WHERE farm_id = ?
+                 ORDER BY id DESC
+                 LIMIT 1
+                 FOR UPDATE"
+            );
+
+        $latestStmt->execute([
+            $farmId,
+        ]);
+
+        $latest =
+            $latestStmt->fetch(PDO::FETCH_ASSOC)
+            ?: null;
+
+        if (
+            !is_array($latest)
+            || (int)$latest['id']
+                !== $applicationHistoryId
+        ) {
+            throw new RuntimeException(
+                'Seat-top-up refund reversal is stale because newer tenant commercial history exists.'
+            );
+        }
+
+        if (
+            (string)(
+                $latest['change_reason']
+                ?? ''
+            ) !== 'seat_topup_payment_applied'
+        ) {
+            throw new RuntimeException(
+                'Seat-top-up refund reversal application history has an unexpected reason.'
+            );
+        }
+
+        $applicationSource =
+            subscription_record_history_source_contract(
+                $pdo,
+                $farmId,
+                $applicationHistoryId
+            );
+
+        /*
+         * Runtime must still exactly equal the applied top-up snapshot.
+         */
+        $runtimeBefore =
+            subscription_record_build_snapshot(
+                $pdo,
+                $farmId
+            );
+
+        $runtimeBeforeHash =
+            (string)(
+                $runtimeBefore[
+                    'snapshot_hash'
+                ] ?? ''
+            );
+
+        if (
+            $runtimeBeforeHash === ''
+            || !hash_equals(
+                (string)$applicationSource[
+                    'snapshot_hash'
+                ],
+                $runtimeBeforeHash
+            )
+        ) {
+            throw new RuntimeException(
+                'Seat-top-up refund reversal is stale because current commercial state no longer matches the applied top-up.'
+            );
+        }
+
+        /*
+         * Immediate same-tenant predecessor only.
+         */
+        $predecessorStmt =
+            $pdo->prepare(
+                "SELECT id
+                 FROM subscriptions
+                 WHERE farm_id = ?
+                   AND id < ?
+                 ORDER BY id DESC
+                 LIMIT 1
+                 FOR UPDATE"
+            );
+
+        $predecessorStmt->execute([
+            $farmId,
+            $applicationHistoryId,
+        ]);
+
+        $predecessorHistoryId =
+            (int)$predecessorStmt->fetchColumn();
+
+        if ($predecessorHistoryId < 1) {
+            throw new RuntimeException(
+                'Seat-top-up refund reversal has no immediate predecessor commercial history.'
+            );
+        }
+
+        $predecessor =
+            subscription_record_history_source_contract(
+                $pdo,
+                $farmId,
+                $predecessorHistoryId
+            );
+
+        $appliedSnapshot =
+            $applicationSource['snapshot'];
+
+        $targetSnapshot =
+            $predecessor['snapshot'];
+
+        /*
+         * Paid seat-top-up application changes seats only.
+         * Plan/status/term/modules must therefore be identical.
+         */
+        $commercialInvariantOk =
+            (string)$appliedSnapshot['plan_code']
+                === (string)$targetSnapshot['plan_code']
+            && (string)$appliedSnapshot['status']
+                === (string)$targetSnapshot['status']
+            && (
+                $appliedSnapshot[
+                    'subscription_starts_at'
+                ] ?? null
+            ) === (
+                $targetSnapshot[
+                    'subscription_starts_at'
+                ] ?? null
+            )
+            && (
+                $appliedSnapshot[
+                    'subscription_ends_at'
+                ] ?? null
+            ) === (
+                $targetSnapshot[
+                    'subscription_ends_at'
+                ] ?? null
+            )
+            && (
+                $appliedSnapshot['modules']
+                ?? null
+            ) === (
+                $targetSnapshot['modules']
+                ?? null
+            );
+
+        $requestPlan =
+            billing_seat_change_normalize_plan(
+                (string)(
+                    $requestContract[
+                        'plan_code'
+                    ] ?? ''
+                )
+            );
+
+        $requestModules =
+            billing_seat_change_normalize_modules(
+                is_array(
+                    $requestContract[
+                        'modules'
+                    ] ?? null
+                )
+                    ? $requestContract[
+                        'modules'
+                    ]
+                    : []
+            );
+
+        if (
+            !$commercialInvariantOk
+            || $requestPlan
+                !== (string)$appliedSnapshot['plan_code']
+            || $requestPlan
+                !== (string)$targetSnapshot['plan_code']
+            || $requestModules
+                !== $appliedSnapshot['modules']
+            || $requestModules
+                !== $targetSnapshot['modules']
+        ) {
+            throw new RuntimeException(
+                'Seat-top-up refund reversal predecessor differs outside the purchased seat change.'
+            );
+        }
+
+        $appliedSeats =
+            subscription_seat_normalize_addons(
+                $appliedSnapshot[
+                    'seat_addons'
+                ] ?? []
+            );
+
+        $targetSeats =
+            subscription_seat_normalize_addons(
+                $targetSnapshot[
+                    'seat_addons'
+                ] ?? []
+            );
+
+        ksort(
+            $appliedSeats,
+            SORT_STRING
+        );
+
+        ksort(
+            $targetSeats,
+            SORT_STRING
+        );
+
+        /*
+         * Target role must be exactly from -> to.
+         */
+        if (
+            (int)(
+                $appliedSeats[
+                    $roleCode
+                ] ?? 0
+            ) !== $toExtraSeats
+            || (int)(
+                $targetSeats[
+                    $roleCode
+                ] ?? 0
+            ) !== $fromExtraSeats
+        ) {
+            throw new RuntimeException(
+                'Seat-top-up refund reversal history does not match the requested role seat transition.'
+            );
+        }
+
+        /*
+         * Every non-target role must be identical.
+         */
+        $appliedOtherSeats =
+            $appliedSeats;
+
+        $targetOtherSeats =
+            $targetSeats;
+
+        unset(
+            $appliedOtherSeats[
+                $roleCode
+            ],
+            $targetOtherSeats[
+                $roleCode
+            ]
+        );
+
+        if ($appliedOtherSeats !== $targetOtherSeats) {
+            throw new RuntimeException(
+                'Seat-top-up refund reversal detects unrelated seat changes in the application history.'
+            );
+        }
+
+        /*
+         * Never reduce purchased capacity below assigned users.
+         */
+        subscription_seat_assert_capacity(
+            $pdo,
+            $farmId,
+            (string)$targetSnapshot[
+                'plan_code'
+            ],
+            $targetSnapshot[
+                'modules'
+            ],
+            $targetSeats
+        );
+
+        /*
+         * Restore only the runtime state originally changed by top-up.
+         */
+        subscription_seat_save_addons(
+            $pdo,
+            $farmId,
+            $targetSeats
+        );
+
+        $effectiveLimits =
+            subscription_seat_save_effective_limits(
+                $pdo,
+                $farmId,
+                (string)$targetSnapshot[
+                    'plan_code'
+                ],
+                $targetSnapshot[
+                    'modules'
+                ],
+                $targetSeats
+            );
+
+        $restored =
+            subscription_record_build_snapshot(
+                $pdo,
+                $farmId
+            );
+
+        $restoredHash =
+            (string)(
+                $restored[
+                    'snapshot_hash'
+                ] ?? ''
+            );
+
+        if (
+            $restoredHash === ''
+            || !hash_equals(
+                (string)$predecessor[
+                    'snapshot_hash'
+                ],
+                $restoredHash
+            )
+        ) {
+            throw new RuntimeException(
+                'Seat-top-up refund reversal failed to restore the exact predecessor commercial snapshot.'
+            );
+        }
+
+        /*
+         * Append compensation; never rewrite original history.
+         */
+        $compensation =
+            subscription_record_append_from_history_source(
+                $pdo,
+                $farmId,
+                $predecessorHistoryId,
+                'billing_refund_reversed',
+                $resolvedByUserId
+            );
+
+        $reversalHistoryId =
+            (int)(
+                $compensation['id']
+                ?? 0
+            );
+
+        if ($reversalHistoryId < 1) {
+            throw new RuntimeException(
+                'Seat-top-up refund reversal compensating history has no valid identity.'
+            );
+        }
+
+        $resolved =
+            billing_refund_resolution_finalize_reverse(
+                $pdo,
+                $resolutionContract,
+                $paymentAttemptId,
+                $farmId,
+                $resolvedByUserId,
+                $reason,
+                $reversalHistoryId
+            );
+
+        /*
+         * Final audit: compensation must exactly equal predecessor
+         * and must now be latest commercial history.
+         */
+        $reversalSource =
+            subscription_record_history_source_contract(
+                $pdo,
+                $farmId,
+                $reversalHistoryId
+            );
+
+        if (
+            !hash_equals(
+                (string)$predecessor[
+                    'snapshot_hash'
+                ],
+                (string)$reversalSource[
+                    'snapshot_hash'
+                ]
+            )
+        ) {
+            throw new RuntimeException(
+                'Seat-top-up refund reversal compensation does not match its predecessor source.'
+            );
+        }
+
+        $latestAfterStmt =
+            $pdo->prepare(
+                "SELECT id
+                 FROM subscriptions
+                 WHERE farm_id = ?
+                 ORDER BY id DESC
+                 LIMIT 1"
+            );
+
+        $latestAfterStmt->execute([
+            $farmId,
+        ]);
+
+        if (
+            (int)$latestAfterStmt->fetchColumn()
+                !== $reversalHistoryId
+        ) {
+            throw new RuntimeException(
+                'Seat-top-up refund reversal compensation is not the tenant latest commercial record.'
+            );
+        }
+
+        return [
+            'resolved' => true,
+            'idempotent' => false,
+            'reason' => 'reverse_entitlement',
+            'purpose' => 'seat_topup',
+            'resolution' => $resolved,
+            'lineage' => $lineage,
+            'seat_change_request_id' =>
+                $seatChangeRequestId,
+            'role_code' =>
+                $roleCode,
+            'from_extra_seats' =>
+                $fromExtraSeats,
+            'to_extra_seats' =>
+                $toExtraSeats,
+            'predecessor_subscription_record_id' =>
+                $predecessorHistoryId,
+            'reversal_subscription_record_id' =>
+                $reversalHistoryId,
+            'restored_snapshot_hash' =>
+                $restoredHash,
+            'effective_role_limits' =>
+                $effectiveLimits,
+        ];
+    }
+}
+
+if (!function_exists(
     'billing_refund_resolution_resolve_reverse'
 )) {
     /**
@@ -1473,14 +2238,16 @@ if (!function_exists(
                 $attempt
             );
 
-        /*
-         * Seat-top-up reversal has a different targeted commercial proof:
-         * request role/from/to seats + its durable application-history link.
-         * Do not reuse subscription rollback semantics for it.
-         */
-        if ($purpose !== 'subscription') {
+        if (!in_array(
+            $purpose,
+            [
+                'subscription',
+                'seat_topup',
+            ],
+            true
+        )) {
             throw new RuntimeException(
-                'Seat-top-up refund reversal is not enabled by the subscription reversal contract.'
+                'Unsupported payment purpose for refund reversal.'
             );
         }
 
@@ -1520,12 +2287,49 @@ if (!function_exists(
                 ] ?? 0
             );
 
+        $seatApplicationHistoryId =
+            (int)(
+                $lineage[
+                    'seat_change_applied_subscription_record_id'
+                ] ?? 0
+            );
+
+        $seatChangeRequestId =
+            (int)(
+                $lineage[
+                    'seat_change_request_id'
+                ] ?? 0
+            );
+
+        if ($farmId < 1) {
+            throw new RuntimeException(
+                'Refund reversal tenant lineage is invalid.'
+            );
+        }
+
         if (
-            $farmId < 1
-            || $appliedSubscriptionRecordId < 1
+            $purpose === 'subscription'
+            && $appliedSubscriptionRecordId < 1
         ) {
             throw new RuntimeException(
                 'Refund reversal subscription lineage is invalid.'
+            );
+        }
+
+        if (
+            $purpose === 'seat_topup'
+            && (
+                $seatApplicationHistoryId < 1
+                || $seatChangeRequestId < 1
+                || !is_array(
+                    $lineage[
+                        'seat_request_contract'
+                    ] ?? null
+                )
+            )
+        ) {
+            throw new RuntimeException(
+                'Refund reversal seat-top-up lineage is invalid.'
             );
         }
 
@@ -1582,6 +2386,16 @@ if (!function_exists(
         if ((string)$contract['status'] !== 'pending_review') {
             throw new RuntimeException(
                 'Refund resolution is not pending review.'
+            );
+        }
+
+        if ($purpose === 'seat_topup') {
+            return billing_refund_resolution_resolve_reverse_seat_topup_pending(
+                $pdo,
+                $paymentAttemptId,
+                $resolvedByUserId,
+                $reason,
+                $lineage
             );
         }
 
@@ -1872,91 +2686,19 @@ if (!function_exists(
         }
 
         /*
-         * Resolve review and durably bind the exact compensation history row.
+         * Complete subscription reversal through the same
+         * exactly-once finalizer used by seat-top-up reversal.
          */
-        $updateResolution =
-            $pdo->prepare(
-                "UPDATE billing_refund_resolutions
-                 SET status = 'resolved',
-                     resolution_action =
-                         'reverse_entitlement',
-                     reversal_subscription_record_id = ?,
-                     resolved_at = CURRENT_TIMESTAMP,
-                     resolved_by_user_id = ?,
-                     resolution_reason = ?,
-                     updated_at = CURRENT_TIMESTAMP
-                 WHERE id = ?
-                   AND payment_attempt_id = ?
-                   AND status = 'pending_review'
-                   AND reversal_subscription_record_id
-                       IS NULL"
-            );
-
-        $updateResolution->execute([
-            $reversalSubscriptionRecordId,
-            $resolvedByUserId,
-            $reason,
-            (int)$contract['id'],
-            $paymentAttemptId,
-        ]);
-
-        if ($updateResolution->rowCount() !== 1) {
-            throw new RuntimeException(
-                'Refund reversal could not be resolved exactly once.'
-            );
-        }
-
         $resolved =
-            billing_refund_resolution_by_payment(
+            billing_refund_resolution_finalize_reverse(
                 $pdo,
+                $contract,
                 $paymentAttemptId,
-                false
+                $farmId,
+                $resolvedByUserId,
+                $reason,
+                $reversalSubscriptionRecordId
             );
-
-        if ($resolved === null) {
-            throw new RuntimeException(
-                'Resolved refund reversal could not be reloaded.'
-            );
-        }
-
-        $resolvedContract =
-            billing_refund_resolution_row_contract(
-                $resolved
-            );
-
-        if (
-            (string)$resolvedContract['status']
-                !== 'resolved'
-            || (string)(
-                $resolvedContract[
-                    'resolution_action'
-                ] ?? ''
-            ) !== 'reverse_entitlement'
-            || (int)(
-                $resolvedContract[
-                    'reversal_subscription_record_id'
-                ] ?? 0
-            ) !== $reversalSubscriptionRecordId
-            || (int)(
-                $resolvedContract[
-                    'resolved_by_user_id'
-                ] ?? 0
-            ) !== $resolvedByUserId
-            || (string)(
-                $resolvedContract[
-                    'resolution_reason'
-                ] ?? ''
-            ) !== $reason
-            || empty(
-                $resolvedContract[
-                    'resolved_at'
-                ]
-            )
-        ) {
-            throw new RuntimeException(
-                'Refund reversal failed its post-write resolution audit contract.'
-            );
-        }
 
         $reversalSource =
             subscription_record_history_source_contract(

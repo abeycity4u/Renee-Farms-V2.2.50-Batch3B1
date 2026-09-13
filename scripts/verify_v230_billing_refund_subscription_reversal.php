@@ -229,6 +229,23 @@ $source =
         )
     );
 
+$finalizerReflection =
+    new ReflectionFunction(
+        'billing_refund_resolution_finalize_reverse'
+    );
+
+$finalizerSource =
+    implode(
+        '',
+        array_slice(
+            $lines,
+            $finalizerReflection->getStartLine() - 1,
+            $finalizerReflection->getEndLine()
+                - $finalizerReflection->getStartLine()
+                + 1
+        )
+    );
+
 $check(
     strpos(
         $source,
@@ -252,9 +269,13 @@ $check(
 $check(
     strpos(
         $source,
+        "billing_refund_resolution_resolve_reverse_seat_topup_pending("
+    ) !== false
+    && strpos(
+        $source,
         "Seat-top-up refund reversal is not enabled"
-    ) !== false,
-    'seat-top-up reversal fails closed in subscription-only resolver'
+    ) === false,
+    'shared reverse resolver dispatches seat-top-up refunds to the dedicated bounded branch'
 );
 
 $check(
@@ -344,13 +365,21 @@ $check(
 $check(
     strpos(
         $source,
+        "billing_refund_resolution_finalize_reverse("
+    ) !== false
+    && strpos(
+        $finalizerSource,
+        "UPDATE billing_refund_resolutions"
+    ) !== false
+    && strpos(
+        $finalizerSource,
         "reversal_subscription_record_id = ?"
     ) !== false
     && strpos(
-        $source,
+        $finalizerSource,
         "'reverse_entitlement'"
     ) !== false,
-    'resolution atomically records reverse action and exact compensation history'
+    'resolution uses shared exactly-once finalizer with exact compensation history'
 );
 
 $forbiddenPaymentDml =
