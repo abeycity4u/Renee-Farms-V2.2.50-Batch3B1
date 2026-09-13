@@ -1,6 +1,6 @@
 <?php
 /**
- * V2.3 Gap D Phase 3A Platform Owner refund-review surface verifier.
+ * V2.3 Gap D Platform Owner refund-review surface verifier.
  *
  * Static/database-free/provider-network-free.
  *
