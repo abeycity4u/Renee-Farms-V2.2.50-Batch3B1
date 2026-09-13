@@ -23,7 +23,18 @@ $pagePath =
 $navPath =
     $root . '/includes/platform_owner_nav_discoverability.php';
 
-foreach ([$pagePath, $navPath] as $requiredPath) {
+$headPath =
+    $root . '/navbar_head.php';
+
+$confirmationPath =
+    $root . '/assets/js/confirmations.js';
+
+foreach ([
+    $pagePath,
+    $navPath,
+    $headPath,
+    $confirmationPath,
+] as $requiredPath) {
     if (!is_file($requiredPath)) {
         fwrite(
             STDERR,
@@ -40,6 +51,12 @@ $page =
 
 $nav =
     (string)file_get_contents($navPath);
+
+$head =
+    (string)file_get_contents($headPath);
+
+$confirmation =
+    (string)file_get_contents($confirmationPath);
 
 $checks = 0;
 $failures = 0;
@@ -155,6 +172,54 @@ $check(
         'billing_refund_resolution_ready($pdo)'
     ) !== false,
     'surface fails closed when refund-resolution storage is not ready'
+);
+
+$check(
+    strpos(
+        $page,
+        'data-confirm="Preserve this tenant\'s already-applied commercial entitlement despite the verified provider refund?"'
+    ) !== false
+    && strpos(
+        $page,
+        'data-confirm-title="Preserve entitlement?"'
+    ) !== false
+    && strpos(
+        $page,
+        'data-confirm-button="Preserve Entitlement"'
+    ) !== false
+    && strpos(
+        $page,
+        'data-confirm-tone="primary"'
+    ) !== false
+    && strpos(
+        $page,
+        'data-confirm-message='
+    ) === false,
+    'preserve form uses canonical shared confirmation attributes'
+);
+
+$check(
+    strpos(
+        $head,
+        '/assets/js/confirmations.js'
+    ) !== false,
+    'shared authenticated head loads the platform confirmation runtime'
+);
+
+$check(
+    strpos(
+        $confirmation,
+        "form[data-confirm]"
+    ) !== false
+    && strpos(
+        $confirmation,
+        'opts.submitter'
+    ) !== false
+    && strpos(
+        $confirmation,
+        'form.submit()'
+    ) !== false,
+    'confirmation runtime consumes form data-confirm and preserves submitter semantics'
 );
 
 $check(

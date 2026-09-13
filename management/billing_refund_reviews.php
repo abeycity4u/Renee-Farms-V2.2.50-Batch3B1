@@ -349,6 +349,10 @@ $pageTitle =
                                         method="post"
                                         action="<?php echo $h(BASE_URL . '/management/billing_refund_reviews.php'); ?>"
                                         class="d-flex flex-column gap-2"
+                                        data-confirm="Preserve this tenant's already-applied commercial entitlement despite the verified provider refund?"
+                                        data-confirm-title="Preserve entitlement?"
+                                        data-confirm-button="Preserve Entitlement"
+                                        data-confirm-tone="primary"
                                     >
                                         <?php echo csrf_field(); ?>
 
@@ -380,7 +384,6 @@ $pageTitle =
                                             class="btn btn-sm btn-outline-primary"
                                             name="preserve_entitlement"
                                             value="1"
-                                            data-confirm-message="Preserve this tenant's already-applied commercial entitlement despite the verified provider refund?"
                                         >
                                             <i class="bi bi-shield-check"></i>
                                             Preserve entitlement
