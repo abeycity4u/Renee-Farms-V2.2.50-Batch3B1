@@ -119,6 +119,178 @@ $check(
     'non-JSON non-2xx responses preserve HTTP status without exposing an untrusted body'
 );
 
+$explicitCheckoutRejection =
+    new BillingProviderCheckoutRejectedException(
+        'Provider explicitly rejected checkout initialization.'
+    );
+
+$localCheckoutFailure =
+    new BillingProviderCheckoutNotSentException(
+        'Checkout failed before provider transport.'
+    );
+
+$ambiguousCheckoutFailure =
+    new RuntimeException(
+        'Simulated ambiguous provider response.'
+    );
+
+$check(
+    billing_provider_checkout_initialization_is_definitive_rejection(
+        $explicitCheckoutRejection
+    )
+    && !billing_provider_checkout_initialization_is_definitive_rejection(
+        $localCheckoutFailure
+    )
+    && !billing_provider_checkout_initialization_is_definitive_rejection(
+        $ambiguousCheckoutFailure
+    ),
+    'only explicit provider rejection satisfies the definitive-rejection classifier'
+);
+
+$check(
+    billing_provider_checkout_initialization_is_terminal(
+        $explicitCheckoutRejection
+    )
+    && billing_provider_checkout_initialization_is_terminal(
+        $localCheckoutFailure
+    )
+    && !billing_provider_checkout_initialization_is_terminal(
+        $ambiguousCheckoutFailure
+    )
+    && !billing_provider_checkout_initialization_is_terminal(
+        $opaqueHttpError
+    ),
+    'terminal initialization policy closes only not-sent or explicitly rejected attempts'
+);
+
+$check(
+    str_contains(
+        $source['paystack'],
+        'BillingProviderCheckoutNotSentException'
+    )
+    && str_contains(
+        $source['paystack'],
+        'throw new BillingProviderCheckoutRejectedException('
+    )
+    && str_contains(
+        $source['paystack'],
+        'Paystack checkout initialization response was incomplete.'
+    )
+    && str_contains(
+        $source['flutterwave'],
+        'BillingProviderCheckoutNotSentException'
+    )
+    && str_contains(
+        $source['flutterwave'],
+        'throw new BillingProviderCheckoutRejectedException('
+    )
+    && str_contains(
+        $source['flutterwave'],
+        'Flutterwave checkout initialization response was incomplete.'
+    ),
+    'both providers distinguish not-sent, explicit rejection and malformed-response ambiguity'
+);
+
+$flutterwaveExplicitErrorTransport =
+    static function (
+        string $method,
+        string $url,
+        array $headers,
+        ?array $payload = null
+    ): array {
+        return [
+            'status' => 200,
+            'json' => [
+                'status' => 'error',
+                'message' => 'Rejected',
+            ],
+        ];
+    };
+
+$flutterwaveExplicitErrorRejected = false;
+
+try {
+    $probeAdapter =
+        new FlutterwaveBillingProviderAdapter(
+            'stage2e-probe-secret',
+            'stage2e-probe-webhook-hash',
+            $flutterwaveExplicitErrorTransport
+        );
+
+    $probeAdapter->initializeCheckout([
+        'provider_reference' =>
+            'rf-stage2e-flutterwave-explicit-error',
+        'amount' => '100.00',
+        'currency' => 'NGN',
+        'context' => [
+            'customer_email' =>
+                'billing.qa@example.test',
+            'redirect_url' =>
+                'https://example.test/billing/return',
+        ],
+    ]);
+} catch (BillingProviderCheckoutRejectedException $e) {
+    $flutterwaveExplicitErrorRejected = true;
+}
+
+$check(
+    $flutterwaveExplicitErrorRejected,
+    'Flutterwave explicit status=error is a terminal checkout rejection'
+);
+
+$flutterwaveUnknownStatusTransport =
+    static function (
+        string $method,
+        string $url,
+        array $headers,
+        ?array $payload = null
+    ): array {
+        return [
+            'status' => 200,
+            'json' => [
+                'status' => 'unexpected-status',
+            ],
+        ];
+    };
+
+$flutterwaveUnknownStatusAmbiguous = false;
+
+try {
+    $probeAdapter =
+        new FlutterwaveBillingProviderAdapter(
+            'stage2e-probe-secret',
+            'stage2e-probe-webhook-hash',
+            $flutterwaveUnknownStatusTransport
+        );
+
+    $probeAdapter->initializeCheckout([
+        'provider_reference' =>
+            'rf-stage2e-flutterwave-unknown-status',
+        'amount' => '100.00',
+        'currency' => 'NGN',
+        'context' => [
+            'customer_email' =>
+                'billing.qa@example.test',
+            'redirect_url' =>
+                'https://example.test/billing/return',
+        ],
+    ]);
+} catch (Throwable $e) {
+    $flutterwaveUnknownStatusAmbiguous =
+        !($e instanceof
+            BillingProviderCheckoutRejectedException)
+        && !($e instanceof
+            BillingProviderCheckoutNotSentException)
+        && !billing_provider_checkout_initialization_is_terminal(
+            $e
+        );
+}
+
+$check(
+    $flutterwaveUnknownStatusAmbiguous,
+    'unknown Flutterwave initialization status remains ambiguous and recoverable'
+);
+
 $check(
     str_contains(
         $source['transport'],
@@ -282,11 +454,17 @@ try {
             'currency' => 'USD',
         ]
     );
-} catch (InvalidArgumentException $e) {
-    $paystackContextInjectionRejected = true;
+} catch (BillingProviderCheckoutNotSentException $e) {
+    $paystackContextInjectionRejected =
+        $e->getPrevious()
+            instanceof InvalidArgumentException;
 }
-$check($paystackContextInjectionRejected && count($paystackCalls) === $paystackCallsBeforeInjection,
-    'reserved context injection is rejected before Paystack transport is called');
+$check(
+    $paystackContextInjectionRejected
+    && count($paystackCalls)
+        === $paystackCallsBeforeInjection,
+    'reserved context injection is typed not-sent and rejected before Paystack transport is called'
+);
 
 $flutterwaveCalls = [];
 $flutterwaveTransport = static function (string $method, string $url, array $headers, ?array $payload = null) use (&$flutterwaveCalls): array {

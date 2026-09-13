@@ -219,37 +219,52 @@ try {
                 $context
             );
     } catch (Throwable $providerError) {
-        try {
-            $pdo->beginTransaction();
-
-            billing_audit_mark_initialization_failed(
-                $pdo,
-                $attemptId,
-                'seat_topup_checkout_initialization_failed'
+        $terminalInitializationFailure =
+            billing_provider_checkout_initialization_is_terminal(
+                $providerError
             );
 
-            billing_seat_change_mark_payment_failed(
-                $pdo,
-                $attemptId
-            );
+        /*
+         * Preserve ambiguous initialization as an initialized payment attempt
+         * plus awaiting-payment durable seat request. The reconciliation
+         * launcher will verify the provider before replacement or application.
+         */
+        if ($terminalInitializationFailure) {
+            try {
+                $pdo->beginTransaction();
 
-            $pdo->commit();
-        } catch (Throwable $cleanupError) {
-            if ($pdo->inTransaction()) {
-                $pdo->rollBack();
+                billing_audit_mark_initialization_failed(
+                    $pdo,
+                    $attemptId,
+                    'seat_topup_checkout_initialization_failed'
+                );
+
+                billing_seat_change_mark_payment_failed(
+                    $pdo,
+                    $attemptId
+                );
+
+                $pdo->commit();
+            } catch (Throwable $cleanupError) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+
+                throw new RuntimeException(
+                    'Seat-top-up checkout cleanup could not be recorded safely.',
+                    0,
+                    $cleanupError
+                );
             }
-
-            throw new RuntimeException(
-                'Seat-top-up checkout cleanup could not be recorded safely.',
-                0,
-                $cleanupError
-            );
         }
 
+        $checkoutFailureMessage =
+            $terminalInitializationFailure
+                ? 'Payment checkout could not be started. Please try again.'
+                : 'Seat top-up checkout status could not be confirmed. Please try again; the earlier attempt will be checked before a new checkout is started.';
+
         http_response_code(502);
-        exit(
-            'Payment checkout could not be started. Please try again.'
-        );
+        exit($checkoutFailureMessage);
     }
 
     try {

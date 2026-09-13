@@ -355,25 +355,53 @@ try {
             $context
         );
     } catch (Throwable $providerError) {
-        $pdo->beginTransaction();
-        try {
-            billing_audit_mark_initialization_failed($pdo, $attemptId, 'checkout_initialization_failed');
-            $pdo->commit();
-        } catch (Throwable $auditError) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
+        $terminalInitializationFailure =
+            billing_provider_checkout_initialization_is_terminal(
+                $providerError
+            );
+
+        /*
+         * Only a provably not-sent request or explicit provider rejection
+         * is terminal here.
+         *
+         * Network failure, timeout, malformed/empty response or checkout-result
+         * normalization failure is ambiguous: the provider may already hold the
+         * frozen reference. Preserve initialized so centralized recovery can
+         * verify the authoritative provider fact before replacement.
+         */
+        if ($terminalInitializationFailure) {
+            $pdo->beginTransaction();
+            try {
+                billing_audit_mark_initialization_failed(
+                    $pdo,
+                    $attemptId,
+                    'checkout_initialization_failed'
+                );
+                $pdo->commit();
+            } catch (Throwable $auditError) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+            }
         }
+
+        $checkoutFailureMessage =
+            $terminalInitializationFailure
+                ? 'Payment checkout could not be started. Please try again.'
+                : 'Payment checkout status could not be confirmed. Please try again; the earlier attempt will be checked before a new checkout is started.';
+
         if (!billing_tenant_actor_is_recovery(
             $actor
         )) {
             redirectWithNotification(
                 'error',
-                'Payment checkout could not be started. Please try again.',
+                $checkoutFailureMessage,
                 '/billing/account.php'
             );
         }
 
         http_response_code(502);
-        exit('Payment checkout could not be started. Please try again.');
+        exit($checkoutFailureMessage);
     }
 
     $pdo->beginTransaction();

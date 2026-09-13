@@ -6,7 +6,9 @@
  * is isolated behind an injectable transport callable for offline verification.
  */
 
-if (!interface_exists('BillingProviderAdapterInterface')) {
+if (!interface_exists('BillingProviderAdapterInterface')
+    || !class_exists('BillingProviderCheckoutNotSentException')
+    || !class_exists('BillingProviderCheckoutRejectedException')) {
     require_once __DIR__ . '/billing_provider_contract.php';
 }
 require_once __DIR__ . '/billing_provider_context.php';
@@ -57,27 +59,75 @@ if (!class_exists('FlutterwaveBillingProviderAdapter')) {
 
         public function initializeCheckout(array $request): array
         {
-            $reference = billing_provider_normalize_reference((string)($request['provider_reference'] ?? ''));
-            $amount = billing_provider_normalize_amount($request['amount'] ?? null);
-            $currency = billing_provider_normalize_currency((string)($request['currency'] ?? ''));
-            $context = billing_provider_sanitize_checkout_context(
-                is_array($request['context'] ?? null) ? $request['context'] : []
-            );
-            $redirectUrl = $context['redirect_url'] ?? $context['callback_url'] ?? null;
-            if ($redirectUrl === null) {
-                throw new InvalidArgumentException('Flutterwave checkout requires an HTTPS redirect URL.');
+            try {
+                $reference =
+                    billing_provider_normalize_reference(
+                        (string)(
+                            $request[
+                                'provider_reference'
+                            ] ?? ''
+                        )
+                    );
+
+                $amount =
+                    billing_provider_normalize_amount(
+                        $request['amount'] ?? null
+                    );
+
+                $currency =
+                    billing_provider_normalize_currency(
+                        (string)(
+                            $request['currency'] ?? ''
+                        )
+                    );
+
+                $context =
+                    billing_provider_sanitize_checkout_context(
+                        is_array(
+                            $request['context'] ?? null
+                        )
+                            ? $request['context']
+                            : []
+                    );
+
+                $redirectUrl =
+                    $context['redirect_url']
+                        ?? $context['callback_url']
+                        ?? null;
+
+                if ($redirectUrl === null) {
+                    throw new InvalidArgumentException(
+                        'Flutterwave checkout requires an HTTPS redirect URL.'
+                    );
+                }
+
+                $customer = [
+                    'email' =>
+                        $context['customer_email'],
+                ];
+
+                if (!empty(
+                    $context['customer_name']
+                )) {
+                    $customer['name'] =
+                        $context['customer_name'];
+                }
+
+                $payload = [
+                    'tx_ref' => $reference,
+                    'amount' => $amount,
+                    'currency' => $currency,
+                    'redirect_url' =>
+                        $redirectUrl,
+                    'customer' => $customer,
+                ];
+            } catch (Throwable $preflightError) {
+                throw new BillingProviderCheckoutNotSentException(
+                    'Flutterwave checkout request failed before provider transport.',
+                    0,
+                    $preflightError
+                );
             }
-
-            $customer = ['email' => $context['customer_email']];
-            if (!empty($context['customer_name'])) $customer['name'] = $context['customer_name'];
-
-            $payload = [
-                'tx_ref' => $reference,
-                'amount' => $amount,
-                'currency' => $currency,
-                'redirect_url' => $redirectUrl,
-                'customer' => $customer,
-            ];
 
             $response = billing_adapter_transport_call(
                 $this->transport,
@@ -87,10 +137,33 @@ if (!class_exists('FlutterwaveBillingProviderAdapter')) {
                 $payload
             );
             $json = $response['json'];
-            if (strtolower(trim((string)($json['status'] ?? ''))) !== 'success'
-                || !is_array($json['data'] ?? null)) {
-                throw new RuntimeException('Flutterwave checkout initialization was not accepted.');
+            $providerStatus =
+                strtolower(trim(
+                    (string)(
+                        $json['status'] ?? ''
+                    )
+                ));
+
+            /*
+             * Only Flutterwave's explicit initialization error marker is
+             * authoritative rejection here. Unknown status vocabulary is
+             * ambiguous and must remain recoverable.
+             */
+            if ($providerStatus === 'error') {
+                throw new BillingProviderCheckoutRejectedException(
+                    'Flutterwave checkout initialization was explicitly rejected.'
+                );
             }
+
+            if ($providerStatus !== 'success'
+                || !is_array(
+                    $json['data'] ?? null
+                )) {
+                throw new RuntimeException(
+                    'Flutterwave checkout initialization response was incomplete.'
+                );
+            }
+
             $data = $json['data'];
 
             return [

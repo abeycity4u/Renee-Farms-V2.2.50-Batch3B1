@@ -413,6 +413,41 @@ $check(
     'prior-attempt reconciliation and stop outcomes precede replacement-provider validation, preparation and initialization'
 );
 
+$routeProviderErrorPos = strpos(
+    $route,
+    'catch (Throwable $providerError)'
+);
+
+$routeRejectionPolicyPos = strpos(
+    $route,
+    'billing_provider_checkout_initialization_is_terminal('
+);
+
+$routeInitializationFailPos = strpos(
+    $route,
+    'billing_audit_mark_initialization_failed('
+);
+
+$check(
+    $routeProviderInitializePos !== false
+    && $routeProviderErrorPos !== false
+    && $routeRejectionPolicyPos !== false
+    && $routeInitializationFailPos !== false
+    && $routeProviderInitializePos < $routeProviderErrorPos
+    && $routeProviderErrorPos < $routeRejectionPolicyPos
+    && $routeRejectionPolicyPos
+        < $routeInitializationFailPos
+    && strpos(
+        $route,
+        'if ($terminalInitializationFailure)'
+    ) !== false
+    && strpos(
+        $route,
+        'Payment checkout status could not be confirmed.'
+    ) !== false,
+    'ambiguous provider initialization remains recoverable while not-sent or explicit rejection may close the attempt'
+);
+
 $paidAppliedBranch = '';
 
 if ($routePaidAppliedPos !== false

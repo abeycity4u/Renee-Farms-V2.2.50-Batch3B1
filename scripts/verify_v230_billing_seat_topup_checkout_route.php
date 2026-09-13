@@ -332,14 +332,39 @@ $providerErrorPos = strpos(
     'catch(Throwable$providerError)'
 );
 
+$rejectionPolicyPos = strpos(
+    $routeTokens,
+    'billing_provider_checkout_initialization_is_terminal($providerError)'
+);
+
+$definitiveGuardPos = strpos(
+    $routeTokens,
+    'if($terminalInitializationFailure){',
+    $providerErrorPos === false
+        ? 0
+        : $providerErrorPos
+);
+
 $check(
     $providerErrorPos !== false
+    && $rejectionPolicyPos !== false
+    && $definitiveGuardPos !== false
     && $attemptFailPos !== false
     && $requestFailPos !== false
     && $providerInitPos < $providerErrorPos
-    && $providerErrorPos < $attemptFailPos
+    && $providerErrorPos < $rejectionPolicyPos
+    && $rejectionPolicyPos < $definitiveGuardPos
+    && $definitiveGuardPos < $attemptFailPos
     && $attemptFailPos < $requestFailPos,
-    'provider initialization failure closes payment audit before its durable seat request'
+    'only not-sent or explicit provider rejection closes payment audit and its durable seat request'
+);
+
+$check(
+    strpos(
+        $routeTokens,
+        "'Seat top-up checkout status could not be confirmed. Please try again; the earlier attempt will be checked before a new checkout is started.'"
+    ) !== false,
+    'ambiguous seat-top-up initialization leaves durable state for centralized recovery'
 );
 
 $check(

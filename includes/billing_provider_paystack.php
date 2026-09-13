@@ -6,7 +6,9 @@
  * adapter can be verified without live credentials or external requests.
  */
 
-if (!interface_exists('BillingProviderAdapterInterface')) {
+if (!interface_exists('BillingProviderAdapterInterface')
+    || !class_exists('BillingProviderCheckoutNotSentException')
+    || !class_exists('BillingProviderCheckoutRejectedException')) {
     require_once __DIR__ . '/billing_provider_contract.php';
 }
 require_once __DIR__ . '/billing_provider_context.php';
@@ -66,21 +68,60 @@ if (!class_exists('PaystackBillingProviderAdapter')) {
 
         public function initializeCheckout(array $request): array
         {
-            $reference = billing_provider_normalize_reference((string)($request['provider_reference'] ?? ''));
-            $amount = billing_provider_normalize_amount($request['amount'] ?? null);
-            $currency = billing_provider_normalize_currency((string)($request['currency'] ?? ''));
-            $context = billing_provider_sanitize_checkout_context(
-                is_array($request['context'] ?? null) ? $request['context'] : []
-            );
+            try {
+                $reference =
+                    billing_provider_normalize_reference(
+                        (string)(
+                            $request[
+                                'provider_reference'
+                            ] ?? ''
+                        )
+                    );
 
-            $payload = [
-                'email' => $context['customer_email'],
-                'amount' => billing_adapter_decimal_to_minor($amount),
-                'currency' => $currency,
-                'reference' => $reference,
-            ];
-            if (!empty($context['callback_url'])) {
-                $payload['callback_url'] = $context['callback_url'];
+                $amount =
+                    billing_provider_normalize_amount(
+                        $request['amount'] ?? null
+                    );
+
+                $currency =
+                    billing_provider_normalize_currency(
+                        (string)(
+                            $request['currency'] ?? ''
+                        )
+                    );
+
+                $context =
+                    billing_provider_sanitize_checkout_context(
+                        is_array(
+                            $request['context'] ?? null
+                        )
+                            ? $request['context']
+                            : []
+                    );
+
+                $payload = [
+                    'email' =>
+                        $context['customer_email'],
+                    'amount' =>
+                        billing_adapter_decimal_to_minor(
+                            $amount
+                        ),
+                    'currency' => $currency,
+                    'reference' => $reference,
+                ];
+
+                if (!empty(
+                    $context['callback_url']
+                )) {
+                    $payload['callback_url'] =
+                        $context['callback_url'];
+                }
+            } catch (Throwable $preflightError) {
+                throw new BillingProviderCheckoutNotSentException(
+                    'Paystack checkout request failed before provider transport.',
+                    0,
+                    $preflightError
+                );
             }
 
             $response = billing_adapter_transport_call(
@@ -91,9 +132,24 @@ if (!class_exists('PaystackBillingProviderAdapter')) {
                 $payload
             );
             $json = $response['json'];
-            if (($json['status'] ?? null) !== true || !is_array($json['data'] ?? null)) {
-                throw new RuntimeException('Paystack checkout initialization was not accepted.');
+            $providerAccepted =
+                $json['status'] ?? null;
+
+            if ($providerAccepted === false) {
+                throw new BillingProviderCheckoutRejectedException(
+                    'Paystack checkout initialization was explicitly rejected.'
+                );
             }
+
+            if ($providerAccepted !== true
+                || !is_array(
+                    $json['data'] ?? null
+                )) {
+                throw new RuntimeException(
+                    'Paystack checkout initialization response was incomplete.'
+                );
+            }
+
             $data = $json['data'];
             $returnedReference = trim((string)($data['reference'] ?? $reference));
             if ($returnedReference === '') $returnedReference = $reference;

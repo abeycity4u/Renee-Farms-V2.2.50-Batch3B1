@@ -15,6 +15,59 @@
  * This file contains no provider SDK, credential, endpoint or network call.
  */
 
+/*
+ * Checkout initialization has three materially different failure classes:
+ *
+ * 1. not sent:
+ *    local validation failed before provider transport was attempted;
+ *
+ * 2. explicitly rejected:
+ *    the provider returned an authoritative negative initialization fact;
+ *
+ * 3. ambiguous:
+ *    network/HTTP uncertainty or an incomplete/malformed provider response.
+ *
+ * Only the first two are safe to terminalize locally. Ambiguous failures must
+ * leave the durable payment attempt initialized for authoritative recovery.
+ */
+if (!class_exists('BillingProviderCheckoutNotSentException')) {
+    final class BillingProviderCheckoutNotSentException
+        extends RuntimeException
+    {
+    }
+}
+
+if (!class_exists('BillingProviderCheckoutRejectedException')) {
+    final class BillingProviderCheckoutRejectedException
+        extends RuntimeException
+    {
+    }
+}
+
+if (!function_exists(
+    'billing_provider_checkout_initialization_is_definitive_rejection'
+)) {
+    function billing_provider_checkout_initialization_is_definitive_rejection(
+        Throwable $error
+    ): bool {
+        return $error
+            instanceof BillingProviderCheckoutRejectedException;
+    }
+}
+
+if (!function_exists(
+    'billing_provider_checkout_initialization_is_terminal'
+)) {
+    function billing_provider_checkout_initialization_is_terminal(
+        Throwable $error
+    ): bool {
+        return $error
+            instanceof BillingProviderCheckoutNotSentException
+            || $error
+                instanceof BillingProviderCheckoutRejectedException;
+    }
+}
+
 if (!interface_exists('BillingProviderAdapterInterface')) {
     interface BillingProviderAdapterInterface
     {
@@ -316,9 +369,31 @@ if (!function_exists('billing_provider_initialize_checkout')) {
         array $pricedQuote,
         array $context = []
     ): array {
-        $provider = billing_provider_normalize_code($provider);
-        $adapter = billing_provider_adapter($provider);
-        $request = billing_provider_checkout_request($providerReference, $pricedQuote, $context);
+        try {
+            $provider =
+                billing_provider_normalize_code(
+                    $provider
+                );
+
+            $adapter =
+                billing_provider_adapter(
+                    $provider
+                );
+
+            $request =
+                billing_provider_checkout_request(
+                    $providerReference,
+                    $pricedQuote,
+                    $context
+                );
+        } catch (Throwable $preflightError) {
+            throw new BillingProviderCheckoutNotSentException(
+                'Billing checkout failed before provider initialization was attempted.',
+                0,
+                $preflightError
+            );
+        }
+
         $result = $adapter->initializeCheckout($request);
         $normalized = billing_provider_normalize_checkout_result($provider, $result);
         if (!hash_equals($providerReference, $normalized['provider_reference'])) {

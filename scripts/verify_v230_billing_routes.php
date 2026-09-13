@@ -297,9 +297,39 @@ $check(
     'billing attempt is frozen and committed by centralized preparation before provider checkout initialization'
 );
 
-$check(strpos($checkout, 'billing_audit_mark_pending(') !== false
-    && strpos($checkout, 'billing_audit_mark_initialization_failed(') !== false,
-    'checkout records provider initialization success/failure only on the billing attempt');
+$checkoutProviderErrorPos = strpos(
+    $checkout,
+    'catch (Throwable $providerError)'
+);
+
+$checkoutRejectionPolicyPos = strpos(
+    $checkout,
+    'billing_provider_checkout_initialization_is_terminal('
+);
+
+$checkoutInitializationFailPos = strpos(
+    $checkout,
+    'billing_audit_mark_initialization_failed('
+);
+
+$check(
+    strpos(
+        $checkout,
+        'billing_audit_mark_pending('
+    ) !== false
+    && $checkoutProviderErrorPos !== false
+    && $checkoutRejectionPolicyPos !== false
+    && $checkoutInitializationFailPos !== false
+    && $providerInitPos < $checkoutProviderErrorPos
+    && $checkoutProviderErrorPos < $checkoutRejectionPolicyPos
+    && $checkoutRejectionPolicyPos
+        < $checkoutInitializationFailPos
+    && strpos(
+        $checkout,
+        'if ($terminalInitializationFailure)'
+    ) !== false,
+    'checkout terminalizes only not-sent or explicit initialization rejection while preserving provider ambiguity'
+);
 $check(strpos($checkout, "header('Location: ' . \$checkout['checkout_url'], true, 303)") !== false,
     'successful checkout uses a 303 redirect to the normalized provider URL');
 
