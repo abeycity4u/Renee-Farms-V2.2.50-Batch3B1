@@ -445,6 +445,57 @@ if (!function_exists('billing_seat_topup_assert_current_lineage')) {
     }
 }
 
+
+if (!function_exists('billing_seat_topup_applied_history_link_id')) {
+    function billing_seat_topup_applied_history_link_id(
+        PDO $pdo,
+        array $requestState,
+        int $farmId
+    ): int {
+        if ($farmId < 1) {
+            throw new InvalidArgumentException(
+                'A valid tenant is required for applied seat-top-up history.'
+            );
+        }
+
+        $historyRecordId =
+            (int)(
+                $requestState[
+                    'applied_subscription_record_id'
+                ]
+                ?? 0
+            );
+
+        if ($historyRecordId < 1) {
+            throw new RuntimeException(
+                'Applied seat-top-up request is missing its immutable commercial-history link.'
+            );
+        }
+
+        $stmt = $pdo->prepare(
+            "SELECT id
+             FROM subscriptions
+             WHERE id = ?
+               AND farm_id = ?
+             LIMIT 1"
+        );
+
+        $stmt->execute([
+            $historyRecordId,
+            $farmId,
+        ]);
+
+        if ((int)$stmt->fetchColumn()
+            !== $historyRecordId) {
+            throw new RuntimeException(
+                'Applied seat-top-up commercial-history link is not valid for this tenant.'
+            );
+        }
+
+        return $historyRecordId;
+    }
+}
+
 if (!function_exists('billing_seat_topup_apply_paid_attempt')) {
     function billing_seat_topup_apply_paid_attempt(
         PDO $pdo,
@@ -527,6 +578,13 @@ if (!function_exists('billing_seat_topup_apply_paid_attempt')) {
                     );
                 }
 
+                $historyRecordId =
+                    billing_seat_topup_applied_history_link_id(
+                        $pdo,
+                        $requestState,
+                        $attemptContract['farm_id']
+                    );
+
                 if ($startedTransaction) {
                     $pdo->commit();
                 }
@@ -547,6 +605,8 @@ if (!function_exists('billing_seat_topup_apply_paid_attempt')) {
                         $requestContract[
                             'to_extra_seats'
                         ],
+                    'history_record_id' =>
+                        $historyRecordId,
                     'applied_at' =>
                         $requestState[
                             'applied_at'
@@ -638,6 +698,15 @@ if (!function_exists('billing_seat_topup_apply_paid_attempt')) {
                     ]
                 );
 
+            $historyRecordId =
+                (int)($history['id'] ?? 0);
+
+            if ($historyRecordId < 1) {
+                throw new RuntimeException(
+                    'Applied seat top-up did not create a valid immutable commercial-history record.'
+                );
+            }
+
             $historySeats =
                 subscription_seat_normalize_addons(
                     is_array(
@@ -667,12 +736,15 @@ if (!function_exists('billing_seat_topup_apply_paid_attempt')) {
             $update = $pdo->prepare(
                 "UPDATE billing_seat_change_requests
                  SET status = 'applied',
+                     applied_subscription_record_id = ?,
                      applied_at = CURRENT_TIMESTAMP
                  WHERE id = ?
-                   AND status = 'awaiting_payment'"
+                   AND status = 'awaiting_payment'
+                   AND applied_subscription_record_id IS NULL"
             );
 
             $update->execute([
+                $historyRecordId,
                 (int)$requestState['id'],
             ]);
 
@@ -689,16 +761,38 @@ if (!function_exists('billing_seat_topup_apply_paid_attempt')) {
                     false
                 );
 
-            if (!$appliedRow
-                || (string)(
-                    $appliedRow['status']
-                    ?? ''
-                ) !== 'applied'
+            if (!$appliedRow) {
+                throw new RuntimeException(
+                    'Applied seat-top-up request could not be verified.'
+                );
+            }
+
+            $appliedState =
+                billing_seat_change_row_contract(
+                    $appliedRow
+                );
+
+            if ($appliedState['status']
+                    !== 'applied'
                 || empty(
-                    $appliedRow['applied_at']
+                    $appliedState['applied_at']
                 )) {
                 throw new RuntimeException(
                     'Applied seat-top-up request could not be verified.'
+                );
+            }
+
+            $linkedHistoryRecordId =
+                billing_seat_topup_applied_history_link_id(
+                    $pdo,
+                    $appliedState,
+                    $attemptContract['farm_id']
+                );
+
+            if ($linkedHistoryRecordId
+                !== $historyRecordId) {
+                throw new RuntimeException(
+                    'Applied seat-top-up request does not link to the commercial history created by this application.'
                 );
             }
 
@@ -727,9 +821,9 @@ if (!function_exists('billing_seat_topup_apply_paid_attempt')) {
                 'effective_role_limits' =>
                     $effectiveLimits,
                 'history_record_id' =>
-                    (int)($history['id'] ?? 0),
+                    $linkedHistoryRecordId,
                 'applied_at' =>
-                    $appliedRow['applied_at'],
+                    $appliedState['applied_at'],
             ];
         } catch (Throwable $e) {
             if ($startedTransaction

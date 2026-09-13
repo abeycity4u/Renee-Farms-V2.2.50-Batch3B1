@@ -50,6 +50,7 @@ if (!function_exists('billing_seat_change_required_columns')) {
             'latest_paid_attempt_id',
             'effective_at',
             'payment_attempt_id',
+            'applied_subscription_record_id',
             'initiated_by_user_id',
             'request_hash',
             'applied_at',
@@ -135,6 +136,11 @@ if (!function_exists('billing_seat_change_foreign_keys_ready')) {
                 'billing_payment_attempts',
                 'RESTRICT',
             ],
+            'fk_billing_seat_change_applied_subscription' => [
+                'billing_seat_change_requests',
+                'subscriptions',
+                'RESTRICT',
+            ],
             'fk_billing_seat_change_latest_subscription' => [
                 'billing_seat_change_requests',
                 'subscriptions',
@@ -187,15 +193,16 @@ if (!function_exists('billing_seat_change_migration_ready')) {
         $stmt = $pdo->prepare(
             "SELECT COUNT(DISTINCT filename)
              FROM schema_migrations
-             WHERE filename IN (?, ?)"
+             WHERE filename IN (?, ?, ?)"
         );
 
         $stmt->execute([
             '045_billing_seat_change_foundation.sql',
             '046_billing_seat_quote_snapshot.sql',
+            '051_billing_seat_application_history_link.sql',
         ]);
 
-        return (int)$stmt->fetchColumn() === 2;
+        return (int)$stmt->fetchColumn() === 3;
     }
 }
 
@@ -1070,11 +1077,28 @@ if (!function_exists('billing_seat_change_row_contract')) {
             );
         }
 
+        $appliedSubscriptionRecordId =
+            $row['applied_subscription_record_id']
+                ?? null;
+
+        if ($appliedSubscriptionRecordId !== null) {
+            $appliedSubscriptionRecordId =
+                (int)$appliedSubscriptionRecordId;
+
+            if ($appliedSubscriptionRecordId < 1) {
+                throw new RuntimeException(
+                    'Stored applied commercial-history identity is invalid.'
+                );
+            }
+        }
+
         return [
             'id' => (int)($row['id'] ?? 0),
             'status' => $status,
             'contract' => $contract,
             'request_hash' => $storedHash,
+            'applied_subscription_record_id' =>
+                $appliedSubscriptionRecordId,
             'applied_at' =>
                 $row['applied_at'] ?? null,
             'cancelled_at' =>
