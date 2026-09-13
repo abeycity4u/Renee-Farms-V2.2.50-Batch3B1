@@ -330,8 +330,21 @@ $check(
     ) !== false,
     'checkout terminalizes only not-sent or explicit initialization rejection while preserving provider ambiguity'
 );
-$check(strpos($checkout, "header('Location: ' . \$checkout['checkout_url'], true, 303)") !== false,
-    'successful checkout uses a 303 redirect to the normalized provider URL');
+$check(
+    strpos(
+        $checkout,
+        '/includes/billing_provider_handoff.php'
+    ) !== false
+    && substr_count(
+        $checkout,
+        'billing_provider_handoff($checkout);'
+    ) === 1
+    && strpos(
+        $checkout,
+        "header('Location: ' . \$checkout['checkout_url'], true, 303)"
+    ) === false,
+    'successful checkout uses the shared same-origin provider handoff instead of a direct external form redirect'
+);
 
 $check(strpos($return, "REQUEST_METHOD") !== false
     && strpos($return, "!== 'GET'") !== false,

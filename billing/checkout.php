@@ -2,8 +2,8 @@
 /**
  * V2.3 controlled checkout route.
  *
- * Creates/updates billing_payment_attempts, then redirects to the explicitly
- * selected provider. Subscription/entitlement application is never performed
+ * Creates/updates billing_payment_attempts, then hands the browser to the
+ * explicitly selected provider through the shared CSP-safe handoff. Subscription/entitlement application is never performed
  * here. Normal Farm Admin sessions and the restricted subscription-recovery
  * actor share the same centralized billing path.
  */
@@ -13,6 +13,7 @@ require_once dirname(__DIR__) . '/includes/billing_payment_foundation.php';
 require_once dirname(__DIR__) . '/includes/billing_currency_policy.php';
 require_once dirname(__DIR__) . '/includes/billing_pricing_contract.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_contract.php';
+require_once dirname(__DIR__) . '/includes/billing_provider_handoff.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_selection.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_adapters.php';
 require_once dirname(__DIR__) . '/includes/billing_route_request.php';
@@ -430,8 +431,12 @@ try {
         exit('Payment checkout could not be recorded safely. Please try again.');
     }
 
-    header('Location: ' . $checkout['checkout_url'], true, 303);
-    exit();
+    /*
+     * End the form submission on this same-origin response before crossing
+     * to the provider. The shared handoff document performs ordinary browser
+     * navigation after HTTP 200, keeping global CSP form-action 'self' strict.
+     */
+    billing_provider_handoff($checkout);
 } catch (InvalidArgumentException $e) {
     if (!billing_tenant_actor_is_recovery(
         $actor

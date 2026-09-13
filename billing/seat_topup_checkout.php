@@ -23,6 +23,8 @@ require_once dirname(__DIR__)
 require_once dirname(__DIR__)
     . '/includes/billing_provider_contract.php';
 require_once dirname(__DIR__)
+    . '/includes/billing_provider_handoff.php';
+require_once dirname(__DIR__)
     . '/includes/billing_provider_selection.php';
 require_once dirname(__DIR__)
     . '/includes/billing_provider_adapters.php';
@@ -293,13 +295,11 @@ try {
         );
     }
 
-    header(
-        'Location: '
-            . $checkout['checkout_url'],
-        true,
-        303
-    );
-    exit();
+    /*
+     * Break the POST redirect chain on our own origin before crossing to the
+     * payment provider. This preserves strict global form-action CSP policy.
+     */
+    billing_provider_handoff($checkout);
 } catch (InvalidArgumentException $e) {
     http_response_code(422);
     exit('Invalid seat top-up checkout request.');

@@ -270,9 +270,9 @@ $pendingPos = strpos(
     'billing_audit_mark_pending('
 );
 
-$redirectPos = strrpos(
+$handoffPos = strpos(
     $routeTokens,
-    'header('
+    'billing_provider_handoff($checkout);'
 );
 
 $check(
@@ -280,12 +280,12 @@ $check(
     && $preparePos !== false
     && $providerInitPos !== false
     && $pendingPos !== false
-    && $redirectPos !== false
+    && $handoffPos !== false
     && $referencePos < $preparePos
     && $preparePos < $providerInitPos
     && $providerInitPos < $pendingPos
-    && $pendingPos < $redirectPos,
-    'server reference, durable initiation, provider call, pending audit and redirect are ordered safely'
+    && $pendingPos < $handoffPos,
+    'server reference, durable initiation, provider call, pending audit and shared handoff are ordered safely'
 );
 
 $check(
@@ -433,13 +433,18 @@ $check(
 
 $check(
     strpos(
+        $route,
+        '/includes/billing_provider_handoff.php'
+    ) !== false
+    && substr_count(
         $routeTokens,
-        'header('
-        . '\'Location: \'.'
-        . '$checkout[\'checkout_url\'],'
-        . 'true,303)'
-    ) !== false,
-    'successful initialization redirects only after safe provider state recording'
+        'billing_provider_handoff($checkout);'
+    ) === 1
+    && strpos(
+        $routeTokens,
+        '$checkout[\'checkout_url\']'
+    ) === false,
+    'successful initialization uses the shared browser handoff only after safe provider state recording'
 );
 
 echo "\nChecks: {$checks}\n";
