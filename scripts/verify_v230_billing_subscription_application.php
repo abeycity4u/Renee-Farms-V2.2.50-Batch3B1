@@ -328,6 +328,117 @@ $check(
 $check(strpos($source['init'], 'billing_subscription_application.php') === false,
     'Stage 2G application is not globally loaded through init.php');
 
+$renewalProbe = false;
+if (preg_match(
+    '/\$scheduledReductionStmt\s*=\s*\$pdo\s*->\s*prepare\s*\(/',
+    $app,
+    $renewalProbeMatch,
+    PREG_OFFSET_CAPTURE
+) === 1) {
+    $renewalProbe = $renewalProbeMatch[0][1];
+}
+
+$renewalApply = false;
+if (preg_match(
+    '/\bbilling_renewal_seat_apply_paid_snapshot\s*\(/',
+    $app,
+    $renewalApplyMatch,
+    PREG_OFFSET_CAPTURE,
+    $renewalProbe === false ? 0 : $renewalProbe
+) === 1) {
+    $renewalApply = $renewalApplyMatch[0][1];
+}
+
+$renewalSeatSave = false;
+if (preg_match(
+    '/\bsubscription_seat_save_addons\s*\(/',
+    $app,
+    $renewalSeatSaveMatch,
+    PREG_OFFSET_CAPTURE,
+    $renewalApply === false ? 0 : $renewalApply
+) === 1) {
+    $renewalSeatSave = $renewalSeatSaveMatch[0][1];
+}
+
+$renewalHistory = false;
+if (preg_match(
+    '/\bbilling_subscription_insert_history\s*\(/',
+    $app,
+    $renewalHistoryMatch,
+    PREG_OFFSET_CAPTURE,
+    $renewalApply === false ? 0 : $renewalApply
+) === 1) {
+    $renewalHistory = $renewalHistoryMatch[0][1];
+}
+
+$renewalLink = false;
+if (preg_match(
+    '/applied_subscription_record_id\s*=\s*\?/',
+    $app,
+    $renewalLinkMatch,
+    PREG_OFFSET_CAPTURE,
+    $renewalApply === false ? 0 : $renewalApply
+) === 1) {
+    $renewalLink = $renewalLinkMatch[0][1];
+}
+
+$check(
+    preg_match(
+        '/require_once\s+__DIR__\s*\.\s*[\'"]\/billing_renewal_seat_application\.php[\'"]\s*;/',
+        $app
+    ) === 1
+    && preg_match(
+        '/billing_seat_change_ready\s*\(\s*\$pdo\s*\)/',
+        $app
+    ) === 1,
+    'subscription application loads renewal-seat application and requires durable seat-change storage'
+);
+$check(
+    $renewalProbe !== false
+    && preg_match(
+        '/WHERE\s+farm_id\s*=\s*\?/i',
+        substr($app, $renewalProbe)
+    ) === 1
+    && preg_match(
+        '/change_kind\s*=\s*[\'"]remove[\'"]/i',
+        substr($app, $renewalProbe)
+    ) === 1
+    && preg_match(
+        '/status\s*=\s*[\'"]scheduled[\'"]/i',
+        substr($app, $renewalProbe)
+    ) === 1
+    && preg_match(
+        '/\$scheduledReductionStmt\s*->\s*execute\s*\(\s*\[\s*\$contract\s*\[\s*[\'"]farm_id[\'"]\s*\]\s*\]\s*\)\s*;/',
+        substr($app, $renewalProbe)
+    ) === 1,
+    'scheduled renewal-reduction discovery is tenant pinned and limited to scheduled removals'
+);
+$check(
+    preg_match(
+        '/if\s*\(\s*\$scheduledReductionCount\s*>\s*0\s*\)/',
+        substr($app, $renewalProbe)
+    ) === 1
+    && $renewalApply !== false,
+    'scheduled reductions enter the canonical paid-renewal seat applicator'
+);
+$check(
+    $renewalApply !== false
+    && $renewalSeatSave !== false
+    && $renewalHistory !== false
+    && $renewalLink !== false
+    && $renewalApply < $renewalSeatSave
+    && $renewalApply < $renewalHistory
+    && $renewalApply < $renewalLink,
+    'renewal reductions are consumed before entitlement, history and attempt linkage finalize'
+);
+$check(
+    preg_match_all(
+        '/\bbilling_renewal_seat_apply_paid_snapshot\s*\(/',
+        $app
+    ) === 1,
+    'subscription application has exactly one renewal-seat application call'
+);
+
 echo "\n{$checks} checks, {$failures} failure(s).\n";
 if ($failures > 0) {
     fwrite(STDERR, "FAIL: V2.3 Billing Stage 2G subscription application contract is not closed.\n");

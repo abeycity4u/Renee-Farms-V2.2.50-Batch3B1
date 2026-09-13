@@ -23,6 +23,7 @@ require_once __DIR__ . '/billing_payment_foundation.php';
 require_once __DIR__ . '/billing_payment_audit_state.php';
 require_once __DIR__ . '/billing_currency_policy.php';
 require_once __DIR__ . '/billing_provider_selection.php';
+require_once __DIR__ . '/billing_renewal_seat_application.php';
 
 if (!function_exists('billing_subscription_application_table_exists')) {
     function billing_subscription_application_table_exists(PDO $pdo, string $table): bool
@@ -70,6 +71,7 @@ if (!function_exists('billing_subscription_application_ready')) {
     {
         if (!billing_payment_foundation_ready($pdo) || !subscription_record_table_ready($pdo)) return false;
         if (!subscription_seat_addon_table_exists($pdo)) return false;
+        if (!billing_seat_change_ready($pdo)) return false;
         foreach (['farms', 'farm_modules', 'farm_role_limits'] as $table) {
             if (!billing_subscription_application_table_exists($pdo, $table)) return false;
         }
@@ -383,6 +385,29 @@ if (!function_exists('billing_subscription_apply_paid_attempt')) {
             $farmStmt->execute([$contract['farm_id']]);
             $farm = $farmStmt->fetch(PDO::FETCH_ASSOC) ?: null;
             if (!$farm) throw new RuntimeException('Tenant farm could not be locked for subscription application.');
+
+            /*
+             * The tenant farm is now locked, so seat-reduction scheduling,
+             * cancellation and paid renewal application serialize here.
+             * Only a real scheduled reduction enters the canonical applicator;
+             * ordinary activation/renewal/product changes remain unchanged.
+             */
+            $scheduledReductionStmt = $pdo->prepare(
+                "SELECT COUNT(*)
+                 FROM billing_seat_change_requests
+                 WHERE farm_id = ?
+                   AND change_kind = 'remove'
+                   AND status = 'scheduled'"
+            );
+            $scheduledReductionStmt->execute([$contract['farm_id']]);
+            $scheduledReductionCount = (int)$scheduledReductionStmt->fetchColumn();
+
+            if ($scheduledReductionCount > 0) {
+                billing_renewal_seat_apply_paid_snapshot(
+                    $pdo,
+                    $contract
+                );
+            }
 
             $currentModules = subscription_record_commercial_modules($pdo, $contract['farm_id']);
             subscription_seat_assert_capacity(
