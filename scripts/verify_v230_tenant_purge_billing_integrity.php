@@ -152,20 +152,42 @@ $assert(
     'migration 046 continues protecting durable payment identity.'
 );
 
+$retainedFkAdd = strpos(
+    $migration048,
+    'ALTER TABLE billing_payment_attempts ADD CONSTRAINT fk_billing_attempt_farm_restrict FOREIGN KEY (farm_id) REFERENCES farms(id) ON DELETE RESTRICT'
+);
+$legacyFkDrop = strpos(
+    $migration048,
+    'ALTER TABLE billing_payment_attempts DROP FOREIGN KEY fk_billing_attempt_farm'
+);
+
 $assert(
-    strpos(
-        $migration048,
-        'DROP FOREIGN KEY fk_billing_attempt_farm, ADD CONSTRAINT fk_billing_attempt_farm FOREIGN KEY (farm_id) REFERENCES farms(id) ON DELETE RESTRICT'
-    ) !== false,
-    'migration 048 replaces destructive CASCADE semantics with RESTRICT in one ALTER TABLE.'
+    $retainedFkAdd !== false,
+    'migration 048 establishes a new permanent RESTRICT farm foreign key.'
+);
+
+$assert(
+    $legacyFkDrop !== false,
+    'migration 048 removes the legacy farm foreign key only after replacement protection is available.'
+);
+
+$assert(
+    $retainedFkAdd !== false
+    && $legacyFkDrop !== false
+    && $retainedFkAdd < $legacyFkDrop,
+    'migration 048 establishes RESTRICT protection before dropping the legacy CASCADE key.'
 );
 
 $assert(
     strpos(
         $migration048,
-        'ALTER TABLE billing_payment_attempts ADD CONSTRAINT fk_billing_attempt_farm FOREIGN KEY (farm_id) REFERENCES farms(id) ON DELETE RESTRICT'
+        'constraint_name = \'fk_billing_attempt_farm_restrict\''
+    ) !== false
+    && strpos(
+        $migration048,
+        "UPPER(delete_rule) IN ('RESTRICT', 'NO ACTION')"
     ) !== false,
-    'migration 048 can restore the protected farm foreign key when it is absent.'
+    'legacy FK removal is gated on the retained safe farm relationship.'
 );
 
 $assert(
@@ -178,8 +200,9 @@ $assert(
 
 $assert(
     strpos($foundation, 'SELECT table_name, referenced_table_name, delete_rule') !== false
+    && strpos($foundation, "'fk_billing_attempt_farm_restrict' => [") !== false
     && strpos($foundation, "['RESTRICT', 'NO ACTION']") !== false,
-    'billing foundation readiness now verifies safe payment-attempt farm delete semantics.'
+    'billing foundation readiness requires the retained safe payment-attempt farm foreign key.'
 );
 
 $assert(
@@ -211,8 +234,10 @@ $assert(
 
 $assert(
     strpos($runner048, 'orphaned billing payment attempts') !== false
+    && strpos($runner048, "'fk_billing_attempt_farm_restrict'") !== false
+    && strpos($runner048, 'legacy farm foreign key in place') !== false
     && strpos($runner048, "['RESTRICT', 'NO ACTION']") !== false,
-    'targeted retention runner fails closed on orphan data and unsafe final FK semantics.'
+    'targeted retention runner fails closed on orphan data, missing retained protection, and legacy FK residue.'
 );
 
 $assert(

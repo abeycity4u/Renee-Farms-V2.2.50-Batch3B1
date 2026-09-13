@@ -79,27 +79,61 @@ $fkStmt = $pdo->prepare(
     "SELECT table_name, referenced_table_name, delete_rule
      FROM information_schema.referential_constraints
      WHERE constraint_schema = DATABASE()
-       AND constraint_name = 'fk_billing_attempt_farm'
+       AND constraint_name = ?
      LIMIT 1"
 );
-$fkStmt->execute();
-$beforeFk = $fkStmt->fetch(PDO::FETCH_ASSOC) ?: null;
 
-if ($beforeFk) {
-    if ((string)$beforeFk['table_name'] !== 'billing_payment_attempts'
-        || (string)$beforeFk['referenced_table_name'] !== 'farms') {
-        fwrite(STDERR, "FAIL: fk_billing_attempt_farm points to an unexpected table relationship.\n");
+$readFarmFk = static function (PDOStatement $stmt, string $constraint): ?array {
+    $stmt->execute([$constraint]);
+    return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+};
+
+$validateFarmFk = static function (
+    ?array $fk,
+    string $constraint,
+    array $allowedDeleteRules
+): void {
+    if (!$fk) {
+        return;
+    }
+
+    if ((string)$fk['table_name'] !== 'billing_payment_attempts'
+        || (string)$fk['referenced_table_name'] !== 'farms') {
+        fwrite(
+            STDERR,
+            "FAIL: {$constraint} points to an unexpected table relationship.\n"
+        );
         exit(1);
     }
 
-    $beforeDeleteRule = strtoupper(trim((string)$beforeFk['delete_rule']));
-    if (!in_array($beforeDeleteRule, ['CASCADE', 'RESTRICT', 'NO ACTION'], true)) {
-        fwrite(STDERR, "FAIL: fk_billing_attempt_farm has an unexpected delete rule.\n");
+    $deleteRule = strtoupper(trim((string)$fk['delete_rule']));
+
+    if (!in_array($deleteRule, $allowedDeleteRules, true)) {
+        fwrite(
+            STDERR,
+            "FAIL: {$constraint} has an unexpected delete rule.\n"
+        );
         exit(1);
     }
-} else {
-    $beforeDeleteRule = 'ABSENT';
-}
+};
+
+$beforeLegacyFk = $readFarmFk($fkStmt, 'fk_billing_attempt_farm');
+$beforeRetentionFk = $readFarmFk(
+    $fkStmt,
+    'fk_billing_attempt_farm_restrict'
+);
+
+$validateFarmFk(
+    $beforeLegacyFk,
+    'fk_billing_attempt_farm',
+    ['CASCADE', 'RESTRICT', 'NO ACTION']
+);
+
+$validateFarmFk(
+    $beforeRetentionFk,
+    'fk_billing_attempt_farm_restrict',
+    ['RESTRICT', 'NO ACTION']
+);
 
 $pdo->exec(
     "CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -145,18 +179,35 @@ if ($afterAttempts !== $beforeAttempts || $afterEvents !== $beforeEvents) {
     exit(1);
 }
 
-$fkStmt->execute();
-$afterFk = $fkStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+$afterRetentionFk = $readFarmFk(
+    $fkStmt,
+    'fk_billing_attempt_farm_restrict'
+);
+$afterLegacyFk = $readFarmFk(
+    $fkStmt,
+    'fk_billing_attempt_farm'
+);
 
-if (!$afterFk
-    || (string)$afterFk['table_name'] !== 'billing_payment_attempts'
-    || (string)$afterFk['referenced_table_name'] !== 'farms'
+if (!$afterRetentionFk
+    || (string)$afterRetentionFk['table_name'] !== 'billing_payment_attempts'
+    || (string)$afterRetentionFk['referenced_table_name'] !== 'farms'
     || !in_array(
-        strtoupper(trim((string)$afterFk['delete_rule'])),
+        strtoupper(trim((string)$afterRetentionFk['delete_rule'])),
         ['RESTRICT', 'NO ACTION'],
         true
     )) {
-    fwrite(STDERR, "FAIL: migration 048 did not establish safe tenant-retention delete semantics.\n");
+    fwrite(
+        STDERR,
+        "FAIL: migration 048 did not establish the retained RESTRICT farm foreign key.\n"
+    );
+    exit(1);
+}
+
+if ($afterLegacyFk) {
+    fwrite(
+        STDERR,
+        "FAIL: migration 048 left the legacy farm foreign key in place.\n"
+    );
     exit(1);
 }
 
@@ -172,7 +223,7 @@ echo $alreadyApplied
 echo "PASS: migration 003 was not invoked by this script.\n";
 echo "PASS: no orphan billing payment attempts were present.\n";
 echo "PASS: billing audit row counts were preserved.\n";
-echo "PASS: fk_billing_attempt_farm now blocks destructive farm deletion.\n";
+echo "PASS: fk_billing_attempt_farm_restrict now blocks destructive farm deletion.\n";
 echo "billing_payment_attempts rows: {$afterAttempts}\n";
 echo "billing_provider_events rows: {$afterEvents}\n";
 echo "PASS: no billing row, entitlement, subscription-history or operational farm data was rewritten.\n";

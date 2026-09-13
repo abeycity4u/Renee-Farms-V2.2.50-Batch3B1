@@ -95,7 +95,7 @@ if (!function_exists('billing_payment_foreign_keys_ready')) {
     function billing_payment_foreign_keys_ready(PDO $pdo): bool
     {
         $expected = [
-            'fk_billing_attempt_farm' => [
+            'fk_billing_attempt_farm_restrict' => [
                 'billing_payment_attempts',
                 'farms',
                 ['RESTRICT', 'NO ACTION'],
