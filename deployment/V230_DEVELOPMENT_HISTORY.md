@@ -1,19 +1,19 @@
 # Renee Farms Platform V2.3 Development History
 
-Audit snapshot: 2026-09-12
+Audit snapshot: 2026-09-13
 
 ## Authoritative source
 
 - Repository: `abeycity4u/Renee-Farms-V2.2.50-Batch3B1`
 - Branch: `v230-commercial-hardening-saas-readiness`
-- Production runtime HEAD: `61ddad930b87fb5bba372958d00d0d249c891e68`
+- Production runtime HEAD: `c4612670d93691a2131a620228388ba31d03a7c2`
 - Production: `https://reneefarms.com`
 - Server checkout: `~/renee-deploy`
 - Live root: `~/public_html`
 
 ## Current deployment position
 
-Production runtime is now carried forward through commit `61ddad9`, including the completed tenant payment-receipt PDF export and branding closure, initialized subscription-attempt recovery for interrupted checkout execution, and typed preservation of non-2xx billing-provider HTTP evidence without changing provider-status interpretation. The 2026-09-11 to 2026-09-12 sequence completed commercial billing coordination and seat-change hardening, Stage 2I TEST/SANDBOX end-to-end payment proof, CSP Report-Only observation, production CSP enforcement, legacy/manual billing-period resilience, subscription-history date clarification, tenant-facing paid-payment receipts and fail-closed recovery of provider-known initialized attempts.
+Production runtime is now carried forward through commit `c461267`, including the completed tenant payment-receipt PDF and branding closure, initialized subscription-attempt recovery, typed preservation of non-2xx billing-provider HTTP evidence, Composer `/vendor/` web-exposure hardening, and billing/payment-history retention across tenant deletion. Migration `048_billing_tenant_retention_integrity.sql` is applied in production: payment attempts now retain a farm foreign key with `ON DELETE RESTRICT`, the former CASCADE farm FK is absent, and the application layer blocks permanent deletion of farms with billing/payment history while directing the Platform Owner to suspension instead.
 
 CSP is now enforcing in production. The clean Report-Only observation and owner approval were followed by an initial enforcement attempt that failed safely because mixed OPcache generations allowed new `config.php` code to call a newer CSP emitter while an older cached policy file remained loaded. That attempt was rolled back. Commit `59f6e63` made the rollout OPcache-compatible, and the subsequent policy-only deployment passed repeated unauthenticated probes, authenticated browser smoke and post-smoke log observation.
 
@@ -292,6 +292,35 @@ Documentation-only commits may therefore exist after the production runtime HEAD
 - No database migration, database mutation, provider execution, payment-mode change, root `.htaccess` replacement, CSP change, Farm A mutation or Farm 15 mutation occurred.
 - This production web-exposure / Composer vendor milestone is COMPLETE / CLOSED.
 
+## 2026-09-13 billing-history tenant-retention integrity closure
+
+- A commercial audit-integrity defect was identified in the tenant deletion path. `management/farms.php` intentionally purges tenant data, including subscriptions, while the original `billing_payment_attempts.farm_id -> farms.id` relationship used `ON DELETE CASCADE`. A permanent farm deletion could therefore destroy durable payment-attempt history and detach surviving provider-event evidence.
+- Live read-only preflight confirmed the defect was real in production: the payment-attempt farm FK was `CASCADE`, there were 13 billing payment attempts across 3 farms, 7 provider events and 0 orphan payment attempts.
+- Commit `310c34c` (`Preserve billing history across tenant deletion`) added the application-level billing-history deletion guard, migration 048, a targeted migration runner, billing-foundation delete-rule readiness checks and expanded static verification.
+- The application guard was deployed first. `management/farms.php` now refuses permanent tenant deletion when billing payment history exists and tells the Platform Owner to suspend the farm instead. The centralized guard executes before tenant purge rows are deleted, so all callers fail closed.
+- Commit `ee2c8bd` (`Make billing retention FK replacement atomic`) attempted to replace the old CASCADE FK with a same-name RESTRICT FK in one `ALTER TABLE`.
+- The first production migration-048 execution failed safely with `RUN_RC=255`. MariaDB `11.4.13-MariaDB-cll-lve-log` returned SQLSTATE `HY000`, error 1005 / errno 121 (`Duplicate key on write or update`) because the same FK constraint name was being dropped and recreated inside one ALTER statement.
+- Post-failure verification proved there was no partial migration: the legacy FK remained `CASCADE`, migration 048 remained unrecorded, billing payment attempts remained 13, provider events remained 7 and orphan payment attempts remained 0.
+- Commit `c461267` (`Harden billing retention FK migration`) replaced the incompatible same-name strategy with a fail-closed two-step design using the permanent retained constraint `fk_billing_attempt_farm_restrict`.
+- The hardened migration first establishes `fk_billing_attempt_farm_restrict` with `ON DELETE RESTRICT`. Only after information-schema verification proves that safe retained relationship exists may it drop the legacy `fk_billing_attempt_farm`. If the second DDL fails, RESTRICT protection remains active.
+- Mandatory remote GitHub semantic review passed before the corrected production rollout. The branch pointed exactly to `c4612670d93691a2131a620228388ba31d03a7c2`, with parent `ee2c8bdd4f595250fc46262904a3020cd7455e03` and only the four intended retention-integrity files changed.
+- The hardened migration and targeted runner were deployed with exact source/live hash matching. Migration 048 then executed successfully with `RUN_RC=0`.
+- Final production schema state:
+  - legacy `fk_billing_attempt_farm`: ABSENT
+  - retained `fk_billing_attempt_farm_restrict`: PRESENT
+  - retained FK relationship: `billing_payment_attempts(farm_id) -> farms(id)`
+  - retained FK delete rule: `RESTRICT`
+  - migration 048 recorded: YES
+- Final production audit evidence remained unchanged at 13 billing payment attempts and 7 provider events, with 0 orphan payment attempts and 3 farms represented in payment history.
+- `includes/billing_payment_foundation.php` was deliberately deployed only after migration 048 succeeded. Runtime verification returned `BILLING_FOUNDATION_READY=YES`.
+- Static tenant-retention verification passed 28 checks with 0 failures. Production PHP lint passed for `management/farms.php`, `includes/billing_payment_foundation.php` and the targeted migration-048 runner.
+- No production farm was deleted to prove the protection. `PRODUCTION_FARM_DELETE_TEST=NOT_PERFORMED`; verification used source contracts, live schema inspection, row-count preservation and runtime readiness checks instead.
+- Production rollback backups created during this closure:
+  - `/home/renee/renee-deploy-backups/tenant-retention-20260912-195859`
+  - `/home/renee/renee-deploy-backups/tenant-retention-safe-fk-20260912-201011`
+  - `/home/renee/renee-deploy-backups/tenant-retention-foundation-20260912-201148`
+- Migration 048 and the billed-tenant permanent-deletion defect are COMPLETE / CLOSED. Do not rerun migration 048, restore CASCADE semantics, erase payment-attempt history, or perform a production tenant deletion merely for QA unless actual regression evidence requires a separately reviewed recovery plan.
+
 ## Important interpretation
 
 A checkpoint being in the current lineage means its committed work was carried forward into later commits. Later commits may legitimately modify the same files, so production should use the latest descendant version rather than an old intermediate snapshot.
@@ -301,6 +330,7 @@ The numbered CSP verifier filename series ends at Batch 68. Working development 
 ## Major closed areas from hand-off
 
 - Commercial billing lifecycle and recovery hardening
+- Billing/payment-history tenant-retention integrity
 - Tenant paid-payment receipt / proof-of-payment visibility
 - Management Sales Records terminology consistency
 - Tenant and permission hardening
@@ -312,7 +342,7 @@ The numbered CSP verifier filename series ends at Batch 68. Working development 
 
 ## Current roadmap position
 
-1. Current production runtime lineage through `ac132e5`: COMPLETE.
+1. Current production runtime lineage through `c461267`: COMPLETE.
 2. Feed audit / platform-wide Recorded By targeted production QA: COMPLETE.
 3. Homepage, Poultry Health, vendor-console, Dashboard Popper, tenant PDF branding and Feed PDF targeted production QA: COMPLETE.
 4. CSP Report-Only observation: COMPLETE / CLOSED.
@@ -327,8 +357,9 @@ The numbered CSP verifier filename series ends at Batch 68. Working development 
 13. Initialized subscription-attempt recovery through `be054da`: DEPLOYED / STRUCTURALLY VERIFIED / CLOSED. Provider-facing recovery execution remains deferred while payment mode is disabled; do not activate production billing merely to repeat QA.
 14. Billing-provider typed HTTP error evidence through `61ddad9`: DEPLOYED / VERIFIED / CLOSED. This preserves non-2xx evidence only and does not yet classify provider-specific reference absence.
 15. Production web-exposure and Composer `/vendor/` hardening through `ac132e5`: DEPLOYED / VERIFIED / CLOSED.
-16. Continue remaining V2.3 commercial/SaaS hardening and commercial QA: NEXT.
-17. Production payment processing remains NOT APPROVED; keep provider execution TEST/SANDBOX until explicit owner approval.
+16. Billing/payment-history tenant-retention integrity through `c461267`: DEPLOYED / MIGRATED / VERIFIED / CLOSED. Migration 048 is complete; do not rerun absent actual regression evidence.
+17. Continue remaining V2.3 commercial/SaaS hardening and commercial QA: NEXT.
+18. Production payment processing remains NOT APPROVED; keep provider execution TEST/SANDBOX until explicit owner approval.
 
 ## Safety rules
 
@@ -345,6 +376,9 @@ The numbered CSP verifier filename series ends at Batch 68. Working development 
 - Do not interpret a preserved provider HTTP status or error body as authoritative reference absence without provider-specific verified semantics; ambiguous responses remain fail-closed.
 - Do not reopen or repeat tenant payment-receipt QA absent actual regression evidence.
 - Preserve the Sales Records terminology change as UI-only; do not rename its routes, filenames, database identifiers, functions or URLs merely for wording consistency.
+- Migration 048 is CLOSED/PASS; do not rerun it absent actual regression evidence and a separately reviewed reason.
+- Never restore `billing_payment_attempts.farm_id -> farms.id` to `ON DELETE CASCADE`; durable billing/payment history must survive tenant lifecycle operations.
+- Farms with billing/payment history cannot be permanently deleted under the current commercial audit model. Suspend them instead, and never delete a production tenant merely to QA this protection.
 - Preserve protected QA/billing evidence.
 - Prefer shared helpers/services and thin routes.
 - Add focused verifiers for important contracts.
