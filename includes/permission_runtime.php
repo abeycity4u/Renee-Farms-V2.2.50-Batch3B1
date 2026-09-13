@@ -259,12 +259,18 @@ if (permission_runtime_ends_with($path, '/poultry/layers_daily_record.php')) {
     }
 } elseif (permission_runtime_ends_with($path, '/poultry/layer_expenses.php')) {
     $extraCapability['expenseAdd'] = permission_runtime_has('poultry_layer_expenses_add');
+    $extraCapability['expenseEdit'] = permission_runtime_has('poultry_layer_expenses_edit');
+    $extraCapability['expenseDelete'] = permission_runtime_has('poultry_layer_expenses_delete');
     if ($method === 'POST' && isset($_POST['add_expense']) && !$extraCapability['expenseAdd']) permission_runtime_deny('You do not have permission to add Layer expenses.');
 } elseif (permission_runtime_ends_with($path, '/poultry/broiler_expenses.php')) {
     $extraCapability['expenseAdd'] = permission_runtime_has('poultry_broiler_expenses_add');
+    $extraCapability['expenseEdit'] = permission_runtime_has('poultry_broiler_expenses_edit');
+    $extraCapability['expenseDelete'] = permission_runtime_has('poultry_broiler_expenses_delete');
     if ($method === 'POST' && isset($_POST['add_expense']) && !$extraCapability['expenseAdd']) permission_runtime_deny('You do not have permission to add Broiler expenses.');
 } elseif (permission_runtime_ends_with($path, '/ruminant/ruminant_expenses.php')) {
     $extraCapability['expenseAdd'] = permission_runtime_has('ruminant_expenses_add');
+    $extraCapability['expenseEdit'] = permission_runtime_has('ruminant_expenses_edit');
+    $extraCapability['expenseDelete'] = permission_runtime_has('ruminant_expenses_delete');
     if ($method === 'POST' && isset($_POST['add_expense']) && !$extraCapability['expenseAdd']) permission_runtime_deny('You do not have permission to add Ruminant expenses.');
 } elseif (permission_runtime_ends_with($path, '/management/sales_records.php')) {
     $extraCapability['salesAdd'] = permission_runtime_has('sales_add');

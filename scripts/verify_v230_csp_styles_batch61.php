@@ -115,8 +115,8 @@ foreach ([
 }
 
 foreach ([
-    'navbar_head.php' => 2,
-    'includes/permission_prepaint.php' => 1,
+    'navbar_head.php' => 0,
+    'includes/permission_prepaint.php' => 0,
 ] as $relative => $expected) {
     $text = file_get_contents($root . '/' . $relative);
 
@@ -125,7 +125,7 @@ foreach ([
             '/<style\b[^>]*>.*?<\/style\s*>/is',
             $text
         ) === $expected,
-        "{$relative} retains expected remaining inline-style count"
+        "{$relative} retains the expected zero inline-style blocks"
     );
 }
 

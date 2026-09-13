@@ -15,6 +15,35 @@ if (($headPath === '/ruminant/ruminant_daily_record.php' || str_ends_with($headP
     $canDeleteRecords = isPlatformOwner() || hasRole('farm_admin') || hasPermission(getUserType(), 'ruminant_daily_delete');
 }
 
+// Legacy livestock expense pages still use one broad action-column flag.
+// Resolve that flag from the exact Edit/Delete permissions before rendering.
+// Add remains independent and is handled by permission_runtime.php.
+$operationalExpensePagePermissions = [
+    '/poultry/layer_expenses.php' => [
+        'poultry_layer_expenses_edit',
+        'poultry_layer_expenses_delete',
+    ],
+    '/poultry/broiler_expenses.php' => [
+        'poultry_broiler_expenses_edit',
+        'poultry_broiler_expenses_delete',
+    ],
+    '/ruminant/ruminant_expenses.php' => [
+        'ruminant_expenses_edit',
+        'ruminant_expenses_delete',
+    ],
+];
+
+foreach ($operationalExpensePagePermissions as $expenseSuffix => $expensePermissions) {
+    if (($headPath === $expenseSuffix || str_ends_with($headPath, $expenseSuffix))
+        && isset($canManageExpenses)) {
+        $expensePrivileged = isPlatformOwner() || hasRole('farm_admin');
+        $canManageExpenses = $expensePrivileged
+            || hasPermission(getUserType(), $expensePermissions[0])
+            || hasPermission(getUserType(), $expensePermissions[1]);
+        break;
+    }
+}
+
 // Customer Debt Management still renders its ledger actions from one legacy
 // admin-only flag. Keep View/Edit/Delete independent without reconstructing the
 // large Sales Records page: View controls whether the debt section renders,

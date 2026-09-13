@@ -26,8 +26,8 @@ $check(
     preg_match_all(
         '/<style\b[^>]*>.*?<\/style\s*>/is',
         $head
-    ) === 1,
-    'navbar_head.php contains exactly one remaining inline style block'
+    ) === 0,
+    'navbar_head.php contains zero inline style blocks'
 );
 
 $check(
@@ -171,9 +171,13 @@ $check(
 $check(
     str_contains(
         $head,
+        '/tenant_theme.css.php'
+    )
+    && !str_contains(
+        $head,
         '$tenantPrimaryColor'
     ),
-    'Remaining navbar style source is still tenant theme driven'
+    'Tenant theme is loaded through the external tenant_theme.css.php stylesheet'
 );
 
 echo PHP_EOL

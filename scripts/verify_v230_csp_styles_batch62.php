@@ -204,8 +204,8 @@ $check(
     preg_match_all(
         '/<style\b[^>]*>.*?<\/style\s*>/is',
         $navbar
-    ) === 2,
-    'navbar_head.php is now the only expected browser inline-style source'
+    ) === 0,
+    'navbar_head.php contains zero inline style blocks'
 );
 
 echo PHP_EOL

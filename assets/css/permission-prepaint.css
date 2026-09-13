@@ -3,13 +3,18 @@
  * PHP selects permission tokens; this stylesheet owns presentation rules.
  */
 
+html[data-permission-prepaint~="daily-add"] button[data-open-record-modal],
 html[data-permission-prepaint~="daily-add"] button[onclick*="openRecordModal"]{display:none!important;}
+html[data-permission-prepaint~="daily-add"] .calendar-day.add-record-btn:not(.has-record){pointer-events:none!important;cursor:default!important;}
 html[data-permission-prepaint~="daily-edit"] table .edit-record-btn{display:none!important;}
+html[data-permission-prepaint~="daily-edit"] .calendar-day.edit-record-btn,
+html[data-permission-prepaint~="daily-edit"] .calendar-day.add-record-btn.has-record{pointer-events:none!important;cursor:default!important;}
 html[data-permission-prepaint~="daily-delete"] table button.btn-outline-danger,
 html[data-permission-prepaint~="daily-delete"] table button[onclick*="deleteLayerDailyRecord"],
 html[data-permission-prepaint~="daily-delete"] table button[onclick*="deleteBroilerDailyRecord"]{display:none!important;}
 
 html[data-permission-prepaint~="expense-edit"] .edit-expense-btn{display:none!important;}
+html[data-permission-prepaint~="expense-delete"] button[data-delete-expense-id],
 html[data-permission-prepaint~="expense-delete"] button[onclick*="deleteExpense"]{display:none!important;}
 html[data-permission-prepaint~="expense-add"] button[data-bs-target="#addExpenseModal"]{display:none!important;}
 
@@ -21,10 +26,14 @@ html[data-permission-prepaint~="sales-payment"] button[data-bs-target*="payment"
 html[data-permission-prepaint~="sales-payment"] button[onclick*="payment" i],
 html[data-permission-prepaint~="sales-payment"] form button[name="record_payment"]{display:none!important;}
 html[data-permission-prepaint~="sales-edit"] .edit-sale-btn{display:none!important;}
+html[data-permission-prepaint~="sales-delete"] button[data-sale-delete-id],
 html[data-permission-prepaint~="sales-delete"] button[onclick*="deleteSale"]{display:none!important;}
 
+html[data-permission-prepaint~="animal-add"] button[data-ruminant-animal-new],
 html[data-permission-prepaint~="animal-add"] button[onclick*="newAnimal"]{display:none!important;}
+html[data-permission-prepaint~="animal-edit"] button[data-ruminant-animal-edit],
 html[data-permission-prepaint~="animal-edit"] button[onclick*="editAnimal"]{display:none!important;}
+html[data-permission-prepaint~="animal-exit"] button[data-ruminant-animal-exit],
 html[data-permission-prepaint~="animal-exit"] button[onclick*="exitAnimal"]{display:none!important;}
 
 html[data-permission-prepaint~="production-cycle-readonly"] form[method="post"],

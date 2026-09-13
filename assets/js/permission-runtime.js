@@ -48,7 +48,8 @@
         if (d) {
             if (!d.add) {
                 document.querySelectorAll(
-                    'button[onclick*="openRecordModal"]'
+                    'button[data-open-record-modal],'
+                    + 'button[onclick*="openRecordModal"]'
                 ).forEach(function (el) {
                     el.remove();
                 });
@@ -102,6 +103,23 @@
             });
         }
 
+        if (x.expenseEdit === false) {
+            document.querySelectorAll(
+                '.edit-expense-btn'
+            ).forEach(function (el) {
+                el.remove();
+            });
+        }
+
+        if (x.expenseDelete === false) {
+            document.querySelectorAll(
+                'button[data-delete-expense-id],'
+                + 'button[onclick*="deleteExpense"]'
+            ).forEach(function (el) {
+                el.remove();
+            });
+        }
+
         if (x.feedAdd === false) {
             document.querySelectorAll(
                 'button[data-bs-target="#addTransactionModal"]'
@@ -139,7 +157,8 @@
 
         if (x.salesDelete === false) {
             document.querySelectorAll(
-                'button[onclick*="deleteSale"]'
+                'button[data-sale-delete-id],'
+                + 'button[onclick*="deleteSale"]'
             ).forEach(function (el) {
                 el.remove();
             });
@@ -147,7 +166,8 @@
 
         if (x.animalAdd === false) {
             document.querySelectorAll(
-                'button[onclick*="newAnimal"]'
+                'button[data-ruminant-animal-new],'
+                + 'button[onclick*="newAnimal"]'
             ).forEach(function (el) {
                 el.remove();
             });
@@ -155,7 +175,8 @@
 
         if (x.animalEdit === false) {
             document.querySelectorAll(
-                'button[onclick*="editAnimal"]'
+                'button[data-ruminant-animal-edit],'
+                + 'button[onclick*="editAnimal"]'
             ).forEach(function (el) {
                 el.remove();
             });
@@ -163,7 +184,8 @@
 
         if (x.animalExit === false) {
             document.querySelectorAll(
-                'button[onclick*="exitAnimal"]'
+                'button[data-ruminant-animal-exit],'
+                + 'button[onclick*="exitAnimal"]'
             ).forEach(function (el) {
                 el.remove();
             });
