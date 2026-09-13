@@ -25,6 +25,20 @@ ob_start(static function (string $html) use ($showPlatformTenantView, $showBilli
         ) ?? $html;
     }
 
+    if ($showPlatformTenantView
+        && stripos($html, '/management/billing_refund_reviews.php') === false) {
+        $refundReviewsLink = '<li><a class="dropdown-item" href="'
+            . htmlspecialchars(BASE_URL, ENT_QUOTES, 'UTF-8')
+            . '/management/billing_refund_reviews.php"><i class="bi bi-arrow-counterclockwise menu-icon me-2"></i> Refund Reviews</a></li>';
+
+        $html = preg_replace(
+            '~(<li><a class="dropdown-item" href="[^"]*/management/platform_tenant_view\.php"><i class="bi bi-eye menu-icon me-2"></i> Tenant View</a></li>)~i',
+            '$1' . $refundReviewsLink,
+            $html,
+            1
+        ) ?? $html;
+    }
+
     if ($showBillingAccount
         && stripos($html, '/billing/account.php') === false) {
         $billingLink = '<li><a class="dropdown-item" href="'
