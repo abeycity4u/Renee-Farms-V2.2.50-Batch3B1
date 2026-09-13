@@ -82,6 +82,61 @@ if (!function_exists('renderNotification')) {
     }
 }
 
+if (!function_exists('redirectWithNotification')) {
+    function redirectWithNotification(
+        string $type,
+        string $message,
+        string $internalPath
+    ): void {
+        $type = strtolower(trim($type));
+
+        if (!in_array(
+            $type,
+            ['error', 'success', 'warning', 'info'],
+            true
+        )) {
+            throw new InvalidArgumentException(
+                'Unsupported notification type.'
+            );
+        }
+
+        $message = trim($message);
+
+        if ($message === '') {
+            throw new InvalidArgumentException(
+                'Notification message is required.'
+            );
+        }
+
+        $internalPath = trim($internalPath);
+
+        if ($internalPath === ''
+            || !str_starts_with($internalPath, '/')
+            || str_starts_with($internalPath, '//')
+            || preg_match('/[\r\n]/', $internalPath)) {
+            throw new InvalidArgumentException(
+                'Notification redirect must use an internal application path.'
+            );
+        }
+
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            throw new RuntimeException(
+                'Notification redirect requires an active session.'
+            );
+        }
+
+        $_SESSION[$type] = $message;
+
+        header(
+            'Location: ' . BASE_URL . $internalPath,
+            true,
+            303
+        );
+
+        exit();
+    }
+}
+
 if (!function_exists('renderSessionNotifications')) {
     function renderSessionNotifications(): void
     {

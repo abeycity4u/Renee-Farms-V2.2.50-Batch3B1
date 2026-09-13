@@ -23,12 +23,23 @@ require_once dirname(__DIR__) . '/includes/billing_current_product.php';
 require_once dirname(__DIR__) . '/includes/billing_commercial_attempt_reconciliation_launcher.php';
 require_once dirname(__DIR__) . '/includes/billing_initialized_attempt_recovery.php';
 require_once dirname(__DIR__) . '/includes/billing_subscription_checkout_initiation.php';
+require_once dirname(__DIR__) . '/includes/notifications.php';
 
 $actor = billing_require_farm_admin_actor($pdo, true, subscription_recovery_target_statuses());
 $farmId = (int)$actor['farm_id'];
 require_valid_csrf_post();
 
 if (!$pdo instanceof PDO || !billing_payment_foundation_ready($pdo)) {
+    if (!billing_tenant_actor_is_recovery(
+        $actor
+    )) {
+        redirectWithNotification(
+            'error',
+            'Billing service is temporarily unavailable. Please try again later.',
+            '/billing/account.php'
+        );
+    }
+
     http_response_code(503);
     exit('Billing service is temporarily unavailable.');
 }
@@ -343,9 +354,36 @@ try {
     header('Location: ' . $checkout['checkout_url'], true, 303);
     exit();
 } catch (InvalidArgumentException $e) {
+    if (!billing_tenant_actor_is_recovery(
+        $actor
+    )) {
+        redirectWithNotification(
+            'error',
+            'Subscription checkout could not be validated. Please refresh Billing & Subscription and try again.',
+            '/billing/account.php'
+        );
+    }
+
     http_response_code(422);
     exit('Invalid subscription checkout request.');
 } catch (Throwable $e) {
+    error_log(
+        'Billing checkout unavailable for farm '
+        . $farmId
+        . ': '
+        . $e->getMessage()
+    );
+
+    if (!billing_tenant_actor_is_recovery(
+        $actor
+    )) {
+        redirectWithNotification(
+            'error',
+            'Payment checkout is currently unavailable. Please try again later.',
+            '/billing/account.php'
+        );
+    }
+
     http_response_code(503);
     exit('Billing checkout is not available right now.');
 }
