@@ -17,6 +17,7 @@ require_once dirname(__DIR__) . '/includes/billing_provider_selection.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_adapters.php';
 require_once dirname(__DIR__) . '/includes/billing_payment_audit_state.php';
 require_once dirname(__DIR__) . '/includes/billing_seat_change_request.php';
+require_once dirname(__DIR__) . '/includes/billing_refund_resolution.php';
 require_once dirname(__DIR__) . '/includes/billing_paid_attempt_dispatcher.php';
 require_once dirname(__DIR__) . '/includes/billing_tenant_actor.php';
 
@@ -74,6 +75,13 @@ try {
         }
 
         $updated = billing_audit_apply_verification($pdo, (int)$locked['id'], $verification);
+
+        if ((string)($updated['status'] ?? '') === 'refunded') {
+            billing_refund_resolution_capture_verified(
+                $pdo,
+                (int)$locked['id']
+            );
+        }
 
         billing_seat_change_reconcile_terminal_payment(
             $pdo,

@@ -13,6 +13,7 @@
 
 require_once __DIR__ . '/billing_payment_foundation.php';
 require_once __DIR__ . '/billing_payment_audit_state.php';
+require_once __DIR__ . '/billing_seat_change_request.php';
 
 if (!function_exists(
     'billing_refund_resolution_statuses'
@@ -551,5 +552,381 @@ if (!function_exists(
         billing_refund_resolution_row_contract($row);
 
         return $row;
+    }
+}
+
+if (!function_exists(
+    'billing_refund_resolution_capture_verified'
+)) {
+    /**
+     * Record the separate commercial review required when a
+     * provider-verified refund belongs to commercial state that
+     * was already applied.
+     *
+     * This function never calls a provider and never changes
+     * subscription, entitlement, seat or payment state.
+     */
+    function billing_refund_resolution_capture_verified(
+        PDO $pdo,
+        int $paymentAttemptId
+    ): array {
+        if ($paymentAttemptId < 1) {
+            throw new InvalidArgumentException(
+                'A valid billing payment attempt is required for refund capture.'
+            );
+        }
+
+        if (!$pdo->inTransaction()) {
+            throw new RuntimeException(
+                'Refund-resolution capture requires an active database transaction.'
+            );
+        }
+
+        if (!billing_refund_resolution_ready($pdo)) {
+            throw new RuntimeException(
+                'Refund-resolution storage is not ready.'
+            );
+        }
+
+        /*
+         * Canonical lock order begins with the payment attempt.
+         */
+        $attempt =
+            billing_audit_attempt_by_id(
+                $pdo,
+                $paymentAttemptId,
+                true
+            );
+
+        if (!$attempt) {
+            throw new RuntimeException(
+                'Billing payment attempt could not be found for refund capture.'
+            );
+        }
+
+        $paymentStatus = strtolower(trim(
+            (string)($attempt['status'] ?? '')
+        ));
+
+        if ($paymentStatus !== 'refunded') {
+            return [
+                'handled' => false,
+                'captured' => false,
+                'idempotent' => true,
+                'reason' => 'payment_not_refunded',
+                'resolution' => null,
+            ];
+        }
+
+        $farmId =
+            (int)($attempt['farm_id'] ?? 0);
+
+        if ($farmId < 1) {
+            throw new RuntimeException(
+                'Refunded billing attempt has an invalid tenant.'
+            );
+        }
+
+        $purpose =
+            billing_payment_attempt_purpose(
+                $attempt
+            );
+
+        $refundVerifiedAt =
+            billing_audit_datetime(
+                $attempt['verified_at'] ?? null
+            );
+
+        if ($refundVerifiedAt === null) {
+            throw new RuntimeException(
+                'Refunded billing attempt is missing provider verification evidence.'
+            );
+        }
+
+        $subscriptionRecordId = null;
+        $seatChangeRequestId = null;
+
+        /*
+         * Lock the durable refund-resolution row or unique-key gap
+         * second, before purpose-specific commercial context.
+         *
+         * Canonical order:
+         * payment attempt -> refund resolution -> purpose context.
+         */
+        $existing =
+            billing_refund_resolution_by_payment(
+                $pdo,
+                $paymentAttemptId,
+                true
+            );
+
+        if ($purpose === 'subscription') {
+            $subscriptionRecordId =
+                (int)(
+                    $attempt[
+                        'applied_subscription_record_id'
+                    ] ?? 0
+                );
+
+            /*
+             * No application means there is no commercial state
+             * requiring refund resolution.
+             */
+            if ($subscriptionRecordId < 1) {
+                return [
+                    'handled' => true,
+                    'captured' => false,
+                    'idempotent' => true,
+                    'reason' =>
+                        'refund_not_post_application',
+                    'resolution' => null,
+                ];
+            }
+
+            if (billing_audit_datetime(
+                $attempt['paid_at'] ?? null
+            ) === null) {
+                throw new RuntimeException(
+                    'Applied refunded subscription attempt is missing its paid evidence.'
+                );
+            }
+
+            $subscriptionStmt =
+                $pdo->prepare(
+                    "SELECT id, farm_id
+                     FROM subscriptions
+                     WHERE id = ?
+                       AND farm_id = ?
+                     LIMIT 1"
+                );
+
+            $subscriptionStmt->execute([
+                $subscriptionRecordId,
+                $farmId,
+            ]);
+
+            $subscription =
+                $subscriptionStmt->fetch(
+                    PDO::FETCH_ASSOC
+                ) ?: null;
+
+            if (!$subscription
+                || (int)$subscription['id']
+                    !== $subscriptionRecordId
+                || (int)$subscription['farm_id']
+                    !== $farmId) {
+                throw new RuntimeException(
+                    'Refunded subscription attempt points to missing or cross-tenant application history.'
+                );
+            }
+        } elseif ($purpose === 'seat_topup') {
+            /*
+             * Provider routes call refund capture before terminal seat
+             * reconciliation so transaction-wide locking remains:
+             * payment attempt -> refund resolution -> seat request.
+             */
+            $requestRow =
+                billing_seat_change_request_by_payment(
+                    $pdo,
+                    $paymentAttemptId,
+                    true
+                );
+
+            if (!$requestRow) {
+                throw new RuntimeException(
+                    'Refunded seat-top-up attempt has no durable seat-change request.'
+                );
+            }
+
+            $requestState =
+                billing_seat_change_row_contract(
+                    $requestRow
+                );
+
+            $requestContract =
+                $requestState['contract'];
+
+            if (($requestContract['change_kind'] ?? '')
+                    !== 'add'
+                || (int)(
+                    $requestContract[
+                        'payment_attempt_id'
+                    ] ?? 0
+                ) !== $paymentAttemptId
+                || (int)(
+                    $requestContract['farm_id']
+                        ?? 0
+                ) !== $farmId) {
+                throw new RuntimeException(
+                    'Refunded seat-top-up attempt does not match its durable seat request.'
+                );
+            }
+
+            /*
+             * An unapplied refunded top-up is handled by existing
+             * terminal reconciliation. Only applied capacity needs
+             * commercial review.
+             */
+            if ($requestState['status'] !== 'applied') {
+                return [
+                    'handled' => true,
+                    'captured' => false,
+                    'idempotent' => true,
+                    'reason' =>
+                        'refund_not_post_application',
+                    'resolution' => null,
+                ];
+            }
+
+            if (trim((string)(
+                $requestState['applied_at'] ?? ''
+            )) === '') {
+                throw new RuntimeException(
+                    'Applied refunded seat-top-up request is missing its application timestamp.'
+                );
+            }
+
+            if (billing_audit_datetime(
+                $attempt['paid_at'] ?? null
+            ) === null) {
+                throw new RuntimeException(
+                    'Applied refunded seat-top-up attempt is missing its paid evidence.'
+                );
+            }
+
+            $seatChangeRequestId =
+                (int)$requestState['id'];
+
+            if ($seatChangeRequestId < 1) {
+                throw new RuntimeException(
+                    'Applied refunded seat-top-up request has an invalid identity.'
+                );
+            }
+        } else {
+            throw new RuntimeException(
+                'Unsupported payment purpose for refund-resolution capture.'
+            );
+        }
+
+        if ($existing !== null) {
+            $contract =
+                billing_refund_resolution_row_contract(
+                    $existing
+                );
+
+            if ((int)$contract['farm_id'] !== $farmId
+                || (int)$contract[
+                    'payment_attempt_id'
+                ] !== $paymentAttemptId
+                || (string)$contract['purpose']
+                    !== $purpose
+                || (
+                    $purpose === 'subscription'
+                    && (int)$contract[
+                        'applied_subscription_record_id'
+                    ] !== $subscriptionRecordId
+                )
+                || (
+                    $purpose === 'seat_topup'
+                    && (int)$contract[
+                        'seat_change_request_id'
+                    ] !== $seatChangeRequestId
+                )) {
+                throw new RuntimeException(
+                    'Existing refund resolution does not match the refunded commercial lineage.'
+                );
+            }
+
+            return [
+                'handled' => true,
+                'captured' => false,
+                'idempotent' => true,
+                'reason' => 'already_captured',
+                'resolution' => $existing,
+            ];
+        }
+
+        $insert =
+            $pdo->prepare(
+                "INSERT INTO billing_refund_resolutions (
+                    farm_id,
+                    payment_attempt_id,
+                    purpose,
+                    status,
+                    resolution_action,
+                    refund_verified_at,
+                    applied_subscription_record_id,
+                    seat_change_request_id,
+                    resolved_at,
+                    resolved_by_user_id,
+                    resolution_reason
+                 ) VALUES (
+                    ?,
+                    ?,
+                    ?,
+                    'pending_review',
+                    NULL,
+                    ?,
+                    ?,
+                    ?,
+                    NULL,
+                    NULL,
+                    NULL
+                 )"
+            );
+
+        $insert->execute([
+            $farmId,
+            $paymentAttemptId,
+            $purpose,
+            $refundVerifiedAt,
+            $subscriptionRecordId,
+            $seatChangeRequestId,
+        ]);
+
+        if ($insert->rowCount() !== 1) {
+            throw new RuntimeException(
+                'Refund resolution could not be captured exactly once.'
+            );
+        }
+
+        $resolution =
+            billing_refund_resolution_by_payment(
+                $pdo,
+                $paymentAttemptId,
+                false
+            );
+
+        if ($resolution === null) {
+            throw new RuntimeException(
+                'Captured refund resolution could not be reloaded.'
+            );
+        }
+
+        $contract =
+            billing_refund_resolution_row_contract(
+                $resolution
+            );
+
+        if ((string)$contract['status']
+                !== 'pending_review'
+            || $contract['resolution_action']
+                !== null
+            || (int)$contract['farm_id']
+                !== $farmId
+            || (string)$contract['purpose']
+                !== $purpose) {
+            throw new RuntimeException(
+                'Captured refund resolution failed its post-write contract.'
+            );
+        }
+
+        return [
+            'handled' => true,
+            'captured' => true,
+            'idempotent' => false,
+            'reason' => 'post_application_refund',
+            'resolution' => $resolution,
+        ];
     }
 }
