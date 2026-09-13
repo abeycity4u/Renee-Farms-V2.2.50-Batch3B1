@@ -7,9 +7,10 @@
  * Proves:
  * - dedicated Platform Owner-only review surface;
  * - canonical POST + CSRF + transaction boundary;
- * - preserve action delegates to shared service;
+ * - preserve and reverse actions delegate to shared services;
+ * - both actions remain explicit, mutually exclusive and confirmed;
  * - no direct commercial/provider mutation in the page;
- * - reverse entitlement is not exposed;
+ * - Platform Tenant View remains read-only;
  * - navigation remains centralized and Platform Owner-only;
  * - Refund Reviews actually anchors after Tenant View using a regex
  *   that functionally matches the rendered Tenant View markup.
@@ -19,6 +20,9 @@ $root = dirname(__DIR__);
 
 $pagePath =
     $root . '/management/billing_refund_reviews.php';
+
+$tenantViewPath =
+    $root . '/management/platform_tenant_view.php';
 
 $navPath =
     $root . '/includes/platform_owner_nav_discoverability.php';
@@ -31,6 +35,7 @@ $confirmationPath =
 
 foreach ([
     $pagePath,
+    $tenantViewPath,
     $navPath,
     $headPath,
     $confirmationPath,
@@ -48,6 +53,9 @@ foreach ([
 
 $page =
     (string)file_get_contents($pagePath);
+
+$tenantView =
+    (string)file_get_contents($tenantViewPath);
 
 $nav =
     (string)file_get_contents($navPath);
@@ -107,7 +115,7 @@ $check(
         $page,
         '$pdo->rollBack();'
     ) !== false,
-    'preserve action executes inside explicit transaction boundary'
+    'refund resolution executes inside explicit transaction boundary'
 );
 
 $check(
@@ -119,35 +127,39 @@ $check(
 );
 
 $check(
-    strpos(
+    substr_count(
         $page,
         'billing_refund_resolution_resolve_reverse'
-    ) === false
-    && strpos(
-        $page,
-        'name="reverse_entitlement"'
-    ) === false,
-    'Phase 3A surface exposes no reverse-entitlement action'
+    ) === 1,
+    'page delegates reverse resolution exactly once to shared service'
 );
 
 $check(
     strpos(
         $page,
+        '$preserveRequested === $reverseRequested'
+    ) !== false
+    && strpos(
+        $page,
+        '$resolutionAction ='
+    ) !== false,
+    'preserve and reverse are explicit mutually-exclusive commercial decisions'
+);
+
+$check(
+    substr_count(
+        $page,
         'name="preserve_entitlement"'
-    ) !== false
-    && strpos(
+    ) === 1
+    && substr_count(
         $page,
-        'name="resolution_reason"'
-    ) !== false
-    && strpos(
-        $page,
-        'maxlength="160"'
-    ) !== false
-    && preg_match(
-        '/name="resolution_reason"[^>]*\brequired\b/s',
+        'name="reverse_entitlement"'
+    ) === 1
+    && preg_match_all(
+        '/name="resolution_reason"[^>]*maxlength="160"[^>]*\brequired\b/s',
         $page
-    ) === 1,
-    'preserve action is explicit and requires bounded review reason'
+    ) === 2,
+    'preserve and reverse are explicit and each requires a bounded review reason'
 );
 
 $check(
@@ -190,12 +202,32 @@ $check(
     && strpos(
         $page,
         'data-confirm-tone="primary"'
+    ) !== false,
+    'preserve form uses canonical shared confirmation attributes'
+);
+
+$check(
+    strpos(
+        $page,
+        'data-confirm-title="Reverse entitlement?"'
+    ) !== false
+    && strpos(
+        $page,
+        'data-confirm-button="Reverse Entitlement"'
+    ) !== false
+    && strpos(
+        $page,
+        'data-confirm-tone="danger"'
+    ) !== false
+    && strpos(
+        $page,
+        'shared safety checks prove an exact reversible lineage'
     ) !== false
     && strpos(
         $page,
         'data-confirm-message='
     ) === false,
-    'preserve form uses canonical shared confirmation attributes'
+    'reverse form uses explicit danger confirmation and reversible-lineage warning'
 );
 
 $check(
@@ -232,6 +264,27 @@ $check(
         'f.id = rr.farm_id'
     ) !== false,
     'review read model keeps payment and tenant lineage bound'
+);
+
+
+$check(
+    strpos(
+        $tenantView,
+        'preserve_entitlement'
+    ) === false
+    && strpos(
+        $tenantView,
+        'reverse_entitlement'
+    ) === false
+    && strpos(
+        $tenantView,
+        'billing_refund_resolution_resolve_preserve'
+    ) === false
+    && strpos(
+        $tenantView,
+        'billing_refund_resolution_resolve_reverse'
+    ) === false,
+    'Platform Tenant View remains read-only with no refund-resolution action'
 );
 
 $protectedDirectDml =

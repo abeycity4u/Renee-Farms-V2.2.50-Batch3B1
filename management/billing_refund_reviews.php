@@ -47,9 +47,21 @@ if ($requestMethod === 'POST') {
             )
         );
 
-    if (!isset(
-        $_POST['preserve_entitlement']
-    )) {
+    $preserveRequested =
+        isset(
+            $_POST['preserve_entitlement']
+        );
+
+    $reverseRequested =
+        isset(
+            $_POST['reverse_entitlement']
+        );
+
+    /*
+     * Exactly one explicit commercial decision must be submitted.
+     * Preserve and reverse remain mutually exclusive.
+     */
+    if ($preserveRequested === $reverseRequested) {
         $_SESSION['error'] =
             'Unsupported refund review action.';
 
@@ -64,25 +76,52 @@ if ($requestMethod === 'POST') {
         redirectBillingRefundReviews();
     }
 
+    $resolutionAction =
+        $reverseRequested
+            ? 'reverse_entitlement'
+            : 'preserve_entitlement';
+
     try {
         $pdo->beginTransaction();
 
-        $result =
-            billing_refund_resolution_resolve_preserve(
-                $pdo,
-                (int)$paymentAttemptId,
-                $resolvedByUserId,
-                $reason
-            );
+        if ($resolutionAction
+            === 'reverse_entitlement') {
+            $result =
+                billing_refund_resolution_resolve_reverse(
+                    $pdo,
+                    (int)$paymentAttemptId,
+                    $resolvedByUserId,
+                    $reason
+                );
+        } else {
+            $result =
+                billing_refund_resolution_resolve_preserve(
+                    $pdo,
+                    (int)$paymentAttemptId,
+                    $resolvedByUserId,
+                    $reason
+                );
+        }
 
         $pdo->commit();
 
-        if (!empty($result['idempotent'])) {
-            $_SESSION['success'] =
-                'This refund review was already resolved by preserving the existing tenant entitlement.';
+        if ($resolutionAction
+            === 'reverse_entitlement') {
+            if (!empty($result['idempotent'])) {
+                $_SESSION['success'] =
+                    'This refund review was already resolved by reversing the applied tenant entitlement.';
+            } else {
+                $_SESSION['success'] =
+                    'Refund review resolved. The applied tenant entitlement was deliberately reversed.';
+            }
         } else {
-            $_SESSION['success'] =
-                'Refund review resolved. The existing tenant entitlement was deliberately preserved.';
+            if (!empty($result['idempotent'])) {
+                $_SESSION['success'] =
+                    'This refund review was already resolved by preserving the existing tenant entitlement.';
+            } else {
+                $_SESSION['success'] =
+                    'Refund review resolved. The existing tenant entitlement was deliberately preserved.';
+            }
         }
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) {
@@ -90,7 +129,9 @@ if ($requestMethod === 'POST') {
         }
 
         error_log(
-            'Platform Owner refund preserve resolution failed for payment attempt '
+            'Platform Owner refund '
+            . $resolutionAction
+            . ' resolution failed for payment attempt '
             . (int)$paymentAttemptId
             . ': '
             . $e->getMessage()
@@ -218,9 +259,13 @@ $pageTitle =
 
     <div class="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
+            <strong>Choose a commercial resolution</strong>
+            for each verified post-application refund.
             <strong>Preserve entitlement</strong>
-            records an explicit commercial decision to leave the tenant's already-applied subscription or purchased seats unchanged after the provider refund.
-            It does not contact the payment provider and does not change the provider refund fact.
+            deliberately leaves the tenant's already-applied commercial state unchanged.
+            <strong>Reverse entitlement</strong>
+            delegates to the shared fail-closed reversal service and succeeds only when the exact application lineage and current commercial state are safely reversible.
+            Neither action contacts the payment provider or changes the provider refund fact.
         </div>
 
         <span class="badge text-bg-light border">
@@ -345,50 +390,97 @@ $pageTitle =
 
                             <td class="refund-review-action-cell">
                                 <?php if ($isPending): ?>
-                                    <form
-                                        method="post"
-                                        action="<?php echo $h(BASE_URL . '/management/billing_refund_reviews.php'); ?>"
-                                        class="d-flex flex-column gap-2"
-                                        data-confirm="Preserve this tenant's already-applied commercial entitlement despite the verified provider refund?"
-                                        data-confirm-title="Preserve entitlement?"
-                                        data-confirm-button="Preserve Entitlement"
-                                        data-confirm-tone="primary"
-                                    >
-                                        <?php echo csrf_field(); ?>
-
-                                        <input
-                                            type="hidden"
-                                            name="payment_attempt_id"
-                                            value="<?php echo (int)$review['payment_attempt_id']; ?>"
+                                    <div class="d-flex flex-column gap-3">
+                                        <form
+                                            method="post"
+                                            action="<?php echo $h(BASE_URL . '/management/billing_refund_reviews.php'); ?>"
+                                            class="d-flex flex-column gap-2"
+                                            data-confirm="Preserve this tenant's already-applied commercial entitlement despite the verified provider refund?"
+                                            data-confirm-title="Preserve entitlement?"
+                                            data-confirm-button="Preserve Entitlement"
+                                            data-confirm-tone="primary"
                                         >
+                                            <?php echo csrf_field(); ?>
 
-                                        <label
-                                            class="visually-hidden"
-                                            for="refundReason<?php echo (int)$review['id']; ?>"
-                                        >
-                                            Resolution reason
-                                        </label>
+                                            <input
+                                                type="hidden"
+                                                name="payment_attempt_id"
+                                                value="<?php echo (int)$review['payment_attempt_id']; ?>"
+                                            >
 
-                                        <input
-                                            type="text"
-                                            class="form-control form-control-sm"
-                                            id="refundReason<?php echo (int)$review['id']; ?>"
-                                            name="resolution_reason"
-                                            maxlength="160"
-                                            required
-                                            placeholder="Reason for preserving entitlement"
-                                        >
+                                            <label
+                                                class="visually-hidden"
+                                                for="refundPreserveReason<?php echo (int)$review['id']; ?>"
+                                            >
+                                                Preserve resolution reason
+                                            </label>
 
-                                        <button
-                                            type="submit"
-                                            class="btn btn-sm btn-outline-primary"
-                                            name="preserve_entitlement"
-                                            value="1"
+                                            <input
+                                                type="text"
+                                                class="form-control form-control-sm"
+                                                id="refundPreserveReason<?php echo (int)$review['id']; ?>"
+                                                name="resolution_reason"
+                                                maxlength="160"
+                                                required
+                                                placeholder="Reason for preserving entitlement"
+                                            >
+
+                                            <button
+                                                type="submit"
+                                                class="btn btn-sm btn-outline-primary"
+                                                name="preserve_entitlement"
+                                                value="1"
+                                            >
+                                                <i class="bi bi-shield-check"></i>
+                                                Preserve entitlement
+                                            </button>
+                                        </form>
+
+                                        <form
+                                            method="post"
+                                            action="<?php echo $h(BASE_URL . '/management/billing_refund_reviews.php'); ?>"
+                                            class="d-flex flex-column gap-2"
+                                            data-confirm="Reverse this tenant's already-applied commercial entitlement because of the verified provider refund? This can change the tenant's current subscription or purchased seats only when the shared safety checks prove an exact reversible lineage."
+                                            data-confirm-title="Reverse entitlement?"
+                                            data-confirm-button="Reverse Entitlement"
+                                            data-confirm-tone="danger"
                                         >
-                                            <i class="bi bi-shield-check"></i>
-                                            Preserve entitlement
-                                        </button>
-                                    </form>
+                                            <?php echo csrf_field(); ?>
+
+                                            <input
+                                                type="hidden"
+                                                name="payment_attempt_id"
+                                                value="<?php echo (int)$review['payment_attempt_id']; ?>"
+                                            >
+
+                                            <label
+                                                class="visually-hidden"
+                                                for="refundReverseReason<?php echo (int)$review['id']; ?>"
+                                            >
+                                                Reverse resolution reason
+                                            </label>
+
+                                            <input
+                                                type="text"
+                                                class="form-control form-control-sm"
+                                                id="refundReverseReason<?php echo (int)$review['id']; ?>"
+                                                name="resolution_reason"
+                                                maxlength="160"
+                                                required
+                                                placeholder="Reason for reversing entitlement"
+                                            >
+
+                                            <button
+                                                type="submit"
+                                                class="btn btn-sm btn-outline-danger"
+                                                name="reverse_entitlement"
+                                                value="1"
+                                            >
+                                                <i class="bi bi-arrow-counterclockwise"></i>
+                                                Reverse entitlement
+                                            </button>
+                                        </form>
+                                    </div>
                                 <?php else: ?>
                                     <div class="fw-semibold text-capitalize">
                                         <?php echo $h(
