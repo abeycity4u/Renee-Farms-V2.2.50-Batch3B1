@@ -3,25 +3,17 @@
  * Focused static verifier for V2.3 initialized subscription-attempt recovery.
  *
  * Database-free, provider-free and mutation-free.
- *
- * Expected recovery contract:
- * - subscription-purpose initialized attempts only;
- * - commercially eligible attempts only;
- * - provider verification outside DB transactions;
- * - verified provider facts revalidated under row lock;
- * - paid dispatch remains centralized;
- * - pending remains blocking;
- * - verified failed/cancelled may settle safely;
- * - refunded settles without commercial application;
- * - provider/network/unknown failures never become terminal facts;
- * - no timestamp-only expiry or guessed provider state.
  */
 
 $root = dirname(__DIR__);
 
-$path =
+$wrapperPath =
     $root
     . '/includes/billing_initialized_attempt_recovery.php';
+
+$corePath =
+    $root
+    . '/includes/billing_initialized_attempt_recovery_core.php';
 
 $checks = 0;
 $failures = 0;
@@ -41,125 +33,99 @@ $check = static function (
     echo "FAIL: {$message}\n";
 };
 
+$wrapper =
+    is_file($wrapperPath)
+        ? file_get_contents($wrapperPath)
+        : '';
+
+$core =
+    is_file($corePath)
+        ? file_get_contents($corePath)
+        : '';
+
+if ($wrapper === false) $wrapper = '';
+if ($core === false) $core = '';
+
 $check(
-    is_file($path),
-    'initialized subscription-attempt recovery helper exists'
+    $wrapper !== ''
+    && $core !== '',
+    'subscription wrapper and shared initialized-recovery core exist'
 );
 
-$source = is_file($path)
-    ? file_get_contents($path)
-    : '';
-
-if ($source === false) {
-    $source = '';
-}
+$check(
+    preg_match(
+        '/require_once\s+__DIR__\s*\.\s*[\'"]\/billing_initialized_attempt_recovery_core\.php[\'"]\s*;/',
+        $wrapper
+    ) === 1,
+    'subscription recovery loads the shared initialized-recovery core'
+);
 
 $check(
     strpos(
-        $source,
-        'billing_provider_verify_payment('
+        $wrapper,
+        "purpose = 'subscription'"
+    ) !== false
+    && strpos(
+        $wrapper,
+        "commercial_disposition = 'eligible'"
+    ) !== false
+    && strpos(
+        $wrapper,
+        "status = 'initialized'"
     ) !== false,
-    'recovery verifies the persisted provider reference'
+    'candidate scope remains limited to eligible initialized subscription attempts'
+);
+
+$check(
+    strpos(
+        $wrapper,
+        'billing_initialized_attempt_recovery_core('
+    ) !== false
+    && preg_match(
+        '/billing_initialized_attempt_recovery_core\s*\([\s\S]*?[\'"]subscription[\'"]/',
+        $wrapper
+    ) === 1,
+    'subscription recovery delegates initialized mechanics with subscription purpose'
 );
 
 $verifyPos = strpos(
-    $source,
+    $core,
     'billing_provider_verify_payment('
 );
 
 $beginPos = strpos(
-    $source,
+    $core,
     '$pdo->beginTransaction();'
 );
 
-$check(
-    $verifyPos !== false
-    && $beginPos !== false
-    && $verifyPos < $beginPos,
-    'provider verification occurs before recovery transaction begins'
-);
-
-$check(
-    strpos(
-        $source,
-        "purpose = 'subscription'"
-    ) !== false
-    && strpos(
-        $source,
-        "commercial_disposition = 'eligible'"
-    ) !== false
-    && strpos(
-        $source,
-        "status = 'initialized'"
-    ) !== false,
-    'candidate scope is limited to eligible initialized subscription attempts'
-);
-
-$check(
-    strpos(
-        $source,
-        'billing_audit_apply_verification('
-    ) !== false,
-    'authoritative provider fact enters the canonical payment audit layer'
-);
-
-$check(
-    strpos(
-        $source,
-        'billing_paid_attempt_dispatch('
-    ) !== false,
-    'verified paid recovery uses centralized exactly-once paid dispatch'
-);
-
-$check(
-    strpos(
-        $source,
-        "'pending_blocked'"
-    ) !== false,
-    'verified pending attempt remains blocking'
-);
-
-$check(
-    strpos(
-        $source,
-        "'paid_applied'"
-    ) !== false,
-    'verified paid attempt stops replacement checkout after application'
-);
-
-$check(
-    strpos(
-        $source,
-        "'refunded_settled'"
-    ) !== false,
-    'verified refund settles without replacement-payment ambiguity'
-);
-
-$check(
-    strpos(
-        $source,
-        "'superseded'"
-    ) !== false,
-    'verified terminal failed/cancelled state can be commercially superseded'
-);
-
-$check(
-    strpos(
-        $source,
-        "'initialized_blocked'"
-    ) !== false,
-    'ambiguous initialized state has an explicit blocking outcome'
-);
-
-
 $lockPos = strpos(
-    $source,
-    'billing_audit_attempt_by_id('
+    $core,
+    'billing_audit_attempt_by_id(',
+    $beginPos === false ? 0 : $beginPos
 );
 
 $applyPos = strpos(
-    $source,
-    'billing_audit_apply_verification('
+    $core,
+    'billing_audit_apply_verification(',
+    $lockPos === false
+        ? 0
+        : $lockPos
+);
+
+$settlePos = strpos(
+    $core,
+    '$settleVerified(',
+    $applyPos === false
+        ? 0
+        : $applyPos
+);
+
+$commitPos = strpos(
+    $core,
+    '$pdo->commit();',
+    $settlePos === false
+        ? 0
+        : $settlePos
 );
 
 $check(
@@ -167,66 +133,151 @@ $check(
     && $beginPos !== false
     && $lockPos !== false
     && $applyPos !== false
+    && $settlePos !== false
+    && $commitPos !== false
     && $verifyPos < $beginPos
     && $beginPos < $lockPos
-    && $lockPos < $applyPos,
-    'recovery re-locks durable attempt after provider verification and before applying provider fact'
+    && $lockPos < $applyPos
+    && $applyPos < $settlePos
+    && $settlePos < $commitPos,
+    'shared core verifies outside the transaction then locks, audits, settles and commits in order'
 );
 
 $check(
     strpos(
-        $source,
-        "!== 'eligible'"
+        $core,
+        'catch (Throwable $providerError)'
     ) !== false
     && strpos(
-        $source,
+        $core,
+        "'outcome' => 'initialized_blocked'"
+    ) !== false,
+    'provider/network ambiguity remains an explicit initialized blocking outcome'
+);
+
+$check(
+    strpos(
+        $core,
         "!== 'initialized'"
     ) !== false
     && strpos(
-        $source,
-        'changed identity during provider verification'
+        $core,
+        '$expectedPurpose'
+    ) !== false
+    && strpos(
+        $core,
+        'billing_payment_attempt_purpose('
     ) !== false,
-    'recovery revalidates tenant identity, disposition and initialized state after provider I/O'
+    'shared core revalidates initialized state and expected payment purpose under lock'
 );
 
-$providerCatchPos = strpos(
-    $source,
-    'catch (Throwable $providerError)'
+$stalePos = strpos(
+    $core,
+    '$staleBlocked'
 );
 
-$initializedBlockedPos = strpos(
-    $source,
-    "'outcome' => 'initialized_blocked'",
-    $providerCatchPos === false
+$applyAfterStalePos = strpos(
+    $core,
+    'billing_audit_apply_verification(',
+    $stalePos === false
         ? 0
-        : $providerCatchPos
+        : $stalePos
 );
 
 $check(
-    $providerCatchPos !== false
-    && $initializedBlockedPos !== false
-    && $providerCatchPos < $initializedBlockedPos,
-    'provider exception remains an explicit blocking initialized outcome'
+    $stalePos !== false
+    && $applyAfterStalePos !== false
+    && $stalePos < $applyAfterStalePos
+    && strpos(
+        $core,
+        "'outcome' => 'initialized_blocked'",
+        $stalePos
+    ) !== false
+    && strpos(
+        $wrapper,
+        "'stale_blocked' => true"
+    ) !== false
+    && strpos(
+        $wrapper,
+        "'stale_blocked' => false"
+    ) !== false,
+    'purpose-specific stale state blocks safely before provider fact application'
 );
 
 $check(
     strpos(
-        $source,
+        $core,
         'billing_audit_mark_initialization_failed('
     ) === false,
-    'recovery never converts provider ambiguity into initialization failure'
+    'shared recovery never converts provider ambiguity into initialization failure'
 );
 
 $check(
     strpos(
-        $source,
+        $wrapper,
+        'billing_commercial_attempt_disposition_state('
+    ) !== false
+    && strpos(
+        $wrapper,
+        "!== 'eligible'"
+    ) !== false
+    && strpos(
+        $wrapper,
+        'applied_subscription_record_id'
+    ) !== false
+    && strpos(
+        $wrapper,
+        "['paid_at']"
+    ) !== false,
+    'subscription callback preserves commercial eligibility and conflicting-paid-evidence guards'
+);
+
+$check(
+    strpos(
+        $wrapper,
+        'billing_paid_attempt_dispatch('
+    ) !== false
+    && strpos(
+        $wrapper,
+        "'paid_applied'"
+    ) !== false
+    && strpos(
+        $wrapper,
+        "'pending_blocked'"
+    ) !== false
+    && strpos(
+        $wrapper,
+        "'refunded_settled'"
+    ) !== false
+    && strpos(
+        $wrapper,
+        "'superseded'"
+    ) !== false,
+    'subscription-specific settlement outcomes remain unchanged'
+);
+
+$check(
+    strpos(
+        $wrapper,
         'billing_commercial_attempt_mark_superseded_after_verified_terminal('
     ) !== false
     && strpos(
-        $source,
+        $wrapper,
         "'initialized_recovery_terminal'"
     ) !== false,
-    'verified failed or cancelled recovery binds terminal supersession to the recovery reason'
+    'verified failed/cancelled subscription recovery retains canonical supersession'
+);
+
+$check(
+    strpos(
+        $wrapper,
+        'billing_provider_verify_payment('
+    ) === false
+    && strpos(
+        $wrapper,
+        'billing_audit_apply_verification('
+    ) === false,
+    'subscription wrapper no longer duplicates provider verification or audit application mechanics'
 );
 
 $unsafeAgePatterns = [
@@ -240,7 +291,8 @@ $unsafeAgePatterns = [
 $hasUnsafeAgeRule = false;
 
 foreach ($unsafeAgePatterns as $needle) {
-    if (strpos($source, $needle) !== false) {
+    if (strpos($wrapper, $needle) !== false
+        || strpos($core, $needle) !== false) {
         $hasUnsafeAgeRule = true;
         break;
     }
@@ -248,7 +300,7 @@ foreach ($unsafeAgePatterns as $needle) {
 
 $check(
     !$hasUnsafeAgeRule,
-    'recovery does not expire initialized attempts solely by age'
+    'initialized recovery still has no timestamp-only expiry rule'
 );
 
 $protectedDirectDml =
@@ -259,9 +311,13 @@ $protectedDirectDml =
 $check(
     preg_match(
         $protectedDirectDml,
-        $source
+        $wrapper
+    ) !== 1
+    && preg_match(
+        $protectedDirectDml,
+        $core
     ) !== 1,
-    'recovery performs no direct entitlement or subscription DML'
+    'shared core and subscription wrapper perform no direct entitlement or subscription DML'
 );
 
 echo "\nChecks: {$checks}\n";

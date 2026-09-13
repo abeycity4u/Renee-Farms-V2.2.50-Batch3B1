@@ -24,6 +24,7 @@ require_once __DIR__ . '/billing_payment_foundation.php';
 require_once __DIR__ . '/billing_provider_contract.php';
 require_once __DIR__ . '/billing_provider_adapters.php';
 require_once __DIR__ . '/billing_payment_audit_state.php';
+require_once __DIR__ . '/billing_initialized_attempt_recovery_core.php';
 require_once __DIR__ . '/billing_commercial_attempt_disposition.php';
 require_once __DIR__ . '/billing_paid_attempt_dispatcher.php';
 
@@ -212,318 +213,212 @@ if (!function_exists(
             ];
         }
 
-        $attemptId =
-            (int)($candidate['attempt_id'] ?? 0);
+        $core =
+            billing_initialized_attempt_recovery_core(
+                $pdo,
+                $candidate,
+                'subscription',
+                static function (
+                    PDO $pdo,
+                    array $lockedAttempt,
+                    array $candidate
+                ): array {
+                    $disposition =
+                        billing_commercial_attempt_disposition_state(
+                            $lockedAttempt
+                        );
 
-        if ($attemptId < 1) {
-            throw new RuntimeException(
-                'Initialized checkout recovery candidate has an invalid payment identity.'
-            );
-        }
+                    if (($disposition['disposition'] ?? '')
+                        !== 'eligible') {
+                        return [
+                            'stale_blocked' => true,
+                        ];
+                    }
 
-        $provider =
-            (string)$candidate['provider'];
-
-        $providerReference =
-            (string)$candidate[
-                'provider_reference'
-            ];
-
-        /*
-         * Provider registration and verification MUST remain outside a
-         * database transaction.
-         *
-         * Any provider exception is ambiguous. It is not proof of decline,
-         * cancellation, abandonment or reference absence, so the initialized
-         * attempt remains blocking.
-         */
-        try {
-            billing_provider_register_configured_adapters(
-                $provider
-            );
-
-            $verification =
-                billing_provider_verify_payment(
-                    $provider,
-                    $providerReference
-                );
-        } catch (Throwable $providerError) {
-            if ($pdo->inTransaction()) {
-                throw new RuntimeException(
-                    'Provider recovery failure unexpectedly overlapped a database transaction.',
-                    0,
-                    $providerError
-                );
-            }
-
-            return [
-                'attempt_found' => true,
-                'outcome' => 'initialized_blocked',
-                'farm_id' => $farmId,
-                'attempt_id' => $attemptId,
-                'blocking' => true,
-                'provider' => $provider,
-                'provider_reference' =>
-                    $providerReference,
-                'verification' => null,
-                'application' => null,
-                'supersession' => null,
-            ];
-        }
-
-        if ($pdo->inTransaction()) {
-            throw new RuntimeException(
-                'Initialized checkout provider verification unexpectedly opened a database transaction.'
-            );
-        }
-
-        $pdo->beginTransaction();
-
-        try {
-            /*
-             * Preserve the established commercial lock order:
-             *
-             * payment attempt -> tenant farm
-             *
-             * Paid dispatch and commercial supersession both follow this
-             * ordering.
-             */
-            $lockedAttempt =
-                billing_audit_attempt_by_id(
-                    $pdo,
-                    $attemptId,
-                    true
-                );
-
-            if (!is_array($lockedAttempt)
-                || (int)(
-                    $lockedAttempt['farm_id']
-                        ?? 0
-                ) !== $farmId
-                || billing_payment_attempt_purpose(
-                    $lockedAttempt
-                ) !== 'subscription') {
-                throw new RuntimeException(
-                    'Initialized subscription attempt changed identity during provider verification.'
-                );
-            }
-
-            $lockedDisposition =
-                billing_commercial_attempt_disposition_state(
-                    $lockedAttempt
-                );
-
-            $lockedStatus =
-                strtolower(trim(
-                    (string)(
-                        $lockedAttempt['status']
-                        ?? ''
-                    )
-                ));
-
-            /*
-             * Candidate selection occurred before provider I/O. A return or
-             * webhook may have changed the durable attempt while verification
-             * was in flight. Never apply the stale provider fact to an attempt
-             * that has left the exact initialized/eligible state selected.
-             */
-            if (($lockedDisposition['disposition'] ?? '')
-                    !== 'eligible'
-                || $lockedStatus
-                    !== 'initialized') {
-                $pdo->rollBack();
-
-                return [
-                    'attempt_found' => true,
-                    'outcome' => 'initialized_blocked',
-                    'farm_id' => $farmId,
-                    'attempt_id' => $attemptId,
-                    'blocking' => true,
-                    'provider' => $provider,
-                    'provider_reference' =>
-                        $providerReference,
-                    'verification' => null,
-                    'application' => null,
-                    'supersession' => null,
-                ];
-            }
-
-            if ((int)(
-                $lockedAttempt[
-                    'applied_subscription_record_id'
-                ] ?? 0
-            ) > 0
-                || billing_audit_datetime(
-                    $lockedAttempt['paid_at']
-                        ?? null
-                ) !== null) {
-                throw new RuntimeException(
-                    'Initialized subscription attempt gained conflicting paid evidence during recovery.'
-                );
-            }
-
-            /*
-             * This re-locks the same attempt through the canonical audit layer
-             * and validates provider, reference, amount and currency before the
-             * authoritative provider status is persisted.
-             */
-            $updated =
-                billing_audit_apply_verification(
-                    $pdo,
-                    $attemptId,
-                    $verification
-                );
-
-            if ((int)($updated['id'] ?? 0)
-                    !== $attemptId
-                || (int)(
-                    $updated['farm_id']
-                        ?? 0
-                ) !== $farmId
-                || billing_payment_attempt_purpose(
-                    $updated
-                ) !== 'subscription') {
-                throw new RuntimeException(
-                    'Recovered subscription payment identity changed unexpectedly.'
-                );
-            }
-
-            $updatedDisposition =
-                billing_commercial_attempt_disposition_state(
-                    $updated
-                );
-
-            if (($updatedDisposition['disposition'] ?? '')
-                !== 'eligible') {
-                throw new RuntimeException(
-                    'Recovered subscription payment lost commercial eligibility unexpectedly.'
-                );
-            }
-
-            $status =
-                strtolower(trim(
-                    (string)($updated['status'] ?? '')
-                ));
-
-            $outcome = '';
-            $blocking = false;
-            $application = null;
-            $supersession = null;
-
-            if ($status === 'paid') {
-                $application =
-                    billing_paid_attempt_dispatch(
-                        $pdo,
-                        $attemptId
-                    );
-
-                if (($application['audit_only'] ?? false)
-                    === true) {
-                    throw new RuntimeException(
-                        'Eligible recovered subscription payment unexpectedly entered audit-only dispatch.'
-                    );
-                }
-
-                $finalAttempt =
-                    billing_audit_attempt_by_id(
-                        $pdo,
-                        $attemptId,
-                        false
-                    );
-
-                if (!is_array($finalAttempt)
-                    || (int)(
-                        $finalAttempt[
+                    if ((int)(
+                        $lockedAttempt[
                             'applied_subscription_record_id'
                         ] ?? 0
-                    ) < 1
-                    || strtolower(trim(
-                        (string)(
-                            $finalAttempt['status']
-                            ?? ''
-                        )
-                    )) !== 'paid') {
+                    ) > 0
+                        || billing_audit_datetime(
+                            $lockedAttempt['paid_at']
+                                ?? null
+                        ) !== null) {
+                        throw new RuntimeException(
+                            'Initialized subscription attempt gained conflicting paid evidence during recovery.'
+                        );
+                    }
+
+                    return [
+                        'stale_blocked' => false,
+                    ];
+                },
+                static function (
+                    PDO $pdo,
+                    array $updated,
+                    array $candidate,
+                    array $lockedContext
+                ) use ($actorUserId): array {
+                    $attemptId =
+                        (int)($updated['id'] ?? 0);
+
+                    $updatedDisposition =
+                        billing_commercial_attempt_disposition_state(
+                            $updated
+                        );
+
+                    if (($updatedDisposition['disposition'] ?? '')
+                        !== 'eligible') {
+                        throw new RuntimeException(
+                            'Recovered subscription payment lost commercial eligibility unexpectedly.'
+                        );
+                    }
+
+                    $status = strtolower(trim(
+                        (string)($updated['status'] ?? '')
+                    ));
+
+                    $application = null;
+                    $supersession = null;
+
+                    if ($status === 'paid') {
+                        $application =
+                            billing_paid_attempt_dispatch(
+                                $pdo,
+                                $attemptId
+                            );
+
+                        if (($application['audit_only'] ?? false)
+                            === true) {
+                            throw new RuntimeException(
+                                'Eligible recovered subscription payment unexpectedly entered audit-only dispatch.'
+                            );
+                        }
+
+                        $finalAttempt =
+                            billing_audit_attempt_by_id(
+                                $pdo,
+                                $attemptId,
+                                false
+                            );
+
+                        if (!is_array($finalAttempt)
+                            || (int)(
+                                $finalAttempt[
+                                    'applied_subscription_record_id'
+                                ] ?? 0
+                            ) < 1
+                            || strtolower(trim(
+                                (string)(
+                                    $finalAttempt['status']
+                                    ?? ''
+                                )
+                            )) !== 'paid') {
+                            throw new RuntimeException(
+                                'Recovered paid subscription did not persist its exactly-once application linkage.'
+                            );
+                        }
+
+                        return [
+                            'outcome' => 'paid_applied',
+                            'blocking' => false,
+                            'application' => $application,
+                            'supersession' => null,
+                        ];
+                    }
+
+                    if ($status === 'pending') {
+                        return [
+                            'outcome' => 'pending_blocked',
+                            'blocking' => true,
+                            'application' => null,
+                            'supersession' => null,
+                        ];
+                    }
+
+                    if (in_array(
+                        $status,
+                        ['failed', 'cancelled'],
+                        true
+                    )) {
+                        $verifiedAt =
+                            billing_audit_datetime(
+                                $updated['verified_at']
+                                    ?? null
+                            );
+
+                        if ($verifiedAt === null) {
+                            throw new RuntimeException(
+                                'Recovered terminal subscription payment is missing its provider verification timestamp.'
+                            );
+                        }
+
+                        $supersession =
+                            billing_commercial_attempt_mark_superseded_after_verified_terminal(
+                                $pdo,
+                                $attemptId,
+                                $actorUserId,
+                                $verifiedAt,
+                                'initialized_recovery_terminal'
+                            );
+
+                        if (($supersession['disposition'] ?? '')
+                            !== 'superseded') {
+                            throw new RuntimeException(
+                                'Recovered terminal subscription attempt was not commercially superseded.'
+                            );
+                        }
+
+                        return [
+                            'outcome' => 'superseded',
+                            'blocking' => false,
+                            'application' => null,
+                            'supersession' => $supersession,
+                        ];
+                    }
+
+                    if ($status === 'refunded') {
+                        return [
+                            'outcome' => 'refunded_settled',
+                            'blocking' => false,
+                            'application' => null,
+                            'supersession' => null,
+                        ];
+                    }
+
                     throw new RuntimeException(
-                        'Recovered paid subscription did not persist its exactly-once application linkage.'
+                        'Initialized checkout recovery produced an unsupported provider payment state.'
                     );
                 }
+            );
 
-                $outcome = 'paid_applied';
-                $blocking = false;
-            } elseif ($status === 'pending') {
-                $outcome = 'pending_blocked';
-                $blocking = true;
-            } elseif (in_array(
-                $status,
-                ['failed', 'cancelled'],
-                true
-            )) {
-                $verifiedAt =
-                    billing_audit_datetime(
-                        $updated['verified_at']
-                            ?? null
-                    );
-
-                if ($verifiedAt === null) {
-                    throw new RuntimeException(
-                        'Recovered terminal subscription payment is missing its provider verification timestamp.'
-                    );
-                }
-
-                $supersession =
-                    billing_commercial_attempt_mark_superseded_after_verified_terminal(
-                        $pdo,
-                        $attemptId,
-                        $actorUserId,
-                        $verifiedAt,
-                        'initialized_recovery_terminal'
-                    );
-
-                if (($supersession['disposition'] ?? '')
-                    !== 'superseded') {
-                    throw new RuntimeException(
-                        'Recovered terminal subscription attempt was not commercially superseded.'
-                    );
-                }
-
-                $outcome = 'superseded';
-                $blocking = false;
-            } elseif ($status === 'refunded') {
-                /*
-                 * There is no commercial subscription application to undo:
-                 * this attempt never progressed beyond initialized locally.
-                 * Preserve the verified refund as the provider audit fact and
-                 * allow replacement checkout coordination to continue.
-                 */
-                $outcome = 'refunded_settled';
-                $blocking = false;
-            } else {
-                throw new RuntimeException(
-                    'Initialized checkout recovery produced an unsupported provider payment state.'
-                );
-            }
-
-            $pdo->commit();
-        } catch (Throwable $e) {
-            if ($pdo->inTransaction()) {
-                $pdo->rollBack();
-            }
-
-            throw $e;
-        }
+        $settlement =
+            is_array($core['settlement'] ?? null)
+                ? $core['settlement']
+                : [];
 
         return [
             'attempt_found' => true,
-            'outcome' => $outcome,
+            'outcome' =>
+                (string)($core['outcome'] ?? ''),
             'farm_id' => $farmId,
-            'attempt_id' => $attemptId,
-            'blocking' => $blocking,
-            'provider' => $provider,
+            'attempt_id' =>
+                (int)($core['attempt_id'] ?? 0),
+            'blocking' =>
+                $core['blocking'] ?? true,
+            'provider' =>
+                $core['provider'] ?? null,
             'provider_reference' =>
-                $providerReference,
-            'verification' => $verification,
-            'application' => $application,
-            'supersession' => $supersession,
+                $core['provider_reference']
+                    ?? null,
+            'verification' =>
+                $core['verification'] ?? null,
+            'application' =>
+                $settlement['application']
+                    ?? null,
+            'supersession' =>
+                $settlement['supersession']
+                    ?? null,
         ];
     }
 }

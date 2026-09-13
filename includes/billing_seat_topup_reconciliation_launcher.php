@@ -13,7 +13,7 @@
  * Contract:
  * - inspect one tenant's oldest durable add-seat request awaiting payment;
  * - serialize unresolved seat-top-up payment work across all seat roles;
- * - an initialized checkout remains blocking without guessing provider state;
+ * - initialized checkout crash windows recover through shared authoritative provider verification;
  * - provider verification occurs only while no database transaction is open;
  * - verified paid attempts are applied through the central paid dispatcher;
  * - verified terminal attempts are reconciled through the durable seat-change
@@ -26,6 +26,7 @@ require_once __DIR__ . '/billing_payment_foundation.php';
 require_once __DIR__ . '/billing_provider_contract.php';
 require_once __DIR__ . '/billing_provider_adapters.php';
 require_once __DIR__ . '/billing_payment_audit_state.php';
+require_once __DIR__ . '/billing_initialized_attempt_recovery_core.php';
 require_once __DIR__ . '/billing_seat_change_request.php';
 require_once __DIR__ . '/billing_paid_attempt_dispatcher.php';
 
@@ -251,30 +252,253 @@ if (!function_exists(
         }
 
         /*
-         * An initialized attempt means initiation committed but provider
-         * initialization has not yet been safely recorded as pending.
+         * An initialized attempt is the provider-initialization crash window:
+         * the payment attempt and durable add-seat request committed, but the
+         * provider result was not safely recorded locally.
          *
-         * Do not race another checkout and do not guess provider state here.
+         * Recover only this state through the shared initialized-attempt core.
+         * Provider/network work stays outside the transaction there. The core
+         * then locks the payment attempt first; this callback locks and
+         * revalidates the durable seat-change request before any provider fact
+         * is applied through the canonical audit layer.
          */
         if (($candidate['status'] ?? '')
             === 'initialized') {
+            $core =
+                billing_initialized_attempt_recovery_core(
+                    $pdo,
+                    $candidate,
+                    'seat_topup',
+                    static function (
+                        PDO $pdo,
+                        array $lockedAttempt,
+                        array $candidate
+                    ) use (
+                        $farmId,
+                        $attemptId,
+                        $requestId,
+                        $roleCode
+                    ): array {
+                        $lockedRequest =
+                            billing_seat_change_request_by_payment(
+                                $pdo,
+                                $attemptId,
+                                true
+                            );
+
+                        if (!is_array($lockedRequest)) {
+                            throw new RuntimeException(
+                                'Initialized seat-top-up payment lost its durable seat-change request.'
+                            );
+                        }
+
+                        $requestState =
+                            billing_seat_change_row_contract(
+                                $lockedRequest
+                            );
+
+                        $requestContract =
+                            $requestState['contract']
+                                ?? null;
+
+                        if (!is_array($requestContract)) {
+                            throw new RuntimeException(
+                                'Initialized seat-top-up durable request has an invalid contract.'
+                            );
+                        }
+
+                        /*
+                         * Identity drift is corruption and fails closed.
+                         * Status drift alone can be a concurrent return/webhook
+                         * settlement, so it uses the shared stale-block path and
+                         * does not apply the provider fact selected before I/O.
+                         */
+                        if ((int)($requestState['id'] ?? 0)
+                                !== $requestId
+                            || (int)(
+                                $requestContract['farm_id']
+                                    ?? 0
+                            ) !== $farmId
+                            || ($requestContract[
+                                'change_kind'
+                            ] ?? '') !== 'add'
+                            || ($requestContract[
+                                'role_code'
+                            ] ?? '') !== $roleCode
+                            || (int)(
+                                $requestContract[
+                                    'payment_attempt_id'
+                                ] ?? 0
+                            ) !== $attemptId) {
+                            throw new RuntimeException(
+                                'Initialized seat-top-up durable request changed identity during provider verification.'
+                            );
+                        }
+
+                        if (($requestState['status'] ?? '')
+                            !== 'awaiting_payment') {
+                            return [
+                                'stale_blocked' => true,
+                                'request_state' =>
+                                    $requestState,
+                            ];
+                        }
+
+                        return [
+                            'stale_blocked' => false,
+                            'request_state' =>
+                                $requestState,
+                        ];
+                    },
+                    static function (
+                        PDO $pdo,
+                        array $updated,
+                        array $candidate,
+                        array $lockedContext
+                    ) use (
+                        $farmId,
+                        $attemptId
+                    ): array {
+                        if ((int)(
+                            $updated['farm_id']
+                                ?? 0
+                        ) !== $farmId
+                            || (int)(
+                                $updated['id']
+                                    ?? 0
+                            ) !== $attemptId
+                            || billing_payment_attempt_purpose(
+                                $updated
+                            ) !== 'seat_topup') {
+                            throw new RuntimeException(
+                                'Recovered seat-top-up payment identity changed unexpectedly.'
+                            );
+                        }
+
+                        $status = strtolower(trim(
+                            (string)(
+                                $updated['status']
+                                    ?? ''
+                            )
+                        ));
+
+                        if ($status === 'paid') {
+                            $application =
+                                billing_paid_attempt_dispatch(
+                                    $pdo,
+                                    $attemptId
+                                );
+
+                            return [
+                                'outcome' =>
+                                    'paid_applied',
+                                'blocking' => true,
+                                'application' =>
+                                    $application,
+                                'terminal_reconciliation' =>
+                                    null,
+                            ];
+                        }
+
+                        if ($status === 'pending') {
+                            return [
+                                'outcome' =>
+                                    'pending_blocked',
+                                'blocking' => true,
+                                'application' => null,
+                                'terminal_reconciliation' =>
+                                    null,
+                            ];
+                        }
+
+                        if (in_array(
+                            $status,
+                            ['failed', 'cancelled'],
+                            true
+                        )) {
+                            $terminal =
+                                billing_seat_change_reconcile_terminal_payment(
+                                    $pdo,
+                                    $attemptId
+                                );
+
+                            if (($terminal['handled'] ?? false)
+                                !== true) {
+                                throw new RuntimeException(
+                                    'Recovered terminal seat-top-up payment was not reconciled to its durable request.'
+                                );
+                            }
+
+                            return [
+                                'outcome' =>
+                                    'terminal_settled',
+                                'blocking' => false,
+                                'application' => null,
+                                'terminal_reconciliation' =>
+                                    $terminal,
+                            ];
+                        }
+
+                        if ($status === 'refunded') {
+                            $terminal =
+                                billing_seat_change_reconcile_terminal_payment(
+                                    $pdo,
+                                    $attemptId
+                                );
+
+                            if (($terminal['handled'] ?? false)
+                                !== true) {
+                                throw new RuntimeException(
+                                    'Recovered refunded seat-top-up payment was not reconciled to its durable request.'
+                                );
+                            }
+
+                            return [
+                                'outcome' =>
+                                    'refunded_settled',
+                                'blocking' => false,
+                                'application' => null,
+                                'terminal_reconciliation' =>
+                                    $terminal,
+                            ];
+                        }
+
+                        throw new RuntimeException(
+                            'Initialized seat-top-up recovery produced an unsupported provider payment state.'
+                        );
+                    }
+                );
+
+            $settlement =
+                is_array($core['settlement'] ?? null)
+                    ? $core['settlement']
+                    : [];
+
             return [
                 'attempt_found' => true,
-                'outcome' => 'initialized_blocked',
+                'outcome' =>
+                    (string)($core['outcome'] ?? ''),
                 'farm_id' => $farmId,
                 'role_code' => $roleCode,
-                'attempt_id' => $attemptId,
+                'attempt_id' =>
+                    (int)($core['attempt_id'] ?? 0),
                 'request_id' => $requestId,
-                'blocking' => true,
+                'blocking' =>
+                    $core['blocking'] ?? true,
                 'provider' =>
-                    (string)$candidate['provider'],
+                    $core['provider'] ?? null,
                 'provider_reference' =>
-                    (string)$candidate[
-                        'provider_reference'
-                    ],
-                'verification' => null,
-                'application' => null,
-                'terminal_reconciliation' => null,
+                    $core['provider_reference']
+                        ?? null,
+                'verification' =>
+                    $core['verification'] ?? null,
+                'application' =>
+                    $settlement['application']
+                        ?? null,
+                'terminal_reconciliation' =>
+                    $settlement[
+                        'terminal_reconciliation'
+                    ] ?? null,
             ];
         }
 

@@ -227,15 +227,119 @@ $beginPos = strpos(
     '$pdo->beginTransaction();'
 );
 
+$coreRequirePos = strpos(
+    $source,
+    'billing_initialized_attempt_recovery_core.php'
+);
+
+$coreCallPos = strpos(
+    $source,
+    'billing_initialized_attempt_recovery_core(',
+    $initializedPos === false
+        ? 0
+        : $initializedPos
+);
+
+$corePurposePos = strpos(
+    $source,
+    "'seat_topup'",
+    $coreCallPos === false
+        ? 0
+        : $coreCallPos
+);
+
+$initializedEndPos = strpos(
+    $source,
+    '$provider =',
+    $coreCallPos === false
+        ? 0
+        : $coreCallPos
+);
+
+$initializedSource = '';
+
+if ($coreCallPos !== false
+    && $initializedEndPos !== false
+    && $coreCallPos < $initializedEndPos) {
+    $initializedSource = substr(
+        $source,
+        $coreCallPos,
+        $initializedEndPos - $coreCallPos
+    );
+}
+
 $check(
     $initializedPos !== false
+    && $coreRequirePos !== false
+    && $coreCallPos !== false
+    && $corePurposePos !== false
     && $registerPos !== false
-    && $initializedPos < $registerPos
+    && $initializedPos < $coreCallPos
+    && $coreCallPos < $registerPos,
+    'initialized seat-top-up crash recovery delegates to the shared initialized-attempt core before ordinary reconciliation'
+);
+
+$check(
+    $initializedSource !== ''
     && strpos(
-        $source,
-        "'outcome' => 'initialized_blocked'"
+        $initializedSource,
+        'billing_seat_change_request_by_payment('
+    ) !== false
+    && strpos(
+        $initializedSource,
+        "'stale_blocked' => true"
+    ) !== false
+    && strpos(
+        $initializedSource,
+        "'stale_blocked' => false"
+    ) !== false
+    && strpos(
+        $initializedSource,
+        "'awaiting_payment'"
     ) !== false,
-    'an in-flight initialized checkout blocks another top-up without provider guessing'
+    'initialized recovery locks and revalidates the durable awaiting-payment request through the shared stale-state contract'
+);
+
+$check(
+    $initializedSource !== ''
+    && strpos(
+        $initializedSource,
+        'billing_paid_attempt_dispatch('
+    ) !== false
+    && strpos(
+        $initializedSource,
+        'billing_seat_change_reconcile_terminal_payment('
+    ) !== false
+    && strpos(
+        $initializedSource,
+        "'paid_applied'"
+    ) !== false
+    && strpos(
+        $initializedSource,
+        "'pending_blocked'"
+    ) !== false
+    && strpos(
+        $initializedSource,
+        "'terminal_settled'"
+    ) !== false
+    && strpos(
+        $initializedSource,
+        "'refunded_settled'"
+    ) !== false,
+    'initialized recovery retains canonical paid, pending and terminal seat-top-up settlement semantics'
+);
+
+$check(
+    $initializedSource !== ''
+    && strpos(
+        $initializedSource,
+        'billing_provider_verify_payment('
+    ) === false
+    && strpos(
+        $initializedSource,
+        'billing_audit_apply_verification('
+    ) === false,
+    'initialized seat-top-up wrapper does not duplicate provider verification or audit-application mechanics'
 );
 
 $check(
@@ -308,12 +412,18 @@ $check(
 
 $paidDispatchPos = strpos(
     $source,
-    'billing_paid_attempt_dispatch('
+    'billing_paid_attempt_dispatch(',
+    $applyVerificationPos === false
+        ? 0
+        : $applyVerificationPos
 );
 
 $terminalPos = strpos(
     $source,
-    'billing_seat_change_reconcile_terminal_payment('
+    'billing_seat_change_reconcile_terminal_payment(',
+    $applyVerificationPos === false
+        ? 0
+        : $applyVerificationPos
 );
 
 $commitPos = strpos(
