@@ -149,8 +149,8 @@ $check(
     substr_count(
         $route,
         'redirectWithNotification('
-    ) >= 3,
-    'checkout delegates normal failure redirects to the shared helper'
+    ) >= 8,
+    'checkout delegates all normal Farm Admin failure redirects to the shared helper'
 );
 
 $check(
@@ -160,7 +160,19 @@ $check(
     ) !== false
     && strpos(
         $route,
+        "http_response_code(409);"
+    ) !== false
+    && strpos(
+        $route,
         "http_response_code(422);"
+    ) !== false
+    && strpos(
+        $route,
+        "http_response_code(500);"
+    ) !== false
+    && strpos(
+        $route,
+        "http_response_code(502);"
     ) !== false
     && strpos(
         $route,
@@ -177,8 +189,24 @@ $check(
     && strpos(
         $route,
         'Subscription checkout could not be validated. Please refresh Billing & Subscription and try again.'
+    ) !== false
+    && strpos(
+        $route,
+        'An earlier subscription payment is still pending verification. No new checkout was started.'
+    ) !== false
+    && strpos(
+        $route,
+        'An earlier subscription checkout could not yet be verified safely. No new checkout was started.'
+    ) !== false
+    && strpos(
+        $route,
+        'Payment checkout could not be started. Please try again.'
+    ) !== false
+    && strpos(
+        $route,
+        'Payment checkout could not be recorded safely. Please try again.'
     ) !== false,
-    'tenant-facing checkout failure messages remain explicit'
+    'tenant-facing checkout failure messages remain explicit across all normal failure paths'
 );
 
 $check(
@@ -212,5 +240,5 @@ if ($failures > 0) {
     exit(1);
 }
 
-echo "PASS: billing checkout failures use the shared styled notification PRG helper without changing recovery fallback behavior.\n";
+echo "PASS: all normal Farm Admin checkout failures use the shared styled notification PRG helper without changing recovery fallback behavior.\n";
 ?>

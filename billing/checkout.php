@@ -130,6 +130,16 @@ try {
     }
 
     if ($initializedOutcome === 'pending_blocked') {
+        if (!billing_tenant_actor_is_recovery(
+            $actor
+        )) {
+            redirectWithNotification(
+                'warning',
+                'An earlier subscription payment is still pending verification. No new checkout was started.',
+                '/billing/account.php'
+            );
+        }
+
         http_response_code(409);
         exit(
             'An earlier subscription payment is still pending verification. No new checkout was started.'
@@ -137,6 +147,16 @@ try {
     }
 
     if ($initializedOutcome === 'initialized_blocked') {
+        if (!billing_tenant_actor_is_recovery(
+            $actor
+        )) {
+            redirectWithNotification(
+                'warning',
+                'An earlier subscription checkout could not yet be verified safely. No new checkout was started.',
+                '/billing/account.php'
+            );
+        }
+
         http_response_code(409);
         exit(
             'An earlier subscription checkout could not yet be verified safely. No new checkout was started.'
@@ -202,6 +222,16 @@ try {
     }
 
     if ($stoppedReason === 'pending_blocked') {
+        if (!billing_tenant_actor_is_recovery(
+            $actor
+        )) {
+            redirectWithNotification(
+                'warning',
+                'An earlier subscription payment is still pending verification. No new checkout was started.',
+                '/billing/account.php'
+            );
+        }
+
         http_response_code(409);
         exit(
             'An earlier subscription payment is still pending verification. No new checkout was started.'
@@ -332,6 +362,16 @@ try {
         } catch (Throwable $auditError) {
             if ($pdo->inTransaction()) $pdo->rollBack();
         }
+        if (!billing_tenant_actor_is_recovery(
+            $actor
+        )) {
+            redirectWithNotification(
+                'error',
+                'Payment checkout could not be started. Please try again.',
+                '/billing/account.php'
+            );
+        }
+
         http_response_code(502);
         exit('Payment checkout could not be started. Please try again.');
     }
@@ -347,6 +387,17 @@ try {
         $pdo->commit();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
+
+        if (!billing_tenant_actor_is_recovery(
+            $actor
+        )) {
+            redirectWithNotification(
+                'error',
+                'Payment checkout could not be recorded safely. Please try again.',
+                '/billing/account.php'
+            );
+        }
+
         http_response_code(500);
         exit('Payment checkout could not be recorded safely. Please try again.');
     }
