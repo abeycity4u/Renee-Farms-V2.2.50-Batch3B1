@@ -132,6 +132,85 @@ verify_throws(
     'fractional allocation quantity rejected'
 );
 
+/* Explicit Sales form adapter. */
+verify_true(
+    sale_population_effect_rows_from_post([]) === [],
+    'missing stock-effect mode remains financial-only'
+);
+
+verify_true(
+    sale_population_effect_rows_from_post([
+        'population_effect_mode' => 'financial_only',
+        'quantity' => '500',
+        'unit_of_measure' => 'Head',
+        'population_cycle_ids' => ['12'],
+        'population_quantities' => ['50'],
+    ]) === [],
+    'financial-only mode ignores stale physical rows and never infers from financial fields'
+);
+
+$postRows = sale_population_effect_rows_from_post([
+    'population_effect_mode' => 'remove_live_population',
+    'population_cycle_ids' => ['9', '4'],
+    'population_quantities' => ['25', '10'],
+]);
+
+verify_true(
+    $postRows === [
+        ['cycle_id' => 4, 'population_quantity' => 10],
+        ['cycle_id' => 9, 'population_quantity' => 25],
+    ],
+    'explicit physical rows normalize deterministically'
+);
+
+verify_throws(
+    function (): void {
+        sale_population_effect_rows_from_post([
+            'population_effect_mode' => 'remove_live_population',
+            'population_cycle_ids' => [],
+            'population_quantities' => [],
+        ]);
+    },
+    'live-population mode requires an explicit source row'
+);
+
+verify_throws(
+    function (): void {
+        sale_population_effect_rows_from_post([
+            'population_effect_mode' => 'remove_live_population',
+            'population_cycle_ids' => ['2'],
+            'population_quantities' => ['1.5'],
+        ]);
+    },
+    'form adapter rejects fractional physical headcount'
+);
+
+verify_throws(
+    function (): void {
+        sale_population_effect_rows_from_post([
+            'population_effect_mode' => 'remove_live_population',
+            'population_cycle_ids' => ['2', '2'],
+            'population_quantities' => ['1', '1'],
+        ]);
+    },
+    'form adapter rejects duplicate source cycles'
+);
+
+verify_throws(
+    function (): void {
+        sale_population_effect_rows_from_post([
+            'population_effect_mode' => 'automatic',
+        ]);
+    },
+    'implicit or unknown population-effect mode is rejected'
+);
+
+verify_true(
+    strpos($service, "spe.is_active=1") !== false
+    && strpos($service, 'sale_population_effect_rows_for_sales') !== false,
+    'current-effect reader exposes active durable rows through one shared query'
+);
+
 /* Shared-service ownership and projection boundaries. */
 verify_true(
     preg_match(

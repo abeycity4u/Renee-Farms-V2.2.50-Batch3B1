@@ -77,6 +77,136 @@ if (!function_exists('sale_population_effect_normalize_rows')) {
     }
 }
 
+if (!function_exists('sale_population_effect_rows_from_post')) {
+    /**
+     * Convert the explicit Sales form contract into canonical physical rows.
+     *
+     * Missing mode is deliberately financial-only for backwards compatibility.
+     * Financial quantity, product text, and UOM are never inspected here.
+     */
+    function sale_population_effect_rows_from_post(array $post): array
+    {
+        $mode = strtolower(trim(
+            (string)($post['population_effect_mode'] ?? 'financial_only')
+        ));
+
+        if ($mode === '' || $mode === 'financial_only') {
+            return [];
+        }
+
+        if ($mode !== 'remove_live_population') {
+            throw new InvalidArgumentException(
+                'Select whether this sale is financial-only or removes live population.'
+            );
+        }
+
+        $cycleIds = $post['population_cycle_ids'] ?? [];
+        $quantities = $post['population_quantities'] ?? [];
+
+        if (!is_array($cycleIds) || !is_array($quantities)) {
+            throw new InvalidArgumentException(
+                'Population source cycles and headcounts must be submitted as matching rows.'
+            );
+        }
+
+        $cycleIds = array_values($cycleIds);
+        $quantities = array_values($quantities);
+
+        if (
+            !$cycleIds
+            || count($cycleIds) !== count($quantities)
+        ) {
+            throw new InvalidArgumentException(
+                'Add at least one source cycle and whole live headcount.'
+            );
+        }
+
+        $rows = [];
+        foreach ($cycleIds as $index => $cycleId) {
+            $rows[] = [
+                'cycle_id' => $cycleId,
+                'population_quantity' => $quantities[$index] ?? null,
+            ];
+        }
+
+        $normalized = sale_population_effect_normalize_rows($rows);
+        $result = [];
+
+        foreach ($normalized as $cycleId => $quantity) {
+            $result[] = [
+                'cycle_id' => $cycleId,
+                'population_quantity' => $quantity,
+            ];
+        }
+
+        return $result;
+    }
+}
+
+if (!function_exists('sale_population_effect_rows_for_sales')) {
+    /**
+     * Read current explicit physical effects for Sales presentation/editing.
+     * Inactive rows remain durable audit history but are not current stock effect.
+     */
+    function sale_population_effect_rows_for_sales(
+        PDO $pdo,
+        int $farmId,
+        array $saleIds
+    ): array {
+        if ($farmId <= 0) {
+            throw new InvalidArgumentException('A valid farm is required.');
+        }
+
+        $saleIds = array_values(array_unique(array_filter(
+            array_map('intval', $saleIds),
+            static fn(int $id): bool => $id > 0
+        )));
+
+        if (!$saleIds) {
+            return [];
+        }
+
+        sort($saleIds, SORT_NUMERIC);
+        $placeholders = implode(',', array_fill(0, count($saleIds), '?'));
+
+        $stmt = $pdo->prepare(
+            "SELECT
+                 spe.id,
+                 spe.sale_id,
+                 spe.cycle_id,
+                 spe.population_quantity,
+                 pc.cycle_code,
+                 pc.farm_type,
+                 pc.production_type
+             FROM sale_population_effects spe
+             INNER JOIN production_cycles pc
+                 ON pc.id=spe.cycle_id
+                AND pc.farm_id=spe.farm_id
+             WHERE spe.farm_id=?
+               AND spe.sale_id IN ({$placeholders})
+               AND spe.is_active=1
+             ORDER BY spe.sale_id,spe.cycle_id,spe.id"
+        );
+
+        $stmt->execute(array_merge([$farmId], $saleIds));
+
+        $map = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $saleId = (int)$row['sale_id'];
+            $map[$saleId][] = [
+                'id' => (int)$row['id'],
+                'cycle_id' => (int)$row['cycle_id'],
+                'population_quantity' => (int)$row['population_quantity'],
+                'cycle_code' => (string)$row['cycle_code'],
+                'farm_type' => (string)$row['farm_type'],
+                'production_type' => (string)$row['production_type'],
+            ];
+        }
+
+        return $map;
+    }
+}
+
 if (!function_exists('sale_population_effect_sync')) {
     /**
      * Synchronize all explicit physical headcount removals owned by one sale.
