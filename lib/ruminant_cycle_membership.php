@@ -18,6 +18,43 @@ function ruminant_cycle_memberships_for_animal(PDO $pdo, int $farmId, int $anima
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
+
+function ruminant_cycle_membership_at_date_locked(
+    PDO $pdo,
+    int $farmId,
+    int $animalId,
+    string $date
+): ?array {
+    if ($farmId <= 0 || $animalId <= 0) {
+        throw new RuntimeException('A valid farm and animal are required.');
+    }
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/',$date)) {
+        throw new RuntimeException('Enter a valid membership date.');
+    }
+
+    $stmt=$pdo->prepare(
+        'SELECT id,cycle_id,start_date,end_date
+         FROM ruminant_animal_cycle_memberships
+         WHERE farm_id=?
+           AND animal_id=?
+           AND start_date<=?
+           AND (end_date IS NULL OR end_date>=?)
+         ORDER BY start_date DESC,id DESC
+         LIMIT 2
+         FOR UPDATE'
+    );
+    $stmt->execute([$farmId,$animalId,$date,$date]);
+    $rows=$stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    if(count($rows)>1){
+        throw new RuntimeException(
+            'Ruminant membership integrity failed: overlapping production-cycle memberships exist on this date.'
+        );
+    }
+
+    return $rows[0] ?? null;
+}
+
 function ruminant_cycle_membership_add(PDO $pdo, int $farmId, int $animalId, int $cycleId, string $startDate, ?string $endDate, ?string $notes, ?int $createdBy): int
 {
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/',$startDate)) throw new RuntimeException('Enter a valid membership start date.');

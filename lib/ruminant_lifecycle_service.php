@@ -9,6 +9,161 @@
  */
 require_once __DIR__.'/ruminant_cycle_membership.php';
 
+require_once __DIR__.'/production_population_projection.php';
+
+function ruminant_lifecycle_population_movement_type(string $outcome): ?string
+{
+    return match ($outcome) {
+        'manual_dead' => 'mortality',
+        'manual_culled', 'culled_slaughtered' => 'cull',
+        'sold_live' => 'sale',
+        // A transfer must be projected only by the future paired transfer
+        // service so one farm/cycle cannot lose stock without the matching in.
+        'manual_transferred' => null,
+        default => throw new RuntimeException('Unsupported ruminant lifecycle exit outcome for population projection.'),
+    };
+}
+
+function ruminant_lifecycle_population_cycle_hint(
+    PDO $pdo,
+    int $farmId,
+    int $exitEventId,
+    ?array $membership
+): ?int {
+    if ($membership !== null) {
+        return (int)$membership['cycle_id'];
+    }
+
+    $current = production_population_projection_active_snapshot(
+        $pdo,
+        $farmId,
+        'ruminant_exit',
+        $exitEventId
+    );
+
+    return $current !== null ? (int)$current['cycle_id'] : null;
+}
+
+function ruminant_lifecycle_sync_exit_population(
+    PDO $pdo,
+    int $farmId,
+    int $animalId,
+    int $exitEventId,
+    string $exitDate
+): void {
+    $stmt = $pdo->prepare(
+        'SELECT id,exit_date,exit_outcome,recorded_by
+         FROM ruminant_animal_exit_events
+         WHERE id=? AND farm_id=? AND animal_id=?
+         FOR UPDATE'
+    );
+    $stmt->execute([$exitEventId,$farmId,$animalId]);
+    $event = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$event) {
+        throw new RuntimeException('Ruminant lifecycle exit event could not be found for population synchronization.');
+    }
+    if ((string)$event['exit_date'] !== $exitDate) {
+        throw new RuntimeException('Ruminant lifecycle exit date changed unexpectedly during population synchronization.');
+    }
+
+    $membership = ruminant_cycle_membership_at_date_locked(
+        $pdo,
+        $farmId,
+        $animalId,
+        $exitDate
+    );
+    $cycleId = ruminant_lifecycle_population_cycle_hint(
+        $pdo,
+        $farmId,
+        $exitEventId,
+        $membership
+    );
+
+    if ($cycleId === null) {
+        return;
+    }
+
+    $movementType = ruminant_lifecycle_population_movement_type(
+        (string)$event['exit_outcome']
+    );
+
+    $desired = null;
+    if ($movementType !== null && $membership !== null) {
+        $desired = [
+            'movement_type' => $movementType,
+            'movement_date' => $exitDate,
+            'quantity' => 1,
+            'notes' => 'Tagged ruminant lifecycle exit event #'.$exitEventId,
+        ];
+    }
+
+    $recordedBy = (int)($event['recorded_by'] ?? 0);
+
+    production_population_projection_sync(
+        $pdo,
+        $farmId,
+        $cycleId,
+        'ruminant_exit',
+        $exitEventId,
+        $desired,
+        $recordedBy > 0 ? $recordedBy : null,
+        'Tagged ruminant lifecycle exit synchronized.'
+    );
+}
+
+function ruminant_lifecycle_remove_exit_population(
+    PDO $pdo,
+    int $farmId,
+    int $animalId,
+    int $exitEventId
+): void {
+    $stmt = $pdo->prepare(
+        'SELECT exit_date,recorded_by
+         FROM ruminant_animal_exit_events
+         WHERE id=? AND farm_id=? AND animal_id=?
+         FOR UPDATE'
+    );
+    $stmt->execute([$exitEventId,$farmId,$animalId]);
+    $event = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    $membership = null;
+    $recordedBy = null;
+    if ($event) {
+        $membership = ruminant_cycle_membership_at_date_locked(
+            $pdo,
+            $farmId,
+            $animalId,
+            (string)$event['exit_date']
+        );
+        $candidateUserId = (int)($event['recorded_by'] ?? 0);
+        $recordedBy = $candidateUserId > 0 ? $candidateUserId : null;
+    }
+
+    $cycleId = ruminant_lifecycle_population_cycle_hint(
+        $pdo,
+        $farmId,
+        $exitEventId,
+        $membership
+    );
+
+    if ($cycleId === null) {
+        return;
+    }
+
+    production_population_projection_sync(
+        $pdo,
+        $farmId,
+        $cycleId,
+        'ruminant_exit',
+        $exitEventId,
+        null,
+        $recordedBy,
+        'Tagged ruminant lifecycle exit reversed.'
+    );
+}
+
+
 function ruminant_lifecycle_apply_exit_boundary(PDO $pdo, int $farmId, int $animalId, int $exitEventId, string $exitDate): void
 {
     if ($exitEventId <= 0) throw new RuntimeException('A valid lifecycle exit event is required.');
@@ -46,11 +201,29 @@ function ruminant_lifecycle_apply_exit_boundary(PDO $pdo, int $farmId, int $anim
                      AND start_date<=?
                      AND (end_date IS NULL OR end_date>?)")
         ->execute([$exitDate,$exitEventId,$farmId,$animalId,$exitDate,$exitDate]);
+
+    ruminant_lifecycle_sync_exit_population(
+        $pdo,
+        $farmId,
+        $animalId,
+        $exitEventId,
+        $exitDate
+    );
 }
 
 function ruminant_lifecycle_reverse_exit_boundary(PDO $pdo, int $farmId, int $animalId, int $exitEventId): void
 {
     if($exitEventId<=0) return;
+
+    // Remove the durable population projection while the exit event and its
+    // bounded membership context still exist.
+    ruminant_lifecycle_remove_exit_population(
+        $pdo,
+        $farmId,
+        $animalId,
+        $exitEventId
+    );
+
     $stmt=$pdo->prepare("SELECT id,pre_exit_end_date
                          FROM ruminant_animal_cycle_memberships
                          WHERE farm_id=? AND animal_id=? AND closed_by_exit_event_id=?
