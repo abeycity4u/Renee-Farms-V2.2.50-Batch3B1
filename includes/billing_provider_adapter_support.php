@@ -110,6 +110,41 @@ if (!function_exists('billing_adapter_decode_json')) {
     }
 }
 
+if (!function_exists('billing_adapter_failure_code')) {
+    function billing_adapter_failure_code($value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if (!is_scalar($value)) {
+            throw new RuntimeException(
+                'Provider returned an invalid failure detail.'
+            );
+        }
+
+        $value = trim((string)$value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        $hasControlCharacters =
+            preg_match(
+                '/[\\x00-\\x1F\\x7F]/',
+                $value
+            ) === 1;
+
+        if (strlen($value) <= 80
+            && !$hasControlCharacters) {
+            return $value;
+        }
+
+        return 'failure_sha256:'
+            . hash('sha256', $value);
+    }
+}
+
 if (!function_exists('billing_adapter_event_id')) {
     function billing_adapter_event_id(string $provider, string $eventType, $providerId, string $rawPayload): string
     {

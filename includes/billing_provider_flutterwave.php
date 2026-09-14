@@ -192,11 +192,14 @@ if (!class_exists('FlutterwaveBillingProviderAdapter')) {
             $data = $json['data'];
             $status = $this->mapStatus((string)($data['status'] ?? ''));
             $providerId = trim((string)($data['id'] ?? ''));
-            $failure = null;
-            if ($status !== 'paid') {
-                $failure = trim((string)($data['processor_response'] ?? $data['status'] ?? ''));
-                if ($failure === '') $failure = null;
-            }
+            $failure =
+                $status === 'paid'
+                    ? null
+                    : billing_adapter_failure_code(
+                        $data['processor_response']
+                            ?? $data['status']
+                            ?? null
+                    );
 
             return [
                 'verified' => true,

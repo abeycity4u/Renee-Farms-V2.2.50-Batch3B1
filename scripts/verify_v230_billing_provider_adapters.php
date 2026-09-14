@@ -337,6 +337,30 @@ $check(billing_adapter_decimal_to_minor('10000.00') === 1000000
     && billing_adapter_minor_to_decimal(1000000) === '10000.00',
     'exact NGN decimal/minor-unit conversion is reversible');
 
+$shortFailureDetail = 'Do Not Honour';
+$longFailureDetail =
+    str_repeat(
+        'provider-decline-detail-',
+        8
+    );
+$longFailureToken =
+    'failure_sha256:'
+    . hash(
+        'sha256',
+        $longFailureDetail
+    );
+
+$check(
+    billing_adapter_failure_code(
+        $shortFailureDetail
+    ) === $shortFailureDetail
+    && billing_adapter_failure_code(
+        $longFailureDetail
+    ) === $longFailureToken
+    && strlen($longFailureToken) <= 80,
+    'shared provider failure normalization preserves short details and fingerprints overlong details within the durable 80-character contract'
+);
+
 $paystackCalls = [];
 $paystackTransport = static function (string $method, string $url, array $headers, ?array $payload = null) use (&$paystackCalls): array {
     $paystackCalls[] = compact('method', 'url', 'headers', 'payload');
@@ -411,6 +435,60 @@ $paystackVerifyCall = $paystackCalls[1] ?? [];
 $check(($paystackVerifyCall['method'] ?? null) === 'GET'
     && ($paystackVerifyCall['url'] ?? null) === 'https://api.paystack.co/transaction/verify/rf-stage2e-paystack',
     'Paystack verification uses the frozen provider reference');
+
+$paystackFailureTransport =
+    static function (
+        string $method,
+        string $url,
+        array $headers,
+        ?array $payload = null
+    ) use ($longFailureDetail): array {
+        return [
+            'status' => 200,
+            'json' => [
+                'status' => true,
+                'data' => [
+                    'id' => '901099',
+                    'status' => 'failed',
+                    'reference' =>
+                        'rf-stage2e-paystack-failed',
+                    'amount' => 1000000,
+                    'currency' => 'NGN',
+                    'paid_at' => null,
+                    'gateway_response' =>
+                        $longFailureDetail,
+                ],
+            ],
+        ];
+    };
+
+$paystackFailureAdapter =
+    new PaystackBillingProviderAdapter(
+        'stage2e-paystack-failure-secret',
+        $paystackFailureTransport
+    );
+
+$paystackFailed =
+    billing_provider_normalize_payment_result(
+        'paystack',
+        $paystackFailureAdapter->verifyPayment(
+            'rf-stage2e-paystack-failed'
+        )
+    );
+
+$check(
+    ($paystackFailed['verified'] ?? null) === true
+    && ($paystackFailed['status'] ?? null) === 'failed'
+    && ($paystackFailed['failure_code'] ?? null)
+        === $longFailureToken
+    && strlen(
+        (string)(
+            $paystackFailed['failure_code']
+            ?? ''
+        )
+    ) <= 80,
+    'Paystack overlong gateway failure detail is deterministically bounded through the shared failure-code contract'
+);
 
 $paystackWebhookRaw = json_encode([
     'event' => 'charge.success',
@@ -538,6 +616,66 @@ $flutterwaveVerifyCall = $flutterwaveCalls[1] ?? [];
 $check(($flutterwaveVerifyCall['method'] ?? null) === 'GET'
     && str_contains((string)($flutterwaveVerifyCall['url'] ?? ''), '/v3/transactions/verify_by_reference?tx_ref=rf-stage2e-flutterwave'),
     'Flutterwave verification uses the frozen transaction reference');
+
+$flutterwaveFailureTransport =
+    static function (
+        string $method,
+        string $url,
+        array $headers,
+        ?array $payload = null
+    ) use ($longFailureDetail): array {
+        return [
+            'status' => 200,
+            'json' => [
+                'status' => 'success',
+                'data' => [
+                    'id' => '902099',
+                    'status' => 'failed',
+                    'tx_ref' =>
+                        'rf-stage2e-flutterwave-failed',
+                    'amount' => '1932.87',
+                    'currency' => 'NGN',
+                    'created_at' =>
+                        '2026-09-14T00:00:00.000Z',
+                    'processor_response' =>
+                        $longFailureDetail,
+                ],
+            ],
+        ];
+    };
+
+$flutterwaveFailureAdapter =
+    new FlutterwaveBillingProviderAdapter(
+        'stage2e-flutterwave-failure-secret',
+        'stage2e-flutterwave-failure-hash',
+        $flutterwaveFailureTransport
+    );
+
+$flutterwaveFailed =
+    billing_provider_normalize_payment_result(
+        'flutterwave',
+        $flutterwaveFailureAdapter->verifyPayment(
+            'rf-stage2e-flutterwave-failed'
+        )
+    );
+
+$check(
+    ($flutterwaveFailed['verified'] ?? null) === true
+    && ($flutterwaveFailed['status'] ?? null) === 'failed'
+    && ($flutterwaveFailed['amount'] ?? null)
+        === '1932.87'
+    && ($flutterwaveFailed['currency'] ?? null)
+        === 'NGN'
+    && ($flutterwaveFailed['failure_code'] ?? null)
+        === $longFailureToken
+    && strlen(
+        (string)(
+            $flutterwaveFailed['failure_code']
+            ?? ''
+        )
+    ) <= 80,
+    'Flutterwave overlong processor failure detail is deterministically bounded through the shared failure-code contract'
+);
 
 $flutterwaveWebhookRaw = json_encode([
     'event' => 'charge.completed',

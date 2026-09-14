@@ -179,11 +179,14 @@ if (!class_exists('PaystackBillingProviderAdapter')) {
             $data = $json['data'];
             $status = $this->mapStatus((string)($data['status'] ?? ''));
             $providerId = trim((string)($data['id'] ?? ''));
-            $failure = null;
-            if ($status !== 'paid') {
-                $failure = trim((string)($data['gateway_response'] ?? $data['status'] ?? ''));
-                if ($failure === '') $failure = null;
-            }
+            $failure =
+                $status === 'paid'
+                    ? null
+                    : billing_adapter_failure_code(
+                        $data['gateway_response']
+                            ?? $data['status']
+                            ?? null
+                    );
 
             return [
                 'verified' => true,
