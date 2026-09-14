@@ -14,6 +14,7 @@ require_once(__DIR__ . '/../lib/sales_receivables.php');
 require_once(__DIR__ . '/../lib/sales_allocation.php');
 require_once(__DIR__ . '/../lib/ruminant_sale_animal_allocation.php');
 require_once(__DIR__ . '/../lib/ruminant_animal_exit.php');
+require_once(__DIR__ . '/../lib/sale_population_effects.php');
 require_once(__DIR__ . '/../lib/sales_units.php');
 require_once(__DIR__ . '/../lib/transaction_actor_display.php');
 $tenantFarmId = requireCurrentFarmId();
@@ -260,6 +261,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
         $scope = attribution_scope($cycleId > 0 ? $cycleId : null, $saleFarmType, $productionType);
         try {
+            $populationEffectRows = sale_population_effect_rows_from_post($_POST);
+        } catch (InvalidArgumentException $e) {
+            $_SESSION['error'] = $e->getMessage();
+            header("Location: sales_records.php?report_mode={$reportMode}&month={$month}&year={$year}&farm_type={$farmType}");
+            exit();
+        }
+        try {
             $animalRevenueAllocation = $saleFarmType === 'ruminant'
                 ? ruminant_sale_build_animal_allocations($pdo, $tenantFarmId, $productionType, $totalAmount, $_POST)
                 : ['mode' => 'shared', 'rows' => []];
@@ -297,6 +305,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if ($saleFarmType === 'ruminant') {
             ruminant_sale_apply_exit_outcomes($pdo, $tenantFarmId, $saleId, (string)$_POST['sale_date'], $animalRevenueAllocation, $_POST, (int)$_SESSION['user_id']);
         }
+        sale_population_effect_sync(
+            $pdo,
+            $tenantFarmId,
+            $saleId,
+            $populationEffectRows,
+            (int)$_SESSION['user_id']
+        );
         $allocationResult = sales_refresh_automatic_allocation($pdo, $tenantFarmId, $saleId, (int)$_SESSION['user_id']);
         if ($saleFarmType === 'poultry' && $productionType === 'layer' && layer_egg_is_sale_product($_POST['product_type'] ?? null)) {
             sales_rebuild_layer_egg_allocations($pdo, $tenantFarmId, (string)$_POST['sale_date'], (int)$_SESSION['user_id']);
@@ -536,6 +551,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
         $newTotal = (float)$_POST['quantity'] * (float)$_POST['unit_price'];
         try {
+            $populationEffectRows = sale_population_effect_rows_from_post($_POST);
+        } catch (InvalidArgumentException $e) {
+            $_SESSION['error'] = $e->getMessage();
+            header("Location: sales_records.php?report_mode={$reportMode}&month={$month}&year={$year}&farm_type={$farmType}");
+            exit();
+        }
+        try {
             $animalRevenueAllocation = $saleFarmType === 'ruminant'
                 ? ruminant_sale_build_animal_allocations($pdo, $tenantFarmId, $productionType, $newTotal, $_POST)
                 : ['mode' => 'shared', 'rows' => []];
@@ -571,6 +593,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             // Converting a formerly ruminant sale to another farm type must not leave a stale animal exit.
             ruminant_sale_apply_exit_outcomes($pdo, $tenantFarmId, (int)$_POST['sale_id'], (string)$_POST['sale_date'], ['mode'=>'shared','rows'=>[]], [], (int)$_SESSION['user_id']);
         }
+        sale_population_effect_sync(
+            $pdo,
+            $tenantFarmId,
+            (int)$_POST['sale_id'],
+            $populationEffectRows,
+            (int)$_SESSION['user_id']
+        );
         $allocationResult = sales_refresh_automatic_allocation($pdo, $tenantFarmId, (int)$_POST['sale_id'], (int)$_SESSION['user_id']);
         $wasLayerEgg = (($beforeSale['farm_type'] ?? '') === 'poultry' && strtolower((string)($beforeSale['production_type'] ?? '')) === 'layer' && layer_egg_is_sale_product($beforeSale['product_type'] ?? null));
         $isLayerEgg = ($saleFarmType === 'poultry' && $productionType === 'layer' && layer_egg_is_sale_product($_POST['product_type'] ?? null));

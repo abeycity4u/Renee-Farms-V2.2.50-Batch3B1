@@ -13,12 +13,22 @@ $root = dirname(__DIR__);
 $servicePath = $root . '/lib/sale_population_effects.php';
 $migration057Path = $root . '/migrations/057_sale_population_effect_foundation.sql';
 $migration058Path = $root . '/migrations/058_sale_population_effect_lifecycle.sql';
+$salesPagePath = $root . '/management/sales_records.php';
+$deleteSalePath = $root . '/api/delete_sale.php';
 
 $service = file_get_contents($servicePath);
 $m057 = file_get_contents($migration057Path);
 $m058 = file_get_contents($migration058Path);
+$salesPage = file_get_contents($salesPagePath);
+$deleteSaleApi = file_get_contents($deleteSalePath);
 
-if ($service === false || $m057 === false || $m058 === false) {
+if (
+    $service === false
+    || $m057 === false
+    || $m058 === false
+    || $salesPage === false
+    || $deleteSaleApi === false
+) {
     fwrite(STDERR, "VERIFY_SETUP_FAILED\n");
     exit(2);
 }
@@ -375,6 +385,83 @@ verify_true(
     $deleteGuard !== ''
     && strpos($deleteGuard, 'is_active') === false,
     'inactive history also blocks destructive sale deletion'
+);
+
+/* Thin Sales route integration. */
+verify_true(
+    strpos($salesPage, 'lib/sale_population_effects.php') !== false
+    && strpos($deleteSaleApi, 'lib/sale_population_effects.php') !== false,
+    'Sales writers and delete endpoint load the shared population service'
+);
+
+verify_true(
+    preg_match_all(
+        '/sale_population_effect_rows_from_post\s*\(\s*\$_POST\s*\)/',
+        $salesPage
+    ) === 2,
+    'add and edit routes both use the shared explicit POST adapter'
+);
+
+verify_true(
+    preg_match_all(
+        '/sale_population_effect_sync\s*\(/',
+        $salesPage
+    ) === 2,
+    'add and edit routes both synchronize through the shared population service'
+);
+
+verify_true(
+    preg_match(
+        '/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+sale_population_effects/i',
+        $salesPage
+    ) !== 1,
+    'Sales page contains no direct sale-population-effect DML'
+);
+
+$receivableGuardPos = strpos(
+    $deleteSaleApi,
+    'receivable_assert_sale_deletable'
+);
+$populationGuardPos = strpos(
+    $deleteSaleApi,
+    'sale_population_effect_assert_deletable'
+);
+$ruminantReversePos = strpos(
+    $deleteSaleApi,
+    'ruminant_sale_reverse_exit_events'
+);
+$hardDeletePos = strpos(
+    $deleteSaleApi,
+    'DELETE FROM sales_records'
+);
+
+verify_true(
+    $receivableGuardPos !== false
+    && $populationGuardPos !== false
+    && $ruminantReversePos !== false
+    && $hardDeletePos !== false
+    && $receivableGuardPos < $populationGuardPos
+    && $populationGuardPos < $ruminantReversePos
+    && $populationGuardPos < $hardDeletePos,
+    'population history blocks deletion before destructive sale cleanup'
+);
+
+verify_true(
+    preg_match(
+        '/catch\s*\(\s*SalePopulationEffectException\s+\$e\s*\)/',
+        $deleteSaleApi
+    ) === 1
+    && strpos($deleteSaleApi, '$e->getMessage()') !== false
+    && strpos($deleteSaleApi, '409') !== false,
+    'population delete policy returns its friendly conflict response'
+);
+
+verify_true(
+    preg_match(
+        '/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+sale_population_effects/i',
+        $deleteSaleApi
+    ) !== 1,
+    'delete endpoint contains no direct sale-population-effect DML'
 );
 
 /* Migration 057 foundational guarantees. */
