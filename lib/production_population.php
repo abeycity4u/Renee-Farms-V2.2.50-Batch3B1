@@ -575,6 +575,15 @@ if (!function_exists('production_population_establish_baseline')) {
                 }
             }
 
+            if (
+                $baselineSource === 'legacy_cutover'
+                && (string)$cycle['status'] !== 'active'
+            ) {
+                throw new ProductionPopulationException(
+                    'Legacy population cutover can only be established for an active cycle.'
+                );
+            }
+
             $existing = production_population_lock_baseline(
                 $pdo,
                 $farmId,

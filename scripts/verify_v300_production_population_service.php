@@ -137,6 +137,22 @@ $compact = preg_replace('/\s+/', ' ', $source);
 
 $check(
     preg_match(
+        '/\$baselineSource\s*===\s*\x27legacy_cutover\x27/',
+        $source
+    ) === 1
+    && preg_match(
+        '/\(string\)\s*\$cycle\s*\[\s*\x27status\x27\s*\]\s*!==\s*\x27active\x27/',
+        $source
+    ) === 1
+    && strpos(
+        $source,
+        'Legacy population cutover can only be established for an active cycle.'
+    ) !== false,
+    'legacy cutover is limited to active existing cycles'
+);
+
+$check(
+    preg_match(
         '/\$quantity\s*<=\s*0/',
         $source
     ) === 1
