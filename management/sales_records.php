@@ -80,6 +80,57 @@ $allSalesCycles = $allCyclesStmt->fetchAll(PDO::FETCH_ASSOC);
 $saleFarmTypeLabel = static function (string $type): string {
     return ucfirst($type);
 };
+
+$renderSalePopulationEffectControls = static function (string $prefix): void {
+    $idPrefix = $prefix === 'edit' ? 'edit' : 'add';
+    ?>
+    <div class="card mb-3 sale-population-effect-card" id="<?php echo $idPrefix; ?>PopulationEffectCard">
+        <div class="card-body py-3">
+            <div class="fw-semibold mb-2">Live Population Effect</div>
+
+            <select
+                name="population_effect_mode"
+                id="<?php echo $idPrefix; ?>PopulationEffectMode"
+                class="form-select"
+            >
+                <option value="financial_only" selected>
+                    Financial only — do not change live population
+                </option>
+                <option value="remove_live_population">
+                    Remove live population — explicit headcount by source cycle
+                </option>
+            </select>
+
+            <small class="text-muted d-block mt-1">
+                Product, sales quantity and unit of measure never imply a population change.
+                Choose Remove live population only when this sale physically removes animals or birds.
+            </small>
+
+            <div
+                id="<?php echo $idPrefix; ?>PopulationEffectRows"
+                class="mt-3 d-none"
+            ></div>
+
+            <button
+                type="button"
+                id="<?php echo $idPrefix; ?>PopulationEffectAddRow"
+                class="btn btn-sm btn-outline-secondary d-none"
+            >
+                Add source cycle
+            </button>
+
+            <div
+                id="<?php echo $idPrefix; ?>PopulationEffectRuminantNote"
+                class="alert alert-info py-2 px-3 mt-2 mb-0 d-none"
+            >
+                Aggregate/group headcount only. Do not include tagged animals whose
+                Sold live or Culled/slaughtered outcome is handled through Animal Registry.
+            </div>
+        </div>
+    </div>
+    <?php
+};
+
 $selectedCustomer = trim($_GET['customer'] ?? '');
 
 $debtFeatureEnabled = true;
@@ -116,6 +167,11 @@ $ruminantAnimalsStmt->execute([$tenantFarmId]);
 $ruminantSaleAnimals = $ruminantAnimalsStmt->fetchAll(PDO::FETCH_ASSOC);
 $ruminantSaleAnimalAllocations = ruminant_sale_allocations_for_sales($pdo, $tenantFarmId, array_column($salesRecords, 'id'));
 $ruminantSaleExitEvents = ruminant_sale_exit_events_for_sales($pdo, $tenantFarmId, array_column($salesRecords, 'id'));
+$salePopulationEffectMap = sale_population_effect_rows_for_sales(
+    $pdo,
+    $tenantFarmId,
+    array_column($salesRecords, 'id')
+);
 
 // Get sales summary with the same attribution scope as the detail ledger.
 if ($farmType === '') {
@@ -920,6 +976,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                         <th>Cycle</th>
                                         <th>Allocation</th>
                                         <th>Animal Revenue Attribution</th>
+                                        <th>Population Effect</th>
                                         <th>Product</th>
                                         <th>Quantity</th>
                                         <th>Unit</th>
@@ -936,7 +993,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 <tbody>
                                     <?php if (empty($salesRecords)): ?>
                                     <tr>
-                                        <td colspan="<?php echo $showActions ? '15' : '14'; ?>" class="text-center text-muted py-4">
+                                        <td colspan="<?php echo $showActions ? '16' : '15'; ?>" class="text-center text-muted py-4">
                                             <i class="bi bi-cart display-4 d-block mb-2"></i>
                                             No sales recorded for this period
                                         </td>
@@ -992,6 +1049,28 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                                     }
                                                 }
                                                 ?>
+                                            </td>
+                                            <td>
+                                                <?php
+                                                $populationRows = $salePopulationEffectMap[(int)$sale['id']] ?? [];
+                                                ?>
+                                                <?php if (!$populationRows): ?>
+                                                    <span class="badge bg-secondary">Financial only</span>
+                                                <?php else: ?>
+                                                    <?php foreach ($populationRows as $populationRow): ?>
+                                                        <div class="small mb-1">
+                                                            <span class="badge bg-danger">
+                                                                -<?php echo number_format((int)$populationRow['population_quantity']); ?> head
+                                                            </span>
+                                                            <span class="text-muted">
+                                                                <?php echo htmlspecialchars((string)$populationRow['cycle_code']); ?>
+                                                            </span>
+                                                        </div>
+                                                    <?php endforeach; ?>
+                                                    <?php if (($sale['farm_type'] ?? '') === 'ruminant'): ?>
+                                                        <div class="small text-muted">Aggregate/group only</div>
+                                                    <?php endif; ?>
+                                                <?php endif; ?>
                                             </td>
                                             <td>
                                                 <span class="badge bg-primary">
@@ -1129,6 +1208,8 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                        value="₦0.00" readonly>
                             </div>
                         </div>
+
+                        <?php $renderSalePopulationEffectControls('add'); ?>
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
@@ -1339,6 +1420,8 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                             </div>
                         </div>
 
+                        <?php $renderSalePopulationEffectControls('edit'); ?>
+
                         <div class="card mb-3" id="editPaymentStatusCard">
                             <div class="card-body py-2">
                                 <div class="fw-semibold mb-2">Payment / Credit Status</div>
@@ -1422,6 +1505,11 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
         ); ?>"
         data-ruminant-sale-exit-map="<?php echo htmlspecialchars(
             app_json_script($ruminantSaleExitEvents),
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        ); ?>"
+        data-sale-population-effect-map="<?php echo htmlspecialchars(
+            app_json_script($salePopulationEffectMap),
             ENT_QUOTES | ENT_SUBSTITUTE,
             'UTF-8'
         ); ?>"

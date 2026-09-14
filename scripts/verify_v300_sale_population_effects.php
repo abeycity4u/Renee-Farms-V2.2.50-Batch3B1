@@ -15,12 +15,14 @@ $migration057Path = $root . '/migrations/057_sale_population_effect_foundation.s
 $migration058Path = $root . '/migrations/058_sale_population_effect_lifecycle.sql';
 $salesPagePath = $root . '/management/sales_records.php';
 $deleteSalePath = $root . '/api/delete_sale.php';
+$salesJsPath = $root . '/assets/js/management-sales-records.js';
 
 $service = file_get_contents($servicePath);
 $m057 = file_get_contents($migration057Path);
 $m058 = file_get_contents($migration058Path);
 $salesPage = file_get_contents($salesPagePath);
 $deleteSaleApi = file_get_contents($deleteSalePath);
+$salesJs = file_get_contents($salesJsPath);
 
 if (
     $service === false
@@ -28,6 +30,7 @@ if (
     || $m058 === false
     || $salesPage === false
     || $deleteSaleApi === false
+    || $salesJs === false
 ) {
     fwrite(STDERR, "VERIFY_SETUP_FAILED\n");
     exit(2);
@@ -462,6 +465,125 @@ verify_true(
         $deleteSaleApi
     ) !== 1,
     'delete endpoint contains no direct sale-population-effect DML'
+);
+
+/* Explicit Sales population presentation and browser contract. */
+verify_true(
+    substr_count(
+        $salesPage,
+        'sale_population_effect_rows_for_sales('
+    ) === 1,
+    'Sales page reads current physical effects through the shared reader'
+);
+
+verify_true(
+    strpos($salesPage, 'data-sale-population-effect-map') !== false
+    && strpos($salesPage, '<th>Population Effect</th>') !== false,
+    'Sales presentation exposes current explicit population effects'
+);
+
+verify_true(
+    strpos(
+        $salesPage,
+        'name="population_effect_mode"'
+    ) !== false
+    && strpos(
+        $salesPage,
+        'value="financial_only" selected'
+    ) !== false
+    && strpos(
+        $salesPage,
+        'value="remove_live_population"'
+    ) !== false,
+    'Sales modal component requires an explicit physical-effect mode'
+);
+
+verify_true(
+    strpos(
+        $salesPage,
+        'Aggregate/group headcount only'
+    ) !== false
+    && strpos(
+        $salesPage,
+        'Animal Registry'
+    ) !== false,
+    'mixed ruminant UI separates aggregate headcount from tagged lifecycle exits'
+);
+
+verify_true(
+    strpos($salesJs, 'salePopulationEffectMap') !== false
+    && strpos(
+        $salesJs,
+        'function refreshSalePopulationEffect'
+    ) !== false
+    && strpos(
+        $salesJs,
+        'function loadEditSalePopulationEffect'
+    ) !== false,
+    'Sales browser behavior centrally loads and refreshes population effects'
+);
+
+verify_true(
+    strpos(
+        $salesJs,
+        "name: 'population_cycle_ids[]'"
+    ) !== false
+    && strpos(
+        $salesJs,
+        "name: 'population_quantities[]'"
+    ) !== false,
+    'browser submits explicit source-cycle and whole-headcount rows'
+);
+
+$populationUiStart = strpos(
+    $salesJs,
+    'function salePopulationSelectors'
+);
+$populationUiEnd = $populationUiStart === false
+    ? false
+    : strpos(
+        $salesJs,
+        '$(document).ready',
+        $populationUiStart
+    );
+
+$populationUi = (
+    $populationUiStart !== false
+    && $populationUiEnd !== false
+    && $populationUiEnd > $populationUiStart
+)
+    ? substr(
+        $salesJs,
+        $populationUiStart,
+        $populationUiEnd - $populationUiStart
+    )
+    : '';
+
+verify_true(
+    $populationUi !== ''
+    && strpos($populationUi, "'#addQuantity'") === false
+    && strpos($populationUi, '"#addQuantity"') === false
+    && strpos($populationUi, "'#editSaleQuantity'") === false
+    && strpos($populationUi, '"#editSaleQuantity"') === false
+    && strpos($populationUi, "'#addUnitPreset'") === false
+    && strpos($populationUi, '"#addUnitPreset"') === false
+    && strpos($populationUi, "'#editSaleUnitPreset'") === false
+    && strpos($populationUi, '"#editSaleUnitPreset"') === false
+    && strpos($populationUi, "'#addProductType'") === false
+    && strpos($populationUi, '"#addProductType"') === false
+    && strpos($populationUi, "'#editSaleProduct'") === false
+    && strpos($populationUi, '"#editSaleProduct"') === false,
+    'population UI never infers headcount from financial quantity, UOM, or product'
+);
+
+verify_true(
+    $populationUi !== ''
+    && strpos($populationUi, 'directCycle > 0') !== false
+    && strpos(
+        $populationUi,
+        'Number(cycle.id) === directCycle'
+    ) !== false,
+    'cycle-attributed sale UI locks population source to its selected sale cycle'
 );
 
 /* Migration 057 foundational guarantees. */

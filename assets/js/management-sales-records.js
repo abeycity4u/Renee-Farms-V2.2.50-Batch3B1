@@ -38,6 +38,10 @@
             configElement.dataset.ruminantSaleExitMap,
             {}
         ),
+        salePopulationEffectMap: parseJson(
+            configElement.dataset.salePopulationEffectMap,
+            {}
+        ),
         csrfToken: configElement.dataset.csrfToken || '',
         deleteSaleUrl: configElement.dataset.deleteSaleUrl || ''
     };
@@ -103,6 +107,7 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
     const ruminantSaleAnimals = salesRecordsConfig.ruminantSaleAnimals;
     const ruminantSaleAllocationMap = salesRecordsConfig.ruminantSaleAllocationMap;
     const ruminantSaleExitMap = salesRecordsConfig.ruminantSaleExitMap;
+    const salePopulationEffectMap = salesRecordsConfig.salePopulationEffectMap;
 
     function refreshSaleAttribution(prefix, selectedProduction = '', selectedCycle = 0) {
         // Add modal uses addFarmType; Edit modal uses editSaleFarmType.
@@ -186,17 +191,338 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
         refreshRuminantSaleAnimalChoices('edit', rows);
     }
 
+    function salePopulationSelectors(prefix) {
+        const isEdit = prefix === 'edit';
+        return {
+            farm: isEdit ? '#editSaleFarmType' : '#addFarmType',
+            production: isEdit ? '#editSaleProductionType' : '#addProductionType',
+            cycle: isEdit ? '#editSaleCycleId' : '#addCycleId',
+            mode: isEdit ? '#editPopulationEffectMode' : '#addPopulationEffectMode',
+            rows: isEdit ? '#editPopulationEffectRows' : '#addPopulationEffectRows',
+            addRow: isEdit ? '#editPopulationEffectAddRow' : '#addPopulationEffectAddRow',
+            ruminantNote: isEdit
+                ? '#editPopulationEffectRuminantNote'
+                : '#addPopulationEffectRuminantNote'
+        };
+    }
+
+    function eligibleSalePopulationCycles(prefix) {
+        const ids = salePopulationSelectors(prefix);
+        const farm = String($(ids.farm).val() || '');
+        const production = String($(ids.production).val() || '');
+
+        if (!['poultry', 'ruminant'].includes(farm) || !production) {
+            return [];
+        }
+
+        return salesCycles.filter(cycle => {
+            if (String(cycle.farm_type) !== farm) return false;
+            return production === 'shared'
+                || String(cycle.production_type) === production;
+        });
+    }
+
+    function currentSalePopulationRows(prefix) {
+        const ids = salePopulationSelectors(prefix);
+        const rows = [];
+
+        $(ids.rows).find('.sale-population-effect-row').each(function() {
+            const row = $(this);
+            rows.push({
+                cycle_id: Number(
+                    row.find('.sale-population-cycle').val() || 0
+                ),
+                population_quantity: String(
+                    row.find('.sale-population-quantity').val() || ''
+                )
+            });
+        });
+
+        return rows;
+    }
+
+    function appendSalePopulationEffectRow(prefix, row = {}) {
+        const ids = salePopulationSelectors(prefix);
+        const directCycle = Number($(ids.cycle).val() || 0);
+        let cycles = eligibleSalePopulationCycles(prefix);
+
+        if (directCycle > 0) {
+            cycles = cycles.filter(
+                cycle => Number(cycle.id) === directCycle
+            );
+        }
+
+        const wrapper = $('<div>', {
+            class: 'row g-2 align-items-end mb-2 sale-population-effect-row'
+        });
+
+        const cycleColumn = $('<div>', {class: 'col-md-7'});
+        cycleColumn.append(
+            $('<label>', {
+                class: 'form-label small mb-1',
+                text: 'Source production cycle'
+            })
+        );
+
+        const cycleSelect = $('<select>', {
+            class: 'form-select sale-population-cycle',
+            name: 'population_cycle_ids[]',
+            required: true
+        });
+
+        if (directCycle <= 0) {
+            cycleSelect.append(new Option('Select source cycle...', ''));
+        }
+
+        cycles.forEach(cycle => {
+            const cycleProduction = String(cycle.production_type || '');
+            const productionLabel = cycleProduction
+                ? cycleProduction.charAt(0).toUpperCase()
+                    + cycleProduction.slice(1)
+                : 'Production';
+            const label = String($(ids.production).val() || '') === 'shared'
+                ? `${cycle.cycle_code} — ${productionLabel} — ${cycle.status}`
+                : `${cycle.cycle_code} — ${cycle.status}`;
+
+            cycleSelect.append(
+                new Option(
+                    label,
+                    String(cycle.id),
+                    false,
+                    Number(cycle.id) === Number(row.cycle_id || directCycle)
+                )
+            );
+        });
+
+        if (directCycle > 0) {
+            cycleSelect.val(String(directCycle));
+        } else if (Number(row.cycle_id || 0) > 0) {
+            cycleSelect.val(String(row.cycle_id));
+        }
+
+        cycleColumn.append(cycleSelect);
+
+        const quantityColumn = $('<div>', {class: 'col-md-3'});
+        quantityColumn.append(
+            $('<label>', {
+                class: 'form-label small mb-1',
+                text: 'Whole headcount'
+            })
+        );
+
+        quantityColumn.append(
+            $('<input>', {
+                type: 'number',
+                class: 'form-control sale-population-quantity',
+                name: 'population_quantities[]',
+                min: '1',
+                step: '1',
+                required: true,
+                value: row.population_quantity ?? ''
+            })
+        );
+
+        const actionColumn = $('<div>', {class: 'col-md-2'});
+
+        if (directCycle <= 0) {
+            actionColumn.append(
+                $('<button>', {
+                    type: 'button',
+                    class: 'btn btn-outline-danger w-100 sale-population-remove-row',
+                    text: 'Remove'
+                }).attr('data-population-prefix', prefix)
+            );
+        } else {
+            actionColumn.append(
+                $('<div>', {
+                    class: 'small text-muted pb-2',
+                    text: 'Selected sale cycle'
+                })
+            );
+        }
+
+        wrapper.append(cycleColumn, quantityColumn, actionColumn);
+        $(ids.rows).append(wrapper);
+    }
+
+    function refreshSalePopulationEffect(prefix, selectedRows = null) {
+        const ids = salePopulationSelectors(prefix);
+        const farm = String($(ids.farm).val() || '');
+        const eligibleFarm = ['poultry', 'ruminant'].includes(farm);
+        const modeElement = $(ids.mode);
+
+        modeElement
+            .find('option[value="remove_live_population"]')
+            .prop('disabled', !eligibleFarm);
+
+        if (!eligibleFarm) {
+            modeElement.val('financial_only');
+        }
+
+        const removeLive =
+            modeElement.val() === 'remove_live_population'
+            && eligibleFarm;
+
+        const rowsElement = $(ids.rows);
+        const addRowButton = $(ids.addRow);
+
+        $(ids.ruminantNote).toggleClass(
+            'd-none',
+            !(removeLive && farm === 'ruminant')
+        );
+
+        if (!removeLive) {
+            rowsElement.empty().addClass('d-none');
+            addRowButton.addClass('d-none');
+            return;
+        }
+
+        let rows = Array.isArray(selectedRows)
+            ? selectedRows.slice()
+            : currentSalePopulationRows(prefix);
+
+        const directCycle = Number($(ids.cycle).val() || 0);
+
+        if (directCycle > 0) {
+            const matching = rows.find(
+                row => Number(row.cycle_id) === directCycle
+            );
+
+            rows = [{
+                cycle_id: directCycle,
+                population_quantity:
+                    matching ? matching.population_quantity : ''
+            }];
+        } else if (!rows.length) {
+            rows = [{}];
+        }
+
+        rowsElement.empty().removeClass('d-none');
+
+        if (!eligibleSalePopulationCycles(prefix).length) {
+            rowsElement.append(
+                $('<div>', {
+                    class: 'alert alert-warning py-2 mb-0',
+                    text: 'No matching production cycle is available for this population effect.'
+                })
+            );
+            addRowButton.addClass('d-none');
+            return;
+        }
+
+        rows.forEach(row => appendSalePopulationEffectRow(prefix, row));
+        addRowButton.toggleClass('d-none', directCycle > 0);
+    }
+
+    function loadEditSalePopulationEffect(saleId) {
+        const rows = salePopulationEffectMap[String(saleId)] || [];
+
+        $('#editPopulationEffectMode').val(
+            rows.length
+                ? 'remove_live_population'
+                : 'financial_only'
+        );
+
+        refreshSalePopulationEffect('edit', rows);
+    }
+
     $(document).ready(function() {
         refreshSaleAttribution('add');
-        $('#addFarmType').on('change', () => { refreshSaleAttribution('add'); refreshRuminantSaleAnimalChoices('add'); });
-        $('#addProductionType').on('change', () => { refreshSaleAttribution('add', $('#addProductionType').val()); refreshRuminantSaleAnimalChoices('add'); });
-        $('#editSaleFarmType').on('change', () => { refreshSaleAttribution('edit'); refreshRuminantSaleAnimalChoices('edit'); });
-        $('#editSaleProductionType').on('change', () => { refreshSaleAttribution('edit', $('#editSaleProductionType').val()); refreshRuminantSaleAnimalChoices('edit'); });
         refreshRuminantSaleAnimalChoices('add');
-        $('#addSaleAnimalAllocationMode').on('change', () => refreshRuminantSaleAnimalChoices('add'));
-        $('#editSaleAnimalAllocationMode').on('change', () => refreshRuminantSaleAnimalChoices('edit'));
+        refreshSalePopulationEffect('add');
+
+        $('#addFarmType').on('change', () => {
+            refreshSaleAttribution('add');
+            refreshRuminantSaleAnimalChoices('add');
+            refreshSalePopulationEffect('add');
+        });
+
+        $('#addProductionType').on('change', () => {
+            refreshSaleAttribution('add', $('#addProductionType').val());
+            refreshRuminantSaleAnimalChoices('add');
+            refreshSalePopulationEffect('add');
+        });
+
+        $('#editSaleFarmType').on('change', () => {
+            refreshSaleAttribution('edit');
+            refreshRuminantSaleAnimalChoices('edit');
+            refreshSalePopulationEffect('edit');
+        });
+
+        $('#editSaleProductionType').on('change', () => {
+            refreshSaleAttribution(
+                'edit',
+                $('#editSaleProductionType').val()
+            );
+            refreshRuminantSaleAnimalChoices('edit');
+            refreshSalePopulationEffect('edit');
+        });
+
+        $('#addCycleId').on(
+            'change',
+            () => refreshSalePopulationEffect('add')
+        );
+        $('#editSaleCycleId').on(
+            'change',
+            () => refreshSalePopulationEffect('edit')
+        );
+
+        $('#addPopulationEffectMode').on(
+            'change',
+            () => refreshSalePopulationEffect('add')
+        );
+        $('#editPopulationEffectMode').on(
+            'change',
+            () => refreshSalePopulationEffect('edit')
+        );
+
+        $('#addPopulationEffectAddRow').on(
+            'click',
+            () => appendSalePopulationEffectRow('add')
+        );
+        $('#editPopulationEffectAddRow').on(
+            'click',
+            () => appendSalePopulationEffectRow('edit')
+        );
+
+        $(document).on(
+            'click',
+            '.sale-population-remove-row',
+            function() {
+                const prefix = String(
+                    $(this).attr('data-population-prefix') || 'add'
+                );
+                const ids = salePopulationSelectors(prefix);
+
+                $(this)
+                    .closest('.sale-population-effect-row')
+                    .remove();
+
+                if (
+                    $(ids.mode).val() === 'remove_live_population'
+                    && !$(ids.rows)
+                        .find('.sale-population-effect-row')
+                        .length
+                ) {
+                    appendSalePopulationEffectRow(prefix);
+                }
+            }
+        );
+
+        $('#addSaleAnimalAllocationMode').on(
+            'change',
+            () => refreshRuminantSaleAnimalChoices('add')
+        );
+        $('#editSaleAnimalAllocationMode').on(
+            'change',
+            () => refreshRuminantSaleAnimalChoices('edit')
+        );
+
         $(document).on('change', '.sale-animal-check', function() {
-            $(this).closest('.d-flex').find('.sale-animal-exit').toggleClass('d-none', !this.checked);
+            $(this)
+                .closest('.d-flex')
+                .find('.sale-animal-exit')
+                .toggleClass('d-none', !this.checked);
         });
 
         function refreshEditReceivablePosition() {
@@ -289,6 +615,7 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
             refreshSaleAttribution('edit', String(data.production || ''), Number(data.cycle || 0));
             setEditSaleUnit(String(data.unit || ''));
             loadEditSaleAnimalAllocation(Number(data.id || 0));
+            loadEditSalePopulationEffect(Number(data.id || 0));
             updateTotalField('#editSaleQuantity', '#editSalePrice', '#editTotalAmount');
         }
     });
