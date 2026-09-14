@@ -81,7 +81,9 @@ $check(
 );
 
 $expectedSources = [
-    'daily_record',
+    'daily_layer_record',
+    'daily_broiler_record',
+    'daily_ruminant_record',
     'sale',
     'ruminant_exit',
     'transfer',

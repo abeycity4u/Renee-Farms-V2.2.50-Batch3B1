@@ -67,13 +67,17 @@ if (!function_exists('production_population_source_types')) {
      * Integration ownership is intentionally central.
      *
      * A durable source row is expected for every source except adjustment.
+     * Daily Record sources are namespaced by physical table because Layer,
+     * Broiler and Ruminant records use independent auto-increment identities.
      * Manual adjustments are request-token owned until/unless a dedicated
      * adjustment entity is introduced later.
      */
     function production_population_source_types(): array
     {
         return [
-            'daily_record',
+            'daily_layer_record',
+            'daily_broiler_record',
+            'daily_ruminant_record',
             'sale',
             'ruminant_exit',
             'transfer',
