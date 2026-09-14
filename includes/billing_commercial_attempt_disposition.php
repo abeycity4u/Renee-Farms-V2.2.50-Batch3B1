@@ -8,16 +8,21 @@
  * - commercial_disposition says whether a subscription attempt may still
  *   affect tenant commercial state.
  *
- * Supersession is deliberately narrow:
+ * Runtime supersession is deliberately narrow:
  *
  * - subscription purpose only;
  * - caller-owned transaction;
  * - payment attempt locked first, then tenant farm;
  * - only provider-verified failed/cancelled attempts may be superseded;
- * - paid/applied/open attempts cannot be superseded;
+ * - paid/applied/open attempts cannot be superseded by the runtime helper;
  * - the exact verification timestamp that justified supersession is retained;
  * - no payment status, entitlement, subscription, provider or network work
  *   occurs here.
+ *
+ * Migration 053 is a one-time normalization for pre-hardening open attempts
+ * already made commercially obsolete by a strictly newer verified,
+ * paid-and-applied subscription. It changes disposition audit metadata only
+ * and does not broaden the runtime helper below.
  */
 
 require_once __DIR__ . '/billing_payment_foundation.php';
