@@ -637,6 +637,56 @@ if (!function_exists('production_cycle_create_v3')) {
     }
 }
 
+if (!function_exists('production_cycle_cutover_population_v3')) {
+    /**
+     * Explicitly place an existing active legacy cycle under canonical V3
+     * population tracking.
+     *
+     * The quantity is user-confirmed physical truth. Never infer it from Daily
+     * Records, Animal Registry, Sales, opening-stock history, or other legacy
+     * records.
+     *
+     * The canonical population service owns cycle eligibility, baseline
+     * uniqueness/idempotency, locking, baseline persistence, and audit policy.
+     */
+    function production_cycle_cutover_population_v3(
+        PDO $pdo,
+        int $farmId,
+        int $cycleId,
+        string $baselineDate,
+        $baselineQuantity,
+        ?string $notes,
+        ?int $userId
+    ): int {
+        production_cycle_assert_farm_id($farmId);
+        production_cycle_assert_user_id($userId);
+
+        $baselineDate = trim($baselineDate);
+
+        if (!production_cycle_valid_date($baselineDate)) {
+            throw new InvalidArgumentException(
+                'Enter a valid population cutover date.'
+            );
+        }
+
+        $baselineQuantity = production_cycle_nonnegative_int(
+            $baselineQuantity,
+            'Current live population'
+        );
+
+        return production_population_establish_baseline(
+            $pdo,
+            $farmId,
+            $cycleId,
+            $baselineDate,
+            $baselineQuantity,
+            'legacy_cutover',
+            $notes,
+            $userId
+        );
+    }
+}
+
 if (!function_exists('production_cycle_update_bird_cost_basis')) {
     function production_cycle_update_bird_cost_basis(
         PDO $pdo,
