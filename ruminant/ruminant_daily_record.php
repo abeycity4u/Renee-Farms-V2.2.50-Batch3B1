@@ -2,6 +2,7 @@
 <?php
 require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/../lib/daily_feed_sync.php');
+require_once(__DIR__ . '/../lib/daily_population_sync.php');
 requireLogin();
 
 // Check access
@@ -60,6 +61,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_record']) && $
         if ($record && in_array(strtolower($record['animal_type']), $managedTypes, true)) {
             try {
                 $pdo->beginTransaction();
+                daily_population_remove_mortality(
+                    $pdo,
+                    $tenantFarmId,
+                    'daily_ruminant_record',
+                    $recordId,
+                    (int)$_SESSION['user_id']
+                );
                 delete_daily_feed_usage($pdo, $tenantFarmId, $recordId, 'daily_ruminant_record');
                 $deleteStmt = $pdo->prepare("DELETE FROM ruminant_daily_records WHERE id = ? AND farm_id = ?");
                 $deleteStmt->execute([$recordId, $tenantFarmId]);
@@ -297,6 +305,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_record'])) {
                 throw new InvalidArgumentException('Please select the feed item used for this daily consumption.');
             }
         $waterConsumption = $nonNegative($_POST['water_consumption'] ?? 0, 'Water consumption');
+        $tagNo = trim((string)($_POST['tag_no'] ?? ''));
+        if ($mortality > 0 && $tagNo !== '') {
+            throw new InvalidArgumentException(
+                'For a tagged animal death, record the exit from the Animal Registry. Daily Record mortality is for unregistered or group losses only.'
+            );
+        }
     } catch (InvalidArgumentException $e) {
         $_SESSION['error'] = safeUserExceptionMessage($e, 'The ruminant daily record could not be saved.');
         header('Location: ruminant_daily_record.php?month=' . urlencode($month) . '&cycle_id=' . (int)$selectedCycleId);
@@ -353,7 +367,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_record'])) {
             water_consumption_liters = ?, other_details = ?, tag_no = ?,
             medications = ?, reproduction_details = ?, remarks = ?
             WHERE farm_id = ? AND record_date = ? AND LOWER(animal_type) = ?" . ($cycleIdForSave !== null ? " AND cycle_id = ?" : ""));
-        $updateParams = [$openingStock, $mortality, $feedConsumption, $feedItemId ?: null, $feedItemId > 0 ? (string)($_POST['feed_consumption_unit'] ?? 'kg') : 'kg', $waterConsumption, $_POST['other_details'] ?? '', $_POST['tag_no'] ?? '', $_POST['medications'] ?? '', $_POST['reproduction_details'] ?? '', $_POST['remarks'] ?? '', $tenantFarmId, $recordDate, $animalType];
+        $updateParams = [$openingStock, $mortality, $feedConsumption, $feedItemId ?: null, $feedItemId > 0 ? (string)($_POST['feed_consumption_unit'] ?? 'kg') : 'kg', $waterConsumption, $_POST['other_details'] ?? '', $tagNo, $_POST['medications'] ?? '', $_POST['reproduction_details'] ?? '', $_POST['remarks'] ?? '', $tenantFarmId, $recordDate, $animalType];
         if ($cycleIdForSave !== null) $updateParams[] = $cycleIdForSave;
         $stmt->execute($updateParams);
     } else {
@@ -362,12 +376,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_record'])) {
              feed_consumption_kg, feed_item_id, feed_consumption_unit, water_consumption_liters, other_details,
              tag_no, medications, reproduction_details, remarks, user_id)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$tenantFarmId, $cycleIdForSave, $recordDate, $animalType, $openingStock, $mortality, $feedConsumption, $feedItemId ?: null, $feedItemId > 0 ? (string)($_POST['feed_consumption_unit'] ?? 'kg') : 'kg', $waterConsumption, $_POST['other_details'] ?? '', $_POST['tag_no'] ?? '', $_POST['medications'] ?? '', $_POST['reproduction_details'] ?? '', $_POST['remarks'] ?? '', $_SESSION['user_id']]);
+        $stmt->execute([$tenantFarmId, $cycleIdForSave, $recordDate, $animalType, $openingStock, $mortality, $feedConsumption, $feedItemId ?: null, $feedItemId > 0 ? (string)($_POST['feed_consumption_unit'] ?? 'kg') : 'kg', $waterConsumption, $_POST['other_details'] ?? '', $tagNo, $_POST['medications'] ?? '', $_POST['reproduction_details'] ?? '', $_POST['remarks'] ?? '', $_SESSION['user_id']]);
     }
 
     
         $dailyRecordId = $existingRecordId ? (int)$existingRecordId : (int)$pdo->lastInsertId();
         sync_daily_feed_usage($pdo, $tenantFarmId, $dailyRecordId, $feedItemId > 0 ? $feedItemId : null, $feedConsumption, $cycleIdForSave, $recordDate, 'ruminant', 'ruminant', 'daily_ruminant_record');
+        daily_population_sync_mortality($pdo, $tenantFarmId, 'daily_ruminant_record', $dailyRecordId, $cycleIdForSave, $recordDate, $mortality, (int)$_SESSION['user_id']);
         $pdo->commit();
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
@@ -821,9 +836,10 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!";
                                        id="openingStock" min="0" required>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label>Mortality</label>
+                                <label>Mortality (Unregistered / Group)</label>
                                 <input type="number" name="mortality" class="form-control"
                                        id="mortality" min="0" value="0">
+                                <small class="text-muted">Tagged animal deaths must be recorded from the Animal Registry so population is not deducted twice.</small>
                             </div>
                         </div>
 

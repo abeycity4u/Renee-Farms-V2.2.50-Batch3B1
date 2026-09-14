@@ -2,6 +2,7 @@
 <?php
 require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/../lib/daily_feed_sync.php');
+require_once(__DIR__ . '/../lib/daily_population_sync.php');
 require_once(__DIR__ . '/../lib/sales_allocation.php');
 requireLogin();
 
@@ -288,6 +289,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         
         $dailyRecordId = $existingRecordId ? (int)$existingRecordId : (int)$pdo->lastInsertId();
         sync_daily_feed_usage($pdo, $tenantFarmId, $dailyRecordId, $feedItemId > 0 ? $feedItemId : null, $feedConsumption, $cycleIdForSave, $recordDate, 'poultry', 'layer', 'daily_layer_record');
+        daily_population_sync_mortality($pdo, $tenantFarmId, 'daily_layer_record', $dailyRecordId, $cycleIdForSave, $recordDate, $mortality, (int)$_SESSION['user_id']);
         // Egg ownership is derived from Daily Records. Rebuild later pooled Layer
         // sales whenever historical production changes.
         sales_rebuild_layer_egg_allocations($pdo, $tenantFarmId, $recordDate, (int)$_SESSION['user_id']);

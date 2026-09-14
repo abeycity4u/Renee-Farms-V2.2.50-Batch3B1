@@ -2,6 +2,7 @@
 <?php
 require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/../lib/daily_feed_sync.php');
+require_once(__DIR__ . '/../lib/daily_population_sync.php');
 requireLogin();
 
 // Check access
@@ -266,6 +267,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_record'])) {
     
         $dailyRecordId = $existingRecordId ? (int)$existingRecordId : (int)$pdo->lastInsertId();
         sync_daily_feed_usage($pdo, $tenantFarmId, $dailyRecordId, $feedItemId > 0 ? $feedItemId : null, $feedConsumption, $cycleIdForSave, $recordDate, 'poultry', 'broiler', 'daily_broiler_record');
+        daily_population_sync_mortality($pdo, $tenantFarmId, 'daily_broiler_record', $dailyRecordId, $cycleIdForSave, $recordDate, $mortality, (int)$_SESSION['user_id']);
         $pdo->commit();
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
