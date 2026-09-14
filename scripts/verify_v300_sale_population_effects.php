@@ -180,8 +180,21 @@ verify_true(
 );
 
 verify_true(
-    strpos($service, 'ruminant_animal_exit_events') !== false,
-    'tagged-ruminant lifecycle ownership is guarded'
+    strpos($service, 'ruminant_animal_exit_events') === false
+    && strpos($service, 'ruminant_sale_exit') === false,
+    'aggregate Sales population effect never queries or derives tagged-ruminant exits'
+);
+
+verify_true(
+    strpos(
+        $service,
+        'may legitimately coexist in one sale'
+    ) !== false
+    && strpos(
+        $service,
+        'those remain lifecycle-owned'
+    ) !== false,
+    'mixed tagged and aggregate ruminant sale ownership is explicit'
 );
 
 verify_true(

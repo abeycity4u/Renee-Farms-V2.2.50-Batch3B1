@@ -154,27 +154,13 @@ if (!function_exists('sale_population_effect_sync')) {
             }
 
             /*
-             * A sale already owning tagged-ruminant lifecycle exits must not
-             * also deduct those animals through the aggregate Sales source.
+             * Tagged ruminants and aggregate/unregistered animals have separate
+             * population writers and may legitimately coexist in one sale.
+             *
+             * This service owns only the explicitly supplied aggregate/group
+             * headcount. It never reads, counts, derives, or re-projects tagged
+             * Animal Registry exits; those remain lifecycle-owned.
              */
-            if ($desired && $saleFarmType === 'ruminant') {
-                $exitStmt = $pdo->prepare(
-                    "SELECT id
-                     FROM ruminant_animal_exit_events
-                     WHERE farm_id=?
-                       AND sale_id=?
-                     LIMIT 1
-                     FOR UPDATE"
-                );
-                $exitStmt->execute([$farmId, $saleId]);
-
-                if ($exitStmt->fetchColumn() !== false) {
-                    throw new SalePopulationEffectException(
-                        'Tagged animals in this sale already use Animal Registry lifecycle exits. Do not deduct them again as a group population sale.'
-                    );
-                }
-            }
-
             $existingStmt = $pdo->prepare(
                 "SELECT
                      id,
