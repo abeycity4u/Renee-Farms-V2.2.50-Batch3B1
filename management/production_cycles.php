@@ -5,6 +5,7 @@ require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/../includes/audit_helpers.php');
 require_once(__DIR__ . '/../lib/poultry_cycle_lifecycle.php');
 require_once(__DIR__ . '/../lib/poultry_cycle_acquisition.php');
+require_once(__DIR__ . '/../lib/production_cycle_service.php');
 requireLogin();
 requireBusinessReportAccess();
 $tenantFarmId = requireCurrentFarmId();
@@ -21,6 +22,18 @@ $migration038Recorded = false;
 $migration039Recorded = false;
 $errorMessage = null;
 $flash = null;
+
+$populationBaselineTableExists = false;
+$populationCutoverCycles = [];
+$populationTrackedActiveCount = 0;
+
+$cutoverForm = [
+    'cycle_id' => '',
+    'baseline_date' => '',
+    'baseline_quantity' => '',
+    'notes' => '',
+    'confirmed' => false,
+];
 
 $summary = [
     'active_cycles' => 0,
@@ -119,6 +132,7 @@ function getCycleCurrentStock(PDO $pdo, array $cycle): int
 
 try {
     $cycleTableExists = ($pdo->query("SHOW TABLES LIKE 'production_cycles'")->rowCount() > 0);
+    $populationBaselineTableExists = ($pdo->query("SHOW TABLES LIKE 'production_population_baselines'")->rowCount() > 0);
     $stockBatchTableExists = ($pdo->query("SHOW TABLES LIKE 'stock_batches'")->rowCount() > 0);
     $poultryPhaseTableExists = ($pdo->query("SHOW TABLES LIKE 'production_cycle_phases'")->rowCount() > 0);
     $poultryAcquisitionTableExists = ($pdo->query("SHOW TABLES LIKE 'poultry_cycle_acquisitions'")->rowCount() > 0);
@@ -471,6 +485,94 @@ try {
             }
         }
 
+        if ($action === 'confirm_population_cutover') {
+            $cycleId = (int)($_POST['cycle_id'] ?? 0);
+            $baselineDate = trim(
+                (string)($_POST['baseline_date'] ?? '')
+            );
+            $baselineQuantityRaw = trim(
+                (string)($_POST['baseline_quantity'] ?? '')
+            );
+            $notes = trim(
+                (string)($_POST['notes'] ?? '')
+            );
+            $confirmed =
+                (string)($_POST['confirm_cutover'] ?? '') === '1';
+
+            $cutoverForm = [
+                'cycle_id' => $cycleId > 0 ? (string)$cycleId : '',
+                'baseline_date' => $baselineDate,
+                'baseline_quantity' => $baselineQuantityRaw,
+                'notes' => $notes,
+                // A corrected immutable baseline must be explicitly confirmed
+                // again after any failed submission.
+                'confirmed' => false,
+            ];
+
+            if (!$populationBaselineTableExists) {
+                $flash = [
+                    'type' => 'danger',
+                    'title' => 'Population foundation is not available.',
+                    'message' => 'Run the V3 database migrations before confirming a population cutover.',
+                ];
+            } elseif (!$confirmed) {
+                $flash = [
+                    'type' => 'danger',
+                    'title' => 'Population confirmation is required.',
+                    'message' => 'Confirm that the entered headcount is the physically verified live population for the selected cutover date.',
+                ];
+            } else {
+                try {
+                    production_cycle_cutover_population_v3(
+                        $pdo,
+                        $tenantFarmId,
+                        $cycleId,
+                        $baselineDate,
+                        $baselineQuantityRaw,
+                        $notes !== '' ? $notes : null,
+                        isset($_SESSION['user_id'])
+                            ? (int)$_SESSION['user_id']
+                            : null
+                    );
+
+                    $flash = [
+                        'type' => 'success',
+                        'title' => 'V3 population cutover confirmed.',
+                        'message' => 'The selected cycle now uses the user-confirmed population baseline. Earlier legacy records were not reconstructed or backfilled.',
+                        'tip' => 'Future population changes are tracked from this baseline. Correct later population differences through the canonical adjustment workflow instead of rewriting this baseline.',
+                    ];
+
+                    $cutoverForm = [
+                        'cycle_id' => '',
+                        'baseline_date' => '',
+                        'baseline_quantity' => '',
+                        'notes' => '',
+                        'confirmed' => false,
+                    ];
+                } catch (Throwable $e) {
+                    $safe =
+                        $e instanceof InvalidArgumentException
+                        || $e instanceof ProductionCycleException
+                        || $e instanceof ProductionPopulationException;
+
+                    if (!$safe) {
+                        error_log(
+                            'Production population cutover failed: '
+                            . $e->getMessage()
+                        );
+                    }
+
+                    $flash = [
+                        'type' => 'danger',
+                        'title' => 'Population cutover was not saved.',
+                        'message' => $safe
+                            ? $e->getMessage()
+                            : 'The population cutover could not be completed. No baseline was changed.',
+                    ];
+                }
+            }
+        }
+
         if ($action === 'close_cycle') {
             $cycleId = (int)($_POST['cycle_id'] ?? 0);
             $closeDate = $_POST['close_date'] ?? '';
@@ -535,12 +637,27 @@ try {
             $summary['stock_batches'] = (int)$stockBatchCountStmt->fetchColumn();
         }
 
-        $activeStmt = $pdo->prepare("SELECT id, cycle_code, farm_type, production_type, bird_unit_cost FROM production_cycles WHERE farm_id = ? AND status = 'active' ORDER BY start_date DESC");
+        $activeStmt = $pdo->prepare("SELECT id, cycle_code, farm_type, production_type, start_date, bird_unit_cost FROM production_cycles WHERE farm_id = ? AND status = 'active' ORDER BY start_date DESC");
         $activeStmt->execute([$tenantFarmId]);
         $activeCycles = $activeStmt->fetchAll(PDO::FETCH_ASSOC);
         foreach ($activeCycles as &$cycle) {
             $cycle['current_stock'] = getCycleCurrentStock($pdo, $cycle);
             $summary['total_current_stock'] += (int)$cycle['current_stock'];
+
+            if ($populationBaselineTableExists) {
+                $cycle['population_state'] =
+                    production_population_state(
+                        $pdo,
+                        $tenantFarmId,
+                        (int)$cycle['id']
+                    );
+
+                if ($cycle['population_state'] === null) {
+                    $populationCutoverCycles[] = $cycle;
+                } else {
+                    $populationTrackedActiveCount++;
+                }
+            }
         }
         unset($cycle);
 
@@ -739,6 +856,143 @@ try {
                 </div>
             </div>
         </div>
+
+        <?php if (isPlatformOwner() || hasRole('farm_admin')): ?>
+            <div class="card mb-3" id="population-cutover">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>V3 Population Cutover</strong>
+                    <?php if ($populationBaselineTableExists): ?>
+                        <span class="badge bg-secondary">
+                            <?php echo number_format($populationTrackedActiveCount); ?> active cycle(s) already tracked
+                        </span>
+                    <?php endif; ?>
+                </div>
+                <div class="card-body">
+                    <p class="mb-2">
+                        Use this only for an existing active cycle that has not yet entered V3 population tracking.
+                        Enter the <strong>physically verified live headcount</strong>; the platform will not derive it
+                        from Daily Records, Animal Registry, Sales, opening stock, or other historical records.
+                    </p>
+
+                    <div class="alert alert-warning">
+                        <strong>This establishes the cycle's V3 population starting point.</strong>
+                        The baseline is not silently rewritten later. If the selected date already has
+                        population-changing activity recorded, choose a clean cutover date and confirm the
+                        live headcount before recording that date's V3 population-changing activity.
+                    </div>
+
+                    <?php if (!$populationBaselineTableExists): ?>
+                        <div class="alert alert-danger mb-0">
+                            <strong>V3 population foundation is not available.</strong>
+                            Run the database migrations before confirming a population cutover.
+                        </div>
+                    <?php elseif (empty($populationCutoverCycles)): ?>
+                        <div class="alert alert-info mb-0">
+                            Every active production cycle is already under V3 population tracking,
+                            or there is no active cycle requiring cutover.
+                        </div>
+                    <?php else: ?>
+                        <form method="post" class="row g-3">
+                            <input
+                                type="hidden"
+                                name="csrf_token"
+                                value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>"
+                            >
+                            <input
+                                type="hidden"
+                                name="action"
+                                value="confirm_population_cutover"
+                            >
+
+                            <div class="col-md-6">
+                                <label class="form-label">Active Cycle</label>
+                                <select class="form-select" name="cycle_id" required>
+                                    <option value="">Select cycle requiring cutover</option>
+                                    <?php foreach ($populationCutoverCycles as $cycle): ?>
+                                        <option
+                                            value="<?php echo (int)$cycle['id']; ?>"
+                                            <?php echo (string)$cutoverForm['cycle_id'] === (string)$cycle['id'] ? 'selected' : ''; ?>
+                                        >
+                                            <?php
+                                            echo htmlspecialchars(
+                                                $cycle['cycle_code']
+                                                . ' — '
+                                                . ucfirst((string)$cycle['production_type'])
+                                                . ' — started '
+                                                . (string)$cycle['start_date']
+                                            );
+                                            ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label">Cutover Date</label>
+                                <input
+                                    class="form-control"
+                                    type="date"
+                                    name="baseline_date"
+                                    value="<?php echo htmlspecialchars($cutoverForm['baseline_date'], ENT_QUOTES); ?>"
+                                    required
+                                >
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label">Confirmed Live Population</label>
+                                <input
+                                    class="form-control"
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    name="baseline_quantity"
+                                    value="<?php echo htmlspecialchars($cutoverForm['baseline_quantity'], ENT_QUOTES); ?>"
+                                    required
+                                >
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label">Cutover Notes</label>
+                                <textarea
+                                    class="form-control"
+                                    name="notes"
+                                    rows="2"
+                                    placeholder="Optional: how the live headcount was physically confirmed"
+                                ><?php echo htmlspecialchars($cutoverForm['notes']); ?></textarea>
+                            </div>
+
+                            <div class="col-12">
+                                <div class="form-check">
+                                    <input
+                                        class="form-check-input"
+                                        type="checkbox"
+                                        value="1"
+                                        name="confirm_cutover"
+                                        id="confirmPopulationCutover"
+                                        <?php echo $cutoverForm['confirmed'] ? 'checked' : ''; ?>
+                                        required
+                                    >
+                                    <label
+                                        class="form-check-label"
+                                        for="confirmPopulationCutover"
+                                    >
+                                        I confirm this is the physically verified live population for this
+                                        cycle at the start of the selected cutover date, before that date's
+                                        V3 population-changing activity is recorded.
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="col-12">
+                                <button class="btn btn-warning" type="submit">
+                                    Confirm V3 Population Cutover
+                                </button>
+                            </div>
+                        </form>
+                    <?php endif; ?>
+                </div>
+            </div>
+        <?php endif; ?>
 
         <div class="card mb-3">
             <div class="card-header"><strong>Poultry Bird Cost Basis</strong></div>
