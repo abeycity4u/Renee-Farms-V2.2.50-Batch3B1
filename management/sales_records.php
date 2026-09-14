@@ -101,10 +101,14 @@ $renderSalePopulationEffectControls = static function (string $prefix): void {
                 </option>
             </select>
 
-            <small class="text-muted d-block mt-1">
-                Product, sales quantity and unit of measure never imply a population change.
-                Choose Remove live population only when this sale physically removes animals or birds.
-            </small>
+            <div
+                id="<?php echo $idPrefix; ?>PopulationEffectExplanation"
+                class="small text-muted mt-1"
+            >
+                This option updates only the financial sale record. Saving this sale will not
+                reduce or change live population in any production cycle. Product type, quantity,
+                and unit of measure are treated as financial/revenue data only.
+            </div>
 
             <div
                 id="<?php echo $idPrefix; ?>PopulationEffectRows"
@@ -124,7 +128,7 @@ $renderSalePopulationEffectControls = static function (string $prefix): void {
                 class="alert alert-info py-2 px-3 mt-2 mb-0 d-none"
             >
                 Aggregate/group headcount only. Do not include tagged animals whose
-                Sold live or Culled/slaughtered outcome is handled through Animal Registry.
+                Sold live or Culled/slaughtered outcome is already handled through Animal Registry.
             </div>
         </div>
     </div>

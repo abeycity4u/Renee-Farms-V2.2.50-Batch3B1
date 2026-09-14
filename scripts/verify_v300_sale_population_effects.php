@@ -586,6 +586,46 @@ verify_true(
     'cycle-attributed sale UI locks population source to its selected sale cycle'
 );
 
+verify_true(
+    strpos(
+        $salesPage,
+        'PopulationEffectExplanation'
+    ) !== false
+    && strpos(
+        $salesJs,
+        'salePopulationEffectExplanations'
+    ) !== false,
+    'Sales population explanation is shared across add and edit modes'
+);
+
+verify_true(
+    strpos(
+        $salesJs,
+        'This option updates only the financial sale record.'
+    ) !== false
+    && strpos(
+        $salesJs,
+        'This option records a physical population removal.'
+    ) !== false
+    && strpos(
+        $salesJs,
+        'whole headcount you explicitly enter'
+    ) !== false,
+    'population mode explanation describes the selected operational effect'
+);
+
+verify_true(
+    strpos(
+        $salesJs,
+        'text-nowrap px-3 sale-population-remove-row'
+    ) !== false
+    && strpos(
+        $salesJs,
+        "const actionColumn = $('<div>', {class: 'col-md-3'});"
+    ) !== false,
+    'population row Remove action stays readable on one line'
+);
+
 /* Migration 057 foundational guarantees. */
 verify_true(
     preg_match(

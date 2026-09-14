@@ -198,6 +198,9 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
             production: isEdit ? '#editSaleProductionType' : '#addProductionType',
             cycle: isEdit ? '#editSaleCycleId' : '#addCycleId',
             mode: isEdit ? '#editPopulationEffectMode' : '#addPopulationEffectMode',
+            explanation: isEdit
+                ? '#editPopulationEffectExplanation'
+                : '#addPopulationEffectExplanation',
             rows: isEdit ? '#editPopulationEffectRows' : '#addPopulationEffectRows',
             addRow: isEdit ? '#editPopulationEffectAddRow' : '#addPopulationEffectAddRow',
             ruminantNote: isEdit
@@ -205,6 +208,13 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
                 : '#addPopulationEffectRuminantNote'
         };
     }
+
+    const salePopulationEffectExplanations = {
+        financial_only:
+            'This option updates only the financial sale record. Saving this sale will not reduce or change live population in any production cycle. Product type, quantity, and unit of measure are treated as financial/revenue data only.',
+        remove_live_population:
+            'This option records a physical population removal. Saving this sale will reduce live population only by the whole headcount you explicitly enter for the selected source production cycle(s). Product type, sales quantity, and unit of measure do not determine the population change.'
+    };
 
     function eligibleSalePopulationCycles(prefix) {
         const ids = salePopulationSelectors(prefix);
@@ -256,7 +266,7 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
             class: 'row g-2 align-items-end mb-2 sale-population-effect-row'
         });
 
-        const cycleColumn = $('<div>', {class: 'col-md-7'});
+        const cycleColumn = $('<div>', {class: 'col-md-6'});
         cycleColumn.append(
             $('<label>', {
                 class: 'form-label small mb-1',
@@ -322,13 +332,13 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
             })
         );
 
-        const actionColumn = $('<div>', {class: 'col-md-2'});
+        const actionColumn = $('<div>', {class: 'col-md-3'});
 
         if (directCycle <= 0) {
             actionColumn.append(
                 $('<button>', {
                     type: 'button',
-                    class: 'btn btn-outline-danger w-100 sale-population-remove-row',
+                    class: 'btn btn-outline-danger text-nowrap px-3 sale-population-remove-row',
                     text: 'Remove'
                 }).attr('data-population-prefix', prefix)
             );
@@ -359,8 +369,17 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
             modeElement.val('financial_only');
         }
 
+        const mode = String(
+            modeElement.val() || 'financial_only'
+        );
+
+        $(ids.explanation).text(
+            salePopulationEffectExplanations[mode]
+                || salePopulationEffectExplanations.financial_only
+        );
+
         const removeLive =
-            modeElement.val() === 'remove_live_population'
+            mode === 'remove_live_population'
             && eligibleFarm;
 
         const rowsElement = $(ids.rows);
@@ -403,7 +422,7 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
             rowsElement.append(
                 $('<div>', {
                     class: 'alert alert-warning py-2 mb-0',
-                    text: 'No matching production cycle is available for this population effect.'
+                    text: 'No matching production cycle is available for this population effect. To remove live population, first select or create an eligible production cycle. Otherwise, keep this sale as Financial only.'
                 })
             );
             addRowButton.addClass('d-none');
