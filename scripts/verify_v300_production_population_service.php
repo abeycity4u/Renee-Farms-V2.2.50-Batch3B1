@@ -212,6 +212,18 @@ $check(
 $check(
     strpos(
         $compact,
+        'WHERE farm_id = ? AND source_type = ? AND source_id = ? AND source_version = ? LIMIT 1'
+    ) !== false
+    && strpos(
+        $compact,
+        "(int)\$existing['cycle_id'] === \$cycleId"
+    ) !== false,
+    'durable source/version identity is global across cycles'
+);
+
+$check(
+    strpos(
+        $compact,
         'This cycle already has a different V3 population baseline.'
     ) !== false
     && preg_match(

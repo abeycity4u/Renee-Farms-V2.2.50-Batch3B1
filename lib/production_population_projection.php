@@ -95,20 +95,18 @@ if (!function_exists('production_population_projection_desired')) {
     }
 }
 
-if (!function_exists('production_population_projection_active_locked')) {
-    /**
-     * Caller already owns the cycle/baseline write boundary.
-     */
-    function production_population_projection_active_locked(
+if (!function_exists('production_population_projection_active_rows')) {
+    function production_population_projection_active_rows(
         PDO $pdo,
         int $farmId,
-        int $cycleId,
         string $sourceType,
-        int $sourceId
-    ): ?array {
-        $stmt = $pdo->prepare(
+        int $sourceId,
+        bool $forUpdate
+    ): array {
+        $sql =
             'SELECT
                  m.id,
+                 m.cycle_id,
                  m.movement_date,
                  m.movement_type,
                  m.quantity_delta,
@@ -116,7 +114,6 @@ if (!function_exists('production_population_projection_active_locked')) {
                  m.notes
              FROM production_population_movements m
              WHERE m.farm_id = ?
-               AND m.cycle_id = ?
                AND m.source_type = ?
                AND m.source_id = ?
                AND m.reversal_of_id IS NULL
@@ -128,13 +125,15 @@ if (!function_exists('production_population_projection_active_locked')) {
                      AND r.reversal_of_id = m.id
                )
              ORDER BY m.source_version DESC, m.id DESC
-             LIMIT 2
-             FOR UPDATE'
-        );
+             LIMIT 2';
 
+        if ($forUpdate) {
+            $sql .= ' FOR UPDATE';
+        }
+
+        $stmt = $pdo->prepare($sql);
         $stmt->execute([
             $farmId,
-            $cycleId,
             $sourceType,
             $sourceId,
         ]);
@@ -143,9 +142,47 @@ if (!function_exists('production_population_projection_active_locked')) {
 
         if (count($rows) > 1) {
             throw new ProductionPopulationProjectionException(
-                'Population projection integrity check failed: this source has multiple active movements in one cycle.'
+                'Population projection integrity check failed: this durable source has multiple active movements across cycles.'
             );
         }
+
+        return $rows;
+    }
+}
+
+if (!function_exists('production_population_projection_active_snapshot')) {
+    function production_population_projection_active_snapshot(
+        PDO $pdo,
+        int $farmId,
+        string $sourceType,
+        int $sourceId
+    ): ?array {
+        $rows = production_population_projection_active_rows(
+            $pdo,
+            $farmId,
+            $sourceType,
+            $sourceId,
+            false
+        );
+
+        return $rows[0] ?? null;
+    }
+}
+
+if (!function_exists('production_population_projection_active_locked')) {
+    function production_population_projection_active_locked(
+        PDO $pdo,
+        int $farmId,
+        string $sourceType,
+        int $sourceId
+    ): ?array {
+        $rows = production_population_projection_active_rows(
+            $pdo,
+            $farmId,
+            $sourceType,
+            $sourceId,
+            true
+        );
 
         return $rows[0] ?? null;
     }
@@ -155,7 +192,6 @@ if (!function_exists('production_population_projection_latest_version_locked')) 
     function production_population_projection_latest_version_locked(
         PDO $pdo,
         int $farmId,
-        int $cycleId,
         string $sourceType,
         int $sourceId
     ): int {
@@ -163,7 +199,6 @@ if (!function_exists('production_population_projection_latest_version_locked')) 
             'SELECT COALESCE(MAX(source_version), 0)
              FROM production_population_movements
              WHERE farm_id = ?
-               AND cycle_id = ?
                AND source_type = ?
                AND source_id = ?
                AND reversal_of_id IS NULL'
@@ -171,12 +206,64 @@ if (!function_exists('production_population_projection_latest_version_locked')) 
 
         $stmt->execute([
             $farmId,
-            $cycleId,
             $sourceType,
             $sourceId,
         ]);
 
         return (int)$stmt->fetchColumn();
+    }
+}
+
+if (!function_exists('production_population_projection_lock_cycles')) {
+    function production_population_projection_lock_cycles(
+        PDO $pdo,
+        int $farmId,
+        array $cycleIds
+    ): array {
+        $cycleIds = array_values(array_unique(array_map('intval', $cycleIds)));
+
+        foreach ($cycleIds as $cycleId) {
+            if ($cycleId <= 0) {
+                throw new InvalidArgumentException(
+                    'Select a valid production cycle.'
+                );
+            }
+        }
+
+        sort($cycleIds, SORT_NUMERIC);
+
+        $cycles = [];
+        foreach ($cycleIds as $cycleId) {
+            $cycles[$cycleId] = production_population_lock_cycle(
+                $pdo,
+                $farmId,
+                $cycleId
+            );
+        }
+
+        return $cycles;
+    }
+}
+
+if (!function_exists('production_population_projection_lock_baselines')) {
+    function production_population_projection_lock_baselines(
+        PDO $pdo,
+        int $farmId,
+        array $cycleIds
+    ): array {
+        $cycleIds = array_values(array_unique(array_map('intval', $cycleIds)));
+        sort($cycleIds, SORT_NUMERIC);
+
+        $baselines = [];
+        foreach ($cycleIds as $cycleId) {
+            $baselines[$cycleId] = production_population_lock_baseline(
+                $pdo,
+                $farmId,
+                $cycleId
+            );
+        }
+
+        return $baselines;
     }
 }
 
@@ -203,10 +290,8 @@ if (!function_exists('production_population_projection_sync')) {
     /**
      * Synchronize one durable source row to its canonical population projection.
      *
+     * Source identity is global within one farm across all production cycles.
      * $desired = NULL removes any current projection.
-     *
-     * Return status is intentionally explicit so legacy callers can preserve
-     * existing V2.x behavior until their cycle has entered the V3 baseline.
      */
     function production_population_projection_sync(
         PDO $pdo,
@@ -251,19 +336,83 @@ if (!function_exists('production_population_projection_sync')) {
         }
 
         try {
-            $cycle = production_population_lock_cycle(
-                $pdo,
-                $farmId,
-                $cycleId
-            );
+            $snapshot =
+                production_population_projection_active_snapshot(
+                    $pdo,
+                    $farmId,
+                    $sourceType,
+                    $sourceId
+                );
 
-            $baseline = production_population_lock_baseline(
-                $pdo,
-                $farmId,
-                $cycleId
-            );
+            $cycleIds = [$cycleId];
+            if ($snapshot !== null) {
+                $cycleIds[] = (int)$snapshot['cycle_id'];
+            }
 
-            if (!$baseline) {
+            $lockedCycles =
+                production_population_projection_lock_cycles(
+                    $pdo,
+                    $farmId,
+                    $cycleIds
+                );
+
+            $current =
+                production_population_projection_active_locked(
+                    $pdo,
+                    $farmId,
+                    $sourceType,
+                    $sourceId
+                );
+
+            if (
+                $current !== null
+                && !array_key_exists(
+                    (int)$current['cycle_id'],
+                    $lockedCycles
+                )
+            ) {
+                throw new ProductionPopulationProjectionException(
+                    'Population source changed cycles concurrently. Retry this source update.'
+                );
+            }
+
+            $lockedBaselines =
+                production_population_projection_lock_baselines(
+                    $pdo,
+                    $farmId,
+                    array_keys($lockedCycles)
+                );
+
+            $targetCycle = $lockedCycles[$cycleId];
+            $targetBaseline = $lockedBaselines[$cycleId] ?? null;
+
+            $latestVersion =
+                production_population_projection_latest_version_locked(
+                    $pdo,
+                    $farmId,
+                    $sourceType,
+                    $sourceId
+                );
+
+            $reversalId = null;
+            $currentCycleId =
+                $current !== null
+                ? (int)$current['cycle_id']
+                : null;
+
+            if (!$targetBaseline) {
+                if ($current !== null) {
+                    $reversalId =
+                        production_population_reverse_movement(
+                            $pdo,
+                            $farmId,
+                            $currentCycleId,
+                            (int)$current['id'],
+                            $correctionReason,
+                            $userId
+                        );
+                }
+
                 if ($startedTransaction) {
                     $pdo->commit();
                 }
@@ -271,37 +420,27 @@ if (!function_exists('production_population_projection_sync')) {
                 return [
                     'status' => 'legacy_untracked',
                     'movement_id' => null,
-                    'reversal_id' => null,
+                    'reversal_id' => $reversalId,
                     'source_version' => null,
                     'cycle_id' => $cycleId,
                 ];
             }
 
-            $current =
-                production_population_projection_active_locked(
-                    $pdo,
-                    $farmId,
-                    $cycleId,
-                    $sourceType,
-                    $sourceId
+            if ($desired !== null) {
+                production_population_assert_date_in_cycle(
+                    $targetCycle,
+                    (string)$desired['movement_date']
                 );
-
-            $latestVersion =
-                production_population_projection_latest_version_locked(
-                    $pdo,
-                    $farmId,
-                    $cycleId,
-                    $sourceType,
-                    $sourceId
-                );
+            }
 
             $beforeBaseline =
                 $desired !== null
                 && (string)$desired['movement_date']
-                    < (string)$baseline['baseline_date'];
+                    < (string)$targetBaseline['baseline_date'];
 
             if (
                 $current !== null
+                && $currentCycleId === $cycleId
                 && !$beforeBaseline
                 && $desired !== null
                 && production_population_projection_matches(
@@ -322,14 +461,12 @@ if (!function_exists('production_population_projection_sync')) {
                 ];
             }
 
-            $reversalId = null;
-
             if ($current !== null) {
                 $reversalId =
                     production_population_reverse_movement(
                         $pdo,
                         $farmId,
-                        $cycleId,
+                        $currentCycleId,
                         (int)$current['id'],
                         $correctionReason,
                         $userId

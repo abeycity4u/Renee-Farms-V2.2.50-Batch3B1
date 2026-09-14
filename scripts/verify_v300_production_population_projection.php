@@ -9,6 +9,7 @@
 $root = dirname(__DIR__);
 $servicePath = $root . '/lib/production_population_projection.php';
 $populationPath = $root . '/lib/production_population.php';
+$migrationPath = $root . '/migrations/056_population_global_source_identity.sql';
 
 $checks = 0;
 $failures = 0;
@@ -118,6 +119,10 @@ $check(
 );
 
 $compact = preg_replace('/\s+/', ' ', $source);
+$migration = is_readable($migrationPath)
+    ? file_get_contents($migrationPath)
+    : '';
+$migrationCompact = preg_replace('/\s+/', ' ', (string)$migration);
 
 $check(
     strpos($source, "require_once __DIR__ . '/production_population.php';")
@@ -166,13 +171,70 @@ $check(
 );
 
 $check(
-    strpos($compact, 'LIMIT 2 FOR UPDATE') !== false
+    preg_match('/LIMIT\s+2/', $source) === 1
+    && strpos($compact, "\$sql .= ' FOR UPDATE';") !== false
     && strpos($compact, 'if (count($rows) > 1)') !== false
     && strpos(
         $source,
-        'Population projection integrity check failed: this source has multiple active movements in one cycle.'
+        'Population projection integrity check failed: this durable source has multiple active movements across cycles.'
     ) !== false,
     'projection synchronizer fails closed on multiple active source movements'
+);
+
+$check(
+    strpos(
+        $compact,
+        'WHERE m.farm_id = ? AND m.source_type = ? AND m.source_id = ?'
+    ) !== false
+    && strpos($compact, 'AND m.cycle_id = ?') === false,
+    'active durable-source projection lookup is global across cycles'
+);
+
+$check(
+    strpos(
+        $compact,
+        'SELECT COALESCE(MAX(source_version), 0) FROM production_population_movements WHERE farm_id = ? AND source_type = ? AND source_id = ?'
+    ) !== false,
+    'source_version advances globally across cycles'
+);
+
+$check(
+    strpos($compact, 'sort($cycleIds, SORT_NUMERIC);') !== false
+    && strpos(
+        $compact,
+        'production_population_projection_lock_cycles('
+    ) !== false
+    && strpos(
+        $compact,
+        'production_population_projection_lock_baselines('
+    ) !== false,
+    'cross-cycle corrections lock cycles and baselines in deterministic order'
+);
+
+$check(
+    strpos($compact, '$currentCycleId = $current !== null') !== false
+    && strpos(
+        $compact,
+        'production_population_reverse_movement( $pdo, $farmId, $currentCycleId,'
+    ) !== false
+    && strpos(
+        $compact,
+        "if (!\$targetBaseline) { if (\$current !== null) {"
+    ) !== false,
+    'cross-cycle and legacy-target corrections reverse the prior active projection first'
+);
+
+$check(
+    is_file($migrationPath)
+    && strpos(
+        $migrationCompact,
+        'DROP INDEX uniq_population_movement_source'
+    ) !== false
+    && strpos(
+        $migrationCompact,
+        'UNIQUE KEY uniq_population_movement_source ( farm_id, source_type, source_id, source_version )'
+    ) !== false,
+    'migration 056 enforces global durable source/version uniqueness'
 );
 
 $check(

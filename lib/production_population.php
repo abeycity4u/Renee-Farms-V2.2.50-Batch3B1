@@ -818,12 +818,12 @@ if (!function_exists('production_population_record_movement')) {
                 $sourceStmt = $pdo->prepare(
                     'SELECT
                          id,
+                         cycle_id,
                          movement_date,
                          movement_type,
                          quantity_delta
                      FROM production_population_movements
                      WHERE farm_id = ?
-                       AND cycle_id = ?
                        AND source_type = ?
                        AND source_id = ?
                        AND source_version = ?
@@ -832,7 +832,6 @@ if (!function_exists('production_population_record_movement')) {
 
                 $sourceStmt->execute([
                     $farmId,
-                    $cycleId,
                     $sourceType,
                     $sourceId,
                     $sourceVersion,
@@ -842,7 +841,8 @@ if (!function_exists('production_population_record_movement')) {
 
                 if ($existing) {
                     $same =
-                        (string)$existing['movement_date'] === $movementDate
+                        (int)$existing['cycle_id'] === $cycleId
+                        && (string)$existing['movement_date'] === $movementDate
                         && (string)$existing['movement_type'] === $movementType
                         && (int)$existing['quantity_delta'] === $quantityDelta;
 
