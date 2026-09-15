@@ -283,6 +283,17 @@ if (!function_exists('poultry_acquisition_history')) {
     }
 }
 
+if (!function_exists('poultry_acquisition_cost_per_bird')) {
+    function poultry_acquisition_cost_per_bird(?float $totalCost, int $quantity): ?float
+    {
+        if ($totalCost === null || $quantity <= 0) {
+            return null;
+        }
+
+        return $totalCost / $quantity;
+    }
+}
+
 if (!function_exists('poultry_acquisition_summary')) {
     function poultry_acquisition_summary(array $rows): array
     {
@@ -306,7 +317,9 @@ if (!function_exists('poultry_acquisition_summary')) {
             'entry_count' => count($activeRows),
             'quantity' => $quantity,
             'total_cost' => $allCosted ? $totalCost : null,
-            'effective_cost_per_bird' => ($allCosted && $quantity > 0) ? ($totalCost / $quantity) : null,
+            'effective_cost_per_bird' => $allCosted
+                ? poultry_acquisition_cost_per_bird($totalCost, $quantity)
+                : null,
             'has_uncosted_entry' => !$allCosted && !empty($activeRows),
         ];
     }

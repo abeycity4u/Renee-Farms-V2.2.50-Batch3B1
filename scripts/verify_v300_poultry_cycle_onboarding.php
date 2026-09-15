@@ -305,9 +305,13 @@ $check(
 $check(
     strpos(
         $js,
-        'Internal carry-in may remain uncosted until a defensible cost basis exists.'
+        'Internal carry-in may remain uncosted'
+    ) !== false
+    && strpos(
+        $js,
+        'Acquisition Cost / Bird remains unavailable'
     ) !== false,
-    'UI explains why internal carry-in may be uncosted'
+    'UI explains why internal carry-in may remain uncosted without manufacturing a per-bird acquisition value'
 );
 
 $check(

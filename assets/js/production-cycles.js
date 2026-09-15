@@ -12,11 +12,8 @@ document.addEventListener('DOMContentLoaded', function () {
         ruminant: ['cattle', 'goat', 'sheep', 'other']
     };
 
-    const birdCostBasisWrap = document.getElementById('birdCostBasisWrap');
-
     const render = () => {
         const selectedFarm = farmType.value || 'poultry';
-        if (birdCostBasisWrap) birdCostBasisWrap.style.display = selectedFarm === 'poultry' ? '' : 'none';
         const requestedProduction = productionType.dataset.selected || productionType.value;
         productionType.innerHTML = '';
         (options[selectedFarm] || []).forEach((value) => {
@@ -50,10 +47,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const purchasedOption = document.getElementById('createPurchasedBirdsOption');
         const pointOfLayOption = document.getElementById('createPointOfLayOption');
         const initialPhase = document.getElementById('createPoultryInitialPhase');
-        const unitPrice = document.getElementById('createPoultryUnitPrice');
         const totalCost = document.getElementById('createPoultryTotalCost');
         const costHelp = document.getElementById('createPoultryCostHelp');
-        const openingHeadcount = document.querySelector('input[name="opening_headcount"]');
 
         if (
             !farmType
@@ -125,51 +120,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (costHelp) {
                 costHelp.textContent = acquisitionType.value === 'internal_transfer'
-                    ? 'Internal carry-in may remain uncosted until a defensible cost basis exists.'
-                    : 'Purchased entries require the actual total bird acquisition amount.';
-            }
-        };
-
-        let totalManuallyEdited = false;
-
-        if (totalCost) {
-            totalCost.addEventListener('input', function () {
-                totalManuallyEdited = totalCost.value !== '';
-            });
-        }
-
-        const recalc = function () {
-            if (
-                totalManuallyEdited
-                || !unitPrice
-                || !totalCost
-                || !openingHeadcount
-            ) return;
-
-            const quantity = Number(openingHeadcount.value);
-            const unit = Number(unitPrice.value);
-
-            if (quantity > 0 && unit >= 0 && unitPrice.value !== '') {
-                totalCost.value = (quantity * unit).toFixed(2);
-            } else if (!unitPrice.value) {
-                totalCost.value = '';
+                    ? 'Internal carry-in may remain uncosted until a defensible total acquisition value exists; Acquisition Cost / Bird remains unavailable until then.'
+                    : 'Enter the actual total acquisition cost. Acquisition Cost / Bird is calculated automatically from total cost and Opening Headcount.';
             }
         };
 
         farmType.addEventListener('change', sync);
         productionType.addEventListener('change', sync);
         acquisitionType.addEventListener('change', sync);
-
-        if (openingHeadcount) {
-            openingHeadcount.addEventListener('input', recalc);
-        }
-
-        if (unitPrice) {
-            unitPrice.addEventListener('input', function () {
-                totalManuallyEdited = false;
-                recalc();
-            });
-        }
 
         sync();
     });

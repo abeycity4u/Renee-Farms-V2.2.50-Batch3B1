@@ -63,10 +63,8 @@ $createCycleForm = [
     'start_date' => '',
     'expected_end_date' => '',
     'opening_headcount' => '0',
-    'bird_unit_cost' => '',
     'start_age_days' => '1',
     'poultry_acquisition_type' => 'purchased',
-    'poultry_unit_price' => '',
     'poultry_total_cost' => '',
     'poultry_source_name' => '',
     'poultry_reference_no' => '',
@@ -106,10 +104,8 @@ try {
             $startDate = trim((string)($_POST['start_date'] ?? ''));
             $expectedEndDate = trim((string)($_POST['expected_end_date'] ?? ''));
             $openingHeadcountRaw = trim((string)($_POST['opening_headcount'] ?? '0'));
-            $birdUnitCostRaw = trim((string)($_POST['bird_unit_cost'] ?? ''));
             $startAgeDaysRaw = trim((string)($_POST['start_age_days'] ?? '1'));
             $poultryAcquisitionType = strtolower(trim((string)($_POST['poultry_acquisition_type'] ?? '')));
-            $poultryUnitPriceRaw = trim((string)($_POST['poultry_unit_price'] ?? ''));
             $poultryTotalCostRaw = trim((string)($_POST['poultry_total_cost'] ?? ''));
             $poultrySourceName = trim((string)($_POST['poultry_source_name'] ?? ''));
             $poultryReferenceNo = trim((string)($_POST['poultry_reference_no'] ?? ''));
@@ -124,10 +120,8 @@ try {
                 'start_date' => $startDate,
                 'expected_end_date' => $expectedEndDate,
                 'opening_headcount' => $openingHeadcountRaw,
-                'bird_unit_cost' => $birdUnitCostRaw,
                 'start_age_days' => $startAgeDaysRaw,
                 'poultry_acquisition_type' => $poultryAcquisitionType,
-                'poultry_unit_price' => $poultryUnitPriceRaw,
                 'poultry_total_cost' => $poultryTotalCostRaw,
                 'poultry_source_name' => $poultrySourceName,
                 'poultry_reference_no' => $poultryReferenceNo,
@@ -146,24 +140,27 @@ try {
                     $startAgeDaysRaw,
                     FILTER_VALIDATE_INT
                 );
-            $poultryUnitPrice = $poultryUnitPriceRaw === ''
-                ? null
-                : filter_var($poultryUnitPriceRaw, FILTER_VALIDATE_FLOAT);
             $poultryTotalCost = $poultryTotalCostRaw === ''
                 ? null
                 : filter_var($poultryTotalCostRaw, FILTER_VALIDATE_FLOAT);
 
+            /*
+             * New poultry-cycle economics have one authoritative input:
+             * total acquisition cost.
+             *
+             * Bird Cost Basis remains an internal mortality-valuation fact
+             * and is derived from total acquisition cost / opening flock.
+             */
+            $derivedBirdUnitCost = null;
             if (
-                $poultryTotalCost === null
-                && $poultryUnitPrice !== null
-                && $poultryUnitPrice !== false
+                $farmType === 'poultry'
+                && $poultryTotalCost !== null
+                && $poultryTotalCost !== false
                 && $openingHeadcountForPricing !== false
-                && (int)$openingHeadcountForPricing > 0
             ) {
-                $poultryTotalCost = round(
-                    ((float)$poultryUnitPrice)
-                    * ((int)$openingHeadcountForPricing),
-                    2
+                $derivedBirdUnitCost = poultry_acquisition_cost_per_bird(
+                    (float)$poultryTotalCost,
+                    (int)$openingHeadcountForPricing
                 );
             }
 
@@ -189,21 +186,11 @@ try {
                 ];
             } elseif (
                 $farmType === 'poultry'
-                && $poultryUnitPriceRaw !== ''
-                && (
-                    $poultryUnitPrice === false
-                    || (float)$poultryUnitPrice < 0
-                )
-            ) {
-                $flash = [
-                    'type' => 'danger',
-                    'message' => 'Enter a valid unit purchase price.',
-                    'title' => 'Invalid poultry purchase price.',
-                ];
-            } elseif (
-                $farmType === 'poultry'
                 && $poultryTotalCostRaw !== ''
-                && $poultryTotalCost === false
+                && (
+                    $poultryTotalCost === false
+                    || (float)$poultryTotalCost < 0
+                )
             ) {
                 $flash = [
                     'type' => 'danger',
@@ -238,9 +225,7 @@ try {
                                     $openingHeadcountRaw,
 
                                 'bird_unit_cost' =>
-                                    $farmType === 'poultry'
-                                        ? $birdUnitCostRaw
-                                        : null,
+                                    $derivedBirdUnitCost,
 
                                 'notes' =>
                                     $notes,
@@ -326,11 +311,9 @@ try {
                             'start_date' => '',
                             'expected_end_date' => '',
                             'opening_headcount' => '0',
-                            'bird_unit_cost' => '',
-                            'start_age_days' => '1',
+                                                    'start_age_days' => '1',
                             'poultry_acquisition_type' => 'purchased',
-                            'poultry_unit_price' => '',
-                            'poultry_total_cost' => '',
+                                                    'poultry_total_cost' => '',
                             'poultry_source_name' => '',
                             'poultry_reference_no' => '',
                             'poultry_initial_phase' => 'rearing',
@@ -787,11 +770,6 @@ try {
                             <div class="mb-2"><label class="form-label">Start Date</label><input class="form-control" type="date" name="start_date" value="<?php echo htmlspecialchars($createCycleForm['start_date'], ENT_QUOTES); ?>" required></div>
                             <div class="mb-2"><label class="form-label">Expected End Date</label><input class="form-control" type="date" name="expected_end_date" value="<?php echo htmlspecialchars($createCycleForm['expected_end_date'], ENT_QUOTES); ?>"></div>
                             <div class="mb-2"><label class="form-label">Opening Headcount</label><input class="form-control" type="number" min="0" name="opening_headcount" value="<?php echo htmlspecialchars($createCycleForm['opening_headcount'], ENT_QUOTES); ?>"></div>
-                            <div class="mb-2" id="birdCostBasisWrap">
-                                <label class="form-label">Bird Cost Basis (₦ / bird)</label>
-                                <input class="form-control" type="number" min="0" step="0.01" name="bird_unit_cost" value="<?php echo htmlspecialchars($createCycleForm['bird_unit_cost'], ENT_QUOTES); ?>" placeholder="Optional">
-                                <div class="form-text">Poultry only. Used to value mortality; leave blank if no defensible bird cost is available.</div>
-                            </div>
                             <div class="mb-2"><label class="form-label">Start Age (days)</label><input class="form-control" type="number" min="1" name="start_age_days" value="<?php echo htmlspecialchars($createCycleForm['start_age_days'], ENT_QUOTES); ?>"></div>
 
                             <div id="poultryCycleOnboardingWrap" class="border rounded p-3 mb-3">
@@ -838,21 +816,8 @@ try {
                                 </div>
 
                                 <div class="row g-2">
-                                    <div class="col-md-6 mb-2">
-                                        <label class="form-label">Unit Purchase Price (₦ / bird)</label>
-                                        <input
-                                            class="form-control"
-                                            id="createPoultryUnitPrice"
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            name="poultry_unit_price"
-                                            value="<?php echo htmlspecialchars($createCycleForm['poultry_unit_price'], ENT_QUOTES); ?>"
-                                            placeholder="Optional helper"
-                                        >
-                                    </div>
-                                    <div class="col-md-6 mb-2">
-                                        <label class="form-label">Total Bird Acquisition Amount (₦)</label>
+                                    <div class="col-12 mb-2">
+                                        <label class="form-label">Total Acquisition Cost (₦)</label>
                                         <input
                                             class="form-control"
                                             id="createPoultryTotalCost"
@@ -865,7 +830,9 @@ try {
                                     </div>
                                 </div>
                                 <div class="form-text mb-2" id="createPoultryCostHelp">
-                                    Purchased entries require the actual total bird acquisition amount.
+                                    Purchased entries require the actual total acquisition cost.
+                                    Acquisition Cost / Bird (₦) is calculated automatically from this
+                                    amount and Opening Headcount.
                                 </div>
 
                                 <div class="row g-2">
