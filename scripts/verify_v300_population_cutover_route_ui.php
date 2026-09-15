@@ -54,7 +54,7 @@ $routeStart = strpos(
 
 $routeEnd = strpos(
     $source,
-    "if (\$action === 'close_cycle')",
+    "\n    }\n\n    if (\$cycleTableExists) {",
     $routeStart !== false ? $routeStart : 0
 );
 
@@ -190,9 +190,23 @@ if ($route !== null) {
 }
 
 $check(
-    strpos($source, 'production_population_state(') !== false
-    && strpos($source, '$populationCutoverCycles[] = $cycle;') !== false,
-    'cutover eligibility is derived from canonical population state'
+    strpos(
+        $source,
+        'production_population_intelligence_cycle_snapshot('
+    ) !== false
+    && strpos(
+        $source,
+        "\$cycle['population_snapshot']['tracking_status']"
+    ) !== false
+    && strpos(
+        $source,
+        "=== 'canonical'"
+    ) !== false
+    && strpos(
+        $source,
+        '$populationCutoverCycles[] = $cycle;'
+    ) !== false,
+    'cutover eligibility is derived from shared population intelligence tracking status'
 );
 
 $check(
@@ -200,16 +214,32 @@ $check(
     'population cutover UI section is isolated and discoverable'
 );
 
+$check(
+    preg_match(
+        '/\(isPlatformOwner\(\)\s*\|\|\s*hasRole\(\s*[\'"]farm_admin[\'"]\s*\)\)'
+        . '\s*&&\s*\(\s*!\$populationBaselineTableExists'
+        . '\s*\|\|\s*!empty\(\$populationCutoverCycles\)\s*\)/s',
+        $source
+    ) === 1,
+    'cutover card appears only when the foundation is missing or an active cycle requires cutover'
+);
+
+$check(
+    strpos(
+        $source,
+        'Every active production cycle is already under V3 population tracking'
+    ) === false,
+    'fully tracked farms do not receive a permanent cutover success card'
+);
+
 if ($ui !== null) {
     $check(
-        strpos(
-            substr(
-                $source,
-                max(0, $uiStart - 200),
-                250
-            ),
-            "isPlatformOwner() || hasRole('farm_admin')"
-        ) !== false,
+        preg_match(
+            '/\(isPlatformOwner\(\)\s*\|\|\s*'
+            . 'hasRole\(\s*[\'"]farm_admin[\'"]\s*\)\)'
+            . '\s*&&\s*\(/s',
+            $source
+        ) === 1,
         'cutover management card is rendered only for privileged cycle managers'
     );
 

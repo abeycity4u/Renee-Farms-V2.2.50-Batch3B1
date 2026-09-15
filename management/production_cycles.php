@@ -989,7 +989,13 @@ try {
 
         </div>
 
-        <?php if (isPlatformOwner() || hasRole('farm_admin')): ?>
+        <?php if (
+            (isPlatformOwner() || hasRole('farm_admin'))
+            && (
+                !$populationBaselineTableExists
+                || !empty($populationCutoverCycles)
+            )
+        ): ?>
             <div class="card mb-3" id="population-cutover">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <strong>V3 Population Cutover</strong>
@@ -1017,11 +1023,6 @@ try {
                         <div class="alert alert-danger mb-0">
                             <strong>V3 population foundation is not available.</strong>
                             Run the database migrations before confirming a population cutover.
-                        </div>
-                    <?php elseif (empty($populationCutoverCycles)): ?>
-                        <div class="alert alert-info mb-0">
-                            Every active production cycle is already under V3 population tracking,
-                            or there is no active cycle requiring cutover.
                         </div>
                     <?php else: ?>
                         <form method="post" class="row g-3">
