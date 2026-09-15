@@ -603,18 +603,22 @@ $confirmationText .=
             <div class="card workspace-stat h-100">
                 <div class="card-body">
                     <div class="text-muted small">
-                        Expected End
+                        Bird Cost Basis
                     </div>
 
                     <div class="value">
                         <?php
                         echo htmlspecialchars(
-                            (string)(
-                                $cycle['expected_end_date']
-                                ?? '-'
+                            $moneyOrDash(
+                                $cycle['bird_unit_cost']
+                                ?? null
                             )
                         );
                         ?>
+                    </div>
+
+                    <div class="small text-muted">
+                        Mortality valuation basis
                     </div>
                 </div>
             </div>
@@ -630,7 +634,7 @@ $confirmationText .=
         <div class="card-body">
             <div class="row g-3">
 
-                <div class="col-md-3">
+                <div class="col-6 col-lg">
                     <div class="text-muted small">
                         Cycle Start
                     </div>
@@ -644,7 +648,24 @@ $confirmationText .=
                     </strong>
                 </div>
 
-                <div class="col-md-3">
+                <div class="col-6 col-lg">
+                    <div class="text-muted small">
+                        Expected End
+                    </div>
+
+                    <strong>
+                        <?php
+                        echo htmlspecialchars(
+                            (string)(
+                                $cycle['expected_end_date']
+                                ?? '-'
+                            )
+                        );
+                        ?>
+                    </strong>
+                </div>
+
+                <div class="col-6 col-lg">
                     <div class="text-muted small">
                         Opening Headcount
                     </div>
@@ -658,7 +679,7 @@ $confirmationText .=
                     </strong>
                 </div>
 
-                <div class="col-md-3">
+                <div class="col-6 col-lg">
                     <div class="text-muted small">
                         Production End
                     </div>
@@ -675,7 +696,7 @@ $confirmationText .=
                     </strong>
                 </div>
 
-                <div class="col-md-3">
+                <div class="col-6 col-lg">
                     <div class="text-muted small">
                         Closing Headcount
                     </div>
