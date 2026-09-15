@@ -337,12 +337,16 @@ $check(
     && strpos(
         $legacy,
         "if (\$action === 'record_poultry_acquisition')"
-    ) !== false
+    ) === false
+    && strpos(
+        $legacy,
+        "if (\$action === 'set_initial_poultry_phase')"
+    ) === false
     && strpos(
         $legacy,
         "if (\$action === 'transition_poultry_phase')"
     ) !== false,
-    'legacy direct cycle-close fallback is retired while controlled cutover and historical poultry maintenance remain available'
+    'legacy cycle-close and duplicate initial-onboarding paths are retired while controlled cutover and lifecycle transition remain available'
 );
 
 $check(

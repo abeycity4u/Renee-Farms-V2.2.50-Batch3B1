@@ -163,20 +163,28 @@ if ($toolsSection !== null) {
         strpos(
             $toolsSection,
             'value="record_poultry_acquisition"'
+        ) === false
+        && strpos(
+            $toolsSection,
+            '<strong>Poultry Acquisition History</strong>'
+        ) !== false
+        && strpos(
+            $toolsSection,
+            'value="void_poultry_acquisition"'
         ) !== false,
-        'poultry acquisition maintenance remains available inside maintenance tools'
+        'duplicate flock entry is retired while acquisition history and correction remain available'
     );
 
     $check(
         strpos(
             $toolsSection,
             'value="set_initial_poultry_phase"'
-        ) !== false
-        || strpos(
+        ) === false
+        && strpos(
             $toolsSection,
             'value="transition_poultry_phase"'
         ) !== false,
-        'poultry lifecycle maintenance remains available inside maintenance tools'
+        'duplicate initial phase is retired while lifecycle transition remains available'
     );
 } else {
     for ($i = 0; $i < 6; $i++) {

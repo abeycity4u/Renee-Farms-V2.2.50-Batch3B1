@@ -209,19 +209,19 @@ $check(
     strpos(
         $page,
         'value="record_poultry_acquisition"'
-    ) !== false
+    ) === false
     && strpos(
         $page,
         'value="void_poultry_acquisition"'
     ) !== false,
-    'legacy acquisition setup/correction remains available for existing cycles'
+    'Create Cycle owns initial flock entry while controlled acquisition correction remains available'
 );
 
 $check(
     strpos(
         $page,
         'value="set_initial_poultry_phase"'
-    ) !== false
+    ) === false
     && strpos(
         $page,
         'value="transition_poultry_phase"'
@@ -230,7 +230,7 @@ $check(
         $page,
         'value="end_poultry_phase"'
     ) !== false,
-    'legacy lifecycle completion/transition tools remain available'
+    'Create Cycle owns the initial biological stage while transition and terminal-phase controls remain available'
 );
 
 $check(

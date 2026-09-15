@@ -18,9 +18,6 @@ document.addEventListener('DOMContentLoaded', function () {
         } else if (action === 'update_bird_cost_basis') {
             const card = form.closest('.card');
             if (card) card.remove();
-        } else if (action === 'record_poultry_acquisition') {
-            const col = form.closest('.col-lg-5');
-            if (col) col.remove();
         }
     });
 

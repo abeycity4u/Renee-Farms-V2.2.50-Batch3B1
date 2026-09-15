@@ -435,60 +435,6 @@ try {
             }
         }
 
-        if ($action === 'record_poultry_acquisition') {
-            if (!$poultryAcquisitionTableExists || !$poultryAcquisitionCorrectionReady) {
-                $flash = ['type' => 'danger', 'title' => 'Acquisition migration required.', 'message' => 'Run the database migrations before recording poultry flock entry/acquisition.'];
-            } else {
-                $cycleId = (int)($_POST['cycle_id'] ?? 0);
-                $acquisitionType = strtolower(trim((string)($_POST['acquisition_type'] ?? '')));
-                $acquisitionDate = trim((string)($_POST['acquisition_date'] ?? ''));
-                $quantityRaw = trim((string)($_POST['acquisition_quantity'] ?? ''));
-                $ageDaysRaw = trim((string)($_POST['age_days'] ?? ''));
-                $unitPriceRaw = trim((string)($_POST['unit_price'] ?? ''));
-                $totalCostRaw = trim((string)($_POST['total_cost'] ?? ''));
-                $requestToken = strtolower(trim((string)($_POST['request_token'] ?? '')));
-                $sourceName = trim((string)($_POST['source_name'] ?? ''));
-                $referenceNo = trim((string)($_POST['reference_no'] ?? ''));
-                $acquisitionNotes = trim((string)($_POST['acquisition_notes'] ?? ''));
-
-                $quantity = filter_var($quantityRaw, FILTER_VALIDATE_INT);
-                $ageDays = filter_var($ageDaysRaw, FILTER_VALIDATE_INT);
-                $unitPrice = $unitPriceRaw === '' ? null : filter_var($unitPriceRaw, FILTER_VALIDATE_FLOAT);
-                $totalCost = $totalCostRaw === '' ? null : filter_var($totalCostRaw, FILTER_VALIDATE_FLOAT);
-                if ($totalCost === null && $unitPrice !== null && $unitPrice !== false && $quantity !== false) {
-                    $totalCost = round(((float)$unitPrice) * ((int)$quantity), 2);
-                }
-                try {
-                    if ($quantity === false) { throw new InvalidArgumentException('Acquisition quantity must be a whole number greater than 0.'); }
-                    if ($ageDays === false) { throw new InvalidArgumentException('Age at acquisition must be a whole number of days.'); }
-                    if ($unitPriceRaw !== '' && ($unitPrice === false || (float)$unitPrice < 0)) { throw new InvalidArgumentException('Enter a valid unit purchase price.'); }
-                    if ($totalCostRaw !== '' && $totalCost === false) { throw new InvalidArgumentException('Enter a valid total acquisition amount.'); }
-                    poultry_acquisition_record(
-                        $pdo,
-                        $tenantFarmId,
-                        $cycleId,
-                        $acquisitionType,
-                        $acquisitionDate,
-                        (int)$quantity,
-                        (int)$ageDays,
-                        $totalCost === null ? null : (float)$totalCost,
-                        $sourceName,
-                        $referenceNo,
-                        $acquisitionNotes,
-                        isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null,
-                        $requestToken
-                    );
-                    $_SESSION['success'] = 'Poultry acquisition recorded. The flock entry fact was saved once without changing Inventory, Expenses, period profitability, bird cost basis, or lifecycle history.';
-                    header('Location: ' . BASE_URL . '/management/production_cycles.php#poultry-entry-acquisition');
-                    exit();
-                } catch (Throwable $e) {
-                    $safeMessage = ($e instanceof InvalidArgumentException || $e instanceof PoultryAcquisitionException) ? $e->getMessage() : 'The poultry acquisition could not be saved. No acquisition history was changed.';
-                    if (!($e instanceof InvalidArgumentException) && !($e instanceof PoultryAcquisitionException)) { error_log('Poultry acquisition record failed: ' . $e->getMessage()); }
-                    $flash = ['type' => 'danger', 'title' => 'Poultry acquisition was not saved.', 'message' => $safeMessage];
-                }
-            }
-        }
-
         if ($action === 'void_poultry_acquisition') {
             if (!$poultryAcquisitionTableExists || !$poultryAcquisitionCorrectionReady) {
                 $flash = ['type' => 'danger', 'title' => 'Acquisition migration required.', 'message' => 'Run the database migrations before correcting poultry acquisition history.'];
@@ -504,25 +450,6 @@ try {
                     $safeMessage = ($e instanceof InvalidArgumentException || $e instanceof PoultryAcquisitionException) ? $e->getMessage() : 'The acquisition entry could not be voided. No acquisition history was changed.';
                     if (!($e instanceof InvalidArgumentException) && !($e instanceof PoultryAcquisitionException)) { error_log('Poultry acquisition void failed: ' . $e->getMessage()); }
                     $flash = ['type' => 'danger', 'title' => 'Acquisition entry was not voided.', 'message' => $safeMessage];
-                }
-            }
-        }
-
-        if ($action === 'set_initial_poultry_phase') {
-            if (!$poultryPhaseTableExists) {
-                $flash = ['type' => 'danger', 'title' => 'Lifecycle migration required.', 'message' => 'Run the database migrations before recording poultry lifecycle history.'];
-            } else {
-                $cycleId = (int)($_POST['cycle_id'] ?? 0);
-                $phase = strtolower(trim((string)($_POST['phase'] ?? '')));
-                $startDate = trim((string)($_POST['phase_start_date'] ?? ''));
-                $phaseNotes = trim((string)($_POST['phase_notes'] ?? ''));
-                try {
-                    poultry_lifecycle_record_initial_phase($pdo, $tenantFarmId, $cycleId, $phase, $startDate, $phaseNotes, isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null);
-                    $flash = ['type' => 'success', 'title' => 'Lifecycle history started.', 'message' => 'The initial poultry biological phase was recorded explicitly. No historical phase was inferred.'];
-                } catch (Throwable $e) {
-                    $safeMessage = ($e instanceof InvalidArgumentException || $e instanceof PoultryLifecycleException) ? $e->getMessage() : 'The lifecycle phase could not be saved. No lifecycle history was changed.';
-                    if (!($e instanceof InvalidArgumentException) && !($e instanceof PoultryLifecycleException)) { error_log('Initial poultry lifecycle phase failed: ' . $e->getMessage()); }
-                    $flash = ['type' => 'danger', 'title' => 'Lifecycle phase was not saved.', 'message' => $safeMessage];
                 }
             }
         }
@@ -1226,11 +1153,11 @@ try {
 
         <div class="card mb-3" id="poultry-entry-acquisition">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <strong>Poultry Entry / Acquisition</strong>
+                <strong>Poultry Acquisition History</strong>
                 
             </div>
             <div class="card-body">
-                <p class="text-muted small mb-3">Records how this farm actually received the flock. Broilers may enter at day-old, 2 weeks, 4 weeks, or another known age. Layer Point-of-Lay purchase is recorded explicitly. Acquisition does not post Inventory or Expense transactions and does not alter period profitability or Bird Cost Basis.</p>
+                <p class="text-muted small mb-3">The starting flock for new poultry cycles is recorded once during Create Cycle. This section keeps the resulting acquisition history visible for audit and controlled correction; it does not provide a second flock-entry path.</p>
                 <?php if (!$poultryAcquisitionTableExists): ?>
                     <div class="alert alert-warning mb-0">
                         <strong>Poultry acquisition migration is not available.</strong> Run <code>php scripts/run_migrations.php</code> before recording flock entry facts.
@@ -1267,49 +1194,7 @@ try {
                     </div>
 
                     <div class="row g-3">
-                        <div class="col-lg-5">
-                            <div class="border rounded p-3 h-100">
-                                <h6>Record Flock Entry</h6>
-                                <p class="text-muted small">Use the bird age actually received by this farm. For Broilers, 1 = day-old, 14 = 2 weeks, 28 = 4 weeks. Do not invent an earlier rearing history.</p>
-                                <form method="post" data-confirm="Record this poultry flock acquisition/entry fact?" data-confirm-title="Confirm flock entry" data-confirm-button="Record entry">
-                                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>">
-                                    <input type="hidden" name="action" value="record_poultry_acquisition">
-                                    <input type="hidden" name="request_token" value="<?php echo htmlspecialchars(bin2hex(random_bytes(24)), ENT_QUOTES); ?>">
-                                    <div class="mb-2">
-                                        <label class="form-label">Poultry Cycle</label>
-                                        <select class="form-select" name="cycle_id" id="acquisitionCycle" required>
-                                            <option value="">Select poultry cycle</option>
-                                            <?php foreach ($poultryCycles as $cycle): ?>
-                                                <option value="<?php echo (int)$cycle['id']; ?>" data-production-type="<?php echo htmlspecialchars($cycle['production_type'], ENT_QUOTES); ?>"><?php echo htmlspecialchars($cycle['cycle_code'] . ' — ' . ucfirst($cycle['production_type'])); ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-                                    <div class="mb-2">
-                                        <label class="form-label">Entry / Acquisition Type</label>
-                                        <select class="form-select" name="acquisition_type" id="acquisitionType" required>
-                                            <option value="">Select type</option>
-                                            <option value="purchased">Purchased birds (external purchase)</option>
-                                            <option value="purchased_point_of_lay" data-layer-only="1">Purchased Point-of-Lay (Layer only)</option>
-                                            <option value="internal_transfer">Farm-raised / internal transfer</option>
-                                        </select>
-                                    </div>
-                                    <div class="row g-2">
-                                        <div class="col-md-6 mb-2"><label class="form-label">Acquisition Date</label><input class="form-control" type="date" name="acquisition_date" required></div>
-                                        <div class="col-md-6 mb-2"><label class="form-label">Quantity Received</label><input class="form-control" type="number" min="1" step="1" name="acquisition_quantity" required></div>
-                                    </div>
-                                    <div class="row g-2">
-                                        <div class="col-md-6 mb-2"><label class="form-label">Age at Acquisition (days)</label><input class="form-control" type="number" min="1" step="1" name="age_days" required><div class="form-text">Use actual age; no DOC assumption.</div></div>
-                                        <div class="col-md-6 mb-2"><label class="form-label">Unit Purchase Price (₦ / bird)</label><input class="form-control" id="acquisitionUnitPrice" type="number" min="0" step="0.01" name="unit_price"><div class="form-text">Optional helper. Enter the supplier's price per bird if quoted that way.</div></div>
-                                    </div>
-                                    <div class="mb-2"><label class="form-label">Total Bird Acquisition Amount (₦)</label><input class="form-control" id="acquisitionTotalCost" type="number" min="0" step="0.01" name="total_cost"><div class="form-text"><strong>This is the total amount for all birds, not the unit price.</strong> For purchases it is required; when Quantity + Unit Price are entered, this field is calculated automatically and may be adjusted to the actual invoice total.</div></div>
-                                    <div class="mb-2"><label class="form-label">Source / Supplier</label><input class="form-control" maxlength="190" name="source_name" placeholder="Optional supplier or source"></div>
-                                    <div class="mb-2"><label class="form-label">Reference</label><input class="form-control" maxlength="120" name="reference_no" placeholder="Optional invoice, receipt or delivery reference"></div>
-                                    <div class="mb-2"><label class="form-label">Notes</label><textarea class="form-control" name="acquisition_notes" rows="2" placeholder="Optional management context"></textarea></div>
-                                    <button class="btn btn-primary w-100" type="submit">Record Flock Entry</button>
-                                </form>
-                            </div>
-                        </div>
-                        <div class="col-lg-7">
+                        <div class="col-12">
                             <div class="border rounded p-3 h-100">
                                 <h6>Recorded Acquisition History</h6>
                                 <p class="text-muted small">History is auditable. Erroneous entries are voided rather than deleted; voided rows remain visible and are excluded from active acquisition totals. It is not inferred from opening stock, Bird Cost Basis, Daily Records, Inventory, Expenses, or lifecycle phases.</p>
@@ -1333,7 +1218,7 @@ try {
                                             <?php endforeach; ?>
                                         <?php endforeach; ?>
                                         <?php if ($acquisitionRows === 0): ?>
-                                            <tr><td colspan="8" class="text-center text-muted py-3">No poultry acquisition history has been recorded. Existing cycles remain explicitly unknown until management records known entry facts.</td></tr>
+                                            <tr><td colspan="8" class="text-center text-muted py-3">No poultry acquisition history is recorded for this legacy cycle. New V3 poultry cycles record the starting flock during Create Cycle.</td></tr>
                                         <?php endif; ?>
                                         </tbody>
                                     </table>
@@ -1427,45 +1312,7 @@ try {
                     </div>
 
                     <div class="row g-3">
-                        <div class="col-lg-4">
-                            <div class="border rounded p-3 h-100">
-                                <h6>Set Initial Phase</h6>
-                                <p class="text-muted small">Use only when this cycle has no lifecycle history. Existing cycles are deliberately not backfilled automatically.</p>
-                                <form method="post">
-                                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>">
-                                    <input type="hidden" name="action" value="set_initial_poultry_phase">
-                                    <div class="mb-2">
-                                        <label class="form-label">Cycle</label>
-                                        <select class="form-select" name="cycle_id" required>
-                                            <option value="">Select cycle</option>
-                                            <?php foreach ($poultryCycles as $cycle): ?>
-                                                <?php if (!empty($poultryPhaseHistoryByCycle[(int)$cycle['id']])) continue; ?>
-                                                <option value="<?php echo (int)$cycle['id']; ?>"><?php echo htmlspecialchars($cycle['cycle_code'] . ' — ' . ucfirst($cycle['production_type'])); ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-                                    <div class="mb-2">
-                                        <label class="form-label">Biological Phase</label>
-                                        <select class="form-select" name="phase" required>
-                                            <option value="">Select phase</option>
-                                            <optgroup label="Layer">
-                                                <option value="rearing">Rearing</option>
-                                                <option value="production">Production</option>
-                                            </optgroup>
-                                            <optgroup label="Broiler">
-                                                <option value="growing">Growing / Rearing</option>
-                                                <option value="harvest">Harvest / Sale</option>
-                                            </optgroup>
-                                        </select>
-                                    </div>
-                                    <div class="mb-2"><label class="form-label">Phase Start Date</label><input class="form-control" type="date" name="phase_start_date" required></div>
-                                    <div class="mb-2"><label class="form-label">Notes</label><textarea class="form-control" name="phase_notes" rows="2" placeholder="Optional management context"></textarea></div>
-                                    <button class="btn btn-primary w-100" type="submit">Record Initial Phase</button>
-                                </form>
-                            </div>
-                        </div>
-
-                        <div class="col-lg-4">
+                        <div class="col-lg-6">
                             <div class="border rounded p-3 h-100">
                                 <h6>Record Phase Transition</h6>
                                 <p class="text-muted small">A transition closes the current phase on the previous day and appends the new phase. History is not rewritten.</p>
@@ -1501,7 +1348,7 @@ try {
                             </div>
                         </div>
 
-                        <div class="col-lg-4">
+                        <div class="col-lg-6">
                             <div class="border rounded p-3 h-100">
                                 <h6>End Current Phase</h6>
                                 <p class="text-muted small">Use for a terminal biological phase such as Layer Production or Broiler Harvest / Sale. This does not close the production cycle.</p>
@@ -1547,7 +1394,7 @@ try {
                                 <?php endforeach; ?>
                             <?php endforeach; ?>
                             <?php if ($phaseHistoryRows === 0): ?>
-                                <tr><td colspan="5" class="text-center text-muted py-3">No poultry lifecycle history has been recorded. Existing cycles remain explicitly undefined until management records known history.</td></tr>
+                                <tr><td colspan="5" class="text-center text-muted py-3">No poultry lifecycle history is recorded for this legacy cycle. New V3 poultry cycles record the starting biological stage during Create Cycle.</td></tr>
                             <?php endif; ?>
                             </tbody>
                         </table>

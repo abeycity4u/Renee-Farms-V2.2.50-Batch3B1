@@ -175,42 +175,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 })();
 
-(function () {
-    const cycle = document.getElementById('acquisitionCycle');
-    const type = document.getElementById('acquisitionType');
-    if (!cycle || !type) return;
-    const sync = function () {
-        const selected = cycle.options[cycle.selectedIndex];
-        const productionType = selected ? selected.getAttribute('data-production-type') : '';
-        Array.from(type.options).forEach(function (option) {
-            if (option.getAttribute('data-layer-only') === '1') {
-                option.hidden = productionType === 'broiler';
-                option.disabled = productionType === 'broiler';
-                if (productionType === 'broiler' && option.selected) type.value = '';
-            }
-        });
-    };
-    cycle.addEventListener('change', sync);
-    sync();
-})();
-
-(function () {
-    const qty = document.querySelector('input[name="acquisition_quantity"]');
-    const unit = document.getElementById('acquisitionUnitPrice');
-    const total = document.getElementById('acquisitionTotalCost');
-    if (!qty || !unit || !total) return;
-    let totalManuallyEdited = false;
-    total.addEventListener('input', function () { totalManuallyEdited = total.value !== ''; });
-    const recalc = function () {
-        if (totalManuallyEdited) return;
-        const q = Number(qty.value);
-        const u = Number(unit.value);
-        if (q > 0 && u >= 0 && unit.value !== '') total.value = (q * u).toFixed(2);
-        else if (!unit.value) total.value = '';
-    };
-    qty.addEventListener('input', recalc);
-    unit.addEventListener('input', function () { totalManuallyEdited = false; recalc(); });
-})();
 
 /**
  * Keep the long setup/maintenance area out of the way by default while still
