@@ -812,13 +812,13 @@ try {
                 <summary class="card-header">
                     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
                         <div>
-                            <strong>Setup &amp; Maintenance</strong>
+                            <strong>Create New Cycle</strong>
                             <div class="small text-muted">
-                                Create a cycle, set up population tracking,
-                                and maintain poultry cycle information.
+                                Start a new production cycle here. Existing-cycle corrections
+                                and history stay under Advanced Maintenance.
                             </div>
                         </div>
-                        <span class="badge bg-secondary">Open tools</span>
+                        <span class="badge bg-secondary">Open</span>
                     </div>
                 </summary>
 
@@ -988,6 +988,39 @@ try {
             </div>
 
         </div>
+
+                    <details
+                        class="card mb-3"
+                        id="cycle-maintenance-tools"
+                        <?php echo (
+                            $flash !== null
+                            && in_array(
+                                (string)($_POST['action'] ?? ''),
+                                [
+                                    'confirm_population_cutover',
+                                    'update_bird_cost_basis',
+                                    'void_poultry_acquisition',
+                                    'transition_poultry_phase',
+                                    'end_poultry_phase',
+                                ],
+                                true
+                            )
+                        ) ? 'open' : ''; ?>
+                    >
+                        <summary class="card-header">
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                <div>
+                                    <strong>Advanced Maintenance &amp; History</strong>
+                                    <div class="small text-muted">
+                                        Population setup, cost corrections, acquisition audit,
+                                        and poultry lifecycle changes.
+                                    </div>
+                                </div>
+                                <span class="badge bg-secondary">Open maintenance</span>
+                            </div>
+                        </summary>
+
+                        <div class="card-body">
 
         <?php if (
             (isPlatformOwner() || hasRole('farm_admin'))
@@ -1403,6 +1436,9 @@ try {
                 <?php endif; ?>
             </div>
         </div>
+
+                        </div>
+                    </details>
 
                 </div>
             </details>

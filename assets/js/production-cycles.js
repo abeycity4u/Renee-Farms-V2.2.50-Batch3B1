@@ -177,12 +177,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 /**
- * Keep the long setup/maintenance area out of the way by default while still
- * opening it when an admin deliberately targets one of its tools.
+ * Keep the cycle workspaces out of the way by default while still opening
+ * the exact workspace an admin deliberately targets.
  */
 (function () {
     const openTargetedCycleTools = function () {
         const tools = document.getElementById('cycle-tools');
+        const maintenanceTools = document.getElementById('cycle-maintenance-tools');
+
         if (!tools || !window.location.hash) return;
 
         let target = null;
@@ -195,6 +197,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (target && tools.contains(target)) {
             tools.open = true;
+        }
+
+        if (
+            target
+            && maintenanceTools
+            && maintenanceTools.contains(target)
+        ) {
+            maintenanceTools.open = true;
         }
     };
 

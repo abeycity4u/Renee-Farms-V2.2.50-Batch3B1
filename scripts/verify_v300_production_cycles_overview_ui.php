@@ -62,6 +62,10 @@ $pageCompact = preg_replace('/\s+/', ' ', $page) ?? $page;
 $jsCompact = preg_replace('/\s+/', ' ', $js) ?? $js;
 
 $toolsMarker = strpos($page, 'id="cycle-tools"');
+$maintenanceMarker = strpos(
+    $page,
+    'id="cycle-maintenance-tools"'
+);
 $recentMarker = strpos($page, 'id="recent-cycles"');
 $createMarker = strpos($page, 'id="create-cycle"');
 
@@ -97,16 +101,38 @@ $check(
 );
 
 $check(
-    strpos($page, 'Setup &amp; Maintenance') !== false
-    && strpos($page, 'Open tools') !== false,
-    'collapsed maintenance area has a clear user-facing label'
+    strpos($page, 'Create New Cycle') !== false
+    && strpos(
+        $page,
+        'Advanced Maintenance &amp; History'
+    ) !== false,
+    'creation and advanced-maintenance workspaces have clear user-facing labels'
 );
 
 $check(
     $createMarker !== false
     && $toolsMarker !== false
     && $createMarker > $toolsMarker,
-    'Create Cycle form lives inside the maintenance area'
+    'Create Cycle form remains inside the privileged cycle workspace'
+);
+
+$check(
+    $maintenanceMarker !== false
+    && $createMarker !== false
+    && $recentMarker !== false
+    && $maintenanceMarker > $createMarker
+    && $maintenanceMarker < $recentMarker,
+    'advanced maintenance is nested after Create Cycle and before the cycle list'
+);
+
+$check(
+    $maintenanceMarker !== false
+    && strpos(
+        $page,
+        '<details',
+        max(0, $maintenanceMarker - 250)
+    ) !== false,
+    'advanced maintenance is independently collapsible'
 );
 
 $check(
@@ -240,7 +266,23 @@ $check(
         $jsCompact,
         'tools.open = true'
     ) !== false,
-    'New Cycle action deliberately opens the maintenance area'
+    'New Cycle action deliberately opens the Create Cycle workspace'
+);
+
+$check(
+    strpos(
+        $jsCompact,
+        "document.getElementById('cycle-maintenance-tools')"
+    ) !== false
+    && strpos(
+        $jsCompact,
+        'maintenanceTools.contains(target)'
+    ) !== false
+    && strpos(
+        $jsCompact,
+        'maintenanceTools.open = true'
+    ) !== false,
+    'maintenance deep links open the nested maintenance workspace'
 );
 
 $check(
@@ -264,7 +306,31 @@ $check(
         $page,
         "<?php echo \$flash !== null ? 'open' : ''; ?>"
     ) !== false,
-    'validation/error feedback automatically keeps maintenance tools open'
+    'validation/error feedback automatically keeps the outer cycle workspace open'
+);
+
+$check(
+    strpos(
+        $page,
+        "'confirm_population_cutover'"
+    ) !== false
+    && strpos(
+        $page,
+        "'update_bird_cost_basis'"
+    ) !== false
+    && strpos(
+        $page,
+        "'transition_poultry_phase'"
+    ) !== false
+    && strpos(
+        $page,
+        "'end_poultry_phase'"
+    ) !== false
+    && strpos(
+        $page,
+        ") ? 'open' : ''; ?>"
+    ) !== false,
+    'maintenance feedback can reopen the nested maintenance workspace'
 );
 
 echo "\nChecks: {$checks}\n";
