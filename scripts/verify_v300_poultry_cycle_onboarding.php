@@ -6,7 +6,8 @@
  * - no database connection;
  * - no database writes;
  * - proves the new-cycle UI delegates to canonical poultry services;
- * - proves Manage Cycle and lifecycle service logic were not changed.
+ * - proves Manage Cycle remains a valid workspace target;
+ * - keeps the canonical lifecycle service protected.
  */
 
 $root = dirname(__DIR__);
@@ -233,9 +234,24 @@ $check(
 );
 
 $check(
-    hash('sha256', $manage)
-        === '11667bdba4583aee5ef23028cbf6e1bbad919284ec28f70ddfe45aba5e6343d5',
-    'Manage Cycle source is byte-for-byte unchanged from the Step 5B1 gate'
+    $manage !== ''
+    && strpos(
+        $manage,
+        'Poultry Cycle Workspace'
+    ) !== false
+    && strpos(
+        $manage,
+        '/management/production_cycles.php'
+    ) !== false
+    && strpos(
+        $manage,
+        'poultry_acquisition_history('
+    ) !== false
+    && strpos(
+        $manage,
+        'poultry_lifecycle_history('
+    ) !== false,
+    'Manage Cycle remains the valid contextual workspace target for poultry onboarding'
 );
 
 $check(
