@@ -7,6 +7,7 @@ require_once(__DIR__ . '/../lib/poultry_cycle_lifecycle.php');
 require_once(__DIR__ . '/../lib/poultry_cycle_acquisition.php');
 require_once(__DIR__ . '/../lib/poultry_cycle_onboarding.php');
 require_once(__DIR__ . '/../lib/production_cycle_service.php');
+require_once(__DIR__ . '/../lib/production_population_intelligence.php');
 requireLogin();
 requireBusinessReportAccess();
 $tenantFarmId = requireCurrentFarmId();
@@ -72,70 +73,6 @@ $createCycleForm = [
     'poultry_initial_phase' => 'rearing',
     'notes' => '',
 ];
-
-/**
- * Estimate cycle current stock using latest daily record(s).
- */
-function getCycleCurrentStock(PDO $pdo, array $cycle): int
-{
-    $cycleId = (int)($cycle['id'] ?? 0);
-    $farmType = strtolower((string)($cycle['farm_type'] ?? ''));
-    $productionType = strtolower((string)($cycle['production_type'] ?? ''));
-
-    if ($cycleId <= 0) {
-        return 0;
-    }
-
-    if ($farmType === 'poultry' && $productionType === 'layer') {
-        $stmt = $pdo->prepare(
-            "SELECT opening_stock, mortality
-             FROM layer_daily_records
-             WHERE cycle_id = ?
-             ORDER BY record_date DESC, id DESC
-             LIMIT 1"
-        );
-        $stmt->execute([$cycleId]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        return $row ? max(0, (int)$row['opening_stock'] - (int)$row['mortality']) : 0;
-    }
-
-    if ($farmType === 'poultry' && $productionType === 'broiler') {
-        $stmt = $pdo->prepare(
-            "SELECT opening_stock, mortality
-             FROM broiler_daily_records
-             WHERE cycle_id = ?
-             ORDER BY record_date DESC, id DESC
-             LIMIT 1"
-        );
-        $stmt->execute([$cycleId]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        return $row ? max(0, (int)$row['opening_stock'] - (int)$row['mortality']) : 0;
-    }
-
-    if ($farmType === 'ruminant') {
-        $latestDateStmt = $pdo->prepare(
-            "SELECT MAX(record_date) FROM ruminant_daily_records WHERE cycle_id = ?"
-        );
-        $latestDateStmt->execute([$cycleId]);
-        $latestDate = $latestDateStmt->fetchColumn();
-        if (!$latestDate) {
-            return 0;
-        }
-
-        $sumStmt = $pdo->prepare(
-            "SELECT COALESCE(SUM(opening_stock - mortality), 0)
-             FROM ruminant_daily_records
-             WHERE cycle_id = ? AND record_date = ?"
-        );
-        $sumStmt->execute([$cycleId, $latestDate]);
-
-        return max(0, (int)$sumStmt->fetchColumn());
-    }
-
-    return 0;
-}
 
 try {
     $cycleTableExists = ($pdo->query("SHOW TABLES LIKE 'production_cycles'")->rowCount() > 0);
@@ -747,21 +684,32 @@ try {
         $activeStmt->execute([$tenantFarmId]);
         $activeCycles = $activeStmt->fetchAll(PDO::FETCH_ASSOC);
         foreach ($activeCycles as &$cycle) {
-            $cycle['current_stock'] = getCycleCurrentStock($pdo, $cycle);
-            $summary['total_current_stock'] += (int)$cycle['current_stock'];
+            $cycle['population_snapshot'] =
+                production_population_intelligence_cycle_snapshot(
+                    $pdo,
+                    $tenantFarmId,
+                    $cycle,
+                    null,
+                    $populationBaselineTableExists
+                );
+
+            $cycle['population_state'] =
+                $cycle['population_snapshot']['canonical_state'];
+
+            $cycle['current_stock'] =
+                (int)$cycle['population_snapshot']['quantity'];
+
+            $summary['total_current_stock'] +=
+                (int)$cycle['current_stock'];
 
             if ($populationBaselineTableExists) {
-                $cycle['population_state'] =
-                    production_population_state(
-                        $pdo,
-                        $tenantFarmId,
-                        (int)$cycle['id']
-                    );
-
-                if ($cycle['population_state'] === null) {
-                    $populationCutoverCycles[] = $cycle;
-                } else {
+                if (
+                    $cycle['population_snapshot']['tracking_status']
+                    === 'canonical'
+                ) {
                     $populationTrackedActiveCount++;
+                } else {
+                    $populationCutoverCycles[] = $cycle;
                 }
             }
         }
