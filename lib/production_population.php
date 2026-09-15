@@ -505,6 +505,231 @@ if (!function_exists('production_population_state')) {
     }
 }
 
+if (!function_exists('production_population_current_states')) {
+    /**
+     * Read current canonical population for many cycles with bounded query count.
+     *
+     * Returned map is keyed by cycle id. A NULL value means that cycle has not
+     * yet entered the V3 population contract.
+     */
+    function production_population_current_states(
+        PDO $pdo,
+        int $farmId,
+        array $cycleIds
+    ): array {
+        if ($farmId <= 0) {
+            throw new InvalidArgumentException(
+                'Select a valid farm.'
+            );
+        }
+
+        $normalized = [];
+
+        foreach ($cycleIds as $rawCycleId) {
+            if (is_int($rawCycleId)) {
+                $cycleId = $rawCycleId;
+            } elseif (
+                is_string($rawCycleId)
+                && ctype_digit(trim($rawCycleId))
+            ) {
+                $cycleId = (int)trim($rawCycleId);
+            } else {
+                throw new InvalidArgumentException(
+                    'Select valid production cycles.'
+                );
+            }
+
+            if ($cycleId <= 0) {
+                throw new InvalidArgumentException(
+                    'Select valid production cycles.'
+                );
+            }
+
+            $normalized[$cycleId] =
+                $cycleId;
+        }
+
+        $cycleIds =
+            array_values($normalized);
+
+        if (!$cycleIds) {
+            return [];
+        }
+
+        $states = [];
+
+        foreach ($cycleIds as $cycleId) {
+            $states[$cycleId] = null;
+        }
+
+        $placeholders =
+            implode(
+                ',',
+                array_fill(
+                    0,
+                    count($cycleIds),
+                    '?'
+                )
+            );
+
+        $baselineStmt = $pdo->prepare(
+            "SELECT
+                 b.id,
+                 b.farm_id,
+                 b.cycle_id,
+                 b.baseline_date,
+                 b.baseline_quantity,
+                 b.baseline_source,
+                 pc.cycle_code,
+                 pc.farm_type,
+                 pc.production_type,
+                 pc.status,
+                 pc.start_date,
+                 pc.close_date
+             FROM production_population_baselines b
+             INNER JOIN production_cycles pc
+               ON pc.id = b.cycle_id
+              AND pc.farm_id = b.farm_id
+             WHERE b.farm_id = ?
+               AND b.cycle_id IN ({$placeholders})"
+        );
+
+        $baselineStmt->execute(
+            array_merge(
+                [$farmId],
+                $cycleIds
+            )
+        );
+
+        $baselines = [];
+
+        foreach (
+            $baselineStmt->fetchAll(
+                PDO::FETCH_ASSOC
+            ) as $row
+        ) {
+            $cycleId =
+                (int)$row['cycle_id'];
+
+            $baselines[$cycleId] =
+                $row;
+        }
+
+        if (!$baselines) {
+            return $states;
+        }
+
+        $trackedCycleIds =
+            array_keys($baselines);
+
+        $movementPlaceholders =
+            implode(
+                ',',
+                array_fill(
+                    0,
+                    count($trackedCycleIds),
+                    '?'
+                )
+            );
+
+        $movementStmt = $pdo->prepare(
+            "SELECT
+                 cycle_id,
+                 COALESCE(
+                     SUM(quantity_delta),
+                     0
+                 ) AS movement_delta
+             FROM production_population_movements
+             WHERE farm_id = ?
+               AND cycle_id IN ({$movementPlaceholders})
+             GROUP BY cycle_id"
+        );
+
+        $movementStmt->execute(
+            array_merge(
+                [$farmId],
+                $trackedCycleIds
+            )
+        );
+
+        $movementByCycle = [];
+
+        foreach (
+            $movementStmt->fetchAll(
+                PDO::FETCH_ASSOC
+            ) as $row
+        ) {
+            $movementByCycle[
+                (int)$row['cycle_id']
+            ] =
+                (int)$row['movement_delta'];
+        }
+
+        foreach (
+            $baselines as $cycleId => $baseline
+        ) {
+            $movementDelta =
+                $movementByCycle[$cycleId]
+                ?? 0;
+
+            $quantity =
+                (int)$baseline[
+                    'baseline_quantity'
+                ]
+                + $movementDelta;
+
+            if ($quantity < 0) {
+                throw new ProductionPopulationException(
+                    'Population ledger integrity check failed: '
+                    . 'calculated population is negative.'
+                );
+            }
+
+            $states[$cycleId] = [
+                'enabled' => true,
+                'farm_id' => $farmId,
+                'cycle_id' => $cycleId,
+                'cycle_code' =>
+                    (string)$baseline[
+                        'cycle_code'
+                    ],
+                'farm_type' =>
+                    (string)$baseline[
+                        'farm_type'
+                    ],
+                'production_type' =>
+                    (string)$baseline[
+                        'production_type'
+                    ],
+                'cycle_status' =>
+                    (string)$baseline[
+                        'status'
+                    ],
+                'baseline_date' =>
+                    (string)$baseline[
+                        'baseline_date'
+                    ],
+                'baseline_quantity' =>
+                    (int)$baseline[
+                        'baseline_quantity'
+                    ],
+                'baseline_source' =>
+                    (string)$baseline[
+                        'baseline_source'
+                    ],
+                'movement_delta' =>
+                    $movementDelta,
+                'quantity' =>
+                    $quantity,
+                'as_of_date' =>
+                    null,
+            ];
+        }
+
+        return $states;
+    }
+}
+
 if (!function_exists('production_population_establish_baseline')) {
     function production_population_establish_baseline(
         PDO $pdo,

@@ -8,6 +8,10 @@ $routePath =
     __DIR__
     . '/../management/production_cycles.php';
 
+$populationPath =
+    __DIR__
+    . '/../lib/production_population.php';
+
 $checks = 0;
 $failures = 0;
 
@@ -44,6 +48,10 @@ $service = is_readable($servicePath)
 
 $route = is_readable($routePath)
     ? (string)file_get_contents($routePath)
+    : '';
+
+$population = is_readable($populationPath)
+    ? (string)file_get_contents($populationPath)
     : '';
 
 $check(
@@ -252,6 +260,91 @@ $check(
         "\$cycle['population_state'] =\n                \$cycle['population_snapshot']['canonical_state'];"
     ) !== false,
     'existing population-state compatibility remains available to the page'
+);
+
+$check(
+    substr_count(
+        $population,
+        'function production_population_current_states('
+    ) === 1,
+    'canonical population service exposes one bulk current-state reader'
+);
+
+$check(
+    strpos(
+        $population,
+        'GROUP BY cycle_id'
+    ) !== false
+    && strpos(
+        $population,
+        'b.cycle_id IN ({$placeholders})'
+    ) !== false,
+    'bulk canonical reader resolves baselines and movement totals with bounded grouped queries'
+);
+
+$check(
+    substr_count(
+        $service,
+        'function production_population_intelligence_legacy_current_snapshots('
+    ) === 1,
+    'intelligence service exposes one bounded bulk legacy fallback'
+);
+
+$check(
+    substr_count(
+        $service,
+        'function production_population_intelligence_active_cycle_snapshots('
+    ) === 1,
+    'intelligence service exposes one bulk active-cycle snapshot contract'
+);
+
+$check(
+    substr_count(
+        $service,
+        'production_population_current_states('
+    ) === 1,
+    'bulk active-cycle intelligence delegates canonical state once per farm scope'
+);
+
+$check(
+    strpos(
+        $service,
+        "AND status = 'active'"
+    ) !== false
+    && strpos(
+        $service,
+        "'poultry',"
+    ) !== false
+    && strpos(
+        $service,
+        "'ruminant'"
+    ) !== false,
+    'bulk intelligence reads active livestock cycles only within the requested farm scope'
+);
+
+$check(
+    strpos(
+        $service,
+        'ORDER BY' . PHP_EOL
+        . '                            d2.record_date DESC,'
+    ) !== false
+    && strpos(
+        $service,
+        'GROUP BY d.cycle_id'
+    ) !== false,
+    'bulk legacy fallback preserves latest-row poultry and latest-date ruminant semantics'
+);
+
+$check(
+    strpos(
+        $service,
+        'production_population_baselines'
+    ) === false
+    && strpos(
+        $service,
+        'production_population_movements'
+    ) === false,
+    'bulk intelligence still never bypasses canonical population-table ownership'
 );
 
 echo PHP_EOL;
