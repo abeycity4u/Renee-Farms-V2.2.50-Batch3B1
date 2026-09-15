@@ -8,15 +8,15 @@ if (!function_exists('poultry_acquisition_allowed_types')) {
         $type = strtolower(trim($productionType));
         if ($type === 'layer') {
             return [
-                'purchased' => 'Purchased birds',
+                'purchased' => 'Purchased pullets / young birds',
                 'purchased_point_of_lay' => 'Purchased Point-of-Lay',
-                'internal_transfer' => 'Farm-raised / transferred in',
+                'internal_transfer' => 'Farm-raised / internal transfer',
             ];
         }
         if ($type === 'broiler') {
             return [
-                'purchased' => 'Purchased birds',
-                'internal_transfer' => 'Farm-raised / transferred in',
+                'purchased' => 'Purchased birds (DOC or older birds)',
+                'internal_transfer' => 'Farm-raised / internal transfer',
             ];
         }
         return [];

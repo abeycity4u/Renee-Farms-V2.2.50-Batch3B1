@@ -5,6 +5,7 @@ require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/../includes/audit_helpers.php');
 require_once(__DIR__ . '/../lib/poultry_cycle_lifecycle.php');
 require_once(__DIR__ . '/../lib/poultry_cycle_acquisition.php');
+require_once(__DIR__ . '/../lib/poultry_cycle_onboarding.php');
 require_once(__DIR__ . '/../lib/production_cycle_service.php');
 requireLogin();
 requireBusinessReportAccess();
@@ -63,6 +64,12 @@ $createCycleForm = [
     'opening_headcount' => '0',
     'bird_unit_cost' => '',
     'start_age_days' => '1',
+    'poultry_acquisition_type' => 'purchased',
+    'poultry_unit_price' => '',
+    'poultry_total_cost' => '',
+    'poultry_source_name' => '',
+    'poultry_reference_no' => '',
+    'poultry_initial_phase' => 'rearing',
     'notes' => '',
 ];
 
@@ -164,6 +171,13 @@ try {
             $openingHeadcountRaw = trim((string)($_POST['opening_headcount'] ?? '0'));
             $birdUnitCostRaw = trim((string)($_POST['bird_unit_cost'] ?? ''));
             $startAgeDaysRaw = trim((string)($_POST['start_age_days'] ?? '1'));
+            $poultryAcquisitionType = strtolower(trim((string)($_POST['poultry_acquisition_type'] ?? '')));
+            $poultryUnitPriceRaw = trim((string)($_POST['poultry_unit_price'] ?? ''));
+            $poultryTotalCostRaw = trim((string)($_POST['poultry_total_cost'] ?? ''));
+            $poultrySourceName = trim((string)($_POST['poultry_source_name'] ?? ''));
+            $poultryReferenceNo = trim((string)($_POST['poultry_reference_no'] ?? ''));
+            $poultryInitialPhase = strtolower(trim((string)($_POST['poultry_initial_phase'] ?? '')));
+            $poultryRequestToken = strtolower(trim((string)($_POST['poultry_request_token'] ?? '')));
             $notes = trim((string)($_POST['notes'] ?? ''));
 
             $createCycleForm = [
@@ -175,12 +189,38 @@ try {
                 'opening_headcount' => $openingHeadcountRaw,
                 'bird_unit_cost' => $birdUnitCostRaw,
                 'start_age_days' => $startAgeDaysRaw,
+                'poultry_acquisition_type' => $poultryAcquisitionType,
+                'poultry_unit_price' => $poultryUnitPriceRaw,
+                'poultry_total_cost' => $poultryTotalCostRaw,
+                'poultry_source_name' => $poultrySourceName,
+                'poultry_reference_no' => $poultryReferenceNo,
+                'poultry_initial_phase' => $poultryInitialPhase,
                 'notes' => $notes,
             ];
 
             $openingHeadcount = filter_var($openingHeadcountRaw, FILTER_VALIDATE_INT);
             $birdUnitCost = $birdUnitCostRaw === '' ? null : filter_var($birdUnitCostRaw, FILTER_VALIDATE_FLOAT);
             $startAgeDays = filter_var($startAgeDaysRaw, FILTER_VALIDATE_INT);
+            $poultryUnitPrice = $poultryUnitPriceRaw === ''
+                ? null
+                : filter_var($poultryUnitPriceRaw, FILTER_VALIDATE_FLOAT);
+            $poultryTotalCost = $poultryTotalCostRaw === ''
+                ? null
+                : filter_var($poultryTotalCostRaw, FILTER_VALIDATE_FLOAT);
+
+            if (
+                $poultryTotalCost === null
+                && $poultryUnitPrice !== null
+                && $poultryUnitPrice !== false
+                && $openingHeadcount !== false
+                && (int)$openingHeadcount > 0
+            ) {
+                $poultryTotalCost = round(
+                    ((float)$poultryUnitPrice) * ((int)$openingHeadcount),
+                    2
+                );
+            }
+
             $allowedProductionTypes = [
                 'poultry' => ['layer', 'broiler'],
                 'ruminant' => ['cattle', 'goat', 'sheep', 'other'],
@@ -200,6 +240,32 @@ try {
                 $flash = ['type' => 'danger', 'message' => 'Bird cost basis must be blank or 0 and above.', 'title' => 'Invalid bird cost basis.'];
             } elseif ($startAgeDays === false || $startAgeDays < 1) {
                 $flash = ['type' => 'danger', 'message' => 'Start age must be at least 1 day.', 'title' => 'Invalid start age.'];
+            } elseif (
+                $farmType === 'poultry'
+                && $poultryUnitPriceRaw !== ''
+                && (
+                    $poultryUnitPrice === false
+                    || (float)$poultryUnitPrice < 0
+                )
+            ) {
+                $flash = [
+                    'type' => 'danger',
+                    'message' => 'Enter a valid unit purchase price.',
+                    'title' => 'Invalid poultry purchase price.',
+                ];
+            } elseif (
+                $farmType === 'poultry'
+                && $poultryTotalCostRaw !== ''
+                && (
+                    $poultryTotalCost === false
+                    || (float)$poultryTotalCost < 0
+                )
+            ) {
+                $flash = [
+                    'type' => 'danger',
+                    'message' => 'Enter a valid total bird acquisition amount.',
+                    'title' => 'Invalid poultry acquisition amount.',
+                ];
             } elseif ($expectedEndDate !== '' && $expectedEndDate < $startDate) {
                 $flash = ['type' => 'danger', 'message' => 'Expected end date cannot be earlier than the cycle start date.', 'title' => 'Invalid cycle dates.'];
             } else {
@@ -261,20 +327,85 @@ try {
                             );
                             $seedStmt->execute([$tenantFarmId, $newCycleId, $startDate, $productionType, $openingHeadcount, 'Auto-created from Production Cycle opening stock.', $_SESSION['user_id'] ?? null]);
                         }
+
+                        if ($farmType === 'poultry') {
+                            poultry_cycle_onboarding_record_initial(
+                                $pdo,
+                                $tenantFarmId,
+                                $newCycleId,
+                                [
+                                    'production_type' => $productionType,
+                                    'start_date' => $startDate,
+                                    'quantity' => (int)$openingHeadcount,
+                                    'age_days' => max(1, (int)$startAgeDays),
+                                    'acquisition_type' => $poultryAcquisitionType,
+                                    'total_cost' => $poultryTotalCost === null
+                                        ? null
+                                        : (float)$poultryTotalCost,
+                                    'source_name' => $poultrySourceName,
+                                    'reference_no' => $poultryReferenceNo,
+                                    'initial_phase' => $poultryInitialPhase,
+                                    'request_token' => $poultryRequestToken,
+                                ],
+                                isset($_SESSION['user_id'])
+                                    ? (int)$_SESSION['user_id']
+                                    : null
+                            );
+                        }
+
                         $pdo->commit();
+
+                        if ($farmType === 'poultry') {
+                            $_SESSION['success'] =
+                                'Poultry cycle created. Flock entry and starting biological stage were recorded.';
+                            header(
+                                'Location: '
+                                . BASE_URL
+                                . '/management/poultry_cycle.php?id='
+                                . $newCycleId
+                            );
+                            exit();
+                        }
+
                         $createCycleForm = [
                             'cycle_code' => '', 'farm_type' => $farmType, 'production_type' => $productionType,
-                            'start_date' => '', 'expected_end_date' => '', 'opening_headcount' => '0', 'bird_unit_cost' => '', 'start_age_days' => '1', 'notes' => ''
+                            'start_date' => '',
+                            'expected_end_date' => '',
+                            'opening_headcount' => '0',
+                            'bird_unit_cost' => '',
+                            'start_age_days' => '1',
+                            'poultry_acquisition_type' => 'purchased',
+                            'poultry_unit_price' => '',
+                            'poultry_total_cost' => '',
+                            'poultry_source_name' => '',
+                            'poultry_reference_no' => '',
+                            'poultry_initial_phase' => 'rearing',
+                            'notes' => '',
                         ];
                         $flash = ['type' => 'success', 'message' => 'Production cycle created successfully.'];
-                    } catch (PDOException $e) {
+                    } catch (Throwable $e) {
                         if ($pdo->inTransaction()) { $pdo->rollBack(); }
-                        if ((int)$e->errorInfo[1] === 1062) {
+                        if (
+                            $e instanceof PDOException
+                            && isset($e->errorInfo[1])
+                            && (int)$e->errorInfo[1] === 1062
+                        ) {
                             $flash = [
                                 'type' => 'danger',
                                 'title' => 'Cycle code already exists.',
                                 'message' => 'The cycle code "' . $cycleCode . '" is already being used in this farm. Please choose a different code.',
                                 'tip' => 'Your other entries have been preserved. Change only the cycle code and submit again.',
+                            ];
+                        } elseif (
+                            $e instanceof InvalidArgumentException
+                            || $e instanceof PoultryAcquisitionException
+                            || $e instanceof PoultryLifecycleException
+                        ) {
+                            $flash = [
+                                'type' => 'danger',
+                                'title' => 'Poultry cycle setup could not be completed.',
+                                'message' => $e->getMessage(),
+                                'tip' => 'No cycle, flock-entry, or lifecycle record was saved. Correct the entry and try again.',
                             ];
                         } else {
                             error_log('Production cycle creation failed: ' . $e->getMessage());
@@ -865,6 +996,140 @@ try {
                                 <div class="form-text">Poultry only. Used to value mortality; leave blank if no defensible bird cost is available.</div>
                             </div>
                             <div class="mb-2"><label class="form-label">Start Age (days)</label><input class="form-control" type="number" min="1" name="start_age_days" value="<?php echo htmlspecialchars($createCycleForm['start_age_days'], ENT_QUOTES); ?>"></div>
+
+                            <div id="poultryCycleOnboardingWrap" class="border rounded p-3 mb-3">
+                                <input
+                                    type="hidden"
+                                    name="poultry_request_token"
+                                    value="<?php echo htmlspecialchars(bin2hex(random_bytes(24)), ENT_QUOTES); ?>"
+                                >
+
+                                <h6 class="mb-2">Poultry Flock Entry &amp; Starting Stage</h6>
+                                <p class="small text-muted mb-3">
+                                    For a new poultry cycle, the starting flock is recorded here once.
+                                    Opening Headcount becomes the flock-entry quantity and Start Age becomes
+                                    the age at entry. You do not need to record the same flock again afterward.
+                                </p>
+
+                                <div class="mb-2">
+                                    <label class="form-label">How did these birds enter this cycle?</label>
+                                    <select
+                                        class="form-select"
+                                        name="poultry_acquisition_type"
+                                        id="createPoultryAcquisitionType"
+                                    >
+                                        <option
+                                            value="purchased"
+                                            id="createPurchasedBirdsOption"
+                                            <?php echo $createCycleForm['poultry_acquisition_type'] === 'purchased' ? 'selected' : ''; ?>
+                                        >Purchased birds</option>
+                                        <option
+                                            value="purchased_point_of_lay"
+                                            id="createPointOfLayOption"
+                                            <?php echo $createCycleForm['poultry_acquisition_type'] === 'purchased_point_of_lay' ? 'selected' : ''; ?>
+                                        >Purchased Point-of-Lay</option>
+                                        <option
+                                            value="internal_transfer"
+                                            <?php echo $createCycleForm['poultry_acquisition_type'] === 'internal_transfer' ? 'selected' : ''; ?>
+                                        >Farm-raised / internal transfer</option>
+                                    </select>
+                                    <div class="form-text">
+                                        Farm-raised / internal transfer means birds already owned by this farm
+                                        and carried into this cycle. Do not use it for an external purchase
+                                        simply because the old purchase cost is unknown.
+                                    </div>
+                                </div>
+
+                                <div class="row g-2">
+                                    <div class="col-md-6 mb-2">
+                                        <label class="form-label">Unit Purchase Price (₦ / bird)</label>
+                                        <input
+                                            class="form-control"
+                                            id="createPoultryUnitPrice"
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            name="poultry_unit_price"
+                                            value="<?php echo htmlspecialchars($createCycleForm['poultry_unit_price'], ENT_QUOTES); ?>"
+                                            placeholder="Optional helper"
+                                        >
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <label class="form-label">Total Bird Acquisition Amount (₦)</label>
+                                        <input
+                                            class="form-control"
+                                            id="createPoultryTotalCost"
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            name="poultry_total_cost"
+                                            value="<?php echo htmlspecialchars($createCycleForm['poultry_total_cost'], ENT_QUOTES); ?>"
+                                        >
+                                    </div>
+                                </div>
+                                <div class="form-text mb-2" id="createPoultryCostHelp">
+                                    Purchased entries require the actual total bird acquisition amount.
+                                </div>
+
+                                <div class="row g-2">
+                                    <div class="col-md-6 mb-2">
+                                        <label class="form-label">Source / Supplier</label>
+                                        <input
+                                            class="form-control"
+                                            maxlength="190"
+                                            name="poultry_source_name"
+                                            value="<?php echo htmlspecialchars($createCycleForm['poultry_source_name'], ENT_QUOTES); ?>"
+                                            placeholder="Optional supplier or internal source"
+                                        >
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <label class="form-label">Reference</label>
+                                        <input
+                                            class="form-control"
+                                            maxlength="120"
+                                            name="poultry_reference_no"
+                                            value="<?php echo htmlspecialchars($createCycleForm['poultry_reference_no'], ENT_QUOTES); ?>"
+                                            placeholder="Optional invoice, receipt or transfer reference"
+                                        >
+                                    </div>
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">Starting Biological Stage</label>
+                                    <select
+                                        class="form-select"
+                                        name="poultry_initial_phase"
+                                        id="createPoultryInitialPhase"
+                                    >
+                                        <option
+                                            value="rearing"
+                                            data-production-type="layer"
+                                            <?php echo $createCycleForm['poultry_initial_phase'] === 'rearing' ? 'selected' : ''; ?>
+                                        >Layer — Rearing</option>
+                                        <option
+                                            value="production"
+                                            data-production-type="layer"
+                                            <?php echo $createCycleForm['poultry_initial_phase'] === 'production' ? 'selected' : ''; ?>
+                                        >Layer — Production</option>
+                                        <option
+                                            value="growing"
+                                            data-production-type="broiler"
+                                            <?php echo $createCycleForm['poultry_initial_phase'] === 'growing' ? 'selected' : ''; ?>
+                                        >Broiler — Growing / Rearing</option>
+                                        <option
+                                            value="harvest"
+                                            data-production-type="broiler"
+                                            <?php echo $createCycleForm['poultry_initial_phase'] === 'harvest' ? 'selected' : ''; ?>
+                                        >Broiler — Harvest / Sale</option>
+                                    </select>
+                                    <div class="form-text">
+                                        Confirm the flock's real starting biological stage.
+                                        The platform will not infer it from age.
+                                        Harvest / Sale is a biological stage; it does not record a sales transaction.
+                                    </div>
+                                </div>
+                            </div>
+
                             <div class="mb-2"><label class="form-label">Notes</label><textarea class="form-control" name="notes" rows="2"><?php echo htmlspecialchars($createCycleForm['notes'], ENT_QUOTES); ?></textarea></div>
                             <button class="btn btn-success" type="submit">Create Cycle</button>
                         </form>
@@ -1122,9 +1387,9 @@ try {
                                         <label class="form-label">Entry / Acquisition Type</label>
                                         <select class="form-select" name="acquisition_type" id="acquisitionType" required>
                                             <option value="">Select type</option>
-                                            <option value="purchased">Purchased birds</option>
+                                            <option value="purchased">Purchased birds (external purchase)</option>
                                             <option value="purchased_point_of_lay" data-layer-only="1">Purchased Point-of-Lay (Layer only)</option>
-                                            <option value="internal_transfer">Farm-raised / transferred in</option>
+                                            <option value="internal_transfer">Farm-raised / internal transfer</option>
                                         </select>
                                     </div>
                                     <div class="row g-2">

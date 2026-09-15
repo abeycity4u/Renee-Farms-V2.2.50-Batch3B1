@@ -35,6 +35,146 @@ document.addEventListener('DOMContentLoaded', function () {
     render();
 });
 
+/**
+ * New-cycle poultry onboarding.
+ *
+ * This controls presentation only. Server-side acquisition/lifecycle services
+ * remain authoritative.
+ */
+(function () {
+    document.addEventListener('DOMContentLoaded', function () {
+        const farmType = document.querySelector('select[name="farm_type"]');
+        const productionType = document.getElementById('productionType');
+        const wrap = document.getElementById('poultryCycleOnboardingWrap');
+        const acquisitionType = document.getElementById('createPoultryAcquisitionType');
+        const purchasedOption = document.getElementById('createPurchasedBirdsOption');
+        const pointOfLayOption = document.getElementById('createPointOfLayOption');
+        const initialPhase = document.getElementById('createPoultryInitialPhase');
+        const unitPrice = document.getElementById('createPoultryUnitPrice');
+        const totalCost = document.getElementById('createPoultryTotalCost');
+        const costHelp = document.getElementById('createPoultryCostHelp');
+        const openingHeadcount = document.querySelector('input[name="opening_headcount"]');
+
+        if (
+            !farmType
+            || !productionType
+            || !wrap
+            || !acquisitionType
+            || !initialPhase
+        ) return;
+
+        const sync = function () {
+            const isPoultry = farmType.value === 'poultry';
+            wrap.style.display = isPoultry ? '' : 'none';
+
+            wrap.querySelectorAll('input, select, textarea').forEach(function (control) {
+                control.disabled = !isPoultry;
+            });
+
+            if (!isPoultry) return;
+
+            const type = productionType.value;
+
+            if (purchasedOption) {
+                purchasedOption.textContent = type === 'broiler'
+                    ? 'Purchased birds (DOC or older birds)'
+                    : 'Purchased pullets / young birds';
+            }
+
+            if (pointOfLayOption) {
+                const layerOnly = type !== 'layer';
+                pointOfLayOption.hidden = layerOnly;
+                pointOfLayOption.disabled = layerOnly;
+
+                if (layerOnly && acquisitionType.value === 'purchased_point_of_lay') {
+                    acquisitionType.value = 'purchased';
+                }
+            }
+
+            let firstValidPhase = '';
+
+            Array.from(initialPhase.options).forEach(function (option) {
+                const valid = option.getAttribute('data-production-type') === type;
+                option.hidden = !valid;
+                option.disabled = !valid;
+                if (valid && firstValidPhase === '') firstValidPhase = option.value;
+            });
+
+            const selectedPhase = initialPhase.options[initialPhase.selectedIndex];
+            if (
+                !selectedPhase
+                || selectedPhase.disabled
+                || selectedPhase.getAttribute('data-production-type') !== type
+            ) {
+                initialPhase.value = firstValidPhase;
+            }
+
+            if (
+                acquisitionType.value === 'purchased_point_of_lay'
+                && type === 'layer'
+            ) {
+                initialPhase.value = 'production';
+            }
+
+            acquisitionType.required = true;
+            initialPhase.required = true;
+
+            if (totalCost) {
+                totalCost.required = acquisitionType.value !== 'internal_transfer';
+            }
+
+            if (costHelp) {
+                costHelp.textContent = acquisitionType.value === 'internal_transfer'
+                    ? 'Internal carry-in may remain uncosted until a defensible cost basis exists.'
+                    : 'Purchased entries require the actual total bird acquisition amount.';
+            }
+        };
+
+        let totalManuallyEdited = false;
+
+        if (totalCost) {
+            totalCost.addEventListener('input', function () {
+                totalManuallyEdited = totalCost.value !== '';
+            });
+        }
+
+        const recalc = function () {
+            if (
+                totalManuallyEdited
+                || !unitPrice
+                || !totalCost
+                || !openingHeadcount
+            ) return;
+
+            const quantity = Number(openingHeadcount.value);
+            const unit = Number(unitPrice.value);
+
+            if (quantity > 0 && unit >= 0 && unitPrice.value !== '') {
+                totalCost.value = (quantity * unit).toFixed(2);
+            } else if (!unitPrice.value) {
+                totalCost.value = '';
+            }
+        };
+
+        farmType.addEventListener('change', sync);
+        productionType.addEventListener('change', sync);
+        acquisitionType.addEventListener('change', sync);
+
+        if (openingHeadcount) {
+            openingHeadcount.addEventListener('input', recalc);
+        }
+
+        if (unitPrice) {
+            unitPrice.addEventListener('input', function () {
+                totalManuallyEdited = false;
+                recalc();
+            });
+        }
+
+        sync();
+    });
+})();
+
 (function () {
     const cycle = document.getElementById('acquisitionCycle');
     const type = document.getElementById('acquisitionType');
