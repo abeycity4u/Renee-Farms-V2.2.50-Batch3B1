@@ -5,7 +5,7 @@
  * Static/pure verifier:
  * - no database connection;
  * - no database write;
- * - proves Manage Cycle is a thin End Production route;
+ * - proves canonical End Production remains protected inside the restored Manage Cycle workspace;
  * - proves orchestration delegates to shared lifecycle and V3 cycle services;
  * - proves normal lifecycle rules remain intact outside cycle closing.
  */
@@ -117,36 +117,41 @@ $check(
 $check(
     strpos(
         $manage,
-        "if (\$action !== 'end_production')"
+        "if (\$action === 'end_production')"
+    ) !== false
+    && substr_count(
+        $manage,
+        'value="end_production"'
+    ) === 1,
+    'Manage Cycle keeps canonical End Production as an explicit supported action'
+);
+
+$check(
+    strpos(
+        $manage,
+        'record_poultry_acquisition'
+    ) === false
+    && strpos(
+        $manage,
+        'set_initial_poultry_phase'
+    ) === false
+    && strpos(
+        $manage,
+        'end_poultry_phase'
+    ) === false
+    && strpos(
+        $manage,
+        'void_poultry_acquisition'
     ) !== false
     && strpos(
         $manage,
-        'value="end_production"'
+        'transition_poultry_phase'
+    ) !== false
+    && strpos(
+        $manage,
+        'approve_production_entry_basis'
     ) !== false,
-    'Manage Cycle accepts End Production as its only supported action'
-);
-
-$obsoleteActions = [
-    'record_poultry_acquisition',
-    'void_poultry_acquisition',
-    'set_initial_poultry_phase',
-    'transition_poultry_phase',
-    'end_poultry_phase',
-    'approve_production_entry_basis',
-];
-
-$obsoleteAbsent = true;
-
-foreach ($obsoleteActions as $action) {
-    if (strpos($manage, $action) !== false) {
-        $obsoleteAbsent = false;
-        break;
-    }
-}
-
-$check(
-    $obsoleteAbsent,
-    'Manage Cycle no longer owns acquisition, lifecycle-transition, or economic-basis mutations'
+    'Manage Cycle restores selected-cycle operations without restoring duplicate onboarding or a competing phase-end action'
 );
 
 $check(
@@ -356,21 +361,25 @@ $check(
     ) === false
     && strpos(
         $manage,
-        'Correct an Erroneous Entry'
-    ) === false
-    && strpos(
-        $manage,
         'Set Initial Biological Stage'
     ) === false
     && strpos(
         $manage,
-        'Record Transition'
+        'End Current Stage'
     ) === false
     && strpos(
         $manage,
+        'Correct an Erroneous Entry'
+    ) !== false
+    && strpos(
+        $manage,
+        'Record Transition'
+    ) !== false
+    && strpos(
+        $manage,
         'Production-Entry Economic Basis'
-    ) === false,
-    'rejected operational workspace controls are absent from Manage Cycle'
+    ) !== false,
+    'restored workspace exposes contextual operations while duplicate onboarding and competing stage-end controls remain absent'
 );
 
 $check(

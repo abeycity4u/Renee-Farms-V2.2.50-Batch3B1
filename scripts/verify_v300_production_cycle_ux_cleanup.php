@@ -231,11 +231,27 @@ $check(
 );
 
 $check(
-    substr_count(
+    strpos(
         $manage,
-        "if (\$action !== 'end_production')"
+        'value="record_poultry_acquisition"'
+    ) === false
+    && strpos(
+        $manage,
+        'value="set_initial_poultry_phase"'
+    ) === false
+    && strpos(
+        $manage,
+        'value="end_poultry_phase"'
+    ) === false
+    && substr_count(
+        $manage,
+        'value="transition_poultry_phase"'
+    ) === 1
+    && substr_count(
+        $manage,
+        'value="end_production"'
     ) === 1,
-    'Manage Cycle still restricts mutation to End Production'
+    'Manage Cycle restores contextual lifecycle transition without re-owning initial onboarding or competing phase-end controls'
 );
 
 $check(
