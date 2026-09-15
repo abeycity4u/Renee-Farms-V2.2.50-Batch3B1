@@ -124,11 +124,12 @@ function ruminant_cycle_close_open_membership_at_exit(PDO $pdo, int $farmId, int
 function ruminant_cycle_membership_close(PDO $pdo,int $farmId,int $animalId,int $membershipId,string $endDate): void
 {
     if(!preg_match('/^\d{4}-\d{2}-\d{2}$/',$endDate)) throw new RuntimeException('Enter a valid membership end date.');
-    $s=$pdo->prepare('SELECT start_date,end_date,closed_by_exit_event_id FROM ruminant_animal_cycle_memberships WHERE id=? AND farm_id=? AND animal_id=? LIMIT 1');
+    $s=$pdo->prepare('SELECT start_date,end_date,closed_by_exit_event_id,opened_by_transfer_id,closed_by_transfer_id FROM ruminant_animal_cycle_memberships WHERE id=? AND farm_id=? AND animal_id=? LIMIT 1');
     $s->execute([$membershipId,$farmId,$animalId]); $m=$s->fetch(PDO::FETCH_ASSOC);
     if(!$m) throw new RuntimeException('Cycle membership could not be found.');
     if($endDate<$m['start_date']) throw new RuntimeException('Membership end date cannot be before its start date.');
     if(!empty($m['closed_by_exit_event_id'])) throw new RuntimeException('This membership end date is controlled by a recorded lifecycle exit. Edit/reverse the lifecycle exit instead of rewriting its membership boundary.');
+    if(!empty($m['opened_by_transfer_id']) || !empty($m['closed_by_transfer_id'])) throw new RuntimeException('This membership boundary is controlled by a recorded cycle transfer. Reverse the transfer instead of manually changing this membership.');
     if($m['end_date']!==null && $endDate>$m['end_date']) throw new RuntimeException('A closed historical membership cannot be extended from this correction action.');
     $e=$pdo->prepare("SELECT exit_date FROM ruminant_animal_exit_events WHERE farm_id=? AND animal_id=? ORDER BY exit_date DESC,id DESC LIMIT 1");
     $e->execute([$farmId,$animalId]); $exitDate=$e->fetchColumn();
@@ -150,10 +151,12 @@ function ruminant_cycle_membership_has_financial_activity(PDO $pdo,int $farmId,i
 
 function ruminant_cycle_membership_delete(PDO $pdo, int $farmId, int $animalId, int $membershipId): void
 {
-    $boundary=$pdo->prepare('SELECT closed_by_exit_event_id FROM ruminant_animal_cycle_memberships WHERE id=? AND farm_id=? AND animal_id=? LIMIT 1');
+    $boundary=$pdo->prepare('SELECT closed_by_exit_event_id,opened_by_transfer_id,closed_by_transfer_id FROM ruminant_animal_cycle_memberships WHERE id=? AND farm_id=? AND animal_id=? LIMIT 1');
     $boundary->execute([$membershipId,$farmId,$animalId]);
-    $closedByExit=$boundary->fetchColumn();
-    if($closedByExit!==false && $closedByExit!==null) throw new RuntimeException('This membership is linked to a lifecycle exit boundary and cannot be deleted independently. Review the animal exit history instead.');
+    $boundaryRow=$boundary->fetch(PDO::FETCH_ASSOC);
+    if(!$boundaryRow) throw new RuntimeException('Cycle membership could not be found.');
+    if(!empty($boundaryRow['closed_by_exit_event_id'])) throw new RuntimeException('This membership is linked to a lifecycle exit boundary and cannot be deleted independently. Review the animal exit history instead.');
+    if(!empty($boundaryRow['opened_by_transfer_id']) || !empty($boundaryRow['closed_by_transfer_id'])) throw new RuntimeException('This membership is linked to a recorded cycle transfer and cannot be deleted independently. Review or reverse the transfer instead.');
     if(ruminant_cycle_membership_has_financial_activity($pdo,$farmId,$animalId,$membershipId)) throw new RuntimeException('This membership has financial activity in its date range and cannot be deleted because that would rewrite historical shared-cost economics. Correct the dates instead.');
     $stmt=$pdo->prepare('DELETE FROM ruminant_animal_cycle_memberships WHERE id=? AND farm_id=? AND animal_id=?');
     $stmt->execute([$membershipId,$farmId,$animalId]);
