@@ -153,10 +153,11 @@ if ($farmAccess === 'ruminant' || $farmAccess === 'both') {
     $latestRuminantRecord = $ruminantStmt->fetch();
 }
 
-// Get active-cycle livestock totals for the dashboard ticker with constant query count.
+// Get active-cycle livestock population through the shared population-intelligence contract.
 $livestockSnapshot = dashboard_livestock_snapshot($pdo, $tenantFarmId, $farmAccess);
 $poultryCurrentStock = $livestockSnapshot['poultry'];
 $ruminantCurrentStock = $livestockSnapshot['ruminant'];
+$livestockTracking = $livestockSnapshot['tracking'];
 
 // Load the user's previous login time (before the current session)
 $lastLoginAt = $_SESSION['last_login_at'] ?? null;
@@ -389,6 +390,24 @@ $pageTitle = "Dashboard";
                     <?php endif; ?>
                 </div>
             </div>
+
+            <?php if (!empty($livestockTracking['read_error'])): ?>
+            <div class="small text-warning mt-2">
+                Population snapshot is temporarily unavailable.
+            </div>
+            <?php else: ?>
+                <?php if ((int)$livestockTracking['legacy_estimate_cycles'] > 0): ?>
+                <div class="small text-muted mt-2">
+                    Some active-cycle figures use the latest Daily Record estimate until population tracking is confirmed.
+                </div>
+                <?php endif; ?>
+
+                <?php if ((int)$livestockTracking['untracked_without_snapshot_cycles'] > 0): ?>
+                <div class="small text-muted mt-1">
+                    Some active cycles do not yet have a population snapshot.
+                </div>
+                <?php endif; ?>
+            <?php endif; ?>
         </div>
         <?php endif; ?>
 

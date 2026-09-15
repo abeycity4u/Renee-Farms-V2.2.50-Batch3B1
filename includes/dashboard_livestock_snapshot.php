@@ -1,14 +1,20 @@
 <?php
 /**
- * Constant-query dashboard livestock snapshot.
+ * Dashboard livestock population adapter.
  *
- * Preserves the legacy dashboard ticker semantics while avoiding per-cycle
- * database round trips. Query count stays constant as active cycle count grows.
+ * Physical population policy belongs to the shared population-intelligence
+ * contract. This adapter only shapes those shared active-cycle snapshots for
+ * the Dashboard ticker and exposes whether legacy estimates are contributing.
  */
 
+require_once __DIR__ . '/../lib/production_population_intelligence.php';
+
 if (!function_exists('dashboard_livestock_snapshot')) {
-function dashboard_livestock_snapshot(PDO $pdo, int $farmId, string $farmAccess): array
-{
+function dashboard_livestock_snapshot(
+    PDO $pdo,
+    int $farmId,
+    string $farmAccess
+): array {
     $snapshot = [
         'poultry' => [
             'Layer' => null,
@@ -20,95 +26,221 @@ function dashboard_livestock_snapshot(PDO $pdo, int $farmId, string $farmAccess)
             'Sheep' => null,
             'Other' => null,
         ],
+        'tracking' => [
+            'canonical_cycles' => 0,
+            'legacy_estimate_cycles' => 0,
+            'untracked_without_snapshot_cycles' => 0,
+            'read_error' => false,
+        ],
     ];
 
-    if ($farmId <= 0 || !in_array($farmAccess, ['poultry', 'ruminant', 'both'], true)) {
+    if (
+        $farmId <= 0
+        || !in_array(
+            $farmAccess,
+            [
+                'poultry',
+                'ruminant',
+                'both',
+            ],
+            true
+        )
+    ) {
         return $snapshot;
     }
 
     try {
-        $cycleTableAvailable = $pdo->query("SHOW TABLES LIKE 'production_cycles'")->rowCount() > 0;
+        $cycleSnapshots =
+            production_population_intelligence_active_cycle_snapshots(
+                $pdo,
+                $farmId,
+                $farmAccess
+            );
     } catch (Throwable $e) {
+        $snapshot['tracking']['read_error'] =
+            true;
+
         return $snapshot;
     }
-    if (!$cycleTableAvailable) return $snapshot;
 
-    if ($farmAccess === 'poultry' || $farmAccess === 'both') {
-        $poultrySources = [
-            'layer' => ['table' => 'layer_daily_records', 'label' => 'Layer'],
-            'broiler' => ['table' => 'broiler_daily_records', 'label' => 'Broiler'],
-        ];
+    $poultryTotals = [
+        'Layer' => 0,
+        'Broiler' => 0,
+    ];
 
-        foreach ($poultrySources as $productionType => $source) {
-            $table = $source['table'];
-            $stmt = $pdo->prepare(
-                "SELECT d.opening_stock, d.mortality
-                 FROM production_cycles pc
-                 INNER JOIN {$table} d
-                    ON d.farm_id = pc.farm_id
-                   AND d.cycle_id = pc.id
-                   AND d.id = (
-                        SELECT d2.id
-                        FROM {$table} d2
-                        WHERE d2.farm_id = pc.farm_id
-                          AND d2.cycle_id = pc.id
-                        ORDER BY d2.record_date DESC, d2.id DESC
-                        LIMIT 1
-                   )
-                 WHERE pc.farm_id = ?
-                   AND pc.farm_type = 'poultry'
-                   AND LOWER(pc.production_type) = ?
-                   AND pc.status = 'active'"
+    $poultryFound = [
+        'Layer' => false,
+        'Broiler' => false,
+    ];
+
+    $ruminantTotals = [
+        'Cattle' => 0,
+        'Goat' => 0,
+        'Sheep' => 0,
+        'Other' => 0,
+    ];
+
+    $ruminantFound = [
+        'Cattle' => false,
+        'Goat' => false,
+        'Sheep' => false,
+        'Other' => false,
+    ];
+
+    foreach ($cycleSnapshots as $cycleSnapshot) {
+        $trackingStatus =
+            (string)(
+                $cycleSnapshot[
+                    'tracking_status'
+                ]
+                ?? ''
             );
-            $stmt->execute([$farmId, $productionType]);
-            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            if (!$rows) continue;
-            $total = 0;
-            foreach ($rows as $row) {
-                $total += max(0, (int)$row['opening_stock'] - (int)$row['mortality']);
+        $hasSnapshot =
+            !empty(
+                $cycleSnapshot[
+                    'has_snapshot'
+                ]
+            );
+
+        if ($trackingStatus === 'canonical') {
+            $snapshot[
+                'tracking'
+            ][
+                'canonical_cycles'
+            ]++;
+        } elseif (
+            $trackingStatus
+            === 'legacy_untracked'
+        ) {
+            if ($hasSnapshot) {
+                $snapshot[
+                    'tracking'
+                ][
+                    'legacy_estimate_cycles'
+                ]++;
+            } else {
+                $snapshot[
+                    'tracking'
+                ][
+                    'untracked_without_snapshot_cycles'
+                ]++;
             }
-            $snapshot['poultry'][$source['label']] = $total;
+        }
+
+        if (!$hasSnapshot) {
+            continue;
+        }
+
+        $quantity =
+            max(
+                0,
+                (int)(
+                    $cycleSnapshot[
+                        'quantity'
+                    ]
+                    ?? 0
+                )
+            );
+
+        $farmType =
+            strtolower(
+                trim(
+                    (string)(
+                        $cycleSnapshot[
+                            'farm_type'
+                        ]
+                        ?? ''
+                    )
+                )
+            );
+
+        $productionType =
+            strtolower(
+                trim(
+                    (string)(
+                        $cycleSnapshot[
+                            'production_type'
+                        ]
+                        ?? ''
+                    )
+                )
+            );
+
+        if ($farmType === 'poultry') {
+            $poultryLabels = [
+                'layer' => 'Layer',
+                'broiler' => 'Broiler',
+            ];
+
+            if (
+                !isset(
+                    $poultryLabels[
+                        $productionType
+                    ]
+                )
+            ) {
+                continue;
+            }
+
+            $label =
+                $poultryLabels[
+                    $productionType
+                ];
+
+            $poultryTotals[$label] +=
+                $quantity;
+
+            $poultryFound[$label] =
+                true;
+
+            continue;
+        }
+
+        if ($farmType === 'ruminant') {
+            $ruminantLabels = [
+                'cattle' => 'Cattle',
+                'goat' => 'Goat',
+                'sheep' => 'Sheep',
+                'other' => 'Other',
+            ];
+
+            $label =
+                $ruminantLabels[
+                    $productionType
+                ]
+                ?? 'Other';
+
+            $ruminantTotals[$label] +=
+                $quantity;
+
+            $ruminantFound[$label] =
+                true;
         }
     }
 
-    if ($farmAccess === 'ruminant' || $farmAccess === 'both') {
-        $stmt = $pdo->prepare(
-            "SELECT pc.id AS cycle_id,
-                    pc.production_type,
-                    COALESCE(SUM(d.opening_stock - d.mortality), 0) AS cycle_stock,
-                    COUNT(d.id) AS record_count
-             FROM production_cycles pc
-             LEFT JOIN ruminant_daily_records d
-               ON d.farm_id = pc.farm_id
-              AND d.cycle_id = pc.id
-              AND d.record_date = (
-                    SELECT MAX(d2.record_date)
-                    FROM ruminant_daily_records d2
-                    WHERE d2.farm_id = pc.farm_id
-                      AND d2.cycle_id = pc.id
-              )
-             WHERE pc.farm_id = ?
-               AND pc.farm_type = 'ruminant'
-               AND pc.status = 'active'
-             GROUP BY pc.id, pc.production_type"
-        );
-        $stmt->execute([$farmId]);
+    foreach (
+        $poultryTotals as
+        $label => $quantity
+    ) {
+        $snapshot[
+            'poultry'
+        ][$label] =
+            $poultryFound[$label]
+                ? $quantity
+                : null;
+    }
 
-        $totals = ['cattle' => 0, 'goat' => 0, 'sheep' => 0, 'other' => 0];
-        $found = ['cattle' => false, 'goat' => false, 'sheep' => false, 'other' => false];
-
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            if ((int)$row['record_count'] <= 0) continue;
-            $cycleType = strtolower((string)$row['production_type']);
-            if (!array_key_exists($cycleType, $totals)) $cycleType = 'other';
-            $totals[$cycleType] += max(0, (int)$row['cycle_stock']);
-            $found[$cycleType] = true;
-        }
-
-        foreach (['Cattle' => 'cattle', 'Goat' => 'goat', 'Sheep' => 'sheep', 'Other' => 'other'] as $label => $key) {
-            $snapshot['ruminant'][$label] = $found[$key] ? $totals[$key] : null;
-        }
+    foreach (
+        $ruminantTotals as
+        $label => $quantity
+    ) {
+        $snapshot[
+            'ruminant'
+        ][$label] =
+            $ruminantFound[$label]
+                ? $quantity
+                : null;
     }
 
     return $snapshot;
