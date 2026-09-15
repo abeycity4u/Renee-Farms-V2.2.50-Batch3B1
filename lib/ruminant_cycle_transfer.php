@@ -1066,6 +1066,62 @@ if (!function_exists('ruminant_cycle_transfer_reverse')) {
                     true
                 );
 
+            /*
+             * A concurrent reversal may have completed while
+             * this request was waiting inside the canonical
+             * paired reversal. Reconcile the tagged domain
+             * after locking it before touching memberships.
+             */
+            if (!empty($transfer['reversed_at'])) {
+                $snapshot =
+                    ruminant_cycle_transfer_snapshot(
+                        $transfer
+                    );
+
+                $snapshot['already_reversed'] = true;
+
+                if ($startedTransaction) {
+                    $pdo->commit();
+                }
+
+                return $snapshot;
+            }
+
+            /*
+             * If canonical population was already reversed
+             * but this tagged transfer is still active, the
+             * two domains disagree. Do not guess or rewrite
+             * membership history.
+             */
+            if (
+                !empty(
+                    $populationReversal[
+                        'already_reversed'
+                    ]
+                )
+            ) {
+                throw new RuminantCycleTransferException(
+                    'Tagged-animal transfer integrity failed: '
+                    . 'canonical population transfer is '
+                    . 'already reversed while tagged '
+                    . 'membership transfer remains active.'
+                );
+            }
+
+            if (
+                empty(
+                    $transfer[
+                        'population_reversed_at'
+                    ]
+                )
+            ) {
+                throw new RuminantCycleTransferException(
+                    'Tagged-animal transfer integrity failed: '
+                    . 'canonical population reversal did '
+                    . 'not finalize.'
+                );
+            }
+
             $animal =
                 ruminant_cycle_transfer_animal(
                     $pdo,

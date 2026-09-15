@@ -504,6 +504,69 @@ $check(
     && $populationReversePos < $restoreSourcePos
 );
 
+$postCanonicalLoadPos = strpos(
+    $service,
+    'ruminant_cycle_transfer_load(',
+    $populationReversePos
+);
+
+$concurrentReversalGuardPos = strpos(
+    $service,
+    "if (!empty(\$transfer['reversed_at']))",
+    $postCanonicalLoadPos
+);
+
+$reverseAnimalLockPos = strpos(
+    $service,
+    '$animal =',
+    $postCanonicalLoadPos
+);
+
+$check(
+    'concurrent completed tagged reversal is reconciled before membership mutation',
+    $postCanonicalLoadPos !== false
+    && $concurrentReversalGuardPos !== false
+    && $reverseAnimalLockPos !== false
+    && $populationReversePos < $postCanonicalLoadPos
+    && $postCanonicalLoadPos < $concurrentReversalGuardPos
+    && $concurrentReversalGuardPos < $reverseAnimalLockPos
+    && str_contains(
+        $service,
+        '$snapshot[\'already_reversed\'] = true;'
+    )
+);
+
+$check(
+    'canonical-only reversed mismatch is rejected',
+    str_contains(
+        $service,
+        '$populationReversal['
+    )
+    && str_contains(
+        $service,
+        "'already_reversed'"
+    )
+    && preg_match(
+        '/canonical population transfer is.{0,180}'
+        . 'already reversed while tagged.{0,180}'
+        . 'membership transfer remains active\./s',
+        $service
+    ) === 1
+);
+
+$check(
+    'canonical reversal completion is proved before membership mutation',
+    str_contains(
+        $service,
+        "'population_reversed_at'"
+    )
+    && preg_match(
+        '/canonical population reversal did.{0,120}'
+        . 'not finalize\./s',
+        $service
+    ) === 1
+);
+
 $check(
     'destination membership later history blocks reversal',
     preg_match(
