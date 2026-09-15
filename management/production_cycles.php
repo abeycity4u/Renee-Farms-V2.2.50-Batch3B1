@@ -435,60 +435,6 @@ try {
             }
         }
 
-        if ($action === 'void_poultry_acquisition') {
-            if (!$poultryAcquisitionTableExists || !$poultryAcquisitionCorrectionReady) {
-                $flash = ['type' => 'danger', 'title' => 'Acquisition migration required.', 'message' => 'Run the database migrations before correcting poultry acquisition history.'];
-            } else {
-                $acquisitionId = (int)($_POST['acquisition_id'] ?? 0);
-                $voidReason = trim((string)($_POST['void_reason'] ?? ''));
-                try {
-                    poultry_acquisition_void($pdo, $tenantFarmId, $acquisitionId, $voidReason, isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null);
-                    $_SESSION['success'] = 'Acquisition entry voided. The original row remains in audit history and is excluded from active acquisition totals.';
-                    header('Location: ' . BASE_URL . '/management/production_cycles.php#poultry-entry-acquisition');
-                    exit();
-                } catch (Throwable $e) {
-                    $safeMessage = ($e instanceof InvalidArgumentException || $e instanceof PoultryAcquisitionException) ? $e->getMessage() : 'The acquisition entry could not be voided. No acquisition history was changed.';
-                    if (!($e instanceof InvalidArgumentException) && !($e instanceof PoultryAcquisitionException)) { error_log('Poultry acquisition void failed: ' . $e->getMessage()); }
-                    $flash = ['type' => 'danger', 'title' => 'Acquisition entry was not voided.', 'message' => $safeMessage];
-                }
-            }
-        }
-
-        if ($action === 'transition_poultry_phase') {
-            if (!$poultryPhaseTableExists) {
-                $flash = ['type' => 'danger', 'title' => 'Lifecycle migration required.', 'message' => 'Run the database migrations before recording poultry lifecycle history.'];
-            } else {
-                $cycleId = (int)($_POST['cycle_id'] ?? 0);
-                $nextPhase = strtolower(trim((string)($_POST['phase'] ?? '')));
-                $transitionDate = trim((string)($_POST['phase_start_date'] ?? ''));
-                $phaseNotes = trim((string)($_POST['phase_notes'] ?? ''));
-                try {
-                    poultry_lifecycle_transition_phase($pdo, $tenantFarmId, $cycleId, $nextPhase, $transitionDate, $phaseNotes, isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null);
-                    $flash = ['type' => 'success', 'title' => 'Lifecycle transition recorded.', 'message' => 'The previous phase was closed on the day before this transition and the new phase was appended to history.'];
-                } catch (Throwable $e) {
-                    $safeMessage = ($e instanceof InvalidArgumentException || $e instanceof PoultryLifecycleException) ? $e->getMessage() : 'The lifecycle transition could not be saved. No lifecycle history was changed.';
-                    if (!($e instanceof InvalidArgumentException) && !($e instanceof PoultryLifecycleException)) { error_log('Poultry lifecycle transition failed: ' . $e->getMessage()); }
-                    $flash = ['type' => 'danger', 'title' => 'Lifecycle transition was not saved.', 'message' => $safeMessage];
-                }
-            }
-        }
-
-        if ($action === 'end_poultry_phase') {
-            if (!$poultryPhaseTableExists) {
-                $flash = ['type' => 'danger', 'title' => 'Lifecycle migration required.', 'message' => 'Run the database migrations before recording poultry lifecycle history.'];
-            } else {
-                $cycleId = (int)($_POST['cycle_id'] ?? 0);
-                $endDate = trim((string)($_POST['phase_end_date'] ?? ''));
-                try {
-                    poultry_lifecycle_end_current_phase($pdo, $tenantFarmId, $cycleId, $endDate, isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null);
-                    $flash = ['type' => 'success', 'title' => 'Lifecycle phase ended.', 'message' => 'The current biological phase was closed without changing the production cycle operational status.'];
-                } catch (Throwable $e) {
-                    $safeMessage = ($e instanceof InvalidArgumentException || $e instanceof PoultryLifecycleException) ? $e->getMessage() : 'The lifecycle phase could not be ended. No lifecycle history was changed.';
-                    if (!($e instanceof InvalidArgumentException) && !($e instanceof PoultryLifecycleException)) { error_log('Poultry lifecycle phase end failed: ' . $e->getMessage()); }
-                    $flash = ['type' => 'danger', 'title' => 'Lifecycle phase was not ended.', 'message' => $safeMessage];
-                }
-            }
-        }
 
         if ($action === 'confirm_population_cutover') {
             $cycleId = (int)($_POST['cycle_id'] ?? 0);
@@ -814,8 +760,9 @@ try {
                         <div>
                             <strong>Create New Cycle</strong>
                             <div class="small text-muted">
-                                Start a new production cycle here. Existing-cycle corrections
-                                and history stay under Advanced Maintenance.
+                                Start a new production cycle here. Existing-cycle setup,
+                                cost maintenance and aggregate history stay under Advanced Maintenance.
+                                Selected-cycle poultry operations stay inside Manage Cycle.
                             </div>
                         </div>
                         <span class="badge bg-secondary">Open</span>
@@ -999,9 +946,6 @@ try {
                                 [
                                     'confirm_population_cutover',
                                     'update_bird_cost_basis',
-                                    'void_poultry_acquisition',
-                                    'transition_poultry_phase',
-                                    'end_poultry_phase',
                                 ],
                                 true
                             )
@@ -1012,8 +956,8 @@ try {
                                 <div>
                                     <strong>Advanced Maintenance &amp; History</strong>
                                     <div class="small text-muted">
-                                        Population setup, cost corrections, acquisition audit,
-                                        and poultry lifecycle changes.
+                                        Population setup, cost maintenance, acquisition audit,
+                                        and poultry lifecycle history.
                                     </div>
                                 </div>
                                 <span class="badge bg-secondary">Open maintenance</span>
@@ -1191,7 +1135,7 @@ try {
                 
             </div>
             <div class="card-body">
-                <p class="text-muted small mb-3">The starting flock for new poultry cycles is recorded once during Create Cycle. This section keeps the resulting acquisition history visible for audit and controlled correction; it does not provide a second flock-entry path.</p>
+                <p class="text-muted small mb-3">The starting flock for new poultry cycles is recorded once during Create Cycle. This section keeps aggregate acquisition history visible for audit. Selected-cycle correction is managed inside Manage Cycle.</p>
                 <?php if (!$poultryAcquisitionTableExists): ?>
                     <div class="alert alert-warning mb-0">
                         <strong>Poultry acquisition migration is not available.</strong> Run <code>php scripts/run_migrations.php</code> before recording flock entry facts.
@@ -1257,28 +1201,10 @@ try {
                                         </tbody>
                                     </table>
                                 </div>
-                                <?php
-                                $activeAcquisitionOptions = [];
-                                foreach ($poultryCycles as $cycle) {
-                                    foreach (($poultryAcquisitionHistoryByCycle[(int)$cycle['id']] ?? []) as $row) {
-                                        if (empty($row['voided_at'])) {
-                                            $activeAcquisitionOptions[] = ['cycle' => $cycle, 'row' => $row];
-                                        }
-                                    }
-                                }
-                                ?>
-                                <?php if (!empty($activeAcquisitionOptions)): ?>
-                                    <hr>
-                                    <h6>Correct an Erroneous Entry</h6>
-                                    <p class="text-muted small">Use this only for a mistaken or duplicated acquisition. The row is voided, not deleted, so audit history remains intact.</p>
-                                    <form method="post" data-confirm="Void this acquisition entry? It will remain visible in history but stop contributing to acquisition totals." data-confirm-title="Confirm acquisition correction" data-confirm-button="Void entry">
-                                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>">
-                                        <input type="hidden" name="action" value="void_poultry_acquisition">
-                                        <div class="mb-2"><label class="form-label">Acquisition Entry</label><select class="form-select" name="acquisition_id" required><option value="">Select entry to void</option><?php foreach ($activeAcquisitionOptions as $opt): $r=$opt['row']; $c=$opt['cycle']; ?><option value="<?php echo (int)$r['id']; ?>">#<?php echo (int)$r['id']; ?> · <?php echo htmlspecialchars($c['cycle_code']); ?> · <?php echo htmlspecialchars($r['acquisition_date']); ?> · <?php echo number_format((int)$r['quantity']); ?> birds · <?php echo $r['total_cost'] !== null ? '₦'.number_format((float)$r['total_cost'],2) : 'basis pending'; ?></option><?php endforeach; ?></select></div>
-                                        <div class="mb-2"><label class="form-label">Correction Reason</label><input class="form-control" name="void_reason" maxlength="255" required placeholder="e.g. Duplicate browser resubmission or incorrect amount entered"></div>
-                                        <button class="btn btn-outline-warning" type="submit">Void Erroneous Entry</button>
-                                    </form>
-                                <?php endif; ?>
+                                <div class="alert alert-info mt-3 mb-0">
+                                    Acquisition corrections are managed inside the selected cycle.
+                                    Use <strong>Manage Cycle</strong> in the Production Cycles table below.
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1303,10 +1229,6 @@ try {
                         <?php if ($migration037Recorded): ?>
                             <div class="mt-2"><strong>Detected mismatch:</strong> migration 037 is recorded but <code>production_cycle_phases</code> is missing. Re-run migrations using the same database credentials as the web app.</div>
                         <?php endif; ?>
-                    </div>
-                <?php elseif (!$poultryAcquisitionCorrectionReady): ?>
-                    <div class="alert alert-warning mb-0">
-                        <strong>Batch 2A acquisition correction migration is required.</strong> Run <code>php scripts/run_migrations.php</code> to apply <code>039_poultry_acquisition_submission_corrections.sql</code> before recording or correcting flock entry facts.
                     </div>
                 <?php elseif (empty($poultryCycles)): ?>
                     <div class="text-muted">No poultry production cycle exists yet.</div>
@@ -1345,68 +1267,10 @@ try {
                         </table>
                     </div>
 
-                    <div class="row g-3">
-                        <div class="col-lg-6">
-                            <div class="border rounded p-3 h-100">
-                                <h6>Record Phase Transition</h6>
-                                <p class="text-muted small">A transition closes the current phase on the previous day and appends the new phase. History is not rewritten.</p>
-                                <form method="post" data-confirm="Record this lifecycle transition?" data-confirm-title="Confirm lifecycle transition" data-confirm-button="Record transition">
-                                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>">
-                                    <input type="hidden" name="action" value="transition_poultry_phase">
-                                    <div class="mb-2">
-                                        <label class="form-label">Cycle</label>
-                                        <select class="form-select" name="cycle_id" required>
-                                            <option value="">Select cycle</option>
-                                            <?php foreach ($poultryCycles as $cycle): ?>
-                                                <?php
-                                                $currentPhase = $poultryLifecycleByCycle[(int)$cycle['id']] ?? null;
-                                                $nextPhases = $currentPhase ? poultry_lifecycle_next_phases($cycle['production_type'], $currentPhase['phase']) : [];
-                                                if (!$currentPhase || empty($nextPhases)) continue;
-                                                ?>
-                                                <option value="<?php echo (int)$cycle['id']; ?>"><?php echo htmlspecialchars($cycle['cycle_code'] . ' — ' . poultry_lifecycle_phase_label($cycle['production_type'], $currentPhase['phase'])); ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-                                    <div class="mb-2">
-                                        <label class="form-label">Next Phase</label>
-                                        <select class="form-select" name="phase" required>
-                                            <option value="">Select next phase</option>
-                                            <option value="production">Layer — Production</option>
-                                            <option value="harvest">Broiler — Harvest / Sale</option>
-                                        </select>
-                                    </div>
-                                    <div class="mb-2"><label class="form-label">Transition Date</label><input class="form-control" type="date" name="phase_start_date" required></div>
-                                    <div class="mb-2"><label class="form-label">Notes</label><textarea class="form-control" name="phase_notes" rows="2" placeholder="Optional management context"></textarea></div>
-                                    <button class="btn btn-success w-100" type="submit">Record Transition</button>
-                                </form>
-                            </div>
-                        </div>
-
-                        <div class="col-lg-6">
-                            <div class="border rounded p-3 h-100">
-                                <h6>End Current Phase</h6>
-                                <p class="text-muted small">Use for a terminal biological phase such as Layer Production or Broiler Harvest / Sale. This does not close the production cycle.</p>
-                                <form method="post" data-confirm="End the selected current biological phase?" data-confirm-title="Confirm phase end" data-confirm-button="End phase">
-                                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>">
-                                    <input type="hidden" name="action" value="end_poultry_phase">
-                                    <div class="mb-2">
-                                        <label class="form-label">Cycle</label>
-                                        <select class="form-select" name="cycle_id" required>
-                                            <option value="">Select cycle with an open phase</option>
-                                            <?php foreach ($poultryCycles as $cycle): ?>
-                                                <?php
-                                                $currentPhase = $poultryLifecycleByCycle[(int)$cycle['id']] ?? null;
-                                                if (!$currentPhase || !empty(poultry_lifecycle_next_phases($cycle['production_type'], $currentPhase['phase']))) continue;
-                                                ?>
-                                                <option value="<?php echo (int)$cycle['id']; ?>"><?php echo htmlspecialchars($cycle['cycle_code'] . ' — ' . poultry_lifecycle_phase_label($cycle['production_type'], $currentPhase['phase'])); ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-                                    <div class="mb-2"><label class="form-label">Phase End Date</label><input class="form-control" type="date" name="phase_end_date" required></div>
-                                    <button class="btn btn-outline-warning w-100" type="submit">End Current Phase</button>
-                                </form>
-                            </div>
-                        </div>
+                    <div class="alert alert-info mb-3">
+                        Lifecycle changes are managed inside the selected cycle.
+                        Use <strong>Manage Cycle</strong> in the Production Cycles table below
+                        to record the next biological transition or to end production.
                     </div>
 
                     <hr>

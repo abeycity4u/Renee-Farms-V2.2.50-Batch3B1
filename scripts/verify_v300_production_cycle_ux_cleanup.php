@@ -167,51 +167,67 @@ $check(
 );
 
 $check(
-    substr_count(
+    strpos(
         $page,
         "if (\$action === 'void_poultry_acquisition')"
-    ) === 1,
-    'controlled acquisition correction route remains'
-);
-
-$check(
-    substr_count(
+    ) === false
+    && strpos(
         $page,
         'value="void_poultry_acquisition"'
+    ) === false
+    && substr_count(
+        $manage,
+        "if (\$action === 'void_poultry_acquisition')"
+    ) === 1
+    && substr_count(
+        $manage,
+        'value="void_poultry_acquisition"'
     ) === 1,
-    'controlled acquisition correction form remains'
+    'acquisition correction is owned only by Manage Cycle'
 );
 
 $check(
-    substr_count(
+    strpos(
         $page,
         "if (\$action === 'transition_poultry_phase')"
-    ) === 1,
-    'phase transition route remains'
-);
-
-$check(
-    substr_count(
+    ) === false
+    && strpos(
         $page,
         'value="transition_poultry_phase"'
+    ) === false
+    && substr_count(
+        $manage,
+        "if (\$action === 'transition_poultry_phase')"
+    ) === 1
+    && substr_count(
+        $manage,
+        'value="transition_poultry_phase"'
     ) === 1,
-    'phase transition form remains'
+    'lifecycle transition is owned only by Manage Cycle'
 );
 
 $check(
-    substr_count(
+    strpos(
         $page,
         "if (\$action === 'end_poultry_phase')"
-    ) === 1,
-    'End Current Phase route remains'
-);
-
-$check(
-    substr_count(
+    ) === false
+    && strpos(
         $page,
         'value="end_poultry_phase"'
+    ) === false
+    && strpos(
+        $manage,
+        "if (\$action === 'end_poultry_phase')"
+    ) === false
+    && strpos(
+        $manage,
+        'value="end_poultry_phase"'
+    ) === false
+    && substr_count(
+        $manage,
+        'value="end_production"'
     ) === 1,
-    'End Current Phase form remains'
+    'standalone terminal phase-end mutation is retired in favor of Manage Cycle End Production'
 );
 
 $check(
@@ -327,19 +343,19 @@ $check(
 );
 
 $check(
-    substr_count(
+    strpos(
         $page,
         '<h6>Record Phase Transition</h6>'
-    ) === 1,
-    'phase transition workspace remains visible'
-);
-
-$check(
-    substr_count(
+    ) === false
+    && strpos(
         $page,
         '<h6>End Current Phase</h6>'
-    ) === 1,
-    'End Current Phase workspace remains visible'
+    ) === false
+    && strpos(
+        $page,
+        'Lifecycle changes are managed inside the selected cycle.'
+    ) !== false,
+    'Production Cycles keeps lifecycle history read-only and delegates writes to Manage Cycle'
 );
 
 $check(
@@ -347,7 +363,7 @@ $check(
         $page,
         "require_once(__DIR__ . '/../lib/poultry_cycle_acquisition.php');"
     ) === 1,
-    'acquisition service remains available for history and correction'
+    'acquisition service remains available for aggregate history'
 );
 
 $check(
@@ -355,31 +371,35 @@ $check(
         $page,
         "require_once(__DIR__ . '/../lib/poultry_cycle_lifecycle.php');"
     ) === 1,
-    'lifecycle service remains available'
-);
-
-$check(
-    substr_count(
-        $page,
-        'class="col-lg-6"'
-    ) >= 2,
-    'remaining lifecycle actions use the simplified two-column layout'
+    'lifecycle service remains available for aggregate history'
 );
 
 $check(
     strpos(
         $page,
-        'This section keeps the resulting acquisition history visible for audit and controlled correction'
+        'Selected-cycle correction is managed inside Manage Cycle.'
     ) !== false,
-    'acquisition section explains the new one-entry workflow'
+    'acquisition overview explains the single selected-cycle correction owner'
 );
 
 $check(
     substr_count(
         $page,
         'poultry_acquisition_void('
+    ) === 0
+    && substr_count(
+        $manage,
+        'poultry_acquisition_void('
     ) === 1,
-    'auditable acquisition void behavior remains'
+    'auditable acquisition correction has one route owner'
+);
+
+$check(
+    strpos(
+        $page,
+        '>Manage Cycle</a>'
+    ) !== false,
+    'Production Cycles retains the route into selected-cycle management'
 );
 
 echo PHP_EOL;

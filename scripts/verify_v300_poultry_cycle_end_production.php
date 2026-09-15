@@ -349,9 +349,17 @@ $check(
     ) === false
     && strpos(
         $legacy,
+        "if (\$action === 'void_poultry_acquisition')"
+    ) === false
+    && strpos(
+        $legacy,
         "if (\$action === 'transition_poultry_phase')"
-    ) !== false,
-    'legacy cycle-close and duplicate initial-onboarding paths are retired while controlled cutover and lifecycle transition remain available'
+    ) === false
+    && strpos(
+        $legacy,
+        "if (\$action === 'end_poultry_phase')"
+    ) === false,
+    'Production Cycles retains controlled cutover while selected-cycle poultry mutations are owned by Manage Cycle'
 );
 
 $check(

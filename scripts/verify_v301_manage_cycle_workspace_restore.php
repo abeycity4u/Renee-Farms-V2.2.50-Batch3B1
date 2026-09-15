@@ -10,6 +10,13 @@ $manage = is_file($path)
     ? (string)file_get_contents($path)
     : '';
 
+$overviewPath =
+    $root . '/management/production_cycles.php';
+
+$overview = is_file($overviewPath)
+    ? (string)file_get_contents($overviewPath)
+    : '';
+
 $checks = 0;
 $failures = 0;
 
@@ -306,6 +313,59 @@ $check(
         "'approve_production_entry_basis'"
     ) === false,
     'original mutation permission boundary is preserved for restored workspace actions'
+);
+
+$check(
+    $overview !== '',
+    'Production Cycles overview is readable'
+);
+
+$check(
+    strpos(
+        $overview,
+        "if (\$action === 'void_poultry_acquisition')"
+    ) === false
+    && strpos(
+        $overview,
+        "if (\$action === 'transition_poultry_phase')"
+    ) === false
+    && strpos(
+        $overview,
+        "if (\$action === 'end_poultry_phase')"
+    ) === false,
+    'Production Cycles no longer duplicates selected-cycle poultry mutation routes'
+);
+
+$check(
+    strpos(
+        $overview,
+        'value="void_poultry_acquisition"'
+    ) === false
+    && strpos(
+        $overview,
+        'value="transition_poultry_phase"'
+    ) === false
+    && strpos(
+        $overview,
+        'value="end_poultry_phase"'
+    ) === false,
+    'Production Cycles no longer duplicates selected-cycle poultry mutation forms'
+);
+
+$check(
+    strpos(
+        $overview,
+        '<h6>Recorded Acquisition History</h6>'
+    ) !== false
+    && strpos(
+        $overview,
+        '<h6>Recorded Phase History</h6>'
+    ) !== false
+    && strpos(
+        $overview,
+        '>Manage Cycle</a>'
+    ) !== false,
+    'Production Cycles retains aggregate history and navigation into Manage Cycle'
 );
 
 echo PHP_EOL;

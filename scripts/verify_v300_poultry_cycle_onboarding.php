@@ -213,8 +213,12 @@ $check(
     && strpos(
         $page,
         'value="void_poultry_acquisition"'
+    ) === false
+    && strpos(
+        $manage,
+        'value="void_poultry_acquisition"'
     ) !== false,
-    'Create Cycle owns initial flock entry while controlled acquisition correction remains available'
+    'Create Cycle owns initial flock entry while Manage Cycle owns controlled acquisition correction'
 );
 
 $check(
@@ -225,12 +229,20 @@ $check(
     && strpos(
         $page,
         'value="transition_poultry_phase"'
-    ) !== false
+    ) === false
     && strpos(
         $page,
         'value="end_poultry_phase"'
+    ) === false
+    && strpos(
+        $manage,
+        'value="transition_poultry_phase"'
+    ) !== false
+    && strpos(
+        $manage,
+        'value="end_production"'
     ) !== false,
-    'Create Cycle owns the initial biological stage while transition and terminal-phase controls remain available'
+    'Create Cycle owns the initial biological stage while Manage Cycle owns transition and terminal production closure'
 );
 
 $check(
