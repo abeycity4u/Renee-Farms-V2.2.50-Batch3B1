@@ -704,41 +704,6 @@ try {
             }
         }
 
-        if ($action === 'close_cycle') {
-            $cycleId = (int)($_POST['cycle_id'] ?? 0);
-            $closeDate = $_POST['close_date'] ?? '';
-            $postedClosingHeadcount = trim((string)($_POST['closing_headcount'] ?? ''));
-            $closingHeadcount = ($postedClosingHeadcount === '') ? 0 : (int)$postedClosingHeadcount;
-
-            if ($cycleId <= 0 || $closeDate === '') {
-                $flash = ['type' => 'danger', 'message' => 'Cycle and close date are required to close a production cycle.'];
-            } else {
-                $cycleStmt = $pdo->prepare(
-                    'SELECT id, cycle_code, farm_type, production_type
-                     FROM production_cycles
-                     WHERE id = ? AND farm_id = ? AND status = ?
-                     LIMIT 1'
-                );
-                $cycleStmt->execute([$cycleId, $tenantFarmId, 'active']);
-                $cycleToClose = $cycleStmt->fetch(PDO::FETCH_ASSOC);
-
-                if (!$cycleToClose) {
-                    $flash = ['type' => 'danger', 'message' => 'Selected active cycle was not found.'];
-                } else {
-                    if ($closingHeadcount <= 0) {
-                        $closingHeadcount = getCycleCurrentStock($pdo, $cycleToClose);
-                    }
-
-                    $stmt = $pdo->prepare(
-                        'UPDATE production_cycles
-                         SET status = ?, close_date = ?, closing_headcount = ?
-                         WHERE id = ? AND farm_id = ?'
-                    );
-                    $stmt->execute(['closed', $closeDate, $closingHeadcount, $cycleId, $tenantFarmId]);
-                    $flash = ['type' => 'success', 'message' => 'Cycle closed successfully.'];
-                }
-            }
-        }
     }
 
     if ($cycleTableExists) {
@@ -964,7 +929,7 @@ try {
                         <div>
                             <strong>Setup &amp; Maintenance</strong>
                             <div class="small text-muted">
-                                Create or close a cycle, set up population tracking,
+                                Create a cycle, set up population tracking,
                                 and maintain poultry cycle information.
                             </div>
                         </div>
@@ -1137,28 +1102,6 @@ try {
                 </div>
             </div>
 
-            <div class="col-lg-6">
-                <div class="card h-100">
-                    <div class="card-header"><strong>Close Cycle</strong></div>
-                    <div class="card-body">
-                        <form method="post">
-                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>">
-                            <input type="hidden" name="action" value="close_cycle">
-                            <div class="mb-2"><label class="form-label">Active Cycle</label>
-                                <select class="form-select" name="cycle_id" required>
-                                    <option value="">Select active cycle</option>
-                                    <?php foreach ($activeCycles as $cycle): ?>
-                                        <option value="<?php echo (int)$cycle['id']; ?>"><?php echo htmlspecialchars($cycle['cycle_code'] . ' - ' . $cycle['production_type']); ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="mb-2"><label class="form-label">Close Date</label><input class="form-control" type="date" name="close_date" required></div>
-                            <div class="mb-2"><label class="form-label">Closing Headcount</label><input class="form-control" type="number" min="0" name="closing_headcount" placeholder="Auto-fill from latest closing if left blank or 0"><div class="form-text">Leave blank to derive it from the selected cycle code's latest closing stock.</div></div>
-                            <button class="btn btn-warning" type="submit">Close Cycle</button>
-                        </form>
-                    </div>
-                </div>
-            </div>
         </div>
 
         <?php if (isPlatformOwner() || hasRole('farm_admin')): ?>

@@ -325,7 +325,11 @@ $check(
     strpos(
         $legacy,
         "if (\$action === 'close_cycle')"
-    ) !== false
+    ) === false
+    && strpos(
+        $legacy,
+        'value="close_cycle"'
+    ) === false
     && strpos(
         $legacy,
         "if (\$action === 'confirm_population_cutover')"
@@ -338,7 +342,7 @@ $check(
         $legacy,
         "if (\$action === 'transition_poultry_phase')"
     ) !== false,
-    'legacy Production Cycles fallbacks remain temporarily available during controlled cutover'
+    'legacy direct cycle-close fallback is retired while controlled cutover and historical poultry maintenance remain available'
 );
 
 $check(
