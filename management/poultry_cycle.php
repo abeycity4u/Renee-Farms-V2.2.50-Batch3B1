@@ -52,6 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'end_production',
         'void_poultry_acquisition',
         'transition_poultry_phase',
+        'approve_production_entry_basis',
     ];
 
     if (
@@ -1323,7 +1324,7 @@ $confirmationText .=
           <div class="col-md-4"><div class="text-muted small">Current Source-Derived Economic Basis / Bird</div><strong><?php echo $moneyOrDash($productionEntryCandidate['investment_per_entry_bird']); ?></strong></div>
         </div>
         <?php $needsApproval=!$latestProductionEntrySnapshot || !hash_equals((string)$latestProductionEntrySnapshot['source_fingerprint'],(string)$productionEntryCandidate['source_fingerprint']); ?>
-        <?php if($needsApproval): ?>
+        <?php if($needsApproval && $canManageCycleOperations): ?>
         <form method="post" class="border rounded p-3 mb-3" data-confirm="Approve this source-derived Production-Entry Economic Basis as an immutable version?" data-confirm-title="Confirm economic basis" data-confirm-button="Approve version">
           <?php echo csrf_field(); ?>
           <input type="hidden" name="action" value="approve_production_entry_basis">
@@ -1350,6 +1351,11 @@ $confirmationText .=
           </div>
           <div class="small text-muted mt-2">Approval freezes this version only. Future source corrections are detected and require a new approved version; Bird Cost Basis is not changed.</div>
         </form>
+        <?php elseif($needsApproval): ?>
+        <div class="alert alert-secondary">
+          You can review the current and approved economic basis here.
+          Approval or revision is available to the Platform Owner or Farm Admin.
+        </div>
         <?php endif; ?>
       <?php else: ?>
         <div class="alert alert-warning"><strong>Basis pending:</strong> <?php echo htmlspecialchars($productionEntryCandidate['reason']??'Source-derived production-entry economics are not ready.'); ?></div>

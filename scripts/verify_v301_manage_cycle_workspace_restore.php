@@ -311,8 +311,20 @@ $check(
     && strpos(
         $adminMutationBlock,
         "'approve_production_entry_basis'"
-    ) === false,
-    'original mutation permission boundary is preserved for restored workspace actions'
+    ) !== false,
+    'all selected-cycle mutation actions share the Owner/Farm Admin write boundary'
+);
+
+$check(
+    strpos(
+        $manage,
+        'if($needsApproval && $canManageCycleOperations):'
+    ) !== false
+    && strpos(
+        $manage,
+        'Approval or revision is available to the Platform Owner or Farm Admin.'
+    ) !== false,
+    'permitted non-admin users retain read-only economic-basis visibility'
 );
 
 $check(
