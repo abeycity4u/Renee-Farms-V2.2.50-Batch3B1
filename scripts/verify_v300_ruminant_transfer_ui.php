@@ -170,11 +170,190 @@ $check(
 );
 
 $check(
-    'Step 6B2A does not expose reversal action',
+    'profile delegates reversal exactly once',
     substr_count(
         $profile,
         'ruminant_cycle_transfer_reverse('
-    ) === 0
+    ) === 1
+);
+
+$reverseActionPos = strpos(
+    $profile,
+    "if (\$action === 'reverse_cycle_transfer') {"
+);
+
+$reversePermissionPos =
+    $reverseActionPos !== false
+        ? strpos(
+            $profile,
+            'if (!$canTransfer)',
+            $reverseActionPos
+        )
+        : false;
+
+$reverseLoadPos =
+    $reverseActionPos !== false
+        ? strpos(
+            $profile,
+            'ruminant_cycle_transfer_load(',
+            $reverseActionPos
+        )
+        : false;
+
+$reverseAnimalBindingPos =
+    $reverseLoadPos !== false
+        ? strpos(
+            $profile,
+            "'animal_id'",
+            $reverseLoadPos
+        )
+        : false;
+
+$reverseDelegatePos =
+    $reverseActionPos !== false
+        ? strpos(
+            $profile,
+            'ruminant_cycle_transfer_reverse(',
+            $reverseActionPos
+        )
+        : false;
+
+$check(
+    'reversal action enforces transfer permission before central delegate',
+    $reverseActionPos !== false
+    && $reversePermissionPos !== false
+    && $reverseDelegatePos !== false
+    && $reverseActionPos < $reversePermissionPos
+    && $reversePermissionPos < $reverseDelegatePos
+);
+
+$reverseAnimalBindingContract =
+    preg_match(
+        '/\(int\)\s*\$reverseTarget\s*'
+        . '\[\s*\'animal_id\'\s*\]\s*'
+        . '!==\s*\$animalId/s',
+        $profile
+    ) === 1;
+
+$check(
+    'reversal route binds submitted transfer to current animal through shared loader',
+    $reverseLoadPos !== false
+    && $reverseAnimalBindingPos !== false
+    && $reverseDelegatePos !== false
+    && $reverseLoadPos < $reverseAnimalBindingPos
+    && $reverseAnimalBindingPos < $reverseDelegatePos
+    && $reverseAnimalBindingContract
+);
+
+$check(
+    'failed reversal form and reopen state are preserved',
+    str_contains(
+        $profile,
+        'ruminant_cycle_transfer_reverse_form'
+    )
+    && str_contains(
+        $profile,
+        'ruminant_cycle_transfer_reverse_reopen'
+    )
+);
+
+$check(
+    'reversal modal requires bounded reason',
+    str_contains(
+        $profile,
+        'name="transfer_reversal_reason"'
+    )
+    && str_contains(
+        $profile,
+        'minlength="4"'
+    )
+    && str_contains(
+        $profile,
+        'maxlength="255"'
+    )
+);
+
+$check(
+    'active unreversed history exposes Reverse action',
+    str_contains(
+        $profile,
+        "empty(\$transferRow['reversed_at'])"
+    )
+    && str_contains(
+        $profile,
+        "data-bs-target=\"#cycleTransferReverseModal\""
+    )
+    && str_contains(
+        $profile,
+        '>Reverse</button>'
+    )
+);
+
+$check(
+    'reversal form uses styled destructive confirmation contract',
+    str_contains(
+        $profile,
+        'data-confirm="Reverse this production-cycle transfer?'
+    )
+    && str_contains(
+        $profile,
+        'data-confirm-title="Reverse cycle transfer?"'
+    )
+    && str_contains(
+        $profile,
+        'data-confirm-button="Reverse Transfer"'
+    )
+);
+
+$check(
+    'route does not duplicate central reversal audit ownership',
+    !str_contains(
+        $profile,
+        "'ruminant_cycle_transfer_reversed'"
+    )
+);
+
+$check(
+    'central tagged transfer service owns reversal audit event',
+    str_contains(
+        $service,
+        "'ruminant_cycle_transfer_reversed'"
+    )
+);
+
+$check(
+    'reversal success handles central idempotent replay',
+    str_contains(
+        $profile,
+        "'already_reversed'"
+    )
+    && str_contains(
+        $profile,
+        'No additional changes'
+    )
+    && str_contains(
+        $profile,
+        'were made.'
+    )
+);
+
+$check(
+    'reversal modal remains outside manage-only modal group',
+    strpos(
+        $profile,
+        '/* canManage modal group */'
+    ) !== false
+    && strpos(
+        $profile,
+        'id="cycleTransferReverseModal"'
+    ) !== false
+    && strpos(
+        $profile,
+        '/* canManage modal group */'
+    ) < strpos(
+        $profile,
+        'id="cycleTransferReverseModal"'
+    )
 );
 
 $check(
@@ -506,8 +685,17 @@ $postTransferAuthPos =
     $postActionPos !== false
         ? strpos(
             $profile,
-            "if (\$action === 'transfer_cycle') {",
+            "\$action === 'transfer_cycle'",
             $postActionPos
+        )
+        : false;
+
+$postReverseAuthPos =
+    $postTransferAuthPos !== false
+        ? strpos(
+            $profile,
+            "|| \$action === 'reverse_cycle_transfer'",
+            $postTransferAuthPos
         )
         : false;
 
@@ -548,11 +736,14 @@ $check(
 $check(
     'transfer uses granular permission while other mutations retain canManage',
     $postTransferAuthPos !== false
+    && $postReverseAuthPos !== false
     && $postTransferPermissionPos !== false
     && $postFallbackManagePos !== false
     && $postCsrfPos !== false
     && $postActionPos < $postTransferAuthPos
     && $postTransferAuthPos
+        < $postReverseAuthPos
+    && $postReverseAuthPos
         < $postTransferPermissionPos
     && $postTransferPermissionPos
         < $postFallbackManagePos

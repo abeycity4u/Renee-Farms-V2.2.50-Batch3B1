@@ -25,7 +25,10 @@ $canTransfer = isPlatformOwner()
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
-    if ($action === 'transfer_cycle') {
+    if (
+        $action === 'transfer_cycle'
+        || $action === 'reverse_cycle_transfer'
+    ) {
         if (!$canTransfer) {
             http_response_code(403);
             exit('Access denied.');
@@ -186,6 +189,120 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit();
     }
 
+    if ($action === 'reverse_cycle_transfer') {
+        if (!$canTransfer) {
+            http_response_code(403);
+            exit('Access denied.');
+        }
+
+        $ruminantTransferId =
+            (int)(
+                $_POST[
+                    'ruminant_transfer_id'
+                ] ?? 0
+            );
+
+        $reversalReason =
+            trim(
+                (string)(
+                    $_POST[
+                        'transfer_reversal_reason'
+                    ] ?? ''
+                )
+            );
+
+        $_SESSION[
+            'ruminant_cycle_transfer_reverse_form'
+        ] = [
+            'transfer_id' =>
+                $ruminantTransferId,
+
+            'reason' =>
+                $reversalReason,
+        ];
+
+        try {
+            /*
+             * Resource binding belongs at the profile boundary:
+             * a crafted transfer ID from another animal in the
+             * same farm must not be reversible from this profile.
+             *
+             * The shared loader owns tenant-scoped lookup.
+             */
+            $reverseTarget =
+                ruminant_cycle_transfer_load(
+                    $pdo,
+                    $farmId,
+                    $ruminantTransferId,
+                    false
+                );
+
+            if (
+                (int)$reverseTarget[
+                    'animal_id'
+                ] !== $animalId
+            ) {
+                throw new RuminantCycleTransferException(
+                    'The selected cycle transfer does not '
+                    . 'belong to this animal.'
+                );
+            }
+
+            $reversal =
+                ruminant_cycle_transfer_reverse(
+                    $pdo,
+                    $farmId,
+                    $ruminantTransferId,
+                    $reversalReason,
+                    isset($_SESSION['user_id'])
+                        ? (int)$_SESSION['user_id']
+                        : null
+                );
+
+            unset(
+                $_SESSION[
+                    'ruminant_cycle_transfer_reverse_form'
+                ],
+                $_SESSION[
+                    'ruminant_cycle_transfer_reverse_reopen'
+                ]
+            );
+
+            if (
+                !empty(
+                    $reversal[
+                        'already_reversed'
+                    ]
+                )
+            ) {
+                $_SESSION['success'] =
+                    'This cycle transfer was already '
+                    . 'reversed. No additional changes '
+                    . 'were made.';
+            } else {
+                $_SESSION['success'] =
+                    'Cycle transfer reversed. The '
+                    . 'previous production-cycle '
+                    . 'membership and population were '
+                    . 'restored.';
+            }
+        } catch (Throwable $e) {
+            $_SESSION['error'] =
+                $e->getMessage();
+
+            $_SESSION[
+                'ruminant_cycle_transfer_reverse_reopen'
+            ] = true;
+        }
+
+        header(
+            'Location: animal_view.php?id='
+            . $animalId
+            . '#cycle-transfer-history'
+        );
+        exit();
+    }
+
     if ($action === 'add_health') {
         $date = $_POST['event_date'] ?? '';
         $type = $_POST['event_type'] ?? 'other';
@@ -290,6 +407,53 @@ if ($transferRequestToken === '') {
         bin2hex(
             random_bytes(16)
         );
+}
+
+$reverseTransferForm =
+    $_SESSION[
+        'ruminant_cycle_transfer_reverse_form'
+    ] ?? [];
+
+$reopenTransferReverseModal =
+    !empty(
+        $_SESSION[
+            'ruminant_cycle_transfer_reverse_reopen'
+        ]
+    );
+
+unset(
+    $_SESSION[
+        'ruminant_cycle_transfer_reverse_form'
+    ],
+    $_SESSION[
+        'ruminant_cycle_transfer_reverse_reopen'
+    ]
+);
+
+$reverseTransferId =
+    (int)(
+        $reverseTransferForm[
+            'transfer_id'
+        ] ?? 0
+    );
+
+$reverseTransferRow = null;
+
+if ($reverseTransferId > 0) {
+    foreach (
+        $transferHistory
+        as $transferHistoryRow
+    ) {
+        if (
+            (int)$transferHistoryRow['id']
+            === $reverseTransferId
+        ) {
+            $reverseTransferRow =
+                $transferHistoryRow;
+
+            break;
+        }
+    }
 }
 
 $cycleOptionStmt=$pdo->prepare("SELECT id,cycle_code,production_type,status,start_date,close_date FROM production_cycles WHERE farm_id=? AND farm_type='ruminant' AND LOWER(production_type)=? ORDER BY start_date DESC,id DESC");
@@ -453,6 +617,9 @@ $today = app_today();
                 <th>To</th>
                 <th>Status</th>
                 <th>Notes</th>
+                <?php if($canTransfer): ?>
+                  <th class="text-end">Action</th>
+                <?php endif; ?>
               </tr>
             </thead>
             <tbody>
@@ -476,11 +643,32 @@ $today = app_today();
                     </div>
                   <?php endif; ?>
                 </td>
+                <?php if($canTransfer): ?>
+                  <td class="text-end">
+                    <?php if(
+                        empty($transferRow['reversed_at'])
+                        && $animal['status']==='active'
+                    ): ?>
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-danger"
+                        data-bs-toggle="modal"
+                        data-bs-target="#cycleTransferReverseModal"
+                        data-transfer-reverse-id="<?php echo (int)$transferRow['id']; ?>"
+                        data-transfer-from="<?php echo app_attr((string)$transferRow['from_cycle_code']); ?>"
+                        data-transfer-to="<?php echo app_attr((string)$transferRow['to_cycle_code']); ?>"
+                        data-transfer-date="<?php echo app_attr(date('d/m/Y',strtotime((string)$transferRow['transfer_date']))); ?>"
+                      >Reverse</button>
+                    <?php else: ?>
+                      <span class="text-muted">—</span>
+                    <?php endif; ?>
+                  </td>
+                <?php endif; ?>
               </tr>
             <?php endforeach; ?>
             <?php if(!$transferHistory): ?>
               <tr>
-                <td colspan="5" class="text-center text-muted py-3">
+                <td colspan="<?php echo $canTransfer ? 6 : 5; ?>" class="text-center text-muted py-3">
                   No production-cycle transfer has been recorded for this animal.
                 </td>
               </tr>
@@ -701,7 +889,246 @@ $today = app_today();
 </div>
 <?php endif; ?>
 
+<?php if($canTransfer): ?>
+<div
+  class="modal fade"
+  id="cycleTransferReverseModal"
+  tabindex="-1"
+  aria-hidden="true"
+>
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form
+        method="post"
+        data-confirm="Reverse this production-cycle transfer? The animal will return to its previous cycle and the paired population movement will be reversed. Continue?"
+        data-confirm-title="Reverse cycle transfer?"
+        data-confirm-button="Reverse Transfer"
+      >
+        <div class="modal-header">
+          <h5 class="modal-title">
+            Reverse cycle transfer
+          </h5>
+          <button
+            type="button"
+            class="btn-close"
+            data-bs-dismiss="modal"
+          ></button>
+        </div>
+
+        <div class="modal-body">
+          <input
+            type="hidden"
+            name="csrf_token"
+            value="<?php echo htmlspecialchars(csrf_token(),ENT_QUOTES); ?>"
+          >
+
+          <input
+            type="hidden"
+            name="action"
+            value="reverse_cycle_transfer"
+          >
+
+          <input
+            type="hidden"
+            name="ruminant_transfer_id"
+            id="cycle_transfer_reverse_id"
+            value="<?php echo (int)($reverseTransferForm['transfer_id'] ?? 0); ?>"
+          >
+
+          <div class="alert alert-warning py-2 small">
+            This is a correction, not a new animal movement.
+            It returns the animal to its previous production
+            cycle and reverses the paired population movement.
+            The correction will be blocked if later history or
+            financial activity makes reversal unsafe.
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">
+                From Cycle
+              </label>
+              <input
+                class="form-control"
+                id="cycle_transfer_reverse_from"
+                value="<?php echo htmlspecialchars((string)($reverseTransferRow['from_cycle_code'] ?? '—'),ENT_QUOTES); ?>"
+                disabled
+              >
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">
+                To Cycle
+              </label>
+              <input
+                class="form-control"
+                id="cycle_transfer_reverse_to"
+                value="<?php echo htmlspecialchars((string)($reverseTransferRow['to_cycle_code'] ?? '—'),ENT_QUOTES); ?>"
+                disabled
+              >
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">
+                Original Transfer Date
+              </label>
+              <input
+                class="form-control"
+                id="cycle_transfer_reverse_date"
+                value="<?php echo !empty($reverseTransferRow['transfer_date']) ? htmlspecialchars(date('d/m/Y',strtotime((string)$reverseTransferRow['transfer_date'])),ENT_QUOTES) : '—'; ?>"
+                disabled
+              >
+            </div>
+          </div>
+
+          <div>
+            <label class="form-label">
+              Reversal Reason *
+            </label>
+
+            <textarea
+              class="form-control"
+              name="transfer_reversal_reason"
+              rows="3"
+              minlength="4"
+              maxlength="255"
+              required
+              placeholder="Explain why this transfer is being corrected"
+            ><?php echo htmlspecialchars((string)($reverseTransferForm['reason'] ?? '')); ?></textarea>
+
+            <div class="form-text">
+              Required for the audit history. Enter 4–255
+              characters.
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-outline-secondary"
+            data-bs-dismiss="modal"
+          >Cancel</button>
+
+          <button
+            type="submit"
+            class="btn btn-danger"
+          >Reverse Transfer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
+
 <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/bootstrap5/js/bootstrap.bundle.min.js'); ?>"></script>
+
+<?php if($canTransfer): ?>
+<script>
+(function () {
+    var modalElement =
+        document.getElementById(
+            'cycleTransferReverseModal'
+        );
+
+    if (!modalElement) {
+        return;
+    }
+
+    modalElement.addEventListener(
+        'show.bs.modal',
+        function (event) {
+            var trigger =
+                event.relatedTarget;
+
+            if (!trigger) {
+                return;
+            }
+
+            var idInput =
+                document.getElementById(
+                    'cycle_transfer_reverse_id'
+                );
+
+            var fromInput =
+                document.getElementById(
+                    'cycle_transfer_reverse_from'
+                );
+
+            var toInput =
+                document.getElementById(
+                    'cycle_transfer_reverse_to'
+                );
+
+            var dateInput =
+                document.getElementById(
+                    'cycle_transfer_reverse_date'
+                );
+
+            var reasonInput =
+                modalElement.querySelector(
+                    '[name="transfer_reversal_reason"]'
+                );
+
+            if (idInput) {
+                idInput.value =
+                    trigger.getAttribute(
+                        'data-transfer-reverse-id'
+                    ) || '';
+            }
+
+            if (fromInput) {
+                fromInput.value =
+                    trigger.getAttribute(
+                        'data-transfer-from'
+                    ) || '—';
+            }
+
+            if (toInput) {
+                toInput.value =
+                    trigger.getAttribute(
+                        'data-transfer-to'
+                    ) || '—';
+            }
+
+            if (dateInput) {
+                dateInput.value =
+                    trigger.getAttribute(
+                        'data-transfer-date'
+                    ) || '—';
+            }
+
+            if (reasonInput) {
+                reasonInput.value = '';
+            }
+        }
+    );
+})();
+</script>
+<?php endif; ?>
+
+<?php if($reopenTransferReverseModal && $canTransfer): ?>
+<script>
+(function () {
+    var modalElement =
+        document.getElementById(
+            'cycleTransferReverseModal'
+        );
+
+    if (
+        modalElement
+        && window.bootstrap
+        && window.bootstrap.Modal
+    ) {
+        window.bootstrap.Modal
+            .getOrCreateInstance(
+                modalElement
+            )
+            .show();
+    }
+})();
+</script>
+<?php endif; ?>
 
 <?php if($reopenTransferModal && $canTransfer && $animal['status']==='active'): ?>
 <script>
