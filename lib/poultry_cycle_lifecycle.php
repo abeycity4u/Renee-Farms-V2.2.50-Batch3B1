@@ -260,7 +260,7 @@ if (!function_exists('poultry_lifecycle_transition_phase')) {
 }
 
 if (!function_exists('poultry_lifecycle_end_current_phase')) {
-    function poultry_lifecycle_end_current_phase(PDO $pdo, int $farmId, int $cycleId, string $endDate, ?int $userId): void
+    function poultry_lifecycle_end_current_phase(PDO $pdo, int $farmId, int $cycleId, string $endDate, ?int $userId, bool $cycleClosing = false): void
     {
         $startedTransaction = !$pdo->inTransaction();
         if ($startedTransaction) {
@@ -279,8 +279,18 @@ if (!function_exists('poultry_lifecycle_end_current_phase')) {
             if (!$current) {
                 throw new PoultryLifecycleException('This cycle has no open lifecycle phase to end.');
             }
-            if (!empty(poultry_lifecycle_next_phases((string)$cycle['production_type'], (string)$current['phase']))) {
-                throw new PoultryLifecycleException('This phase has a defined next biological phase. Record a lifecycle transition instead of ending it directly.');
+            if (
+                !$cycleClosing
+                && !empty(
+                    poultry_lifecycle_next_phases(
+                        (string)$cycle['production_type'],
+                        (string)$current['phase']
+                    )
+                )
+            ) {
+                throw new PoultryLifecycleException(
+                    'This phase has a defined next biological phase. Record a lifecycle transition instead of ending it directly.'
+                );
             }
             if ($endDate < (string)$current['start_date']) {
                 throw new InvalidArgumentException('Phase end date cannot be earlier than its start date.');
@@ -297,6 +307,7 @@ if (!function_exists('poultry_lifecycle_end_current_phase')) {
                     'production_type' => $cycle['production_type'],
                     'phase' => $current['phase'],
                     'end_date' => $endDate,
+                    'mode' => $cycleClosing ? 'cycle_closing' : 'normal',
                 ]);
             }
             if ($startedTransaction) {

@@ -237,7 +237,7 @@ $check(
     $manage !== ''
     && strpos(
         $manage,
-        'Poultry Cycle Workspace'
+        '<title>Production Cycle</title>'
     ) !== false
     && strpos(
         $manage,
@@ -245,19 +245,33 @@ $check(
     ) !== false
     && strpos(
         $manage,
-        'poultry_acquisition_history('
+        'poultry_cycle_end_production('
     ) !== false
     && strpos(
         $manage,
-        'poultry_lifecycle_history('
-    ) !== false,
-    'Manage Cycle remains the valid contextual workspace target for poultry onboarding'
+        'record_poultry_acquisition'
+    ) === false
+    && strpos(
+        $manage,
+        'set_initial_poultry_phase'
+    ) === false,
+    'Manage Cycle remains the contextual destination without re-owning poultry onboarding mutations'
 );
 
 $check(
-    hash('sha256', $lifecycle)
-        === 'd6b94f1e630db0dccb80fd72662dd8e25fb728233f3796162effb80ef951b28b',
-    'canonical lifecycle service is byte-for-byte unchanged from the Step 5B1 gate'
+    strpos(
+        $lifecycle,
+        'bool $cycleClosing = false'
+    ) !== false
+    && strpos(
+        $lifecycle,
+        '!$cycleClosing'
+    ) !== false
+    && strpos(
+        $lifecycle,
+        'This phase has a defined next biological phase. Record a lifecycle transition instead of ending it directly.'
+    ) !== false,
+    'canonical lifecycle preserves normal transition policy while allowing explicit cycle-closing context'
 );
 
 $check(
