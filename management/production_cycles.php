@@ -768,8 +768,11 @@ try {
             <div class="card">
                 <div class="card-body">
                     <h4 class="mb-2"><i class="bi bi-arrow-repeat"></i> Production Cycles</h4>
-                    <p class="text-muted mb-1">This page is where the new cycle model appears in the platform.</p>
-                    <p class="mb-0">Use this for Create Cycle, Close Cycle, and cycle-level monitoring. Poultry cycles now open into a dedicated Manage Cycle workspace so this overview does not keep growing into a wall of forms.</p>
+                    <p class="mb-0 text-muted">
+                        Start here to see the production cycles in this farm.
+                        Choose a cycle below to work on it. Setup and maintenance
+                        tools stay out of the way until you need them.
+                    </p>
                 </div>
             </div>
         </div>
@@ -803,10 +806,46 @@ try {
             <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted">Closed Cycles</div><h4><?php echo $summary['closed_cycles']; ?></h4></div></div></div>
         </div>
 
-        <div class="row g-3 mb-3">
-            <div class="col-lg-6">
-                <div class="card h-100">
-                    <div class="card-header"><strong>Create Cycle</strong></div>
+        <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+            <a class="btn btn-outline-primary" href="#recent-cycles">
+                <i class="bi bi-list-ul"></i> Choose a Cycle
+            </a>
+
+            <?php if (isPlatformOwner() || hasRole('farm_admin')): ?>
+                <a
+                    class="btn btn-success"
+                    href="#create-cycle"
+                    data-open-cycle-tools
+                >
+                    <i class="bi bi-plus-circle"></i> New Cycle
+                </a>
+            <?php endif; ?>
+        </div>
+
+        <?php if (isPlatformOwner() || hasRole('farm_admin')): ?>
+            <details
+                class="card mb-3"
+                id="cycle-tools"
+                <?php echo $flash !== null ? 'open' : ''; ?>
+            >
+                <summary class="card-header">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <div>
+                            <strong>Setup &amp; Maintenance</strong>
+                            <div class="small text-muted">
+                                Create or close a cycle, set up population tracking,
+                                and maintain poultry cycle information.
+                            </div>
+                        </div>
+                        <span class="badge bg-secondary">Open tools</span>
+                    </div>
+                </summary>
+
+                <div class="card-body">
+                    <div class="row g-3 mb-3" id="create-cycle">
+                        <div class="col-lg-6">
+                            <div class="card h-100">
+                                <div class="card-header"><strong>Create Cycle</strong></div>
                     <div class="card-body">
                         <form method="post">
                             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>">
@@ -1351,9 +1390,13 @@ try {
             </div>
         </div>
 
-        <div class="card">
+                </div>
+            </details>
+        <?php endif; ?>
+
+        <div class="card" id="recent-cycles">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Recent Cycles</h5>
+                <h5 class="mb-0">Production Cycles</h5>
                 <span class="badge bg-success">New</span>
             </div>
             <div class="card-body p-0">

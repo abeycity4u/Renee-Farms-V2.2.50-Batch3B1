@@ -71,3 +71,40 @@ document.addEventListener('DOMContentLoaded', function () {
     qty.addEventListener('input', recalc);
     unit.addEventListener('input', function () { totalManuallyEdited = false; recalc(); });
 })();
+
+/**
+ * Keep the long setup/maintenance area out of the way by default while still
+ * opening it when an admin deliberately targets one of its tools.
+ */
+(function () {
+    const openTargetedCycleTools = function () {
+        const tools = document.getElementById('cycle-tools');
+        if (!tools || !window.location.hash) return;
+
+        let target = null;
+
+        try {
+            target = document.querySelector(window.location.hash);
+        } catch (error) {
+            return;
+        }
+
+        if (target && tools.contains(target)) {
+            tools.open = true;
+        }
+    };
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const tools = document.getElementById('cycle-tools');
+
+        document.querySelectorAll('[data-open-cycle-tools]').forEach(function (link) {
+            link.addEventListener('click', function () {
+                if (tools) tools.open = true;
+            });
+        });
+
+        openTargetedCycleTools();
+    });
+
+    window.addEventListener('hashchange', openTargetedCycleTools);
+})();
