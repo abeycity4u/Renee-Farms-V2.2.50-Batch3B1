@@ -5,6 +5,7 @@ require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/../includes/audit_helpers.php');
 require_once(__DIR__ . '/../lib/ruminant_animal_economics.php');
 require_once(__DIR__ . '/../lib/ruminant_cycle_membership.php');
+require_once(__DIR__ . '/../lib/ruminant_cycle_transfer_workspace.php');
 require_once(__DIR__ . '/../lib/ruminant_lifecycle_integrity.php');
 require_once(__DIR__ . '/../lib/transaction_actor_display.php');
 requireLogin();
@@ -14,12 +15,30 @@ $animalId = (int)($_GET['id'] ?? 0);
 if ($animalId < 1) { http_response_code(400); exit('Invalid animal.'); }
 
 $canManage = isPlatformOwner() || hasRole('farm_admin') || hasRole('ruminant_manager');
+$canTransfer = isPlatformOwner()
+    || hasRole('farm_admin')
+    || hasPermission(
+        getUserType(),
+        'ruminant_animals_edit'
+    );
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!$canManage) { http_response_code(403); exit('Access denied.'); }
-    if (!verify_csrf_token($_POST['csrf_token'] ?? '')) { http_response_code(419); exit('Invalid request token.'); }
-
     $action = $_POST['action'] ?? '';
+
+    if ($action === 'transfer_cycle') {
+        if (!$canTransfer) {
+            http_response_code(403);
+            exit('Access denied.');
+        }
+    } elseif (!$canManage) {
+        http_response_code(403);
+        exit('Access denied.');
+    }
+
+    if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
+        http_response_code(419);
+        exit('Invalid request token.');
+    }
     $check = $pdo->prepare('SELECT id, tag_no, species, status FROM ruminant_animals WHERE id=? AND farm_id=? LIMIT 1');
     $check->execute([$animalId, $farmId]);
     $target = $check->fetch(PDO::FETCH_ASSOC);
@@ -75,6 +94,98 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: animal_view.php?id='.$animalId.'#cycle-membership'); exit();
     }
 
+    if ($action === 'transfer_cycle') {
+        if (!$canTransfer) {
+            http_response_code(403);
+            exit('Access denied.');
+        }
+
+        $toCycleId =
+            (int)($_POST['to_cycle_id'] ?? 0);
+
+        $transferDate =
+            trim(
+                (string)(
+                    $_POST['transfer_date']
+                    ?? ''
+                )
+            );
+
+        $transferNotes =
+            trim(
+                (string)(
+                    $_POST['transfer_notes']
+                    ?? ''
+                )
+            );
+
+        $requestToken =
+            trim(
+                (string)(
+                    $_POST['transfer_request_token']
+                    ?? ''
+                )
+            );
+
+        $_SESSION[
+            'ruminant_cycle_transfer_form'
+        ] = [
+            'to_cycle_id' =>
+                $toCycleId,
+            'transfer_date' =>
+                $transferDate,
+            'notes' =>
+                $transferNotes,
+            'request_token' =>
+                $requestToken,
+        ];
+
+        try {
+            $transfer =
+                ruminant_cycle_transfer_record(
+                    $pdo,
+                    $farmId,
+                    $animalId,
+                    $toCycleId,
+                    $transferDate,
+                    $transferNotes !== ''
+                        ? $transferNotes
+                        : null,
+                    isset($_SESSION['user_id'])
+                        ? (int)$_SESSION['user_id']
+                        : null,
+                    $requestToken
+                );
+
+            unset(
+                $_SESSION[
+                    'ruminant_cycle_transfer_form'
+                ],
+                $_SESSION[
+                    'ruminant_cycle_transfer_reopen'
+                ]
+            );
+
+            $_SESSION['success'] =
+                'Animal moved to the selected '
+                . 'production cycle and remains Active.';
+        } catch (Throwable $e) {
+            $_SESSION['error'] =
+                $e->getMessage();
+
+            $_SESSION[
+                'ruminant_cycle_transfer_reopen'
+            ] = true;
+        }
+
+        header(
+            'Location: animal_view.php?id='
+            . $animalId
+            . '#cycle-membership'
+        );
+        exit();
+    }
+
     if ($action === 'add_health') {
         $date = $_POST['event_date'] ?? '';
         $type = $_POST['event_type'] ?? 'other';
@@ -124,7 +235,63 @@ $exitStmt = $pdo->prepare("SELECT e.*, s.product_type, s.customer_name, rsa.allo
 $exitStmt->execute([$animalId,$farmId]);
 $exitEvents = $exitStmt->fetchAll(PDO::FETCH_ASSOC);
 
-$memberships = ruminant_cycle_memberships_for_animal($pdo,$farmId,$animalId);
+$transferWorkspace =
+    ruminant_cycle_transfer_workspace(
+        $pdo,
+        $farmId,
+        $animalId
+    );
+
+$memberships =
+    $transferWorkspace['memberships'];
+
+$transferDestinations =
+    $transferWorkspace[
+        'destination_cycles'
+    ];
+
+$transferHistory =
+    $transferWorkspace[
+        'transfer_history'
+    ];
+
+$transferForm =
+    $_SESSION[
+        'ruminant_cycle_transfer_form'
+    ] ?? [];
+
+$reopenTransferModal =
+    !empty(
+        $_SESSION[
+            'ruminant_cycle_transfer_reopen'
+        ]
+    );
+
+unset(
+    $_SESSION[
+        'ruminant_cycle_transfer_form'
+    ],
+    $_SESSION[
+        'ruminant_cycle_transfer_reopen'
+    ]
+);
+
+$transferRequestToken =
+    trim(
+        (string)(
+            $transferForm[
+                'request_token'
+            ] ?? ''
+        )
+    );
+
+if ($transferRequestToken === '') {
+    $transferRequestToken =
+        bin2hex(
+            random_bytes(16)
+        );
+}
+
 $cycleOptionStmt=$pdo->prepare("SELECT id,cycle_code,production_type,status,start_date,close_date FROM production_cycles WHERE farm_id=? AND farm_type='ruminant' AND LOWER(production_type)=? ORDER BY start_date DESC,id DESC");
 $cycleOptionStmt->execute([$farmId,strtolower((string)$animal['species'])]);
 $membershipCycleOptions=$cycleOptionStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -241,11 +408,86 @@ $today = app_today();
       </div>
 
       <div class="card poultry-panel mb-3" id="cycle-membership">
-        <div class="card-header d-flex justify-content-between align-items-center"><strong><i class="bi bi-calendar-range"></i> Production Cycle Membership</strong><?php if($canManage): ?><button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#membershipModal">+ Assign Cycle</button><?php endif; ?></div>
-        <div class="card-body py-2"><div class="small text-muted">Membership history is the audit basis for shared-cost allocation. Date ranges cannot overlap and the cycle species must match this animal.</div></div>
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <strong><i class="bi bi-calendar-range"></i> Production Cycle Membership</strong>
+          <div class="d-flex gap-2">
+            <?php if($canManage): ?><button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#membershipModal">+ Assign Cycle</button><?php endif; ?>
+            <?php if($canTransfer && $animal['status']==='active'): ?>
+              <button
+                type="button"
+                class="btn btn-sm btn-primary"
+                <?php if($transferWorkspace['ready']): ?>
+                  data-bs-toggle="modal"
+                  data-bs-target="#cycleTransferModal"
+                <?php else: ?>
+                  disabled
+                <?php endif; ?>
+              ><i class="bi bi-arrow-left-right"></i> Move to another cycle</button>
+            <?php endif; ?>
+          </div>
+        </div>
+        <div class="card-body py-2">
+          <div class="small text-muted">Membership history is the audit basis for shared-cost allocation. Date ranges cannot overlap and the cycle species must match this animal.</div>
+          <?php if($canTransfer && $animal['status']==='active' && !$transferWorkspace['ready']): ?>
+            <div class="alert alert-warning py-2 small mt-2 mb-0">
+              <strong>Cycle move unavailable.</strong>
+              <?php echo htmlspecialchars((string)$transferWorkspace['readiness_message']); ?>
+            </div>
+          <?php endif; ?>
+        </div>
         <div class="table-responsive"><table class="table table-sm mb-0"><thead><tr><th>Cycle</th><th>Start</th><th>End</th><th>Status</th><th>Notes</th><?php if($canManage): ?><th class="text-end">Action</th><?php endif; ?></tr></thead><tbody>
         <?php foreach($memberships as $m): ?><tr><td><?php echo htmlspecialchars($m['cycle_code']); ?></td><td><?php echo date('d/m/Y',strtotime($m['start_date'])); ?></td><td><?php echo $m['end_date']?date('d/m/Y',strtotime($m['end_date'])):'Open'; ?></td><td><?php echo htmlspecialchars(ucfirst((string)$m['cycle_status'])); ?></td><td><?php echo htmlspecialchars($m['notes'] ?: '—'); ?></td><?php if($canManage): ?><td class="text-end"><?php if(!$m['end_date']): ?><button type="button" class="btn btn-sm btn-outline-primary" data-membership-close-id="<?php echo (int)$m['id']; ?>" data-cycle-code="<?php echo app_attr($m['cycle_code']); ?>">Close</button> <?php endif; ?><form method="post" class="d-inline" data-confirm="Remove this production-cycle membership? Removal is blocked when financial activity exists in its date range." data-confirm-title="Remove membership?" data-confirm-button="Remove"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(),ENT_QUOTES); ?>"><input type="hidden" name="action" value="delete_cycle_membership"><input type="hidden" name="membership_id" value="<?php echo (int)$m['id']; ?>"><button class="btn btn-sm btn-outline-danger">Remove</button></form></td><?php endif; ?></tr><?php endforeach; if(!$memberships): ?><tr><td colspan="<?php echo $canManage?6:5; ?>" class="text-center text-muted py-3">No production-cycle membership recorded.</td></tr><?php endif; ?>
         </tbody></table></div>
+      </div>
+
+      <div class="card poultry-panel mb-3" id="cycle-transfer-history">
+        <div class="card-header">
+          <strong><i class="bi bi-arrow-left-right"></i> Cycle Transfer History</strong>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>From</th>
+                <th>To</th>
+                <th>Status</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+            <?php foreach($transferHistory as $transferRow): ?>
+              <tr>
+                <td><?php echo date('d/m/Y',strtotime((string)$transferRow['transfer_date'])); ?></td>
+                <td><?php echo htmlspecialchars((string)$transferRow['from_cycle_code']); ?></td>
+                <td><?php echo htmlspecialchars((string)$transferRow['to_cycle_code']); ?></td>
+                <td>
+                  <?php if(!empty($transferRow['reversed_at'])): ?>
+                    <span class="badge text-bg-secondary">Reversed</span>
+                  <?php else: ?>
+                    <span class="badge text-bg-success">Active</span>
+                  <?php endif; ?>
+                </td>
+                <td>
+                  <?php echo htmlspecialchars((string)($transferRow['notes'] ?: '—')); ?>
+                  <?php if(!empty($transferRow['reversal_reason'])): ?>
+                    <div class="small text-muted">
+                      Reversal: <?php echo htmlspecialchars((string)$transferRow['reversal_reason']); ?>
+                    </div>
+                  <?php endif; ?>
+                </td>
+              </tr>
+            <?php endforeach; ?>
+            <?php if(!$transferHistory): ?>
+              <tr>
+                <td colspan="5" class="text-center text-muted py-3">
+                  No production-cycle transfer has been recorded for this animal.
+                </td>
+              </tr>
+            <?php endif; ?>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div class="card poultry-panel mb-3" id="animal-expense-economics">
@@ -337,6 +579,8 @@ $today = app_today();
     <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Save Membership</button></div>
   </form></div></div>
 </div>
+
+
 <div class="modal fade" id="healthModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg"><div class="modal-content"><form method="post">
     <div class="modal-header"><h5 class="modal-title">Add Health / Treatment Record</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
@@ -353,8 +597,134 @@ $today = app_today();
     <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Save Health Record</button></div>
   </form></div></div>
 </div>
+<?php endif; /* canManage modal group */ ?>
+<?php if($canTransfer && $animal['status']==='active'): ?>
+<div class="modal fade" id="cycleTransferModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post">
+        <div class="modal-header">
+          <h5 class="modal-title">Move to another production cycle</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(),ENT_QUOTES); ?>">
+          <input type="hidden" name="action" value="transfer_cycle">
+          <input
+            type="hidden"
+            name="transfer_request_token"
+            value="<?php echo htmlspecialchars($transferRequestToken,ENT_QUOTES); ?>"
+          >
+
+          <?php if(!$transferWorkspace['ready']): ?>
+            <div class="alert alert-warning py-2 small">
+              <strong>Cycle move unavailable.</strong>
+              <?php echo htmlspecialchars((string)$transferWorkspace['readiness_message']); ?>
+            </div>
+          <?php endif; ?>
+
+          <div class="mb-3">
+            <label class="form-label">Current Production Cycle</label>
+            <input
+              class="form-control"
+              value="<?php echo htmlspecialchars((string)($transferWorkspace['source_cycle']['cycle_code'] ?? 'No current cycle')); ?>"
+              disabled
+            >
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Move To *</label>
+            <select
+              class="form-select"
+              name="to_cycle_id"
+              required
+              <?php echo $transferWorkspace['ready'] ? '' : 'disabled'; ?>
+            >
+              <option value="">Choose destination cycle</option>
+              <?php foreach($transferDestinations as $destination): ?>
+                <option
+                  value="<?php echo (int)$destination['id']; ?>"
+                  <?php echo (int)($transferForm['to_cycle_id'] ?? 0)===(int)$destination['id'] ? 'selected' : ''; ?>
+                >
+                  <?php echo htmlspecialchars((string)$destination['cycle_code']); ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+            <div class="form-text">
+              Only another active cycle with confirmed V3 population and the same production identity is shown.
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Effective Transfer Date *</label>
+            <input
+              type="date"
+              class="form-control"
+              name="transfer_date"
+              value="<?php echo htmlspecialchars((string)($transferForm['transfer_date'] ?? $today),ENT_QUOTES); ?>"
+              required
+              <?php echo $transferWorkspace['ready'] ? '' : 'disabled'; ?>
+            >
+            <div class="form-text">
+              On this date the animal belongs to the destination cycle. The source membership ends the previous day.
+            </div>
+          </div>
+
+          <div>
+            <label class="form-label">Notes</label>
+            <textarea
+              class="form-control"
+              name="transfer_notes"
+              rows="3"
+              maxlength="255"
+              placeholder="Optional reason or operational note"
+              <?php echo $transferWorkspace['ready'] ? '' : 'disabled'; ?>
+            ><?php echo htmlspecialchars((string)($transferForm['notes'] ?? '')); ?></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-outline-secondary"
+            data-bs-dismiss="modal"
+          >Cancel</button>
+
+          <button
+            class="btn btn-primary"
+            <?php echo $transferWorkspace['ready'] ? '' : 'disabled'; ?>
+          >Move Animal</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 <?php endif; ?>
+
 <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/bootstrap5/js/bootstrap.bundle.min.js'); ?>"></script>
+
+<?php if($reopenTransferModal && $canTransfer && $animal['status']==='active'): ?>
+<script>
+(function () {
+    var modalElement =
+        document.getElementById(
+            'cycleTransferModal'
+        );
+
+    if (
+        modalElement
+        && window.bootstrap
+        && window.bootstrap.Modal
+    ) {
+        window.bootstrap.Modal
+            .getOrCreateInstance(
+                modalElement
+            )
+            .show();
+    }
+})();
+</script>
+<?php endif; ?>
 
 </body>
 </html>

@@ -17,7 +17,12 @@ function ruminant_animal_has_history(PDO $pdo,int $farmId,int $animalId): bool
 function ruminant_manual_exit(PDO $pdo,int $farmId,int $animalId,string $date,string $outcome,?string $notes,?int $userId): int
 {
     if(!preg_match('/^\d{4}-\d{2}-\d{2}$/',$date)) throw new RuntimeException('Enter a valid effective exit date.');
-    $map=['dead'=>'dead','culled'=>'culled','transferred'=>'transferred'];
+    if($outcome==='transferred'){
+        throw new RuntimeException(
+            'Use Move to another cycle from the Animal Profile for an internal production-cycle transfer. Transferred remains available only as historical lifecycle status.'
+        );
+    }
+    $map=['dead'=>'dead','culled'=>'culled'];
     if(!isset($map[$outcome])) throw new RuntimeException('Choose a valid lifecycle outcome.');
     $pdo->beginTransaction();
     try{
