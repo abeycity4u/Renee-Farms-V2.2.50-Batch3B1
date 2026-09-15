@@ -6,8 +6,9 @@
  * own Daily Record, Sales, transfer, lifecycle, acquisition, or financial SQL.
  *
  * V3 creation establishes the immutable cycle-opening population baseline.
- * Do not route live cycle creation here until all post-baseline population
- * writers are integrated with the canonical population ledger.
+ * Live Create Cycle delegates canonical cycle + opening-baseline ownership here.
+ * Daily Record seeding and poultry onboarding remain caller-owned orchestration
+ * inside the same transaction.
  */
 
 require_once __DIR__ . '/livestock_types.php';
@@ -432,8 +433,9 @@ if (!function_exists('production_cycle_create_v3')) {
      * Create a canonical V3 cycle and its cycle-opening population baseline.
      *
      * This deliberately does not seed any Daily Record table. The live Create
-     * Cycle route must not switch to this function until all later population
-     * writers are ledger-aware.
+     * Cycle route delegates canonical cycle + opening-baseline ownership here,
+     * then keeps Daily Record seeding and poultry onboarding inside its
+     * caller-owned transaction.
      */
     function production_cycle_create_v3(
         PDO $pdo,

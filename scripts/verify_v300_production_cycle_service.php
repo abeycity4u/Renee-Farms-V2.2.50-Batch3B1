@@ -3,6 +3,7 @@
 $servicePath = __DIR__ . '/../lib/production_cycle_service.php';
 $livestockPath = __DIR__ . '/../lib/livestock_types.php';
 $populationPath = __DIR__ . '/../lib/production_population.php';
+$routePath = __DIR__ . '/../management/production_cycles.php';
 
 $checks = 0;
 $failures = 0;
@@ -43,12 +44,21 @@ verify_cycle_check(
     'shared population dependency exists and is readable'
 );
 
+verify_cycle_check(
+    is_file($routePath) && is_readable($routePath),
+    'live Production Cycles route exists and is readable'
+);
+
 $source = is_readable($servicePath)
     ? (string)file_get_contents($servicePath)
     : '';
 
 $normalized = preg_replace('/\s+/', ' ', strtolower($source));
 $normalized = is_string($normalized) ? trim($normalized) : '';
+
+$routeSource = is_readable($routePath)
+    ? (string)file_get_contents($routePath)
+    : '';
 
 require_once $servicePath;
 
@@ -262,6 +272,209 @@ verify_cycle_check(
     ) !== false
     && strpos($source, "'production_cycle_closed_v3'") !== false,
     'canonical production cycle mutations retain shared audit hooks'
+);
+
+$routeCreateStart = strpos(
+    $routeSource,
+    "if (\$action === 'create_cycle')"
+);
+
+$routeCreateEnd = strpos(
+    $routeSource,
+    "if (\$action === 'update_bird_cost_basis')",
+    $routeCreateStart !== false
+        ? $routeCreateStart + 1
+        : 0
+);
+
+$routeCreate = (
+    $routeCreateStart !== false
+    && $routeCreateEnd !== false
+    && $routeCreateEnd > $routeCreateStart
+)
+    ? substr(
+        $routeSource,
+        $routeCreateStart,
+        $routeCreateEnd - $routeCreateStart
+    )
+    : '';
+
+verify_cycle_check(
+    $routeCreate !== '',
+    'live Create Cycle POST adapter is statically discoverable'
+);
+
+$routeCreateCallCount =
+    preg_match_all(
+        '/\\$newCycleId\\s*=\\s*'
+        . 'production_cycle_create_v3\\s*\\(/s',
+        $routeCreate,
+        $routeCreateCallMatches
+    );
+
+verify_cycle_check(
+    $routeCreateCallCount === 1
+    && stripos(
+        $routeCreate,
+        'INSERT INTO production_cycles'
+    ) === false,
+    'live Create Cycle delegates cycle persistence exactly once to the canonical service'
+);
+
+verify_cycle_check(
+    strpos(
+        $routeCreate,
+        'production_population_establish_baseline('
+    ) === false
+    && strpos(
+        $routeCreate,
+        'production_population_record_movement('
+    ) === false
+    && stripos(
+        $routeCreate,
+        'production_population_baselines'
+    ) === false
+    && stripos(
+        $routeCreate,
+        'production_population_movements'
+    ) === false,
+    'live Create Cycle route owns no direct population-ledger persistence'
+);
+
+verify_cycle_check(
+    substr_count(
+        $routeCreate,
+        'INSERT INTO layer_daily_records'
+    ) === 1
+    && substr_count(
+        $routeCreate,
+        'INSERT INTO broiler_daily_records'
+    ) === 1
+    && substr_count(
+        $routeCreate,
+        'INSERT INTO ruminant_daily_records'
+    ) === 1,
+    'existing Layer Broiler and Ruminant opening Daily seeds remain caller-owned'
+);
+
+verify_cycle_check(
+    substr_count(
+        $routeCreate,
+        'poultry_cycle_onboarding_record_initial('
+    ) === 1,
+    'existing poultry onboarding remains delegated exactly once after canonical cycle creation'
+);
+
+$routeBeginPos = strpos(
+    $routeCreate,
+    '$pdo->beginTransaction();'
+);
+
+$routeCreateCallPos = false;
+
+if (
+    preg_match(
+        '/\\$newCycleId\\s*=\\s*'
+        . 'production_cycle_create_v3\\s*\\(/s',
+        $routeCreate,
+        $routeCreateCallMatch,
+        PREG_OFFSET_CAPTURE
+    ) === 1
+) {
+    $routeCreateCallPos =
+        (int)$routeCreateCallMatch[0][1];
+}
+
+$routeLayerSeedPos = stripos(
+    $routeCreate,
+    'INSERT INTO layer_daily_records'
+);
+
+$routeOnboardingPos = strpos(
+    $routeCreate,
+    'poultry_cycle_onboarding_record_initial('
+);
+
+$routeCommitPos = strpos(
+    $routeCreate,
+    '$pdo->commit();'
+);
+
+verify_cycle_check(
+    $routeBeginPos !== false
+    && $routeCreateCallPos !== false
+    && $routeLayerSeedPos !== false
+    && $routeOnboardingPos !== false
+    && $routeCommitPos !== false
+    && $routeBeginPos < $routeCreateCallPos
+    && $routeCreateCallPos < $routeLayerSeedPos
+    && $routeLayerSeedPos < $routeOnboardingPos
+    && $routeOnboardingPos < $routeCommitPos,
+    'cycle baseline Daily seed and poultry onboarding remain one caller-owned transaction'
+);
+
+verify_cycle_check(
+    strpos(
+        $routeCreate,
+        "'cycle_code' =>"
+    ) !== false
+    && strpos(
+        $routeCreate,
+        "'farm_type' =>"
+    ) !== false
+    && strpos(
+        $routeCreate,
+        "'production_type' =>"
+    ) !== false
+    && strpos(
+        $routeCreate,
+        "'start_date' =>"
+    ) !== false
+    && strpos(
+        $routeCreate,
+        "'expected_end_date' =>"
+    ) !== false
+    && strpos(
+        $routeCreate,
+        "'opening_headcount' =>"
+    ) !== false
+    && strpos(
+        $routeCreate,
+        "'bird_unit_cost' =>"
+    ) !== false
+    && strpos(
+        $routeCreate,
+        "'notes' =>"
+    ) !== false,
+    'live adapter passes canonical cycle inputs rather than rebuilding persistence policy'
+);
+
+verify_cycle_check(
+    strpos(
+        $routeCreate,
+        '$e instanceof ProductionCycleException'
+    ) !== false
+    && strpos(
+        $routeCreate,
+        'No cycle or related setup record was saved.'
+    ) !== false,
+    'canonical cycle-domain errors return safely with preserved setup semantics'
+);
+
+verify_cycle_check(
+    strpos(
+        $source,
+        'Do not route live cycle creation here until'
+    ) === false
+    && strpos(
+        $source,
+        'live Create'
+    ) !== false
+    && strpos(
+        $source,
+        'caller-owned transaction'
+    ) !== false,
+    'service documentation reflects live canonical Create Cycle delegation'
 );
 
 $withoutComments = preg_replace('/^\s*\/\/.*$/m', '', $source);

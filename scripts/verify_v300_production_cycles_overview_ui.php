@@ -139,8 +139,8 @@ if ($toolsSection !== null) {
     );
 
     $check(
-        strpos($toolsSection, 'value="close_cycle"') !== false,
-        'Close Cycle form remains available inside maintenance tools'
+        strpos($toolsSection, 'value="close_cycle"') === false,
+        'legacy Close Cycle form remains retired from Production Cycles maintenance tools'
     );
 
     $check(

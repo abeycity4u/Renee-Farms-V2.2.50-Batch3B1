@@ -198,9 +198,17 @@ try {
                 'notes' => $notes,
             ];
 
-            $openingHeadcount = filter_var($openingHeadcountRaw, FILTER_VALIDATE_INT);
-            $birdUnitCost = $birdUnitCostRaw === '' ? null : filter_var($birdUnitCostRaw, FILTER_VALIDATE_FLOAT);
-            $startAgeDays = filter_var($startAgeDaysRaw, FILTER_VALIDATE_INT);
+            $openingHeadcountForPricing =
+                filter_var(
+                    $openingHeadcountRaw,
+                    FILTER_VALIDATE_INT
+                );
+
+            $startAgeDays =
+                filter_var(
+                    $startAgeDaysRaw,
+                    FILTER_VALIDATE_INT
+                );
             $poultryUnitPrice = $poultryUnitPriceRaw === ''
                 ? null
                 : filter_var($poultryUnitPriceRaw, FILTER_VALIDATE_FLOAT);
@@ -212,34 +220,36 @@ try {
                 $poultryTotalCost === null
                 && $poultryUnitPrice !== null
                 && $poultryUnitPrice !== false
-                && $openingHeadcount !== false
-                && (int)$openingHeadcount > 0
+                && $openingHeadcountForPricing !== false
+                && (int)$openingHeadcountForPricing > 0
             ) {
                 $poultryTotalCost = round(
-                    ((float)$poultryUnitPrice) * ((int)$openingHeadcount),
+                    ((float)$poultryUnitPrice)
+                    * ((int)$openingHeadcountForPricing),
                     2
                 );
             }
 
-            $allowedProductionTypes = [
-                'poultry' => ['layer', 'broiler'],
-                'ruminant' => ['cattle', 'goat', 'sheep', 'other'],
-            ];
-
-            if ($cycleCode === '' || $productionType === '' || $startDate === '') {
-                $flash = ['type' => 'danger', 'message' => 'Cycle code, production type, and start date are required.', 'title' => 'Required cycle information is missing.'];
-            } elseif (mb_strlen($cycleCode) > 100) {
-                $flash = ['type' => 'danger', 'message' => 'Cycle code must be 100 characters or fewer.', 'title' => 'Cycle code is too long.'];
-            } elseif (!in_array($farmType, allowedFarmTypes(false), true)) {
-                $flash = ['type' => 'danger', 'message' => 'Farm type must be poultry or ruminant.', 'title' => 'Invalid farm type.'];
-            } elseif (!isset($allowedProductionTypes[$farmType]) || !in_array($productionType, $allowedProductionTypes[$farmType], true)) {
-                $flash = ['type' => 'danger', 'message' => 'Select a valid production type for the selected farm type.', 'title' => 'Invalid production type.'];
-            } elseif ($openingHeadcount === false || $openingHeadcount < 0) {
-                $flash = ['type' => 'danger', 'message' => 'Opening headcount must be 0 or greater.', 'title' => 'Invalid opening headcount.'];
-            } elseif ($farmType === 'poultry' && ($birdUnitCost === false || ($birdUnitCost !== null && $birdUnitCost < 0))) {
-                $flash = ['type' => 'danger', 'message' => 'Bird cost basis must be blank or 0 and above.', 'title' => 'Invalid bird cost basis.'];
-            } elseif ($startAgeDays === false || $startAgeDays < 1) {
-                $flash = ['type' => 'danger', 'message' => 'Start age must be at least 1 day.', 'title' => 'Invalid start age.'];
+            /*
+             * Cycle identity, dates, opening population, bird cost basis,
+             * duplicate-code policy and canonical opening baseline belong
+             * to production_cycle_create_v3().
+             *
+             * This adapter keeps only poultry-onboarding-specific input
+             * checks before entering the atomic setup transaction.
+             */
+            if (
+                $farmType === 'poultry'
+                && (
+                    $startAgeDays === false
+                    || $startAgeDays < 1
+                )
+            ) {
+                $flash = [
+                    'type' => 'danger',
+                    'message' => 'Start age must be at least 1 day.',
+                    'title' => 'Invalid start age.',
+                ];
             } elseif (
                 $farmType === 'poultry'
                 && $poultryUnitPriceRaw !== ''
@@ -256,53 +266,60 @@ try {
             } elseif (
                 $farmType === 'poultry'
                 && $poultryTotalCostRaw !== ''
-                && (
-                    $poultryTotalCost === false
-                    || (float)$poultryTotalCost < 0
-                )
+                && $poultryTotalCost === false
             ) {
                 $flash = [
                     'type' => 'danger',
                     'message' => 'Enter a valid total bird acquisition amount.',
                     'title' => 'Invalid poultry acquisition amount.',
                 ];
-            } elseif ($expectedEndDate !== '' && $expectedEndDate < $startDate) {
-                $flash = ['type' => 'danger', 'message' => 'Expected end date cannot be earlier than the cycle start date.', 'title' => 'Invalid cycle dates.'];
             } else {
-                // Friendly pre-check: the database constraint remains the final safeguard.
-                $duplicateStmt = $pdo->prepare(
-                    'SELECT id FROM production_cycles WHERE farm_id = ? AND cycle_code = ? LIMIT 1'
-                );
-                $duplicateStmt->execute([$tenantFarmId, $cycleCode]);
-                if ($duplicateStmt->fetchColumn()) {
-                    $flash = [
-                        'type' => 'danger',
-                        'title' => 'Cycle code already exists.',
-                        'message' => 'The cycle code "' . $cycleCode . '" is already being used in this farm. Please choose a different code.',
-                        'tip' => 'Your other entries have been preserved. Change only the cycle code and submit again.',
-                    ];
-                } else {
-                    try {
-                        $pdo->beginTransaction();
-                        $stmt = $pdo->prepare(
-                            'INSERT INTO production_cycles
-                            (farm_id, cycle_code, farm_type, production_type, status, start_date, expected_end_date, opening_headcount, bird_unit_cost, notes, created_by)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-                        );
-                        $stmt->execute([
+                try {
+                    $pdo->beginTransaction();
+
+                    $newCycleId =
+                        production_cycle_create_v3(
+                            $pdo,
                             $tenantFarmId,
-                            $cycleCode,
-                            $farmType,
-                            $productionType,
-                            'active',
-                            $startDate,
-                            $expectedEndDate !== '' ? $expectedEndDate : null,
-                            $openingHeadcount,
-                            $farmType === 'poultry' ? $birdUnitCost : null,
-                            ($notes !== '' ? $notes : null),
-                            $_SESSION['user_id'] ?? null,
-                        ]);
-                        $newCycleId = (int)$pdo->lastInsertId();
+                            [
+                                'cycle_code' =>
+                                    $cycleCode,
+
+                                'farm_type' =>
+                                    $farmType,
+
+                                'production_type' =>
+                                    $productionType,
+
+                                'start_date' =>
+                                    $startDate,
+
+                                'expected_end_date' =>
+                                    $expectedEndDate,
+
+                                'opening_headcount' =>
+                                    $openingHeadcountRaw,
+
+                                'bird_unit_cost' =>
+                                    $farmType === 'poultry'
+                                        ? $birdUnitCostRaw
+                                        : null,
+
+                                'notes' =>
+                                    $notes,
+                            ],
+                            isset($_SESSION['user_id'])
+                                ? (int)$_SESSION['user_id']
+                                : null
+                        );
+
+                    /*
+                     * Safe to normalize for the route-owned Daily seed and
+                     * poultry onboarding only after the canonical service
+                     * accepted the opening population.
+                     */
+                    $openingHeadcount =
+                        (int)$openingHeadcountRaw;
 
                         // Seed opening record on cycle start date so daily pages can continue immediately.
                         if ($farmType === 'poultry' && $productionType === 'layer') {
@@ -386,26 +403,20 @@ try {
                     } catch (Throwable $e) {
                         if ($pdo->inTransaction()) { $pdo->rollBack(); }
                         if (
-                            $e instanceof PDOException
-                            && isset($e->errorInfo[1])
-                            && (int)$e->errorInfo[1] === 1062
-                        ) {
-                            $flash = [
-                                'type' => 'danger',
-                                'title' => 'Cycle code already exists.',
-                                'message' => 'The cycle code "' . $cycleCode . '" is already being used in this farm. Please choose a different code.',
-                                'tip' => 'Your other entries have been preserved. Change only the cycle code and submit again.',
-                            ];
-                        } elseif (
                             $e instanceof InvalidArgumentException
+                            || $e instanceof ProductionCycleException
                             || $e instanceof PoultryAcquisitionException
                             || $e instanceof PoultryLifecycleException
                         ) {
                             $flash = [
                                 'type' => 'danger',
-                                'title' => 'Poultry cycle setup could not be completed.',
-                                'message' => $e->getMessage(),
-                                'tip' => 'No cycle, flock-entry, or lifecycle record was saved. Correct the entry and try again.',
+                                'title' =>
+                                    'Production cycle setup could not be completed.',
+                                'message' =>
+                                    $e->getMessage(),
+                                'tip' =>
+                                    'No cycle or related setup record was saved. '
+                                    . 'Correct the entry and try again.',
                             ];
                         } else {
                             error_log('Production cycle creation failed: ' . $e->getMessage());
@@ -417,7 +428,6 @@ try {
                             ];
                         }
                     }
-                }
             }
         }
 
