@@ -269,11 +269,59 @@ function poultry_production_entry_approve(PDO $pdo,int $farmId,int $cycleId,int 
     ];
     if (!in_array($category,$allowed,true)) throw new InvalidArgumentException('Select a valid revision category.');
     $reason=trim($reason);
-    $candidate=poultry_production_entry_candidate($pdo,$farmId,$cycleId);
-    if (empty($candidate['ready'])) throw new RuntimeException($candidate['reason'] ?: 'Production-entry economic basis is not ready for approval.');
 
     $pdo->beginTransaction();
     try {
+        /*
+         * The production-cycle row is the stable per-cycle approval mutex.
+         *
+         * Acquire it before calculating the candidate so an approval that
+         * waited behind another approval cannot later append a candidate
+         * calculated before its approval turn began.
+         *
+         * This also serializes the first approval, when no snapshot row
+         * exists yet to lock.
+         */
+        $cycleLock=$pdo->prepare(
+            "SELECT id
+             FROM production_cycles
+             WHERE id=?
+               AND farm_id=?
+             FOR UPDATE"
+        );
+
+        $cycleLock->execute([
+            $cycleId,
+            $farmId,
+        ]);
+
+        $lockedCycleId=
+            $cycleLock->fetchColumn();
+
+        if ($lockedCycleId === false) {
+            throw new RuntimeException(
+                'Production cycle could not be locked for Production-Entry approval.'
+            );
+        }
+
+        /*
+         * Candidate calculation intentionally occurs only after acquiring
+         * the per-cycle approval lock.
+         */
+        $candidate=
+            poultry_production_entry_candidate(
+                $pdo,
+                $farmId,
+                $cycleId
+            );
+
+        if (empty($candidate['ready'])) {
+            throw new RuntimeException(
+                $candidate['reason']
+                ?: 'Production-entry economic basis is not ready for approval.'
+            );
+        }
+
         $lock=$pdo->prepare("SELECT * FROM poultry_production_entry_snapshots WHERE farm_id=? AND cycle_id=? ORDER BY version_no DESC LIMIT 1 FOR UPDATE");
         $lock->execute([$farmId,$cycleId]);
         $previous=$lock->fetch(PDO::FETCH_ASSOC) ?: null;
