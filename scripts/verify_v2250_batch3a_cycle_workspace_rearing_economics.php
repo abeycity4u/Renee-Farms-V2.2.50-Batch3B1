@@ -7,6 +7,7 @@ $page=file_get_contents($root.'/management/poultry_cycle.php');
 $cycles=file_get_contents($root.'/management/production_cycles.php');
 chk($checks,$lib!==false,'rearing economics helper exists');
 chk($checks,strpos($lib,"require_once __DIR__ . '/stock_costing.php';")!==false,'rearing economics explicitly loads canonical stock-costing dependency');
+chk($checks,strpos($lib,"require_once __DIR__ . '/production_population.php';")!==false,'rearing economics explicitly loads canonical population dependency');
 chk($checks,strpos($lib,"phase'] === 'rearing'")!==false,'explicit Rearing phase is required; age/output inference is not used');
 chk($checks,strpos($lib,"transaction_type='used'")!==false,'economics reads effective USED inventory transactions');
 chk($checks,strpos($lib,'stock_feed_item_sql_predicate')!==false,'feed cost uses canonical feed classification predicate');
@@ -15,8 +16,11 @@ chk($checks,strpos($lib,"category<>'feeds'")!==false,'manual feed expense is exc
 chk($checks,strpos($lib,'financial_allocations')!==false,'explicit shared-expense allocations are included');
 chk($checks,strpos($lib,'unallocated_shared_expense_pool')!==false,'unallocated Layer shared costs are disclosed separately');
 chk($checks,strpos($lib,'purchased_point_of_lay')!==false,'POL entry is handled separately from on-farm rearing');
-chk($checks,strpos($lib,'production_entry_headcount')!==false,'production-entry surviving flock context is derived from exact boundary records');
-chk($checks,strpos($lib,'differs from the preceding rearing-day closing flock')!==false,'boundary flock mismatch fails visibly instead of inventing a count');
+chk($checks,strpos($lib,'poultry_production_entry_population_boundary')!==false,'production-entry flock boundary is centralized in one helper');
+chk($checks,strpos($lib,'production_population_state')!==false,'V3 Production-Entry flock uses canonical historical population state');
+chk($checks,strpos($lib,'Canonical population ledger at Rearing close')!==false,'canonical population ledger is the V3 Production-Entry headcount authority');
+chk($checks,strpos($lib,'Legacy fallback only')!==false,'legacy cycles retain exact Daily Record boundary fallback');
+chk($checks,strpos($lib,'does not reconcile to the rearing-end Daily Record closing flock')!==false && strpos($lib,'does not reconcile to the production-start Daily Record opening flock')!==false,'Daily Record boundary remains visible reconciliation evidence without replacing canonical population authority');
 chk($checks,strpos($page,'Cycle Workspace')!==false,'dedicated poultry cycle workspace exists');
 chk(
     $checks,

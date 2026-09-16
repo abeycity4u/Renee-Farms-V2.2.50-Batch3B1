@@ -4,6 +4,187 @@ require_once __DIR__ . '/stock_costing.php';
 require_once __DIR__ . '/inventory_financial.php';
 require_once __DIR__ . '/poultry_cycle_lifecycle.php';
 require_once __DIR__ . '/poultry_cycle_acquisition.php';
+require_once __DIR__ . '/production_population.php';
+
+if (!function_exists('poultry_production_entry_population_boundary')) {
+function poultry_production_entry_population_boundary(
+    PDO $pdo,
+    int $farmId,
+    int $cycleId,
+    string $rearingEnd,
+    string $productionStart
+): array {
+    $result = [
+        'headcount' => null,
+        'source' => null,
+        'canonical_state' => null,
+        'rearing_closing' => null,
+        'production_opening' => null,
+        'warnings' => [],
+    ];
+
+    // Exact Daily Records remain valuable reconciliation evidence, but they
+    // are not the population authority once the cycle has entered the V3
+    // canonical population contract.
+    $entryStmt = $pdo->prepare(
+        'SELECT opening_stock
+         FROM layer_daily_records
+         WHERE farm_id = ?
+           AND cycle_id = ?
+           AND record_date = ?
+         LIMIT 1'
+    );
+    $entryStmt->execute([
+        $farmId,
+        $cycleId,
+        $productionStart,
+    ]);
+
+    $productionOpening = $entryStmt->fetchColumn();
+
+    if ($productionOpening !== false) {
+        $result['production_opening'] =
+            (int)$productionOpening;
+    }
+
+    $endStmt = $pdo->prepare(
+        'SELECT opening_stock, mortality
+         FROM layer_daily_records
+         WHERE farm_id = ?
+           AND cycle_id = ?
+           AND record_date = ?
+         LIMIT 1'
+    );
+    $endStmt->execute([
+        $farmId,
+        $cycleId,
+        $rearingEnd,
+    ]);
+
+    $rearingEndRow =
+        $endStmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($rearingEndRow) {
+        $result['rearing_closing'] = max(
+            0,
+            (int)$rearingEndRow['opening_stock']
+            - (int)$rearingEndRow['mortality']
+        );
+    }
+
+    // First establish whether this historical boundary is covered by the
+    // canonical V3 baseline. A later legacy-cutover baseline cannot be used
+    // to reconstruct an earlier Production-Entry boundary.
+    $currentPopulationState =
+        production_population_state(
+            $pdo,
+            $farmId,
+            $cycleId
+        );
+
+    if (
+        $currentPopulationState !== null
+        && $rearingEnd >=
+            (string)$currentPopulationState['baseline_date']
+    ) {
+        $canonicalState =
+            production_population_state(
+                $pdo,
+                $farmId,
+                $cycleId,
+                $rearingEnd
+            );
+
+        if ($canonicalState !== null) {
+            $result['canonical_state'] =
+                $canonicalState;
+
+            $canonicalHeadcount =
+                (int)$canonicalState['quantity'];
+
+            $result['headcount'] =
+                $canonicalHeadcount;
+
+            $reconciledChecks = 0;
+
+            if ($result['rearing_closing'] !== null) {
+                if (
+                    $result['rearing_closing']
+                    === $canonicalHeadcount
+                ) {
+                    $reconciledChecks++;
+                } else {
+                    $result['warnings'][] =
+                        'Canonical Production-Entry population does not reconcile to the rearing-end Daily Record closing flock.';
+                }
+            }
+
+            if ($result['production_opening'] !== null) {
+                if (
+                    $result['production_opening']
+                    === $canonicalHeadcount
+                ) {
+                    $reconciledChecks++;
+                } else {
+                    $result['warnings'][] =
+                        'Canonical Production-Entry population does not reconcile to the production-start Daily Record opening flock.';
+                }
+            }
+
+            if ($reconciledChecks === 2) {
+                $result['source'] =
+                    'Canonical population ledger at Rearing close, reconciled to exact Daily Record boundary';
+            } elseif ($reconciledChecks === 1) {
+                $result['source'] =
+                    'Canonical population ledger at Rearing close, cross-checked to available Daily Record boundary';
+            } else {
+                $result['source'] =
+                    'Canonical population ledger at Rearing close';
+            }
+
+            return $result;
+        }
+    }
+
+    // Legacy fallback only: where no V3 baseline covers the historical
+    // boundary, preserve the established exact Daily Record reconciliation.
+    if (
+        $result['production_opening'] !== null
+        && $result['rearing_closing'] !== null
+    ) {
+        if (
+            $result['production_opening']
+            === $result['rearing_closing']
+        ) {
+            $result['headcount'] =
+                $result['production_opening'];
+
+            $result['source'] =
+                'Production-start opening flock, reconciled to prior rearing-day closing flock';
+        } else {
+            $result['warnings'][] =
+                'Production-entry flock boundary does not reconcile: production opening flock differs from the preceding rearing-day closing flock.';
+        }
+    } elseif ($result['production_opening'] !== null) {
+        $result['headcount'] =
+            $result['production_opening'];
+
+        $result['source'] =
+            'Production-start opening flock';
+    } elseif ($result['rearing_closing'] !== null) {
+        $result['headcount'] =
+            $result['rearing_closing'];
+
+        $result['source'] =
+            'Rearing-end closing flock';
+    } else {
+        $result['warnings'][] =
+            'No canonical population boundary or exact Daily Record boundary is available, so surviving Production-Entry flock is not inferred.';
+    }
+
+    return $result;
+}
+}
 
 /**
  * V2.2.50 Batch 3A — read-only Layer rearing / production-entry economics.
@@ -203,31 +384,31 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
     $base['known_attributable_rearing_cost'] = round($investment, 2);
     $base['rearing_investment'] = $complete ? round($investment,2) : null;
 
-    // Production-entry headcount: use only the exact boundary records. If both
-    // sides exist but disagree, refuse to invent a definitive surviving count.
-    $entryStmt=$pdo->prepare('SELECT opening_stock FROM layer_daily_records WHERE farm_id=? AND cycle_id=? AND record_date=? LIMIT 1');
-    $entryStmt->execute([$farmId,$cycleId,$productionStart]);
-    $productionOpening=$entryStmt->fetchColumn();
-    $endStmt=$pdo->prepare('SELECT opening_stock,mortality FROM layer_daily_records WHERE farm_id=? AND cycle_id=? AND record_date=? LIMIT 1');
-    $endStmt->execute([$farmId,$cycleId,$end]);
-    $rearingEndRow=$endStmt->fetch(PDO::FETCH_ASSOC);
-    $rearingClosing=$rearingEndRow ? max(0,(int)$rearingEndRow['opening_stock']-(int)$rearingEndRow['mortality']) : null;
+    // Production-entry flock authority:
+    // - V3-tracked cycles use the canonical population ledger at Rearing close;
+    // - exact Daily Records are reconciliation evidence only;
+    // - legacy cycles without a covering V3 baseline retain exact-boundary
+    //   fallback behavior.
+    $populationBoundary =
+        poultry_production_entry_population_boundary(
+            $pdo,
+            $farmId,
+            $cycleId,
+            $end,
+            $productionStart
+        );
 
-    if ($productionOpening !== false && $rearingClosing !== null) {
-        if ((int)$productionOpening === $rearingClosing) {
-            $base['production_entry_headcount']=(int)$productionOpening;
-            $base['production_entry_headcount_source']='Production-start opening flock, reconciled to prior rearing-day closing flock';
-        } else {
-            $base['warnings'][]='Production-entry flock boundary does not reconcile: production opening flock differs from the preceding rearing-day closing flock.';
-        }
-    } elseif ($productionOpening !== false) {
-        $base['production_entry_headcount']=(int)$productionOpening;
-        $base['production_entry_headcount_source']='Production-start opening flock';
-    } elseif ($rearingClosing !== null) {
-        $base['production_entry_headcount']=$rearingClosing;
-        $base['production_entry_headcount_source']='Rearing-end closing flock';
-    } else {
-        $base['warnings'][]='No exact Daily Record was found on the production-entry boundary, so surviving production-entry flock is not inferred.';
+    $base['production_entry_headcount'] =
+        $populationBoundary['headcount'];
+
+    $base['production_entry_headcount_source'] =
+        $populationBoundary['source'];
+
+    foreach (
+        $populationBoundary['warnings'] as $boundaryWarning
+    ) {
+        $base['warnings'][] =
+            $boundaryWarning;
     }
 
     if ($base['rearing_investment'] !== null && !empty($base['production_entry_headcount'])) {
