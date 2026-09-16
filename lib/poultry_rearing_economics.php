@@ -140,6 +140,136 @@ function poultry_production_entry_stock_use_provenance_source(
 }
 }
 
+if (!function_exists('poultry_production_entry_direct_expense_provenance_source')) {
+function poultry_production_entry_direct_expense_provenance_source(
+    array $row
+): array {
+    return poultry_production_entry_provenance_source([
+        'role' => 'direct_expense',
+        'source_type' => 'farm_expense',
+        'source_id' => (int)$row['id'],
+        'source_revision' =>
+            poultry_production_entry_provenance_revision([
+                'expense_date' =>
+                    (string)$row['expense_date'],
+                'cycle_id' =>
+                    $row['cycle_id'] === null
+                    || $row['cycle_id'] === ''
+                        ? null
+                        : (int)$row['cycle_id'],
+                'category' =>
+                    (string)$row['category'],
+                'amount' =>
+                    (string)$row['amount'],
+                'unit' =>
+                    (string)$row['unit'],
+            ]),
+        'effective_date' =>
+            (string)$row['expense_date'],
+    ]);
+}
+}
+
+if (!function_exists('poultry_production_entry_explicit_allocation_provenance_source')) {
+function poultry_production_entry_explicit_allocation_provenance_source(
+    array $row
+): array {
+    return poultry_production_entry_provenance_source([
+        'role' => 'explicit_shared_allocation',
+        'source_type' => 'financial_allocation',
+        'source_id' => (int)$row['id'],
+        'source_revision' =>
+            poultry_production_entry_provenance_revision([
+                'expense_id' =>
+                    (int)$row['expense_id'],
+                'cycle_id' =>
+                    $row['cycle_id'] === null
+                    || $row['cycle_id'] === ''
+                        ? null
+                        : (int)$row['cycle_id'],
+                'allocation_percent' =>
+                    $row['allocation_percent'] === null
+                    || $row['allocation_percent'] === ''
+                        ? null
+                        : (string)$row['allocation_percent'],
+                'allocated_amount' =>
+                    (string)$row['allocated_amount'],
+                'expense_date' =>
+                    (string)$row['expense_date'],
+                'expense_category' =>
+                    (string)$row['category'],
+            ]),
+        'effective_date' =>
+            (string)$row['expense_date'],
+    ]);
+}
+}
+
+if (!function_exists('poultry_production_entry_shared_pool_expense_provenance_source')) {
+function poultry_production_entry_shared_pool_expense_provenance_source(
+    array $row
+): array {
+    return poultry_production_entry_provenance_source([
+        'role' => 'shared_pool_expense',
+        'source_type' => 'farm_expense',
+        'source_id' => (int)$row['id'],
+        'source_revision' =>
+            poultry_production_entry_provenance_revision([
+                'expense_date' =>
+                    (string)$row['expense_date'],
+                'farm_type' =>
+                    (string)$row['farm_type'],
+                'production_type' =>
+                    (string)$row['production_type'],
+                'cycle_id' =>
+                    $row['cycle_id'] === null
+                    || $row['cycle_id'] === ''
+                        ? null
+                        : (int)$row['cycle_id'],
+                'category' =>
+                    (string)$row['category'],
+                'amount' =>
+                    (string)$row['amount'],
+                'unit' =>
+                    (string)$row['unit'],
+            ]),
+        'effective_date' =>
+            (string)$row['expense_date'],
+    ]);
+}
+}
+
+if (!function_exists('poultry_production_entry_shared_pool_allocation_provenance_source')) {
+function poultry_production_entry_shared_pool_allocation_provenance_source(
+    array $row,
+    string $expenseDate
+): array {
+    return poultry_production_entry_provenance_source([
+        'role' => 'shared_pool_allocation',
+        'source_type' => 'financial_allocation',
+        'source_id' => (int)$row['id'],
+        'source_revision' =>
+            poultry_production_entry_provenance_revision([
+                'expense_id' =>
+                    (int)$row['expense_id'],
+                'cycle_id' =>
+                    $row['cycle_id'] === null
+                    || $row['cycle_id'] === ''
+                        ? null
+                        : (int)$row['cycle_id'],
+                'allocation_percent' =>
+                    $row['allocation_percent'] === null
+                    || $row['allocation_percent'] === ''
+                        ? null
+                        : (string)$row['allocation_percent'],
+                'allocated_amount' =>
+                    (string)$row['allocated_amount'],
+            ]),
+        'effective_date' => $expenseDate,
+    ]);
+}
+}
+
 if (!function_exists('poultry_production_entry_population_boundary')) {
 function poultry_production_entry_population_boundary(
     PDO $pdo,
@@ -772,45 +902,289 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
             );
     }
 
-    // Direct non-feed expenses recorded specifically against this cycle.
-    $sql = "SELECT category, COALESCE(SUM(amount*unit),0) total
-            FROM farm_expenses
-            WHERE farm_id=? AND cycle_id=? AND expense_date BETWEEN ? AND ? AND category<>'feeds'
-            GROUP BY category";
-    $stmt=$pdo->prepare($sql); $stmt->execute([$farmId,$cycleId,$start,$end]);
-    foreach ($stmt->fetchAll(PDO::FETCH_KEY_PAIR) as $cat=>$amount) {
-        $value=(float)$amount;
-        $base['expense_breakdown'][$cat]=($base['expense_breakdown'][$cat]??0)+$value;
-        $base['direct_expenses'] += $value;
-    }
-    $base['direct_expenses']=round($base['direct_expenses'],2);
+    /*
+     * Direct non-feed expenses recorded specifically against this cycle.
+     * Retain each row so provenance identifies the same source rows that
+     * produce the existing category totals.
+     */
+    $sql =
+        "SELECT
+             id,
+             expense_date,
+             cycle_id,
+             category,
+             amount,
+             unit
+         FROM farm_expenses
+         WHERE farm_id = ?
+           AND cycle_id = ?
+           AND expense_date BETWEEN ? AND ?
+           AND category <> 'feeds'
+         ORDER BY expense_date ASC, id ASC";
 
-    // Explicit shared-expense allocations are defensible cycle attribution.
-    $sql = "SELECT e.category, COALESCE(SUM(fa.allocated_amount),0) total
-            FROM financial_allocations fa
-            JOIN farm_expenses e ON e.id=fa.expense_id AND e.farm_id=fa.farm_id
-            WHERE fa.farm_id=? AND fa.cycle_id=? AND e.expense_date BETWEEN ? AND ? AND e.category<>'feeds'
-            GROUP BY e.category";
-    $stmt=$pdo->prepare($sql); $stmt->execute([$farmId,$cycleId,$start,$end]);
-    foreach ($stmt->fetchAll(PDO::FETCH_KEY_PAIR) as $cat=>$amount) {
-        $value=(float)$amount;
-        $base['expense_breakdown'][$cat]=($base['expense_breakdown'][$cat]??0)+$value;
-        $base['allocated_shared_expenses'] += $value;
-    }
-    $base['allocated_shared_expenses']=round($base['allocated_shared_expenses'],2);
+    $stmt =
+        $pdo->prepare($sql);
 
-    // Disclosure only: Layer shared expense pool not yet explicitly allocated.
-    // It is NOT included in rearing investment because that would invent precision.
-    $sql = "SELECT COALESCE(SUM(GREATEST((e.amount*e.unit)-COALESCE(a.allocated,0),0)),0)
-            FROM farm_expenses e
-            LEFT JOIN (
-                SELECT farm_id, expense_id, SUM(allocated_amount) allocated
-                FROM financial_allocations GROUP BY farm_id, expense_id
-            ) a ON a.farm_id=e.farm_id AND a.expense_id=e.id
-            WHERE e.farm_id=? AND e.cycle_id IS NULL AND e.expense_date BETWEEN ? AND ?
-              AND e.farm_type IN ('poultry','both') AND LOWER(COALESCE(e.production_type,''))='layer' AND e.category<>'feeds'";
-    $stmt=$pdo->prepare($sql); $stmt->execute([$farmId,$start,$end]);
-    $base['unallocated_shared_expense_pool']=round((float)$stmt->fetchColumn(),2);
+    $stmt->execute([
+        $farmId,
+        $cycleId,
+        $start,
+        $end,
+    ]);
+
+    foreach (
+        $stmt->fetchAll(PDO::FETCH_ASSOC)
+        as $row
+    ) {
+        $cat =
+            (string)$row['category'];
+
+        $value =
+            (float)$row['amount']
+            * (float)$row['unit'];
+
+        $base['expense_breakdown'][$cat] =
+            (
+                $base['expense_breakdown'][$cat]
+                ?? 0.0
+            ) + $value;
+
+        $base['direct_expenses'] +=
+            $value;
+
+        $base['provenance_sources'][] =
+            poultry_production_entry_direct_expense_provenance_source(
+                $row
+            );
+    }
+
+    $base['direct_expenses'] =
+        round(
+            $base['direct_expenses'],
+            2
+        );
+
+    /*
+     * Explicit shared-expense allocations are defensible cycle
+     * attribution. Keep the allocation row plus the joined expense
+     * boundary facts that control eligibility and category.
+     */
+    $sql =
+        "SELECT
+             fa.id,
+             fa.expense_id,
+             fa.cycle_id,
+             fa.allocation_percent,
+             fa.allocated_amount,
+             e.expense_date,
+             e.category
+         FROM financial_allocations fa
+         JOIN farm_expenses e
+           ON e.id = fa.expense_id
+          AND e.farm_id = fa.farm_id
+         WHERE fa.farm_id = ?
+           AND fa.cycle_id = ?
+           AND e.expense_date BETWEEN ? AND ?
+           AND e.category <> 'feeds'
+         ORDER BY e.expense_date ASC, fa.id ASC";
+
+    $stmt =
+        $pdo->prepare($sql);
+
+    $stmt->execute([
+        $farmId,
+        $cycleId,
+        $start,
+        $end,
+    ]);
+
+    foreach (
+        $stmt->fetchAll(PDO::FETCH_ASSOC)
+        as $row
+    ) {
+        $cat =
+            (string)$row['category'];
+
+        $value =
+            (float)$row['allocated_amount'];
+
+        $base['expense_breakdown'][$cat] =
+            (
+                $base['expense_breakdown'][$cat]
+                ?? 0.0
+            ) + $value;
+
+        $base['allocated_shared_expenses'] +=
+            $value;
+
+        $base['provenance_sources'][] =
+            poultry_production_entry_explicit_allocation_provenance_source(
+                $row
+            );
+    }
+
+    $base['allocated_shared_expenses'] =
+        round(
+            $base['allocated_shared_expenses'],
+            2
+        );
+
+    /*
+     * Disclosure-only shared Layer pool.
+     *
+     * Its residual depends on both each qualifying shared expense and
+     * every allocation against that expense, including allocations to
+     * other cycles. Preserve all of those dependencies in provenance.
+     */
+    $sql =
+        "SELECT
+             e.id AS expense_id,
+             e.expense_date,
+             e.farm_type,
+             e.production_type,
+             e.cycle_id AS expense_cycle_id,
+             e.category,
+             e.amount,
+             e.unit,
+             fa.id AS allocation_id,
+             fa.cycle_id AS allocation_cycle_id,
+             fa.allocation_percent,
+             fa.allocated_amount
+         FROM farm_expenses e
+         LEFT JOIN financial_allocations fa
+           ON fa.farm_id = e.farm_id
+          AND fa.expense_id = e.id
+         WHERE e.farm_id = ?
+           AND e.cycle_id IS NULL
+           AND e.expense_date BETWEEN ? AND ?
+           AND e.farm_type IN ('poultry','both')
+           AND LOWER(
+               COALESCE(
+                   e.production_type,
+                   ''
+               )
+           ) = 'layer'
+           AND e.category <> 'feeds'
+         ORDER BY
+             e.expense_date ASC,
+             e.id ASC,
+             fa.id ASC";
+
+    $stmt =
+        $pdo->prepare($sql);
+
+    $stmt->execute([
+        $farmId,
+        $start,
+        $end,
+    ]);
+
+    $sharedPoolExpenses = [];
+
+    foreach (
+        $stmt->fetchAll(PDO::FETCH_ASSOC)
+        as $row
+    ) {
+        $expenseId =
+            (int)$row['expense_id'];
+
+        if (
+            !isset(
+                $sharedPoolExpenses[
+                    $expenseId
+                ]
+            )
+        ) {
+            $expenseSourceRow = [
+                'id' => $expenseId,
+                'expense_date' =>
+                    (string)$row['expense_date'],
+                'farm_type' =>
+                    (string)$row['farm_type'],
+                'production_type' =>
+                    (string)$row['production_type'],
+                'cycle_id' =>
+                    $row['expense_cycle_id'],
+                'category' =>
+                    (string)$row['category'],
+                'amount' =>
+                    (string)$row['amount'],
+                'unit' =>
+                    (string)$row['unit'],
+            ];
+
+            $sharedPoolExpenses[$expenseId] = [
+                'gross' =>
+                    (float)$row['amount']
+                    * (float)$row['unit'],
+                'allocated' => 0.0,
+            ];
+
+            $base['provenance_sources'][] =
+                poultry_production_entry_shared_pool_expense_provenance_source(
+                    $expenseSourceRow
+                );
+        }
+
+        if (
+            $row['allocation_id'] !== null
+            && $row['allocation_id'] !== ''
+        ) {
+            $allocationSourceRow = [
+                'id' =>
+                    (int)$row['allocation_id'],
+                'expense_id' =>
+                    $expenseId,
+                'cycle_id' =>
+                    $row['allocation_cycle_id'],
+                'allocation_percent' =>
+                    $row['allocation_percent'],
+                'allocated_amount' =>
+                    (string)$row[
+                        'allocated_amount'
+                    ],
+            ];
+
+            $sharedPoolExpenses[
+                $expenseId
+            ]['allocated'] +=
+                (float)$row[
+                    'allocated_amount'
+                ];
+
+            $base['provenance_sources'][] =
+                poultry_production_entry_shared_pool_allocation_provenance_source(
+                    $allocationSourceRow,
+                    (string)$row['expense_date']
+                );
+        }
+    }
+
+    $base['unallocated_shared_expense_pool'] =
+        0.0;
+
+    foreach (
+        $sharedPoolExpenses
+        as $sharedPoolExpense
+    ) {
+        $base[
+            'unallocated_shared_expense_pool'
+        ] += max(
+            (float)$sharedPoolExpense['gross']
+            - (float)$sharedPoolExpense[
+                'allocated'
+            ],
+            0.0
+        );
+    }
+
+    $base['unallocated_shared_expense_pool'] =
+        round(
+            $base[
+                'unallocated_shared_expense_pool'
+            ],
+            2
+        );
 
     $complete = $uncostedAcq===0 && $base['uncosted_feed_uses']===0 && $base['uncosted_operating_uses']===0;
     $investment = $acqCost + $base['feed_consumed_cost'] + $base['inventory_operating_cost'] + $base['direct_expenses'] + $base['allocated_shared_expenses'];
