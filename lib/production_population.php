@@ -393,6 +393,146 @@ if (!function_exists('production_population_project_delta_locked')) {
     }
 }
 
+if (!function_exists('production_population_history')) {
+    /**
+     * Read the exact canonical baseline and append-only movement rows used to
+     * reconstruct population through an optional historical boundary.
+     *
+     * Corrections are deliberately not collapsed: original movements,
+     * compensating reversals and later source versions remain visible so
+     * provenance callers can identify the actual canonical history.
+     *
+     * Read-only. No population policy is rewritten here.
+     */
+    function production_population_history(
+        PDO $pdo,
+        int $farmId,
+        int $cycleId,
+        ?string $asOfDate = null
+    ): ?array {
+        if ($farmId <= 0 || $cycleId <= 0) {
+            throw new InvalidArgumentException(
+                'Select a valid production cycle.'
+            );
+        }
+
+        if (
+            $asOfDate !== null
+            && !production_population_valid_date($asOfDate)
+        ) {
+            throw new InvalidArgumentException(
+                'Enter a valid population history date.'
+            );
+        }
+
+        $baselineStmt = $pdo->prepare(
+            'SELECT
+                 id,
+                 farm_id,
+                 cycle_id,
+                 baseline_date,
+                 baseline_quantity,
+                 baseline_source
+             FROM production_population_baselines
+             WHERE farm_id = ?
+               AND cycle_id = ?
+             LIMIT 1'
+        );
+
+        $baselineStmt->execute([
+            $farmId,
+            $cycleId,
+        ]);
+
+        $baseline =
+            $baselineStmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$baseline) {
+            return null;
+        }
+
+        $baselineDate =
+            (string)$baseline['baseline_date'];
+
+        if (
+            $asOfDate !== null
+            && $asOfDate < $baselineDate
+        ) {
+            throw new ProductionPopulationException(
+                'Population history cannot be read before the V3 baseline date.'
+            );
+        }
+
+        if ($asOfDate !== null) {
+            $movementStmt = $pdo->prepare(
+                'SELECT
+                     id,
+                     movement_date,
+                     movement_type,
+                     quantity_delta,
+                     source_type,
+                     source_id,
+                     source_version,
+                     reversal_of_id
+                 FROM production_population_movements
+                 WHERE farm_id = ?
+                   AND cycle_id = ?
+                   AND movement_date <= ?
+                 ORDER BY movement_date ASC, id ASC'
+            );
+
+            $movementStmt->execute([
+                $farmId,
+                $cycleId,
+                $asOfDate,
+            ]);
+        } else {
+            $movementStmt = $pdo->prepare(
+                'SELECT
+                     id,
+                     movement_date,
+                     movement_type,
+                     quantity_delta,
+                     source_type,
+                     source_id,
+                     source_version,
+                     reversal_of_id
+                 FROM production_population_movements
+                 WHERE farm_id = ?
+                   AND cycle_id = ?
+                 ORDER BY movement_date ASC, id ASC'
+            );
+
+            $movementStmt->execute([
+                $farmId,
+                $cycleId,
+            ]);
+        }
+
+        return [
+            'baseline' => [
+                'id' =>
+                    (int)$baseline['id'],
+                'farm_id' =>
+                    (int)$baseline['farm_id'],
+                'cycle_id' =>
+                    (int)$baseline['cycle_id'],
+                'baseline_date' =>
+                    $baselineDate,
+                'baseline_quantity' =>
+                    (int)$baseline['baseline_quantity'],
+                'baseline_source' =>
+                    (string)$baseline['baseline_source'],
+            ],
+            'movements' =>
+                $movementStmt->fetchAll(
+                    PDO::FETCH_ASSOC
+                ) ?: [],
+            'as_of_date' => $asOfDate,
+        ];
+    }
+}
+
 if (!function_exists('production_population_state')) {
     /**
      * Read-only population view.
