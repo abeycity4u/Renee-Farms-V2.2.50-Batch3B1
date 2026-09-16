@@ -7,6 +7,7 @@ require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/../includes/permission_catalog.php');
 require_once(__DIR__ . '/../lib/attribution.php');
 require_once(__DIR__ . '/../lib/ruminant_expense_allocation.php');
+require_once(__DIR__ . '/../lib/expense_revision_service.php');
 require_http_method('POST');
 require_csrf_token();
 require_rate_limit('update_expense', 60, 60);
@@ -110,13 +111,51 @@ try {
     }
 
     $pdo->beginTransaction();
+
+    expense_revision_service_prepare_existing_mutation(
+        $pdo,
+        $farmId,
+        (int)$expenseId,
+        (int)($_SESSION['user_id'] ?? 0)
+    );
+
     $stmt = $pdo->prepare("UPDATE farm_expenses
                            SET expense_date=?, farm_type=?, production_type=?, attribution_scope=?, cycle_id=?, poultry_category=?, category=?, amount=?, unit=?, description=?
                            WHERE id=? AND farm_id=?");
     $stmt->execute([$expenseDate,$farmType,$productionType,$scope,$cycleId>0?$cycleId:null,$poultryCategory,$category,$amount,$unit,$description,$expenseId,$farmId]);
     if ($farmType === 'ruminant') {
-        ruminant_expense_save_animal_allocations($pdo, $farmId, (int)$expenseId, $animalAllocation, (int)($_SESSION['user_id'] ?? 0));
+        ruminant_expense_save_animal_allocations(
+            $pdo,
+            $farmId,
+            (int)$expenseId,
+            $animalAllocation,
+            (int)($_SESSION['user_id'] ?? 0)
+        );
+
+    } elseif (($existing['farm_type'] ?? '') === 'ruminant') {
+        /*
+         * An expense moved away from Ruminant must not retain stale
+         * animal-allocation rows.
+         */
+        ruminant_expense_save_animal_allocations(
+            $pdo,
+            $farmId,
+            (int)$expenseId,
+            [
+                'mode' => 'herd',
+                'rows' => [],
+            ],
+            (int)($_SESSION['user_id'] ?? 0)
+        );
     }
+
+    expense_revision_service_record_updated(
+        $pdo,
+        $farmId,
+        (int)$expenseId,
+        (int)($_SESSION['user_id'] ?? 0)
+    );
+
     $pdo->commit();
 
     $_SESSION['success'] = 'Expense updated successfully.'; send_json(['success' => true, 'message' => 'Expense updated successfully']);

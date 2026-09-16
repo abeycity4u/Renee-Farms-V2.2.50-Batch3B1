@@ -7,6 +7,7 @@ require_once(__DIR__ . '/../lib/attribution.php');
 require_once(__DIR__ . '/../lib/transaction_actor_display.php');
 require_once(__DIR__ . '/../lib/inventory_financial.php');
 require_once(__DIR__ . '/../lib/ruminant_expense_allocation.php');
+require_once(__DIR__ . '/../lib/expense_revision_service.php');
 requireLogin();
 $pdfRequested = pdf_report_is_requested();
 if ($pdfRequested) { pdf_report_begin(); }
@@ -103,6 +104,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_expense'])) {
         ]);
         $expenseId = (int)$pdo->lastInsertId();
         ruminant_expense_save_animal_allocations($pdo, $tenantFarmId, $expenseId, $animalAllocation, (int)$_SESSION['user_id']);
+
+        expense_revision_service_record_created(
+            $pdo,
+            $tenantFarmId,
+            $expenseId,
+            (int)($_SESSION['user_id'] ?? 0)
+        );
+
         $pdo->commit();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();

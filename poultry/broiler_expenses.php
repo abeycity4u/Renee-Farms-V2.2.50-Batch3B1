@@ -6,6 +6,7 @@ require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/../lib/attribution.php');
 require_once(__DIR__ . '/../lib/transaction_actor_display.php');
 require_once(__DIR__ . '/../lib/inventory_financial.php');
+require_once(__DIR__ . '/../lib/expense_revision_service.php');
 requireLogin();
 $pdfRequested = pdf_report_is_requested();
 if ($pdfRequested) { pdf_report_begin(); }
@@ -85,14 +86,58 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_expense'])) {
         }
     }
     $scope = attribution_scope($cycleId > 0 ? $cycleId : null, 'poultry', 'broiler');
-    $stmt = $pdo->prepare("INSERT INTO farm_expenses
-        (farm_id, expense_date, farm_type, production_type, attribution_scope, cycle_id, poultry_category, category, amount, unit, description, user_id)
-        VALUES (?, ?, 'poultry', 'broiler', ?, ?, 'broiler', ?, ?, ?, ?, ?)");
-    $stmt->execute([
-        $tenantFarmId, $expenseDate, $scope, $cycleId > 0 ? $cycleId : null,
-        $expenseCategory, $amount, $unit,
-        trim((string)($_POST['description'] ?? '')), $_SESSION['user_id']
-    ]);
+
+    try {
+        $pdo->beginTransaction();
+
+        $stmt = $pdo->prepare("INSERT INTO farm_expenses
+            (farm_id, expense_date, farm_type, production_type, attribution_scope, cycle_id, poultry_category, category, amount, unit, description, user_id)
+            VALUES (?, ?, 'poultry', 'broiler', ?, ?, 'broiler', ?, ?, ?, ?, ?)");
+
+        $stmt->execute([
+            $tenantFarmId,
+            $expenseDate,
+            $scope,
+            $cycleId > 0 ? $cycleId : null,
+            $expenseCategory,
+            $amount,
+            $unit,
+            trim((string)($_POST['description'] ?? '')),
+            $_SESSION['user_id']
+        ]);
+
+        $expenseId =
+            (int)$pdo->lastInsertId();
+
+        expense_revision_service_record_created(
+            $pdo,
+            $tenantFarmId,
+            $expenseId,
+            (int)($_SESSION['user_id'] ?? 0)
+        );
+
+        $pdo->commit();
+
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+
+        $_SESSION['error'] =
+            'The broiler expense could not be recorded.';
+
+        header(
+            "Location: broiler_expenses.php?month="
+            . date(
+                'Y-m',
+                strtotime(
+                    $expenseDate ?: 'now'
+                )
+            )
+        );
+
+        exit();
+    }
 
     $_SESSION['success'] = "Broiler expense recorded successfully!";
     $redirectMonth = date('Y-m', strtotime($expenseDate));

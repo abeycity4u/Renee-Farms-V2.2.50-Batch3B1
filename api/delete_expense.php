@@ -5,6 +5,7 @@ require_once(__DIR__ . '/api_helpers.php');
 require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/../includes/permission_catalog.php');
 require_once(__DIR__ . '/../includes/audit_helpers.php');
+require_once(__DIR__ . '/../lib/expense_revision_service.php');
 requireLogin(); require_http_method('POST'); require_csrf_token(); require_rate_limit('delete_expense',20,60);
 $id=$_POST['id']??null;
 if(!$id || !ctype_digit((string)$id)) send_json(['success'=>false,'error'=>'A valid record ID is required.'],400);
@@ -35,6 +36,20 @@ try {
    $pdo->rollBack(); send_json(['success'=>false,'error'=>'You do not have permission to delete this expense record.'],403);
   }
  }
+ expense_revision_service_prepare_existing_mutation(
+  $pdo,
+  $farmId,
+  (int)$id,
+  (int)($_SESSION['user_id']??0)
+ );
+
+ expense_revision_service_record_deleted(
+  $pdo,
+  $farmId,
+  (int)$id,
+  (int)($_SESSION['user_id']??0)
+ );
+
  audit_log_event('delete','expense',$id,['before'=>$row]);
  $stmt=$pdo->prepare('DELETE FROM farm_expenses WHERE id=? AND farm_id=?'); $stmt->execute([(int)$id,$farmId]);
  $pdo->commit(); $_SESSION['success'] = 'Expense record deleted successfully.'; send_json(['success'=>true,'message'=>'Expense record deleted successfully.']);
