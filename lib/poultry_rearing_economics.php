@@ -97,43 +97,73 @@ function poultry_production_entry_stock_use_provenance_source(
             return (string)$value;
         };
 
+    $revisionFacts = [
+        'stock_item_id' =>
+            (int)$row['stock_item_id'],
+        'transaction_date' =>
+            (string)$row['transaction_date'],
+        'transaction_type' =>
+            (string)$row['transaction_type'],
+        'quantity' =>
+            (string)$row['quantity'],
+        'unit_cost' =>
+            $nullableString(
+                $row['unit_cost'] ?? null
+            ),
+        'total_cost' =>
+            $nullableString(
+                $row['total_cost'] ?? null
+            ),
+        'financial_classification' =>
+            $nullableString(
+                $row[
+                    'financial_classification'
+                ] ?? null
+            ),
+        'source_type' =>
+            $nullableString(
+                $row['source_type'] ?? null
+            ),
+        'source_id' =>
+            $nullableString(
+                $row['source_id'] ?? null
+            ),
+    ];
+
+    /*
+     * Feed eligibility itself depends on mutable joined item/category
+     * metadata. Preserve those policy inputs in Feed provenance so an
+     * eligibility-changing edit cannot leave the provenance fingerprint
+     * unchanged.
+     *
+     * category_name follows the same LOWER(COALESCE(...)) semantics as
+     * stock_feed_item_sql_predicate(), so case-only edits remain invariant.
+     */
+    if ($role === 'feed_use') {
+        $revisionFacts['feed_category'] =
+            $nullableString(
+                $row['feed_category'] ?? null
+            );
+
+        $revisionFacts[
+            'feed_category_name_normalized'
+        ] =
+            strtolower(
+                (string)(
+                    $row['category_name']
+                    ?? ''
+                )
+            );
+    }
+
     return poultry_production_entry_provenance_source([
         'role' => $role,
         'source_type' => 'stock_transaction',
         'source_id' => (int)$row['id'],
         'source_revision' =>
-            poultry_production_entry_provenance_revision([
-                'stock_item_id' =>
-                    (int)$row['stock_item_id'],
-                'transaction_date' =>
-                    (string)$row['transaction_date'],
-                'transaction_type' =>
-                    (string)$row['transaction_type'],
-                'quantity' =>
-                    (string)$row['quantity'],
-                'unit_cost' =>
-                    $nullableString(
-                        $row['unit_cost'] ?? null
-                    ),
-                'total_cost' =>
-                    $nullableString(
-                        $row['total_cost'] ?? null
-                    ),
-                'financial_classification' =>
-                    $nullableString(
-                        $row[
-                            'financial_classification'
-                        ] ?? null
-                    ),
-                'source_type' =>
-                    $nullableString(
-                        $row['source_type'] ?? null
-                    ),
-                'source_id' =>
-                    $nullableString(
-                        $row['source_id'] ?? null
-                    ),
-            ]),
+            poultry_production_entry_provenance_revision(
+                $revisionFacts
+            ),
         'effective_date' =>
             (string)$row['transaction_date'],
     ]);
@@ -811,7 +841,9 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
              t.total_cost,
              t.financial_classification,
              t.source_type,
-             t.source_id
+             t.source_id,
+             s.feed_category AS feed_category,
+             c.category_name AS category_name
          FROM stock_transactions t
          JOIN stock_items s
            ON s.id = t.stock_item_id

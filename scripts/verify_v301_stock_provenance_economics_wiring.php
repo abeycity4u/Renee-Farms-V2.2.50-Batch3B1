@@ -26,7 +26,10 @@ $assert = static function (
 try {
     /*
      * Pure stock-source mapping contract.
-     * Presentation/audit fields are deliberately not economic identity.
+     *
+     * Feed provenance must preserve both transaction facts and the mutable
+     * item/category metadata used by the canonical Feed eligibility
+     * predicate. Presentation/audit fields remain outside identity.
      */
     $stockA = [
         'id' => 392,
@@ -39,29 +42,66 @@ try {
         'financial_classification' => 'feed',
         'source_type' => 'daily_feed_record',
         'source_id' => 'example-source-1',
+        'feed_category' => 'layer',
+        'category_name' => 'Feeds',
         'remarks' => 'Original display note',
         'created_at' => '2026-09-11 08:00:00',
         'item_name' => 'Layer Feed',
-        'category_name' => 'Feeds',
     ];
 
-    $stockPresentation = $stockA;
+    $stockPresentation =
+        $stockA;
+
     $stockPresentation['remarks'] =
         'Presentation-only note changed';
+
     $stockPresentation['created_at'] =
         '2026-09-11 09:00:00';
+
     $stockPresentation['item_name'] =
         'Display label changed';
-    $stockPresentation['category_name'] =
-        'Feed';
 
-    $stockEconomicChange = $stockA;
-    $stockEconomicChange['total_cost'] =
-        '43334.34';
+    $stockCategoryCaseOnly =
+        $stockA;
 
-    $stockSourceLinkChange = $stockA;
-    $stockSourceLinkChange['source_id'] =
-        'generic-source-id-changed';
+    $stockCategoryCaseOnly[
+        'category_name'
+    ] = 'FEEDS';
+
+    $stockFeedCategoryChange =
+        $stockA;
+
+    $stockFeedCategoryChange[
+        'feed_category'
+    ] = 'broiler';
+
+    $stockCategorySemanticChange =
+        $stockA;
+
+    $stockCategorySemanticChange[
+        'category_name'
+    ] = 'Medication';
+
+    $stockEconomicChange =
+        $stockA;
+
+    $stockEconomicChange[
+        'total_cost'
+    ] = '43334.34';
+
+    $stockSourceLinkChange =
+        $stockA;
+
+    $stockSourceLinkChange[
+        'source_id'
+    ] = 'generic-source-id-changed';
+
+    $stockOperatingClassificationChange =
+        $stockA;
+
+    $stockOperatingClassificationChange[
+        'financial_classification'
+    ] = 'medication_vaccine';
 
     $stockSourceA =
         poultry_production_entry_stock_use_provenance_source(
@@ -72,6 +112,24 @@ try {
     $stockPresentationSource =
         poultry_production_entry_stock_use_provenance_source(
             $stockPresentation,
+            'feed_use'
+        );
+
+    $stockCategoryCaseOnlySource =
+        poultry_production_entry_stock_use_provenance_source(
+            $stockCategoryCaseOnly,
+            'feed_use'
+        );
+
+    $stockFeedCategorySource =
+        poultry_production_entry_stock_use_provenance_source(
+            $stockFeedCategoryChange,
+            'feed_use'
+        );
+
+    $stockCategorySemanticSource =
+        poultry_production_entry_stock_use_provenance_source(
+            $stockCategorySemanticChange,
             'feed_use'
         );
 
@@ -93,25 +151,75 @@ try {
             'operating_inventory_use'
         );
 
+    $stockOperatingClassificationSource =
+        poultry_production_entry_stock_use_provenance_source(
+            $stockOperatingClassificationChange,
+            'operating_inventory_use'
+        );
+
     $assert(
         $stockSourceA['source_revision']
             ===
-        $stockPresentationSource['source_revision'],
+        $stockPresentationSource[
+            'source_revision'
+        ],
         'Stock presentation-only fields changed provenance.'
     );
 
     $assert(
         $stockSourceA['source_revision']
+            ===
+        $stockCategoryCaseOnlySource[
+            'source_revision'
+        ],
+        'Feed category-name case-only change altered provenance.'
+    );
+
+    $assert(
+        $stockSourceA['source_revision']
             !==
-        $stockEconomicSource['source_revision'],
+        $stockFeedCategorySource[
+            'source_revision'
+        ],
+        'Feed-category semantic change did not change provenance.'
+    );
+
+    $assert(
+        $stockSourceA['source_revision']
+            !==
+        $stockCategorySemanticSource[
+            'source_revision'
+        ],
+        'Feed category-name semantic change did not change provenance.'
+    );
+
+    $assert(
+        $stockSourceA['source_revision']
+            !==
+        $stockEconomicSource[
+            'source_revision'
+        ],
         'Stock economic fact change did not change provenance.'
     );
 
     $assert(
         $stockSourceA['source_revision']
             !==
-        $stockSourceLinkSource['source_revision'],
+        $stockSourceLinkSource[
+            'source_revision'
+        ],
         'Generic stock source linkage change did not change provenance.'
+    );
+
+    $assert(
+        $stockOperatingRole[
+            'source_revision'
+        ]
+            !==
+        $stockOperatingClassificationSource[
+            'source_revision'
+        ],
+        'Operating financial classification change did not change provenance.'
     );
 
     $assert(
@@ -254,8 +362,8 @@ try {
     );
 
     $assert(
-        count($sources) === 16,
-        'Expected 16 wired provenance sources.'
+        count($sources) === 19,
+        'Expected 19 wired provenance sources.'
     );
 
     $roleCounts = [];
@@ -448,6 +556,30 @@ try {
         'Stock provenance mapper is not wired.'
     );
 
+    $assert(
+        strpos(
+            $economicsSource,
+            's.feed_category AS feed_category'
+        ) !== false,
+        'Feed query does not retain feed_category eligibility metadata.'
+    );
+
+    $assert(
+        strpos(
+            $economicsSource,
+            'c.category_name AS category_name'
+        ) !== false,
+        'Feed query does not retain category-name eligibility metadata.'
+    );
+
+    $assert(
+        strpos(
+            $economicsSource,
+            "'feed_category_name_normalized'"
+        ) !== false,
+        'Feed provenance does not normalize category-name eligibility metadata.'
+    );
+
     if ($failures) {
         echo "RESULT=FAIL\n";
 
@@ -522,6 +654,10 @@ try {
 
     echo "STOCK_PRESENTATION_ONLY_INVARIANCE=PASS\n";
     echo "STOCK_ECONOMIC_FACT_SENSITIVITY=PASS\n";
+    echo "FEED_CATEGORY_SENSITIVITY=PASS\n";
+    echo "FEED_CATEGORY_NAME_SEMANTIC_SENSITIVITY=PASS\n";
+    echo "FEED_CATEGORY_NAME_CASE_INVARIANCE=PASS\n";
+    echo "OPERATING_CLASSIFICATION_SENSITIVITY=PASS\n";
     echo "STOCK_SOURCE_LINK_SENSITIVITY=PASS\n";
     echo "STOCK_ROLE_SENSITIVITY=PASS\n";
     echo "ROW_LEVEL_POLICY=PASS\n";
