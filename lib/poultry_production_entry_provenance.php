@@ -352,6 +352,49 @@ if (!function_exists('poultry_production_entry_provenance_manifest')) {
     }
 }
 
+if (!function_exists('poultry_production_entry_provenance_manifest_json')) {
+    function poultry_production_entry_provenance_manifest_json(
+        array $manifest
+    ): string {
+        if (
+            ($manifest['schema'] ?? '')
+                !== 'poultry_production_entry_provenance'
+            || (int)($manifest['schema_version'] ?? 0) !== 1
+        ) {
+            throw new InvalidArgumentException(
+                'Invalid Production-Entry provenance manifest.'
+            );
+        }
+
+        $normalized =
+            poultry_production_entry_provenance_manifest(
+                isset($manifest['context'])
+                    && is_array($manifest['context'])
+                        ? $manifest['context']
+                        : [],
+                isset($manifest['sources'])
+                    && is_array($manifest['sources'])
+                        ? $manifest['sources']
+                        : []
+            );
+
+        $json = json_encode(
+            $normalized,
+            JSON_UNESCAPED_SLASHES
+            | JSON_UNESCAPED_UNICODE
+            | JSON_PRESERVE_ZERO_FRACTION
+        );
+
+        if ($json === false) {
+            throw new RuntimeException(
+                'Production-Entry provenance manifest could not be encoded.'
+            );
+        }
+
+        return $json;
+    }
+}
+
 if (!function_exists('poultry_production_entry_provenance_fingerprint')) {
     function poultry_production_entry_provenance_fingerprint(
         array $manifest
@@ -408,6 +451,10 @@ if (!function_exists('poultry_production_entry_provenance_build')) {
 
         return [
             'manifest' => $manifest,
+            'manifest_json' =>
+                poultry_production_entry_provenance_manifest_json(
+                    $manifest
+                ),
             'fingerprint' =>
                 poultry_production_entry_provenance_fingerprint(
                     $manifest

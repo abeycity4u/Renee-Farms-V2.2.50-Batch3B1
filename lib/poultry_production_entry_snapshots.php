@@ -19,7 +19,12 @@ function poultry_production_entry_candidate(PDO $pdo, int $farmId, int $cycleId)
         'direct_expenses'=>0.0, 'explicit_shared_allocations'=>0.0,
         'attributed_investment'=>null, 'production_entry_headcount'=>null,
         'investment_per_entry_bird'=>null, 'unallocated_shared_cost_pool'=>0.0,
-        'source_fingerprint'=>null, 'economics'=>$e,
+        'source_fingerprint'=>null,
+        'provenance_fingerprint'=>null,
+        'provenance_manifest'=>null,
+        'provenance_manifest_json'=>null,
+        'provenance_source_count'=>null,
+        'economics'=>$e,
     ];
     if (empty($e['available'])) {
         $candidate['reason'] = $e['message'] ?? 'Production-entry economics are not available.';
@@ -80,8 +85,166 @@ function poultry_production_entry_candidate(PDO $pdo, int $farmId, int $cycleId)
         'unallocated_shared_cost_pool'=>$candidate['unallocated_shared_cost_pool'],
     ];
     $candidate['source_fingerprint']=hash('sha256', json_encode($fingerprintFacts, JSON_UNESCAPED_SLASHES|JSON_PRESERVE_ZERO_FRACTION));
+
+    // source_fingerprint remains the legacy aggregate-value identity for
+    // compatibility with approvals created before true provenance recording.
+    // New approvals also carry the exact canonical causal-source manifest.
+    $provenanceSources =
+        isset($e['provenance_sources'])
+        && is_array($e['provenance_sources'])
+            ? $e['provenance_sources']
+            : [];
+
+    $provenance =
+        poultry_production_entry_provenance_build(
+            [
+                'farm_id' => $farmId,
+                'cycle_id' => $cycleId,
+                'mode' => $candidate['mode'],
+                'production_entry_date' =>
+                    $candidate['production_entry_date'],
+                'rearing_start_date' =>
+                    $candidate['rearing_start_date'],
+                'rearing_end_date' =>
+                    $candidate['rearing_end_date'],
+            ],
+            $provenanceSources
+        );
+
+    $candidate['provenance_manifest'] =
+        $provenance['manifest'];
+
+    $candidate['provenance_manifest_json'] =
+        $provenance['manifest_json'];
+
+    $candidate['provenance_fingerprint'] =
+        $provenance['fingerprint'];
+
+    $candidate['provenance_source_count'] =
+        count(
+            $provenance['manifest']['sources']
+        );
     $candidate['ready']=true;
     return $candidate;
+}
+}
+
+if (!function_exists('poultry_production_entry_snapshot_comparison')) {
+function poultry_production_entry_snapshot_comparison(
+    ?array $snapshot,
+    array $candidate
+): array {
+    if (empty($candidate['ready'])) {
+        return [
+            'changed' => false,
+            'comparison_basis' => 'not_ready',
+            'provenance_recorded' => false,
+        ];
+    }
+
+    if ($snapshot === null) {
+        return [
+            'changed' => true,
+            'comparison_basis' => 'none',
+            'provenance_recorded' => false,
+        ];
+    }
+
+    $previousProvenance =
+        strtolower(
+            trim(
+                (string)(
+                    $snapshot['provenance_fingerprint']
+                    ?? ''
+                )
+            )
+        );
+
+    $candidateProvenance =
+        strtolower(
+            trim(
+                (string)(
+                    $candidate['provenance_fingerprint']
+                    ?? ''
+                )
+            )
+        );
+
+    $previousHasProvenance =
+        preg_match(
+            '/^[a-f0-9]{64}$/',
+            $previousProvenance
+        ) === 1;
+
+    if ($previousHasProvenance) {
+        if (
+            preg_match(
+                '/^[a-f0-9]{64}$/',
+                $candidateProvenance
+            ) !== 1
+        ) {
+            throw new RuntimeException(
+                'Current Production-Entry provenance is incomplete.'
+            );
+        }
+
+        return [
+            'changed' =>
+                !hash_equals(
+                    $previousProvenance,
+                    $candidateProvenance
+                ),
+            'comparison_basis' => 'provenance',
+            'provenance_recorded' => true,
+        ];
+    }
+
+    $previousLegacy =
+        strtolower(
+            trim(
+                (string)(
+                    $snapshot['source_fingerprint']
+                    ?? ''
+                )
+            )
+        );
+
+    $candidateLegacy =
+        strtolower(
+            trim(
+                (string)(
+                    $candidate['source_fingerprint']
+                    ?? ''
+                )
+            )
+        );
+
+    if (
+        preg_match(
+            '/^[a-f0-9]{64}$/',
+            $previousLegacy
+        ) !== 1
+        || preg_match(
+            '/^[a-f0-9]{64}$/',
+            $candidateLegacy
+        ) !== 1
+    ) {
+        throw new RuntimeException(
+            'Legacy Production-Entry fingerprint is incomplete.'
+        );
+    }
+
+    // Historical approvals created before the provenance cutover did not
+    // record their causal source manifest. Do not manufacture one later.
+    return [
+        'changed' =>
+            !hash_equals(
+                $previousLegacy,
+                $candidateLegacy
+            ),
+        'comparison_basis' => 'legacy_value',
+        'provenance_recorded' => false,
+    ];
 }
 }
 
@@ -115,7 +278,16 @@ function poultry_production_entry_approve(PDO $pdo,int $farmId,int $cycleId,int 
         $lock->execute([$farmId,$cycleId]);
         $previous=$lock->fetch(PDO::FETCH_ASSOC) ?: null;
 
-        if ($previous && hash_equals((string)$previous['source_fingerprint'],(string)$candidate['source_fingerprint'])) {
+        $comparison =
+            poultry_production_entry_snapshot_comparison(
+                $previous,
+                $candidate
+            );
+
+        if (
+            $previous
+            && empty($comparison['changed'])
+        ) {
             throw new RuntimeException('The source-derived economic basis has not changed since the latest approved version.');
         }
         if (!$previous && $category!=='production_entry_confirmation') {
@@ -135,8 +307,9 @@ function poultry_production_entry_approve(PDO $pdo,int $farmId,int $cycleId,int 
           (farm_id,cycle_id,version_no,snapshot_status,entry_model,production_entry_date,rearing_start_date,rearing_end_date,
            acquisition_basis,feed_consumed_cost,operating_inventory_cost,direct_expenses,explicit_shared_allocations,
            attributed_investment,production_entry_headcount,investment_per_entry_bird,unallocated_shared_cost_pool,
-           source_fingerprint,revision_category,revision_reason,previous_snapshot_id,approved_by)
-          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+           source_fingerprint,provenance_fingerprint,provenance_manifest_json,provenance_source_count,
+           revision_category,revision_reason,previous_snapshot_id,approved_by)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
         $st=$pdo->prepare($sql);
         $st->execute([
             $farmId,$cycleId,$version,$status,$model,$candidate['production_entry_date'],
@@ -144,11 +317,14 @@ function poultry_production_entry_approve(PDO $pdo,int $farmId,int $cycleId,int 
             $candidate['feed_consumed_cost'],$candidate['operating_inventory_cost'],$candidate['direct_expenses'],
             $candidate['explicit_shared_allocations'],$candidate['attributed_investment'],$candidate['production_entry_headcount'],
             $candidate['investment_per_entry_bird'],$candidate['unallocated_shared_cost_pool'],$candidate['source_fingerprint'],
+            $candidate['provenance_fingerprint'],$candidate['provenance_manifest_json'],$candidate['provenance_source_count'],
             $category,$reason!==''?$reason:null,$previous?(int)$previous['id']:null,$userId?:null
         ]);
         $id=(int)$pdo->lastInsertId();
         audit_log_event('poultry_production_entry_basis_approved','poultry_production_entry_snapshot',$id,[
             'cycle_id'=>$cycleId,'version'=>$version,'status'=>$status,'source_fingerprint'=>$candidate['source_fingerprint'],
+            'provenance_fingerprint'=>$candidate['provenance_fingerprint'],
+            'provenance_source_count'=>$candidate['provenance_source_count'],
             'attributed_investment'=>$candidate['attributed_investment'],'production_entry_headcount'=>$candidate['production_entry_headcount'],
             'investment_per_entry_bird'=>$candidate['investment_per_entry_bird'],'revision_category'=>$category
         ]);

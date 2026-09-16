@@ -326,6 +326,19 @@ $productionEntrySnapshots =
 $latestProductionEntrySnapshot =
     $productionEntrySnapshots[0] ?? null;
 
+$productionEntryComparison = null;
+
+if (
+    $productionEntryCandidate
+    && !empty($productionEntryCandidate['ready'])
+) {
+    $productionEntryComparison =
+        poultry_production_entry_snapshot_comparison(
+            $latestProductionEntrySnapshot,
+            $productionEntryCandidate
+        );
+}
+
 $moneyOrDash = static function ($value): string {
     return $value === null
         ? '-'
@@ -1154,7 +1167,8 @@ $confirmationText .=
       <div class="small text-muted mb-3">Production-Entry Economic Basis is accumulated attributable rearing investment per surviving bird at production entry. It is a separate management-costing measure and does not replace Bird Cost Basis used for mortality valuation.</div>
       <?php if($latestProductionEntrySnapshot): ?>
         <?php
-          $changed=$productionEntryCandidate && !empty($productionEntryCandidate['ready']) && !hash_equals((string)$latestProductionEntrySnapshot['source_fingerprint'],(string)$productionEntryCandidate['source_fingerprint']);
+          $changed=$productionEntryComparison !== null && !empty($productionEntryComparison['changed']);
+          $comparisonBasis=$productionEntryComparison['comparison_basis'] ?? 'legacy_value';
           $investmentChanged=$productionEntryCandidate && !empty($productionEntryCandidate['ready']) && abs((float)$productionEntryCandidate['attributed_investment']-(float)$latestProductionEntrySnapshot['attributed_investment'])>0.0049;
           $flockChanged=$productionEntryCandidate && !empty($productionEntryCandidate['ready']) && (int)$productionEntryCandidate['production_entry_headcount']!==(int)$latestProductionEntrySnapshot['production_entry_headcount'];
         ?>
@@ -1164,15 +1178,42 @@ $confirmationText .=
           <div class="col-md-3"><div class="text-muted small">Approved Production-entry Flock</div><h5><?php echo number_format((int)$latestProductionEntrySnapshot['production_entry_headcount']); ?></h5></div>
           <div class="col-md-3"><div class="text-muted small">Approved Economic Basis / Entry Bird</div><h5><?php echo $moneyOrDash($latestProductionEntrySnapshot['investment_per_entry_bird']); ?></h5></div>
         </div>
+
+        <?php if(!empty($latestProductionEntrySnapshot['provenance_fingerprint'])): ?>
+          <div class="small text-muted mb-3">
+            Approved provenance recorded ·
+            <?php echo number_format((int)($latestProductionEntrySnapshot['provenance_source_count'] ?? 0)); ?>
+            source records.
+          </div>
+        <?php else: ?>
+          <div class="small text-muted mb-3">
+            Approved provenance not recorded for this legacy version.
+          </div>
+        <?php endif; ?>
+
         <?php if($changed): ?>
-          <div class="alert alert-warning"><strong>Historical source economics changed after the latest approval.</strong>
+          <div class="alert alert-warning">
+            <?php if($comparisonBasis === 'provenance'): ?>
+              <strong>Historical source provenance changed after the latest approval.</strong>
+            <?php else: ?>
+              <strong>Historical source economics changed after the latest approval.</strong>
+            <?php endif; ?>
             <?php if($investmentChanged): ?><div class="mt-2"><strong>Attributed investment changed:</strong> current <?php echo $moneyOrDash($productionEntryCandidate['attributed_investment']); ?> vs approved V<?php echo (int)$latestProductionEntrySnapshot['version_no']; ?> <?php echo $moneyOrDash($latestProductionEntrySnapshot['attributed_investment']); ?>.</div><?php endif; ?>
             <?php if($flockChanged): ?><div class="mt-1"><strong>Production-entry flock changed:</strong> current <?php echo number_format((int)$productionEntryCandidate['production_entry_headcount']); ?> vs approved V<?php echo (int)$latestProductionEntrySnapshot['version_no']; ?> <?php echo number_format((int)$latestProductionEntrySnapshot['production_entry_headcount']); ?>.</div><?php endif; ?>
             <?php if(!$investmentChanged && !$flockChanged): ?><div class="mt-2">Source records changed, but the approved attributed investment and production-entry flock remain numerically unchanged.</div><?php endif; ?>
             <div class="mt-1">Current economic basis / bird is <?php echo $moneyOrDash($productionEntryCandidate['investment_per_entry_bird']); ?>; approved V<?php echo (int)$latestProductionEntrySnapshot['version_no']; ?> is <?php echo $moneyOrDash($latestProductionEntrySnapshot['investment_per_entry_bird']); ?>. Review the corrected source records before approving a revision.</div>
           </div>
         <?php elseif($productionEntryCandidate && !empty($productionEntryCandidate['ready'])): ?>
-          <div class="alert alert-success">Current source-derived economics match the latest approved version.</div>
+          <?php if($comparisonBasis === 'provenance'): ?>
+            <div class="alert alert-success">
+              Current source provenance and economics match the latest approved version.
+            </div>
+          <?php else: ?>
+            <div class="alert alert-success">
+              Current source-derived economics match the latest approved legacy version.
+              True provenance was not recorded for this historical approval.
+            </div>
+          <?php endif; ?>
         <?php endif; ?>
       <?php else: ?>
         <div class="alert alert-secondary">No approved Production-Entry Economic Basis exists yet. Lifecycle and source accounting remain independent from this approval.</div>
@@ -1184,7 +1225,7 @@ $confirmationText .=
           <div class="col-md-4"><div class="text-muted small">Current Production-entry Flock</div><strong><?php echo number_format((int)$productionEntryCandidate['production_entry_headcount']); ?></strong></div>
           <div class="col-md-4"><div class="text-muted small">Current Source-Derived Economic Basis / Bird</div><strong><?php echo $moneyOrDash($productionEntryCandidate['investment_per_entry_bird']); ?></strong></div>
         </div>
-        <?php $needsApproval=!$latestProductionEntrySnapshot || !hash_equals((string)$latestProductionEntrySnapshot['source_fingerprint'],(string)$productionEntryCandidate['source_fingerprint']); ?>
+        <?php $needsApproval=$productionEntryComparison !== null && !empty($productionEntryComparison['changed']); ?>
         <?php if($needsApproval && $canManageCycleOperations): ?>
         <form method="post" class="border rounded p-3 mb-3" data-confirm="Approve this source-derived Production-Entry Economic Basis as an immutable version?" data-confirm-title="Confirm economic basis" data-confirm-button="Approve version">
           <?php echo csrf_field(); ?>
@@ -1228,12 +1269,21 @@ $confirmationText .=
         <span class="small text-muted">Newest approved version first · previous versions remain immutable</span>
       </div>
       <div class="table-responsive"><table class="table table-sm compact-table basis-history-table mb-0">
-        <thead><tr><th>Version</th><th>Status</th><th>Entry Date</th><th class="text-end">Investment</th><th class="text-end">Entry Flock</th><th class="text-end">Basis / Bird</th><th>Revision Details</th><th>Approved</th></tr></thead>
+        <thead><tr><th>Version</th><th>Status</th><th>Entry Date</th><th class="text-end">Investment</th><th class="text-end">Entry Flock</th><th class="text-end">Basis / Bird</th><th>Revision Details</th><th>Provenance</th><th>Approved</th></tr></thead>
         <tbody><?php foreach($productionEntrySnapshots as $snap): ?><tr>
           <td class="history-version">V<?php echo (int)$snap['version_no']; ?><?php if((int)$snap['version_no']===(int)$latestProductionEntrySnapshot['version_no']): ?><span class="badge bg-success ms-1">Current</span><?php endif; ?></td><td><?php echo htmlspecialchars(ucfirst($snap['snapshot_status'])); ?></td>
           <td class="history-number"><?php echo htmlspecialchars($snap['production_entry_date']); ?></td><td class="text-end history-number"><?php echo $moneyOrDash($snap['attributed_investment']); ?></td>
           <td class="text-end history-number"><?php echo number_format((int)$snap['production_entry_headcount']); ?></td><td class="text-end history-number"><?php echo $moneyOrDash($snap['investment_per_entry_bird']); ?></td>
           <td><span class="history-category"><?php echo htmlspecialchars(str_replace('_',' ',(string)$snap['revision_category'])); ?></span><?php if(!empty($snap['revision_reason'])): ?><span class="history-reason"><?php echo htmlspecialchars($snap['revision_reason']); ?></span><?php endif; ?></td>
+          <td>
+            <?php if(!empty($snap['provenance_fingerprint'])): ?>
+              <span class="badge bg-success">Recorded</span>
+              <span class="history-reason"><?php echo number_format((int)($snap['provenance_source_count'] ?? 0)); ?> sources</span>
+            <?php else: ?>
+              <span class="badge bg-secondary">Not recorded</span>
+              <span class="history-reason">Legacy approval</span>
+            <?php endif; ?>
+          </td>
           <td class="history-approved"><?php echo htmlspecialchars($snap['approved_at']); ?><?php echo !empty($snap['approved_by_name'])?'<span class="history-reason">'.htmlspecialchars($snap['approved_by_name']).'</span>':''; ?></td>
         </tr><?php endforeach; ?></tbody>
       </table></div>
