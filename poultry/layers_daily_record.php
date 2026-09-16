@@ -3,6 +3,7 @@
 require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/../lib/daily_feed_sync.php');
 require_once(__DIR__ . '/../lib/daily_population_sync.php');
+require_once(__DIR__ . '/../lib/daily_population_continuity.php');
 require_once(__DIR__ . '/../lib/sales_allocation.php');
 requireLogin();
 
@@ -207,17 +208,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 }
             }
 
-            $nextStmt = $pdo->prepare("SELECT record_date, opening_stock, mortality FROM layer_daily_records WHERE farm_id = ? AND cycle_id = ? AND record_date > ? ORDER BY record_date ASC LIMIT 1");
-            $nextStmt->execute([$tenantFarmId, $cycleIdForSave, $recordDate]);
-            $next = $nextStmt->fetch(PDO::FETCH_ASSOC);
-            if ($next) {
-                $newClosing = max(0, $openingStock - $mortality);
-                if ((int)$next['opening_stock'] !== $newClosing) {
-                    $_SESSION['error'] = "This change would break flock continuity: the next record starts at {$next['opening_stock']}, but this record would close at {$newClosing}.";
-                    header('Location: layers_daily_record.php?month=' . urlencode($yearMonth) . '&cycle_id=' . (int)$selectedCycleId);
-                    exit();
-                }
-            }
         }
 
         // Check if record exists
@@ -288,6 +278,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         
         $dailyRecordId = $existingRecordId ? (int)$existingRecordId : (int)$pdo->lastInsertId();
+
+        $continuityPlan = ['affected_count' => 0];
+
+        if ($cycleIdForSave !== null) {
+            $continuityPlan = daily_population_continuity_apply(
+                $pdo,
+                $tenantFarmId,
+                $cycleIdForSave,
+                'layer',
+                $recordDate,
+                $openingStock,
+                $mortality
+            );
+        }
+
         sync_daily_feed_usage($pdo, $tenantFarmId, $dailyRecordId, $feedItemId > 0 ? $feedItemId : null, $feedConsumption, $cycleIdForSave, $recordDate, 'poultry', 'layer', 'daily_layer_record');
         daily_population_sync_mortality($pdo, $tenantFarmId, 'daily_layer_record', $dailyRecordId, $cycleIdForSave, $recordDate, $mortality, (int)$_SESSION['user_id']);
         // Egg ownership is derived from Daily Records. Rebuild later pooled Layer
@@ -301,7 +306,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             exit();
         }
 
-$_SESSION['success'] = "Daily record saved successfully!";
+$continuityAffected = (int)($continuityPlan['affected_count'] ?? 0);
+$_SESSION['success'] = "Daily record saved successfully!"
+    . ($continuityAffected > 0
+        ? " Population continuity updated across {$continuityAffected} later record(s)."
+        : "");
         $redirectMonth = date('Y-m', strtotime($recordDate));
         header("Location: layers_daily_record.php?month=" . $redirectMonth . "&cycle_id=" . (int)$selectedCycleId);
         exit();
