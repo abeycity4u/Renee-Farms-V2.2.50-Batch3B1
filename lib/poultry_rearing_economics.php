@@ -5,6 +5,7 @@ require_once __DIR__ . '/inventory_financial.php';
 require_once __DIR__ . '/poultry_cycle_lifecycle.php';
 require_once __DIR__ . '/poultry_cycle_acquisition.php';
 require_once __DIR__ . '/production_population.php';
+require_once __DIR__ . '/poultry_production_entry_provenance.php';
 
 if (!function_exists('poultry_production_entry_population_boundary')) {
 function poultry_production_entry_population_boundary(
@@ -20,6 +21,7 @@ function poultry_production_entry_population_boundary(
         'canonical_state' => null,
         'rearing_closing' => null,
         'production_opening' => null,
+        'provenance_sources' => [],
         'warnings' => [],
     ];
 
@@ -98,6 +100,83 @@ function poultry_production_entry_population_boundary(
         if ($canonicalState !== null) {
             $result['canonical_state'] =
                 $canonicalState;
+
+            $populationHistory =
+                production_population_history(
+                    $pdo,
+                    $farmId,
+                    $cycleId,
+                    $rearingEnd
+                );
+
+            if (is_array($populationHistory)) {
+                $baseline =
+                    $populationHistory['baseline']
+                    ?? null;
+
+                if (is_array($baseline)) {
+                    $result['provenance_sources'][] =
+                        poultry_production_entry_provenance_source([
+                            'role' =>
+                                'population_baseline',
+                            'source_type' =>
+                                'production_population_baseline',
+                            'source_id' =>
+                                (int)$baseline['id'],
+                            'source_revision' =>
+                                poultry_production_entry_provenance_revision([
+                                    'baseline_date' =>
+                                        (string)$baseline['baseline_date'],
+                                    'baseline_quantity' =>
+                                        (int)$baseline['baseline_quantity'],
+                                    'baseline_source' =>
+                                        (string)$baseline['baseline_source'],
+                                ]),
+                            'effective_date' =>
+                                (string)$baseline['baseline_date'],
+                        ]);
+                }
+
+                foreach (
+                    $populationHistory['movements'] ?? []
+                    as $movement
+                ) {
+                    $result['provenance_sources'][] =
+                        poultry_production_entry_provenance_source([
+                            'role' =>
+                                'population_movement',
+                            'source_type' =>
+                                'production_population_movement',
+                            'source_id' =>
+                                (int)$movement['id'],
+                            'source_version' =>
+                                (string)$movement['source_version'],
+                            'source_revision' =>
+                                poultry_production_entry_provenance_revision([
+                                    'movement_date' =>
+                                        (string)$movement['movement_date'],
+                                    'movement_type' =>
+                                        (string)$movement['movement_type'],
+                                    'quantity_delta' =>
+                                        (int)$movement['quantity_delta'],
+                                    'source_type' =>
+                                        (string)$movement['source_type'],
+                                    'source_id' =>
+                                        $movement['source_id'] === null
+                                            ? null
+                                            : (string)$movement['source_id'],
+                                    'source_version' =>
+                                        (int)$movement['source_version'],
+                                    'reversal_of_id' =>
+                                        $movement['reversal_of_id'] === null
+                                            ? null
+                                            : (int)$movement['reversal_of_id'],
+                                ]),
+                            'effective_date' =>
+                                (string)$movement['movement_date'],
+                        ]);
+                }
+            }
 
             $canonicalHeadcount =
                 (int)$canonicalState['quantity'];
@@ -215,6 +294,7 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
         'rearing_investment' => null,
         'production_entry_headcount' => null,
         'production_entry_headcount_source' => null,
+        'population_provenance_sources' => [],
         'investment_per_surviving_bird' => null,
         'uncosted_feed_uses' => 0,
         'uncosted_operating_uses' => 0,
@@ -403,6 +483,10 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
 
     $base['production_entry_headcount_source'] =
         $populationBoundary['source'];
+
+    $base['population_provenance_sources'] =
+        $populationBoundary['provenance_sources']
+        ?? [];
 
     foreach (
         $populationBoundary['warnings'] as $boundaryWarning
