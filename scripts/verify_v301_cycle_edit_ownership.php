@@ -427,6 +427,34 @@ $check(
     'Edit Cycle uses acquisition-history success copy only for poultry and generic audit copy for non-poultry opening correction.'
 );
 
+$check(
+    strpos(
+        $edit,
+        "require_once(__DIR__ . '/../includes/notifications.php');"
+    ) !== false
+    && strpos(
+        $edit,
+        'redirectWithNotification('
+    ) !== false
+    && strpos(
+        $edit,
+        "'success',"
+    ) !== false
+    && strpos(
+        $edit,
+        "'/management/production_cycles.php#recent-cycles'"
+    ) !== false
+    && strpos(
+        $edit,
+        "production_cycle_edit_success"
+    ) === false
+    && strpos(
+        $edit,
+        'alert alert-success'
+    ) === false,
+    'Successful Edit Cycle save uses the shared notification system and returns to the Production Cycles table.'
+);
+
 echo "RESULT={$passes}_PASS_{$failures}_FAIL\n";
 
 exit(

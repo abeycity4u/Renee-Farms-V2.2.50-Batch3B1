@@ -156,7 +156,7 @@ $check(
     'Edit Cycle failed submissions preserve form state and error through session PRG.'
 );
 
-$edit303Needle =
+$editError303Needle =
     "header( 'Location: ' . BASE_URL "
     . ". '/management/production_cycle_edit.php?id=' "
     . ". \$cycleId, true, 303 );";
@@ -164,9 +164,21 @@ $edit303Needle =
 $check(
     substr_count(
         $compactEdit,
-        $edit303Needle
-    ) === 2,
-    'Edit Cycle success and handled-error paths both use HTTP 303 without whitespace-sensitive matching.'
+        $editError303Needle
+    ) === 1,
+    'Handled Edit Cycle errors use HTTP 303 back to the preserved Edit form.'
+);
+
+$check(
+    strpos(
+        $compactEdit,
+        "redirectWithNotification( 'success', \$successMessage, '/management/production_cycles.php#recent-cycles' );"
+    ) !== false
+    && strpos(
+        $edit,
+        "production_cycle_edit_success"
+    ) === false,
+    'Successful Edit Cycle save uses the shared success notification and returns to Production Cycles.'
 );
 
 $check(

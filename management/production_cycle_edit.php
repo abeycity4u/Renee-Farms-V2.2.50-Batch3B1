@@ -3,6 +3,7 @@ require_once(dirname(__DIR__) . '/init.php');
 require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/../includes/audit_helpers.php');
+require_once(__DIR__ . '/../includes/notifications.php');
 require_once(__DIR__ . '/../lib/production_cycle_service.php');
 require_once(__DIR__ . '/../lib/poultry_cycle_onboarding.php');
 
@@ -73,15 +74,6 @@ $currentTotalAcquisitionCost =
     && $currentAcquisition['total_cost'] !== ''
         ? (float)$currentAcquisition['total_cost']
         : null;
-
-$flashSuccess = '';
-
-if (!empty($_SESSION['production_cycle_edit_success'])) {
-    $flashSuccess =
-        (string)$_SESSION['production_cycle_edit_success'];
-
-    unset($_SESSION['production_cycle_edit_success']);
-}
 
 $flashError = '';
 
@@ -349,25 +341,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw $error;
         }
 
-        if ($initialCorrectionNeeded) {
-            $_SESSION['production_cycle_edit_success'] =
-                $isPoultry
-                    ? 'Cycle details and initial flock facts updated. The previous acquisition entry remains in audit history.'
-                    : 'Cycle details and opening headcount updated. The correction remains traceable in cycle audit history.';
-        } else {
-            $_SESSION['production_cycle_edit_success'] =
-                'Cycle details updated successfully.';
-        }
+        $successMessage =
+            $initialCorrectionNeeded
+                ? (
+                    $isPoultry
+                        ? 'Cycle details and initial flock facts updated. The previous acquisition entry remains in audit history.'
+                        : 'Cycle details and opening headcount updated. The correction remains traceable in cycle audit history.'
+                )
+                : 'Cycle details updated successfully.';
 
-        header(
-            'Location: '
-            . BASE_URL
-            . '/management/production_cycle_edit.php?id='
-            . $cycleId,
-            true,
-            303
+        redirectWithNotification(
+            'success',
+            $successMessage,
+            '/management/production_cycles.php#recent-cycles'
         );
-        exit();
 
     } catch (Throwable $error) {
         $safe =
@@ -460,12 +447,6 @@ $currentCostPerBird =
             ← Production Cycles
         </a>
     </div>
-
-    <?php if ($flashSuccess !== ''): ?>
-        <div class="alert alert-success">
-            <?php echo htmlspecialchars($flashSuccess); ?>
-        </div>
-    <?php endif; ?>
 
     <?php if ($flashError !== ''): ?>
         <div class="alert alert-danger">
