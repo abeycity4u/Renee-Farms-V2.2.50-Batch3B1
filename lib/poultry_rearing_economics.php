@@ -7,6 +7,62 @@ require_once __DIR__ . '/poultry_cycle_acquisition.php';
 require_once __DIR__ . '/production_population.php';
 require_once __DIR__ . '/poultry_production_entry_provenance.php';
 
+if (!function_exists('poultry_production_entry_lifecycle_provenance_source')) {
+function poultry_production_entry_lifecycle_provenance_source(
+    array $row
+): array {
+    return poultry_production_entry_provenance_source([
+        'role' => 'lifecycle_phase',
+        'source_type' => 'production_cycle_phase',
+        'source_id' => (int)$row['id'],
+        'source_revision' =>
+            poultry_production_entry_provenance_revision([
+                'phase' =>
+                    (string)$row['phase'],
+                'start_date' =>
+                    (string)$row['start_date'],
+                'end_date' =>
+                    empty($row['end_date'])
+                        ? null
+                        : (string)$row['end_date'],
+            ]),
+        'effective_date' =>
+            (string)$row['start_date'],
+    ]);
+}
+}
+
+if (!function_exists('poultry_production_entry_acquisition_provenance_source')) {
+function poultry_production_entry_acquisition_provenance_source(
+    array $row
+): array {
+    $totalCost =
+        $row['total_cost'] === null
+        || $row['total_cost'] === ''
+            ? null
+            : (string)$row['total_cost'];
+
+    return poultry_production_entry_provenance_source([
+        'role' => 'acquisition',
+        'source_type' => 'poultry_cycle_acquisition',
+        'source_id' => (int)$row['id'],
+        'source_revision' =>
+            poultry_production_entry_provenance_revision([
+                'acquisition_type' =>
+                    (string)$row['acquisition_type'],
+                'acquisition_date' =>
+                    (string)$row['acquisition_date'],
+                'quantity' =>
+                    (int)$row['quantity'],
+                'total_cost' =>
+                    $totalCost,
+            ]),
+        'effective_date' =>
+            (string)$row['acquisition_date'],
+    ]);
+}
+}
+
 if (!function_exists('poultry_production_entry_population_boundary')) {
 function poultry_production_entry_population_boundary(
     PDO $pdo,
@@ -294,6 +350,7 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
         'rearing_investment' => null,
         'production_entry_headcount' => null,
         'production_entry_headcount_source' => null,
+        'provenance_sources' => [],
         'population_provenance_sources' => [],
         'investment_per_surviving_bird' => null,
         'uncosted_feed_uses' => 0,
@@ -328,6 +385,18 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
     $base['rearing_phase'] = $rearing;
     $base['production_phase'] = $production;
 
+    foreach ([$rearing, $production] as $phaseRow) {
+        if (
+            is_array($phaseRow)
+            && !empty($phaseRow['id'])
+        ) {
+            $base['provenance_sources'][] =
+                poultry_production_entry_lifecycle_provenance_source(
+                    $phaseRow
+                );
+        }
+    }
+
     $acqRows = poultry_acquisition_history($pdo, $farmId, $cycleId);
     $activeAcq = array_values(array_filter($acqRows, static fn(array $r): bool => empty($r['voided_at'])));
     $polRows = array_values(array_filter($activeAcq, static fn(array $r): bool => (string)$r['acquisition_type'] === 'purchased_point_of_lay'));
@@ -337,8 +406,20 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
         $qty = 0; $cost = 0.0; $allCosted = true;
         foreach ($polRows as $row) {
             $qty += (int)$row['quantity'];
-            if ($row['total_cost'] === null || $row['total_cost'] === '') $allCosted = false;
-            else $cost += (float)$row['total_cost'];
+
+            if (
+                $row['total_cost'] === null
+                || $row['total_cost'] === ''
+            ) {
+                $allCosted = false;
+            } else {
+                $cost += (float)$row['total_cost'];
+            }
+
+            $base['provenance_sources'][] =
+                poultry_production_entry_acquisition_provenance_source(
+                    $row
+                );
         }
         $base['available'] = true;
         $base['mode'] = 'pol';
@@ -370,12 +451,33 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
     // Acquisition basis: active non-POL entries received no later than the end of rearing.
     $acqCost = 0.0; $acqQty = 0; $uncostedAcq = 0; $eligibleAcqRows = 0;
     foreach ($activeAcq as $row) {
-        if ((string)$row['acquisition_type'] === 'purchased_point_of_lay') continue;
-        if ((string)$row['acquisition_date'] > $end) continue;
+        if (
+            (string)$row['acquisition_type']
+            === 'purchased_point_of_lay'
+        ) {
+            continue;
+        }
+
+        if ((string)$row['acquisition_date'] > $end) {
+            continue;
+        }
+
         $eligibleAcqRows++;
         $acqQty += (int)$row['quantity'];
-        if ($row['total_cost'] === null || $row['total_cost'] === '') $uncostedAcq++;
-        else $acqCost += (float)$row['total_cost'];
+
+        if (
+            $row['total_cost'] === null
+            || $row['total_cost'] === ''
+        ) {
+            $uncostedAcq++;
+        } else {
+            $acqCost += (float)$row['total_cost'];
+        }
+
+        $base['provenance_sources'][] =
+            poultry_production_entry_acquisition_provenance_source(
+                $row
+            );
     }
     $base['acquisition_cost'] = round($acqCost, 2);
     $base['acquisition_quantity'] = $acqQty;
@@ -487,6 +589,14 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
     $base['population_provenance_sources'] =
         $populationBoundary['provenance_sources']
         ?? [];
+
+    foreach (
+        $base['population_provenance_sources']
+        as $populationSource
+    ) {
+        $base['provenance_sources'][] =
+            $populationSource;
+    }
 
     foreach (
         $populationBoundary['warnings'] as $boundaryWarning
