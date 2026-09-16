@@ -63,6 +63,83 @@ function poultry_production_entry_acquisition_provenance_source(
 }
 }
 
+if (!function_exists('poultry_production_entry_stock_use_provenance_source')) {
+function poultry_production_entry_stock_use_provenance_source(
+    array $row,
+    string $role
+): array {
+    $role = strtolower(trim($role));
+
+    if (
+        !in_array(
+            $role,
+            [
+                'feed_use',
+                'operating_inventory_use',
+            ],
+            true
+        )
+    ) {
+        throw new InvalidArgumentException(
+            'Select a valid stock-use provenance role.'
+        );
+    }
+
+    $nullableString =
+        static function ($value): ?string {
+            if (
+                $value === null
+                || $value === ''
+            ) {
+                return null;
+            }
+
+            return (string)$value;
+        };
+
+    return poultry_production_entry_provenance_source([
+        'role' => $role,
+        'source_type' => 'stock_transaction',
+        'source_id' => (int)$row['id'],
+        'source_revision' =>
+            poultry_production_entry_provenance_revision([
+                'stock_item_id' =>
+                    (int)$row['stock_item_id'],
+                'transaction_date' =>
+                    (string)$row['transaction_date'],
+                'transaction_type' =>
+                    (string)$row['transaction_type'],
+                'quantity' =>
+                    (string)$row['quantity'],
+                'unit_cost' =>
+                    $nullableString(
+                        $row['unit_cost'] ?? null
+                    ),
+                'total_cost' =>
+                    $nullableString(
+                        $row['total_cost'] ?? null
+                    ),
+                'financial_classification' =>
+                    $nullableString(
+                        $row[
+                            'financial_classification'
+                        ] ?? null
+                    ),
+                'source_type' =>
+                    $nullableString(
+                        $row['source_type'] ?? null
+                    ),
+                'source_id' =>
+                    $nullableString(
+                        $row['source_id'] ?? null
+                    ),
+            ]),
+        'effective_date' =>
+            (string)$row['transaction_date'],
+    ]);
+}
+}
+
 if (!function_exists('poultry_production_entry_population_boundary')) {
 function poultry_production_entry_population_boundary(
     PDO $pdo,
@@ -487,38 +564,212 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
         $base['uncosted_acquisition_entries'] = $uncostedAcq;
     }
 
-    $effective = stock_effective_sql_predicate('t');
-    $feedPredicate = stock_feed_item_sql_predicate('s', 'c');
+    $effective =
+        stock_effective_sql_predicate('t');
 
-    $feedSql = "SELECT COALESCE(SUM(t.total_cost),0), SUM(CASE WHEN t.total_cost IS NULL THEN 1 ELSE 0 END)
-                FROM stock_transactions t
-                JOIN stock_items s ON s.id=t.stock_item_id AND s.farm_id=t.farm_id
-                LEFT JOIN inventory_categories c ON c.id=s.category_id AND c.farm_id=s.farm_id
-                WHERE t.farm_id=? AND t.cycle_id=? AND t.transaction_type='used' AND {$effective}
-                  AND {$feedPredicate} AND t.transaction_date BETWEEN ? AND ?";
-    $stmt = $pdo->prepare($feedSql); $stmt->execute([$farmId,$cycleId,$start,$end]);
-    $feed = $stmt->fetch(PDO::FETCH_NUM) ?: [0,0];
-    $base['feed_consumed_cost'] = round((float)$feed[0],2);
-    $base['uncosted_feed_uses'] = (int)$feed[1];
+    $feedPredicate =
+        stock_feed_item_sql_predicate(
+            's',
+            'c'
+        );
 
-    $classes = array_keys(inventory_operating_consumption_classifications());
-    if ($classes) {
-        $ph = implode(',', array_fill(0,count($classes),'?'));
-        $sql = "SELECT t.financial_classification, COALESCE(SUM(t.total_cost),0) total,
-                       SUM(CASE WHEN t.total_cost IS NULL THEN 1 ELSE 0 END) uncosted
-                FROM stock_transactions t
-                WHERE t.farm_id=? AND t.cycle_id=? AND t.transaction_type='used' AND {$effective}
-                  AND t.transaction_date BETWEEN ? AND ? AND t.financial_classification IN ({$ph})
-                GROUP BY t.financial_classification";
-        $params = array_merge([$farmId,$cycleId,$start,$end],$classes);
-        $stmt=$pdo->prepare($sql); $stmt->execute($params);
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $key=(string)$row['financial_classification'];
-            $base['inventory_operating_breakdown'][$key]=round((float)$row['total'],2);
-            $base['inventory_operating_cost'] += (float)$row['total'];
-            $base['uncosted_operating_uses'] += (int)$row['uncosted'];
+    /*
+     * Read the exact effective Feed movements rather than only their SUM.
+     * The same canonical predicates remain authoritative; row retention is
+     * needed only so Production-Entry provenance can identify its sources.
+     */
+    $feedSql =
+        "SELECT
+             t.id,
+             t.stock_item_id,
+             t.transaction_date,
+             t.transaction_type,
+             t.quantity,
+             t.unit_cost,
+             t.total_cost,
+             t.financial_classification,
+             t.source_type,
+             t.source_id
+         FROM stock_transactions t
+         JOIN stock_items s
+           ON s.id = t.stock_item_id
+          AND s.farm_id = t.farm_id
+         LEFT JOIN inventory_categories c
+           ON c.id = s.category_id
+          AND c.farm_id = s.farm_id
+         WHERE t.farm_id = ?
+           AND t.cycle_id = ?
+           AND t.transaction_type = 'used'
+           AND {$effective}
+           AND {$feedPredicate}
+           AND t.transaction_date BETWEEN ? AND ?
+         ORDER BY t.transaction_date ASC, t.id ASC";
+
+    $stmt =
+        $pdo->prepare($feedSql);
+
+    $stmt->execute([
+        $farmId,
+        $cycleId,
+        $start,
+        $end,
+    ]);
+
+    $base['feed_consumed_cost'] = 0.0;
+    $base['uncosted_feed_uses'] = 0;
+
+    foreach (
+        $stmt->fetchAll(PDO::FETCH_ASSOC)
+        as $row
+    ) {
+        if (
+            $row['total_cost'] === null
+            || $row['total_cost'] === ''
+        ) {
+            $base['uncosted_feed_uses']++;
+        } else {
+            $base['feed_consumed_cost'] +=
+                (float)$row['total_cost'];
         }
-        $base['inventory_operating_cost']=round($base['inventory_operating_cost'],2);
+
+        $base['provenance_sources'][] =
+            poultry_production_entry_stock_use_provenance_source(
+                $row,
+                'feed_use'
+            );
+    }
+
+    $base['feed_consumed_cost'] =
+        round(
+            $base['feed_consumed_cost'],
+            2
+        );
+
+    /*
+     * Operating stock uses follow the same effective-ledger policy.
+     * Retain each contributing row, then reconstruct the same grouped
+     * economics in PHP so provenance and economics share one source set.
+     */
+    $classes =
+        array_keys(
+            inventory_operating_consumption_classifications()
+        );
+
+    if ($classes) {
+        $ph =
+            implode(
+                ',',
+                array_fill(
+                    0,
+                    count($classes),
+                    '?'
+                )
+            );
+
+        $sql =
+            "SELECT
+                 t.id,
+                 t.stock_item_id,
+                 t.transaction_date,
+                 t.transaction_type,
+                 t.quantity,
+                 t.unit_cost,
+                 t.total_cost,
+                 t.financial_classification,
+                 t.source_type,
+                 t.source_id
+             FROM stock_transactions t
+             WHERE t.farm_id = ?
+               AND t.cycle_id = ?
+               AND t.transaction_type = 'used'
+               AND {$effective}
+               AND t.transaction_date BETWEEN ? AND ?
+               AND t.financial_classification IN ({$ph})
+             ORDER BY t.transaction_date ASC, t.id ASC";
+
+        $params =
+            array_merge(
+                [
+                    $farmId,
+                    $cycleId,
+                    $start,
+                    $end,
+                ],
+                $classes
+            );
+
+        $stmt =
+            $pdo->prepare($sql);
+
+        $stmt->execute($params);
+
+        foreach (
+            $stmt->fetchAll(PDO::FETCH_ASSOC)
+            as $row
+        ) {
+            $key =
+                (string)$row[
+                    'financial_classification'
+                ];
+
+            if (
+                !array_key_exists(
+                    $key,
+                    $base[
+                        'inventory_operating_breakdown'
+                    ]
+                )
+            ) {
+                $base[
+                    'inventory_operating_breakdown'
+                ][$key] = 0.0;
+            }
+
+            if (
+                $row['total_cost'] === null
+                || $row['total_cost'] === ''
+            ) {
+                $base[
+                    'uncosted_operating_uses'
+                ]++;
+            } else {
+                $value =
+                    (float)$row['total_cost'];
+
+                $base[
+                    'inventory_operating_breakdown'
+                ][$key] += $value;
+
+                $base[
+                    'inventory_operating_cost'
+                ] += $value;
+            }
+
+            $base['provenance_sources'][] =
+                poultry_production_entry_stock_use_provenance_source(
+                    $row,
+                    'operating_inventory_use'
+                );
+        }
+
+        foreach (
+            $base['inventory_operating_breakdown']
+            as $key => $value
+        ) {
+            $base[
+                'inventory_operating_breakdown'
+            ][$key] =
+                round(
+                    (float)$value,
+                    2
+                );
+        }
+
+        $base['inventory_operating_cost'] =
+            round(
+                $base['inventory_operating_cost'],
+                2
+            );
     }
 
     // Direct non-feed expenses recorded specifically against this cycle.
