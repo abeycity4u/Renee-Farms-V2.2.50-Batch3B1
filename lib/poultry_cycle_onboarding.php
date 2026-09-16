@@ -141,3 +141,208 @@ if (!function_exists('poultry_cycle_onboarding_record_initial')) {
         }
     }
 }
+
+if (!function_exists('poultry_cycle_onboarding_correct_initial_acquisition')) {
+    /**
+     * Replace one active initial acquisition fact without deleting history.
+     *
+     * The erroneous active row is voided with the farmer's correction reason,
+     * then a corrected active row is recorded with the same entry identity
+     * facts and the corrected quantity / total acquisition cost.
+     */
+    function poultry_cycle_onboarding_correct_initial_acquisition(
+        PDO $pdo,
+        int $farmId,
+        int $cycleId,
+        int $quantity,
+        ?float $totalCost,
+        string $reason,
+        ?string $requestToken,
+        ?int $userId
+    ): array {
+        if ($quantity <= 0) {
+            throw new InvalidArgumentException(
+                'Opening headcount must be at least 1 bird for a poultry cycle.'
+            );
+        }
+
+        if ($totalCost !== null && $totalCost < 0) {
+            throw new InvalidArgumentException(
+                'Total acquisition cost cannot be negative.'
+            );
+        }
+
+        $reason = trim($reason);
+
+        if ($reason === '') {
+            throw new InvalidArgumentException(
+                'Enter a correction reason for the opening or acquisition change.'
+            );
+        }
+
+        $reasonLength = function_exists('mb_strlen')
+            ? mb_strlen($reason)
+            : strlen($reason);
+
+        if ($reasonLength < 4) {
+            throw new InvalidArgumentException(
+                'Correction reason must briefly explain the change.'
+            );
+        }
+
+        if ($reasonLength > 255) {
+            throw new InvalidArgumentException(
+                'Correction reason must be 255 characters or fewer.'
+            );
+        }
+
+        $startedTransaction = !$pdo->inTransaction();
+
+        if ($startedTransaction) {
+            $pdo->beginTransaction();
+        }
+
+        try {
+            $history = poultry_acquisition_history(
+                $pdo,
+                $farmId,
+                $cycleId
+            );
+
+            $active = array_values(
+                array_filter(
+                    $history,
+                    static function (array $row): bool {
+                        return empty($row['voided_at']);
+                    }
+                )
+            );
+
+            if (count($active) !== 1) {
+                throw new PoultryAcquisitionException(
+                    'This cycle must have exactly one active initial acquisition entry before Opening Headcount or Total Acquisition Cost can be corrected here.'
+                );
+            }
+
+            $current = $active[0];
+
+            $currentCost =
+                $current['total_cost'] === null
+                || $current['total_cost'] === ''
+                    ? null
+                    : (float)$current['total_cost'];
+
+            $costSame =
+                (
+                    $currentCost === null
+                    && $totalCost === null
+                )
+                || (
+                    $currentCost !== null
+                    && $totalCost !== null
+                    && abs($currentCost - $totalCost) < 0.005
+                );
+
+            if (
+                (int)$current['quantity'] === $quantity
+                && $costSame
+            ) {
+                if ($startedTransaction) {
+                    $pdo->commit();
+                }
+
+                return [
+                    'changed' => false,
+                    'previous_acquisition_id' =>
+                        (int)$current['id'],
+                    'acquisition_id' =>
+                        (int)$current['id'],
+                ];
+            }
+
+            if (
+                (string)$current['acquisition_type'] !== 'internal_transfer'
+                && $totalCost === null
+            ) {
+                throw new InvalidArgumentException(
+                    'Enter the actual total amount paid for purchased birds.'
+                );
+            }
+
+            poultry_acquisition_void(
+                $pdo,
+                $farmId,
+                (int)$current['id'],
+                $reason,
+                $userId
+            );
+
+            $newId = poultry_acquisition_record(
+                $pdo,
+                $farmId,
+                $cycleId,
+                (string)$current['acquisition_type'],
+                (string)$current['acquisition_date'],
+                $quantity,
+                (int)$current['age_days'],
+                $totalCost,
+                isset($current['source_name'])
+                    ? (string)$current['source_name']
+                    : null,
+                isset($current['reference_no'])
+                    ? (string)$current['reference_no']
+                    : null,
+                isset($current['notes'])
+                    ? (string)$current['notes']
+                    : null,
+                $userId,
+                $requestToken
+            );
+
+            if (function_exists('audit_log_event')) {
+                audit_log_event(
+                    'poultry_cycle_initial_acquisition_corrected',
+                    'poultry_cycle_acquisition',
+                    $newId,
+                    [
+                        'cycle_id' =>
+                            $cycleId,
+                        'previous_acquisition_id' =>
+                            (int)$current['id'],
+                        'acquisition_id' =>
+                            $newId,
+                        'previous_quantity' =>
+                            (int)$current['quantity'],
+                        'quantity' =>
+                            $quantity,
+                        'previous_total_cost' =>
+                            $currentCost,
+                        'total_cost' =>
+                            $totalCost,
+                        'correction_reason' =>
+                            $reason,
+                    ]
+                );
+            }
+
+            if ($startedTransaction) {
+                $pdo->commit();
+            }
+
+            return [
+                'changed' => true,
+                'previous_acquisition_id' =>
+                    (int)$current['id'],
+                'acquisition_id' =>
+                    $newId,
+            ];
+
+        } catch (Throwable $error) {
+            if ($startedTransaction && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            throw $error;
+        }
+    }
+}

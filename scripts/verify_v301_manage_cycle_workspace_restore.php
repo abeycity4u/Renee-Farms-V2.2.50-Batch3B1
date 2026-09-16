@@ -81,12 +81,16 @@ $check(
     strpos(
         $manage,
         'value="void_poultry_acquisition"'
-    ) !== false
+    ) === false
     && strpos(
         $manage,
         'poultry_acquisition_void('
-    ) !== false,
-    'Acquisition correction is restored without deletion'
+    ) === false
+    && strpos(
+        $manage,
+        'Correct an Erroneous Entry'
+    ) === false,
+    'routine acquisition correction surface stays retired from Manage Cycle'
 );
 
 $check(
@@ -303,7 +307,7 @@ $check(
     && strpos(
         $adminMutationBlock,
         "'void_poultry_acquisition'"
-    ) !== false
+    ) === false
     && strpos(
         $adminMutationBlock,
         "'transition_poultry_phase'"
@@ -312,7 +316,7 @@ $check(
         $adminMutationBlock,
         "'approve_production_entry_basis'"
     ) !== false,
-    'all selected-cycle mutation actions share the Owner/Farm Admin write boundary'
+    'remaining selected-cycle mutation actions share the Owner/Farm Admin write boundary'
 );
 
 $check(

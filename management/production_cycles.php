@@ -1102,7 +1102,7 @@ try {
                 
             </div>
             <div class="card-body">
-                <p class="text-muted small mb-3">The starting flock for new poultry cycles is recorded once during Create Cycle. This section keeps aggregate acquisition history visible for audit. Selected-cycle correction is managed inside Manage Cycle.</p>
+                <p class="text-muted small mb-3">The starting flock for new poultry cycles is recorded once during Create Cycle. This section keeps aggregate acquisition history visible for audit. Use Edit for cycle details and corrections to Opening Headcount or Total Acquisition Cost.</p>
                 <?php if (!$poultryAcquisitionTableExists): ?>
                     <div class="alert alert-warning mb-0">
                         <strong>Poultry acquisition migration is not available.</strong> Run <code>php scripts/run_migrations.php</code> before recording flock entry facts.
@@ -1169,8 +1169,8 @@ try {
                                     </table>
                                 </div>
                                 <div class="alert alert-info mt-3 mb-0">
-                                    Acquisition corrections are managed inside the selected cycle.
-                                    Use <strong>Manage Cycle</strong> in the Production Cycles table below.
+                                    Use <strong>Edit</strong> in the Production Cycles table for cycle details and initial-entry corrections.
+                                    Corrected acquisition facts remain auditable: the erroneous row is voided rather than deleted.
                                 </div>
                             </div>
                         </div>
@@ -1313,11 +1313,29 @@ try {
                                     <td><?php echo htmlspecialchars($cycle['expected_end_date'] ?? '-'); ?></td>
                                     <td><?php echo htmlspecialchars($cycle['close_date'] ?? '-'); ?></td>
                                     <td>
-                                        <?php if (strtolower((string)$cycle['farm_type']) === 'poultry' && in_array(strtolower((string)$cycle['production_type']), ['layer','broiler'], true)): ?>
-                                            <a class="btn btn-sm btn-outline-primary" href="<?php echo BASE_URL; ?>/management/poultry_cycle.php?id=<?php echo (int)$cycle['id']; ?>">Manage Cycle</a>
-                                        <?php else: ?>
-                                            <span class="text-muted">-</span>
-                                        <?php endif; ?>
+                                        <div class="d-flex flex-wrap gap-1">
+                                            <?php $hasCycleAction = false; ?>
+
+                                            <?php if (strtolower((string)$cycle['farm_type']) === 'poultry' && in_array(strtolower((string)$cycle['production_type']), ['layer','broiler'], true)): ?>
+                                                <?php $hasCycleAction = true; ?>
+                                                <a
+                                                    class="btn btn-sm btn-outline-primary"
+                                                    href="<?php echo BASE_URL; ?>/management/poultry_cycle.php?id=<?php echo (int)$cycle['id']; ?>"
+                                                >Manage Cycle</a>
+                                            <?php endif; ?>
+
+                                            <?php if (isPlatformOwner() || hasRole('farm_admin')): ?>
+                                                <?php $hasCycleAction = true; ?>
+                                                <a
+                                                    class="btn btn-sm btn-outline-secondary"
+                                                    href="<?php echo BASE_URL; ?>/management/production_cycle_edit.php?id=<?php echo (int)$cycle['id']; ?>"
+                                                >Edit</a>
+                                            <?php endif; ?>
+
+                                            <?php if (!$hasCycleAction): ?>
+                                                <span class="text-muted">-</span>
+                                            <?php endif; ?>
+                                        </div>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>

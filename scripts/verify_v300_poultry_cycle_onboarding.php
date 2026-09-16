@@ -37,6 +37,31 @@ $lifecycle = is_file($lifecyclePath) ? (string)file_get_contents($lifecyclePath)
 $helper = is_file($helperPath) ? (string)file_get_contents($helperPath) : '';
 $js = is_file($jsPath) ? (string)file_get_contents($jsPath) : '';
 
+$initialOnboardingStart = strpos(
+    $helper,
+    "if (!function_exists('poultry_cycle_onboarding_record_initial'))"
+);
+
+$initialOnboardingEnd = strpos(
+    $helper,
+    "if (!function_exists('poultry_cycle_onboarding_correct_initial_acquisition'))",
+    $initialOnboardingStart === false
+        ? 0
+        : $initialOnboardingStart
+);
+
+$initialOnboardingSection = (
+    $initialOnboardingStart !== false
+    && $initialOnboardingEnd !== false
+    && $initialOnboardingEnd > $initialOnboardingStart
+)
+    ? substr(
+        $helper,
+        $initialOnboardingStart,
+        $initialOnboardingEnd - $initialOnboardingStart
+    )
+    : '';
+
 $check($page !== '', 'Production Cycles page is readable');
 $check($helper !== '', 'shared poultry onboarding helper exists');
 $check($acq !== '', 'canonical poultry acquisition service is readable');
@@ -73,9 +98,16 @@ $check(
 );
 
 $check(
-    strpos($helper, 'poultry_acquisition_record(') !== false
-    && substr_count($helper, 'poultry_acquisition_record(') === 1,
-    'onboarding helper delegates flock entry exactly once'
+    $initialOnboardingSection !== ''
+    && strpos(
+        $initialOnboardingSection,
+        'poultry_acquisition_record('
+    ) !== false
+    && substr_count(
+        $initialOnboardingSection,
+        'poultry_acquisition_record('
+    ) === 1,
+    'new-cycle onboarding delegates its initial flock entry exactly once'
 );
 
 $check(
@@ -217,8 +249,12 @@ $check(
     && strpos(
         $manage,
         'value="void_poultry_acquisition"'
+    ) === false
+    && strpos(
+        $page,
+        '/management/production_cycle_edit.php?id='
     ) !== false,
-    'Create Cycle owns initial flock entry while Manage Cycle owns controlled acquisition correction'
+    'Create Cycle owns initial flock entry while Edit Cycle owns later initial-entry correction'
 );
 
 $check(

@@ -143,14 +143,92 @@ if (!function_exists('poultry_acquisition_record')) {
             }
 
             if ($requestToken !== '') {
-                $existingStmt = $pdo->prepare('SELECT id FROM poultry_cycle_acquisitions WHERE farm_id = ? AND request_token = ? LIMIT 1');
-                $existingStmt->execute([$farmId, $requestToken]);
-                $existingId = (int)($existingStmt->fetchColumn() ?: 0);
-                if ($existingId > 0) {
-                    if ($startedTransaction && $pdo->inTransaction()) {
+                $existingStmt = $pdo->prepare(
+                    'SELECT
+                         id,
+                         cycle_id,
+                         acquisition_type,
+                         acquisition_date,
+                         quantity,
+                         age_days,
+                         total_cost,
+                         source_name,
+                         reference_no,
+                         notes,
+                         voided_at
+                     FROM poultry_cycle_acquisitions
+                     WHERE farm_id = ?
+                       AND request_token = ?
+                     LIMIT 1
+                     FOR UPDATE'
+                );
+
+                $existingStmt->execute([
+                    $farmId,
+                    $requestToken,
+                ]);
+
+                $existing = $existingStmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($existing) {
+                    if (!empty($existing['voided_at'])) {
+                        throw new PoultryAcquisitionException(
+                            'This acquisition submission token belongs to an entry that has since been corrected or voided. Refresh the page and submit again.'
+                        );
+                    }
+
+                    $existingCost =
+                        $existing['total_cost'] === null
+                        || $existing['total_cost'] === ''
+                            ? null
+                            : (float)$existing['total_cost'];
+
+                    $sameCost =
+                        (
+                            $existingCost === null
+                            && $totalCost === null
+                        )
+                        || (
+                            $existingCost !== null
+                            && $totalCost !== null
+                            && abs(
+                                $existingCost - $totalCost
+                            ) < 0.005
+                        );
+
+                    $same =
+                        (int)$existing['cycle_id'] === $cycleId
+                        && (string)$existing['acquisition_type']
+                            === $acquisitionType
+                        && (string)$existing['acquisition_date']
+                            === $acquisitionDate
+                        && (int)$existing['quantity'] === $quantity
+                        && (int)$existing['age_days'] === $ageDays
+                        && $sameCost
+                        && trim(
+                            (string)($existing['source_name'] ?? '')
+                        ) === $sourceName
+                        && trim(
+                            (string)($existing['reference_no'] ?? '')
+                        ) === $referenceNo
+                        && trim(
+                            (string)($existing['notes'] ?? '')
+                        ) === $notes;
+
+                    if (!$same) {
+                        throw new PoultryAcquisitionException(
+                            'This acquisition submission token has already been used for different flock-entry details. Refresh the page and submit again.'
+                        );
+                    }
+
+                    if (
+                        $startedTransaction
+                        && $pdo->inTransaction()
+                    ) {
                         $pdo->commit();
                     }
-                    return $existingId;
+
+                    return (int)$existing['id'];
                 }
             }
 

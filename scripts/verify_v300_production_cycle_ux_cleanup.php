@@ -175,15 +175,19 @@ $check(
         $page,
         'value="void_poultry_acquisition"'
     ) === false
-    && substr_count(
+    && strpos(
         $manage,
         "if (\$action === 'void_poultry_acquisition')"
-    ) === 1
-    && substr_count(
+    ) === false
+    && strpos(
         $manage,
         'value="void_poultry_acquisition"'
-    ) === 1,
-    'acquisition correction is owned only by Manage Cycle'
+    ) === false
+    && strpos(
+        $page,
+        '/management/production_cycle_edit.php?id='
+    ) !== false,
+    'routine acquisition correction moves from Manage Cycle to Edit Cycle'
 );
 
 $check(
@@ -377,9 +381,9 @@ $check(
 $check(
     strpos(
         $page,
-        'Selected-cycle correction is managed inside Manage Cycle.'
+        'Use Edit for cycle details and corrections to Opening Headcount or Total Acquisition Cost.'
     ) !== false,
-    'acquisition overview explains the single selected-cycle correction owner'
+    'acquisition overview explains Edit Cycle correction ownership'
 );
 
 $check(
@@ -390,8 +394,8 @@ $check(
     && substr_count(
         $manage,
         'poultry_acquisition_void('
-    ) === 1,
-    'auditable acquisition correction has one route owner'
+    ) === 0,
+    'routine acquisition void mutation is retired from farmer-facing cycle pages'
 );
 
 $check(

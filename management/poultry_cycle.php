@@ -50,7 +50,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $adminMutationActions = [
         'end_production',
-        'void_poultry_acquisition',
         'transition_poultry_phase',
         'approve_production_entry_basis',
     ];
@@ -100,65 +99,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 . BASE_URL
                 . '/management/poultry_cycle.php?id='
                 . $cycleId
-            );
-            exit();
-        }
-
-        if ($action === 'void_poultry_acquisition') {
-            $acquisitionId =
-                (int)($_POST['acquisition_id'] ?? 0);
-
-            $voidReason = trim(
-                (string)($_POST['void_reason'] ?? '')
-            );
-
-            $cycleAcquisitions =
-                poultry_acquisition_history(
-                    $pdo,
-                    $farmId,
-                    $cycleId
-                );
-
-            $cycleAcquisitionIds = array_map(
-                static function (array $row): int {
-                    return (int)($row['id'] ?? 0);
-                },
-                $cycleAcquisitions
-            );
-
-            if (
-                $acquisitionId <= 0
-                || !in_array(
-                    $acquisitionId,
-                    $cycleAcquisitionIds,
-                    true
-                )
-            ) {
-                throw new PoultryAcquisitionException(
-                    'The selected acquisition entry does not belong to this cycle.'
-                );
-            }
-
-            poultry_acquisition_void(
-                $pdo,
-                $farmId,
-                $acquisitionId,
-                $voidReason,
-                isset($_SESSION['user_id'])
-                    ? (int)$_SESSION['user_id']
-                    : null
-            );
-
-            $_SESSION['poultry_cycle_flash'] =
-                'Acquisition entry voided. '
-                . 'The original row remains in audit history.';
-
-            header(
-                'Location: '
-                . BASE_URL
-                . '/management/poultry_cycle.php?id='
-                . $cycleId
-                . '#entry'
             );
             exit();
         }
@@ -779,14 +719,8 @@ $confirmationText .=
     </div>
 
     <div id="entry" class="card mb-3 section-anchor">
-        <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="card-header">
             <strong>Entry &amp; Acquisition</strong>
-
-            <?php if ($canManageCycleOperations): ?>
-                <span class="badge bg-primary">Correction available</span>
-            <?php else: ?>
-                <span class="badge bg-info">Read only</span>
-            <?php endif; ?>
         </div>
 
         <div class="card-body">
@@ -930,108 +864,10 @@ $confirmationText .=
                 </table>
             </div>
 
-            <?php
-            $activeAcquisitionRows = array_values(
-                array_filter(
-                    $acquisitionHistory,
-                    static function (array $row): bool {
-                        return empty($row['voided_at']);
-                    }
-                )
-            );
-            ?>
-
-            <?php if ($canManageCycleOperations && $activeAcquisitionRows): ?>
-                <div class="border rounded p-3">
-                    <h6>Correct an Erroneous Entry</h6>
-
-                    <p class="text-muted small">
-                        Use this only for a mistaken or duplicated acquisition.
-                        The original row remains in audit history.
-                    </p>
-
-                    <form
-                        method="post"
-                        data-confirm="Void this acquisition entry? It will remain visible in audit history."
-                        data-confirm-title="Confirm acquisition correction"
-                        data-confirm-button="Void entry"
-                    >
-                        <?php echo csrf_field(); ?>
-
-                        <input
-                            type="hidden"
-                            name="action"
-                            value="void_poultry_acquisition"
-                        >
-
-                        <input
-                            type="hidden"
-                            name="cycle_id"
-                            value="<?php echo (int)$cycleId; ?>"
-                        >
-
-                        <div class="mb-2">
-                            <label class="form-label">
-                                Acquisition Entry
-                            </label>
-
-                            <select
-                                class="form-select"
-                                name="acquisition_id"
-                                required
-                            >
-                                <option value="">
-                                    Select entry
-                                </option>
-
-                                <?php foreach ($activeAcquisitionRows as $row): ?>
-                                    <option value="<?php echo (int)$row['id']; ?>">
-                                        #<?php echo (int)$row['id']; ?>
-                                        ·
-                                        <?php
-                                        echo htmlspecialchars(
-                                            (string)$row['acquisition_date']
-                                        );
-                                        ?>
-                                        ·
-                                        <?php
-                                        echo number_format(
-                                            (int)$row['quantity']
-                                        );
-                                        ?>
-                                        birds
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-
-                        <div class="mb-2">
-                            <label class="form-label">
-                                Correction Reason
-                            </label>
-
-                            <input
-                                class="form-control"
-                                name="void_reason"
-                                maxlength="255"
-                                required
-                                placeholder="Explain the mistaken or duplicated entry"
-                            >
-                        </div>
-
-                        <button
-                            class="btn btn-outline-warning"
-                            type="submit"
-                        >
-                            Void Erroneous Entry
-                        </button>
-                    </form>
-                </div>
-            <?php endif; ?>
-
             <div class="small text-muted mt-3">
                 Initial flock entry is recorded during Create Cycle.
                 Manage Cycle does not create a second onboarding entry.
+                Routine cycle metadata edits do not rewrite acquisition history.
             </div>
         </div>
     </div>

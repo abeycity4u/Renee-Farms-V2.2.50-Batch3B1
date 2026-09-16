@@ -639,6 +639,383 @@ if (!function_exists('production_cycle_create_v3')) {
     }
 }
 
+
+if (!function_exists('production_cycle_update_metadata')) {
+    /**
+     * Update safe descriptive cycle metadata only.
+     *
+     * This deliberately does not alter:
+     * - farm / production identity
+     * - start date
+     * - opening or closing population
+     * - Bird Cost Basis
+     * - lifecycle
+     * - acquisition history
+     * - cycle status / close date
+     */
+    function production_cycle_update_metadata(
+        PDO $pdo,
+        int $farmId,
+        int $cycleId,
+        array $input,
+        ?int $userId
+    ): array {
+        production_cycle_assert_farm_id($farmId);
+        production_cycle_assert_user_id($userId);
+
+        $cycleCode = production_cycle_normalize_code(
+            (string)($input['cycle_code'] ?? '')
+        );
+
+        $expectedEndDate = trim(
+            (string)($input['expected_end_date'] ?? '')
+        );
+
+        if (
+            $expectedEndDate !== ''
+            && !production_cycle_valid_date($expectedEndDate)
+        ) {
+            throw new InvalidArgumentException(
+                'Enter a valid expected end date.'
+            );
+        }
+
+        $notes = production_cycle_normalize_notes(
+            isset($input['notes'])
+                ? (string)$input['notes']
+                : null
+        );
+
+        $startedTransaction = !$pdo->inTransaction();
+
+        if ($startedTransaction) {
+            $pdo->beginTransaction();
+        }
+
+        try {
+            $cycle = production_cycle_get(
+                $pdo,
+                $farmId,
+                $cycleId,
+                true
+            );
+
+            if (
+                $expectedEndDate !== ''
+                && $expectedEndDate < (string)$cycle['start_date']
+            ) {
+                throw new InvalidArgumentException(
+                    'Expected end date cannot be earlier than the cycle start date.'
+                );
+            }
+
+            $duplicateStmt = $pdo->prepare(
+                'SELECT id
+                 FROM production_cycles
+                 WHERE farm_id = ?
+                   AND cycle_code = ?
+                   AND id <> ?
+                 LIMIT 1'
+            );
+
+            $duplicateStmt->execute([
+                $farmId,
+                $cycleCode,
+                $cycleId,
+            ]);
+
+            if ($duplicateStmt->fetchColumn()) {
+                throw new ProductionCycleException(
+                    'This cycle code is already being used in this farm.'
+                );
+            }
+
+            $normalizedExpectedEndDate =
+                $expectedEndDate !== ''
+                    ? $expectedEndDate
+                    : null;
+
+            $previousExpectedEndDate =
+                $cycle['expected_end_date'] === null
+                    ? null
+                    : (string)$cycle['expected_end_date'];
+
+            $changed =
+                $cycleCode !== (string)$cycle['cycle_code']
+                || $normalizedExpectedEndDate !== $previousExpectedEndDate
+                || $notes !== $cycle['notes'];
+
+            if ($changed) {
+                $stmt = $pdo->prepare(
+                    'UPDATE production_cycles
+                     SET cycle_code = ?,
+                         expected_end_date = ?,
+                         notes = ?
+                     WHERE id = ?
+                       AND farm_id = ?'
+                );
+
+                $stmt->execute([
+                    $cycleCode,
+                    $normalizedExpectedEndDate,
+                    $notes,
+                    $cycleId,
+                    $farmId,
+                ]);
+
+                if ($stmt->rowCount() !== 1) {
+                    throw new ProductionCycleException(
+                        'The production cycle changed while you were working. Refresh and try again.'
+                    );
+                }
+
+                if (function_exists('audit_log_event')) {
+                    audit_log_event(
+                        'production_cycle_metadata_updated',
+                        'production_cycle',
+                        $cycleId,
+                        [
+                            'previous_cycle_code' =>
+                                (string)$cycle['cycle_code'],
+                            'cycle_code' =>
+                                $cycleCode,
+                            'previous_expected_end_date' =>
+                                $previousExpectedEndDate,
+                            'expected_end_date' =>
+                                $normalizedExpectedEndDate,
+                            'previous_notes' =>
+                                $cycle['notes'],
+                            'notes' =>
+                                $notes,
+                        ]
+                    );
+                }
+
+                $cycle['cycle_code'] = $cycleCode;
+                $cycle['expected_end_date'] =
+                    $normalizedExpectedEndDate;
+                $cycle['notes'] = $notes;
+            }
+
+            if ($startedTransaction) {
+                $pdo->commit();
+            }
+
+            return $cycle;
+
+        } catch (Throwable $error) {
+            if ($startedTransaction && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            if (production_cycle_is_duplicate_exception($error)) {
+                throw new ProductionCycleException(
+                    'This cycle code is already being used in this farm.'
+                );
+            }
+
+            throw $error;
+        }
+    }
+}
+
+
+
+if (!function_exists('production_cycle_correct_opening_headcount')) {
+    /**
+     * Correct the originally entered opening headcount without rewriting
+     * the immutable V3 population baseline.
+     *
+     * For a cycle_opening baseline, the numerical correction is represented
+     * by an explicit adjustment movement on the opening date.
+     *
+     * A legacy_cutover baseline represents a later physically verified
+     * population, so correcting historical opening headcount does not change
+     * that later cutover quantity.
+     */
+    function production_cycle_correct_opening_headcount(
+        PDO $pdo,
+        int $farmId,
+        int $cycleId,
+        $openingHeadcount,
+        string $reason,
+        ?string $requestToken,
+        ?int $userId
+    ): array {
+        production_cycle_assert_farm_id($farmId);
+        production_cycle_assert_user_id($userId);
+
+        $openingHeadcount = production_cycle_nonnegative_int(
+            $openingHeadcount,
+            'Opening headcount'
+        );
+
+        $reason = trim($reason);
+
+        if ($reason === '') {
+            throw new InvalidArgumentException(
+                'Enter a correction reason for the opening headcount change.'
+            );
+        }
+
+        if (production_cycle_text_length($reason) < 4) {
+            throw new InvalidArgumentException(
+                'Correction reason must briefly explain the opening headcount change.'
+            );
+        }
+
+        if (production_cycle_text_length($reason) > 255) {
+            throw new InvalidArgumentException(
+                'Correction reason must be 255 characters or fewer.'
+            );
+        }
+
+        $startedTransaction = !$pdo->inTransaction();
+
+        if ($startedTransaction) {
+            $pdo->beginTransaction();
+        }
+
+        try {
+            $cycle = production_cycle_get(
+                $pdo,
+                $farmId,
+                $cycleId,
+                true
+            );
+
+            $previousOpening =
+                (int)$cycle['opening_headcount'];
+
+            if ($openingHeadcount === $previousOpening) {
+                if ($startedTransaction) {
+                    $pdo->commit();
+                }
+
+                return [
+                    'changed' => false,
+                    'previous_opening_headcount' =>
+                        $previousOpening,
+                    'opening_headcount' =>
+                        $openingHeadcount,
+                    'population_adjustment_id' =>
+                        null,
+                ];
+            }
+
+            $baseline = production_population_lock_baseline(
+                $pdo,
+                $farmId,
+                $cycleId
+            );
+
+            $populationAdjustmentId = null;
+
+            if (
+                $baseline
+                && (string)$baseline['baseline_source'] === 'cycle_opening'
+            ) {
+                $requestToken =
+                    production_population_normalize_request_token(
+                        $requestToken
+                    );
+
+                if ($requestToken === null) {
+                    throw new InvalidArgumentException(
+                        'Opening-headcount correction requires a valid submission token.'
+                    );
+                }
+
+                $difference =
+                    $openingHeadcount - $previousOpening;
+
+                $populationAdjustmentId =
+                    production_population_record_movement(
+                        $pdo,
+                        $farmId,
+                        $cycleId,
+                        $difference > 0
+                            ? 'adjustment_in'
+                            : 'adjustment_out',
+                        (string)$baseline['baseline_date'],
+                        abs($difference),
+                        'adjustment',
+                        null,
+                        1,
+                        $requestToken,
+                        $reason,
+                        $userId
+                    );
+            }
+
+            $stmt = $pdo->prepare(
+                'UPDATE production_cycles
+                 SET opening_headcount = ?
+                 WHERE id = ?
+                   AND farm_id = ?'
+            );
+
+            $stmt->execute([
+                $openingHeadcount,
+                $cycleId,
+                $farmId,
+            ]);
+
+            if ($stmt->rowCount() !== 1) {
+                throw new ProductionCycleException(
+                    'The production cycle opening headcount could not be corrected safely.'
+                );
+            }
+
+            if (function_exists('audit_log_event')) {
+                audit_log_event(
+                    'production_cycle_opening_headcount_corrected',
+                    'production_cycle',
+                    $cycleId,
+                    [
+                        'cycle_code' =>
+                            (string)$cycle['cycle_code'],
+                        'previous_opening_headcount' =>
+                            $previousOpening,
+                        'opening_headcount' =>
+                            $openingHeadcount,
+                        'correction_reason' =>
+                            $reason,
+                        'population_baseline_source' =>
+                            $baseline
+                                ? (string)$baseline['baseline_source']
+                                : null,
+                        'population_adjustment_id' =>
+                            $populationAdjustmentId,
+                    ]
+                );
+            }
+
+            if ($startedTransaction) {
+                $pdo->commit();
+            }
+
+            return [
+                'changed' => true,
+                'previous_opening_headcount' =>
+                    $previousOpening,
+                'opening_headcount' =>
+                    $openingHeadcount,
+                'population_adjustment_id' =>
+                    $populationAdjustmentId,
+            ];
+
+        } catch (Throwable $error) {
+            if ($startedTransaction && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            throw $error;
+        }
+    }
+}
+
+
 if (!function_exists('production_cycle_cutover_population_v3')) {
     /**
      * Explicitly place an existing active legacy cycle under canonical V3
