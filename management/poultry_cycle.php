@@ -1119,6 +1119,10 @@ $confirmationText .=
         </div>
         <div class="mt-3"><strong>On-farm rearing investment:</strong> Not applicable. No on-farm rearing history is created for purchased POL birds.</div>
       <?php else: ?>
+        <div class="alert alert-info py-2 mb-3">
+          <strong>Rearing-window rule:</strong>
+          Rearing-period cost transactions are included by their effective/source date, not by the day they are edited. A later correction changes these figures only when the corrected record falls within this Rearing Window, including its closing date.
+        </div>
         <div class="row g-3 mb-3">
           <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Rearing Window</div><h6><?php echo htmlspecialchars($rearingEconomics['rearing_phase']['start_date'].' → '.$rearingEconomics['rearing_phase']['end_date']); ?></h6></div></div></div>
           <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">Known Attributable Rearing Cost</div><h5><?php echo $moneyOrDash($rearingEconomics['known_attributable_rearing_cost']); ?></h5></div></div></div>

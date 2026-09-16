@@ -185,6 +185,22 @@ $check(
 $check(
     strpos(
         (string)$page,
+        'Rearing-window rule:'
+    ) !== false
+    && strpos(
+        (string)$page,
+        'effective/source date'
+    ) !== false
+    && strpos(
+        (string)$page,
+        'including its closing date'
+    ) !== false,
+    'Rearing economics explains its effective-date window to the farmer.'
+);
+
+$check(
+    strpos(
+        (string)$page,
         'Bird acquisition basis'
     ) !== false
     && strpos(
