@@ -142,7 +142,7 @@ $check(
     && strpos(
         $manage,
         'void_poultry_acquisition'
-    ) !== false
+    ) === false
     && strpos(
         $manage,
         'transition_poultry_phase'
@@ -151,7 +151,7 @@ $check(
         $manage,
         'approve_production_entry_basis'
     ) !== false,
-    'Manage Cycle restores selected-cycle operations without restoring duplicate onboarding or a competing phase-end action'
+    'Manage Cycle owns current selected-cycle operations without restoring onboarding, acquisition correction, or a competing phase-end action'
 );
 
 $check(
@@ -378,7 +378,7 @@ $check(
     && strpos(
         $manage,
         'Correct an Erroneous Entry'
-    ) !== false
+    ) === false
     && strpos(
         $manage,
         'Record Transition'
@@ -387,7 +387,7 @@ $check(
         $manage,
         'Production-Entry Economic Basis'
     ) !== false,
-    'restored workspace exposes contextual operations while duplicate onboarding and competing stage-end controls remain absent'
+    'restored workspace exposes lifecycle and economic operations while onboarding, acquisition correction, and competing stage-end controls remain absent'
 );
 
 $check(

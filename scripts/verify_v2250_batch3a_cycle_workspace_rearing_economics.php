@@ -17,8 +17,14 @@ chk($checks,strpos($lib,'unallocated_shared_expense_pool')!==false,'unallocated 
 chk($checks,strpos($lib,'purchased_point_of_lay')!==false,'POL entry is handled separately from on-farm rearing');
 chk($checks,strpos($lib,'production_entry_headcount')!==false,'production-entry surviving flock context is derived from exact boundary records');
 chk($checks,strpos($lib,'differs from the preceding rearing-day closing flock')!==false,'boundary flock mismatch fails visibly instead of inventing a count');
-chk($checks,strpos($page,'Poultry Cycle Workspace')!==false,'dedicated poultry cycle workspace exists');
-chk($checks,strpos($page,'Read only here')!==false,'workspace acquisition/lifecycle surfaces are read-only in Batch 3A');
+chk($checks,strpos($page,'Cycle Workspace')!==false,'dedicated poultry cycle workspace exists');
+chk(
+    $checks,
+    strpos($page,'Record Transition')!==false
+    && strpos($page,'Record Flock Entry')===false
+    && strpos($page,'Set Initial Biological Stage')===false,
+    'V3.0.1 workspace owns authorized lifecycle transition without restoring duplicate poultry onboarding'
+);
 chk($checks,strpos($page,'Layer Rearing & Production-Entry Economics')!==false,'workspace exposes Layer rearing economics');
 chk($checks,strpos($page,'does not alter monthly profitability')!==false,'workspace declares canonical period profitability remains untouched');
 chk($checks,strpos($lib,'known_attributable_rearing_cost')!==false,'known attributable rearing cost remains visible even when complete investment is unavailable');

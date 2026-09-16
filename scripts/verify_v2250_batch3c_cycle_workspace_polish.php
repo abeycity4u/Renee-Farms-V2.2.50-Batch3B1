@@ -4,12 +4,12 @@ $file=$root.'/management/poultry_cycle.php';
 $source=file_exists($file)?file_get_contents($file):'';
 
 $checks=[
-  'workspace navigation group is labelled' => 'Workspace sections',
+  'workspace navigation group is labelled' => 'Cycle Workspace',
   'source module navigation group is labelled' => 'Source modules',
-  'economic basis workspace anchor is exposed' => 'href="#economic-basis">Economic Basis</a>',
+  'economic basis workspace anchor is exposed' => 'href="#economic-basis"',
   'daily records are marked as source-module navigation' => 'Daily Records ↗',
   'feed records are marked as source-module navigation' => 'Feed Records ↗',
-  'health records are marked as source-module navigation' => 'Health & Treatment ↗',
+  'health records are marked as source-module navigation' => 'Health &amp; Treatment ↗',
   'expenses are marked as source-module navigation' => 'Expenses ↗',
   'approved basis history heading is present' => 'Approved Basis History',
   'immutable-history note is present' => 'Newest approved version first · previous versions remain immutable',

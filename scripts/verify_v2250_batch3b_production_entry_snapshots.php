@@ -22,5 +22,10 @@ ck($checks,strpos($page,'Confirm Entry Basis')!==false && strpos($page,'Approve 
 ck($checks,strpos($page,'Attributed Rearing Investment')!==false && strpos($page,'Complete Rearing Investment')===false,'financial terminology uses attributed rather than falsely complete');
 ck($checks,strpos($page,'do not replace source accounting here')!==false,'revision UI directs correction to source records');
 ck($checks,strpos($page,'Bird Cost Basis is not changed')!==false,'workspace preserves Bird Cost Basis boundary');
-ck($checks,strpos($page,'Used for mortality valuation only; separate from Production-Entry Economic Basis.')!==false,'workspace clearly separates mortality valuation basis from production-entry economics');
+ck(
+    $checks,
+    strpos($page,'Production-Entry Economic Basis is accumulated attributable rearing investment per surviving bird at production entry.')!==false
+    && strpos($page,'does not replace Bird Cost Basis used for mortality valuation.')!==false,
+    'workspace clearly separates mortality valuation basis from production-entry economics'
+);
 $fail=count(array_filter($checks,fn($x)=>!$x[0])); echo "\n".(count($checks)-$fail)."/".count($checks)." checks passed.\n"; exit($fail?1:0);
