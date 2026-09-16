@@ -270,6 +270,60 @@ function poultry_production_entry_shared_pool_allocation_provenance_source(
 }
 }
 
+if (!function_exists('poultry_production_entry_daily_reconciliation_provenance_source')) {
+function poultry_production_entry_daily_reconciliation_provenance_source(
+    array $row,
+    string $role
+): array {
+    $role =
+        strtolower(
+            trim($role)
+        );
+
+    if (
+        !in_array(
+            $role,
+            [
+                'rearing_end_daily_reconciliation',
+                'production_start_daily_reconciliation',
+            ],
+            true
+        )
+    ) {
+        throw new InvalidArgumentException(
+            'Select a valid Daily Record reconciliation provenance role.'
+        );
+    }
+
+    $facts = [
+        'record_date' =>
+            (string)$row['record_date'],
+        'opening_stock' =>
+            (int)$row['opening_stock'],
+    ];
+
+    if (
+        $role
+        === 'rearing_end_daily_reconciliation'
+    ) {
+        $facts['mortality'] =
+            (int)$row['mortality'];
+    }
+
+    return poultry_production_entry_provenance_source([
+        'role' => $role,
+        'source_type' => 'layer_daily_record',
+        'source_id' => (int)$row['id'],
+        'source_revision' =>
+            poultry_production_entry_provenance_revision(
+                $facts
+            ),
+        'effective_date' =>
+            (string)$row['record_date'],
+    ]);
+}
+}
+
 if (!function_exists('poultry_production_entry_population_boundary')) {
 function poultry_production_entry_population_boundary(
     PDO $pdo,
@@ -285,6 +339,7 @@ function poultry_production_entry_population_boundary(
         'rearing_closing' => null,
         'production_opening' => null,
         'provenance_sources' => [],
+        'reconciliation_provenance_sources' => [],
         'warnings' => [],
     ];
 
@@ -292,34 +347,56 @@ function poultry_production_entry_population_boundary(
     // are not the population authority once the cycle has entered the V3
     // canonical population contract.
     $entryStmt = $pdo->prepare(
-        'SELECT opening_stock
+        'SELECT
+             id,
+             record_date,
+             opening_stock
          FROM layer_daily_records
          WHERE farm_id = ?
            AND cycle_id = ?
            AND record_date = ?
          LIMIT 1'
     );
+
     $entryStmt->execute([
         $farmId,
         $cycleId,
         $productionStart,
     ]);
 
-    $productionOpening = $entryStmt->fetchColumn();
+    $productionStartRow =
+        $entryStmt->fetch(
+            PDO::FETCH_ASSOC
+        );
 
-    if ($productionOpening !== false) {
+    if ($productionStartRow) {
         $result['production_opening'] =
-            (int)$productionOpening;
+            (int)$productionStartRow[
+                'opening_stock'
+            ];
+
+        $result[
+            'reconciliation_provenance_sources'
+        ][] =
+            poultry_production_entry_daily_reconciliation_provenance_source(
+                $productionStartRow,
+                'production_start_daily_reconciliation'
+            );
     }
 
     $endStmt = $pdo->prepare(
-        'SELECT opening_stock, mortality
+        'SELECT
+             id,
+             record_date,
+             opening_stock,
+             mortality
          FROM layer_daily_records
          WHERE farm_id = ?
            AND cycle_id = ?
            AND record_date = ?
          LIMIT 1'
     );
+
     $endStmt->execute([
         $farmId,
         $cycleId,
@@ -327,14 +404,29 @@ function poultry_production_entry_population_boundary(
     ]);
 
     $rearingEndRow =
-        $endStmt->fetch(PDO::FETCH_ASSOC);
+        $endStmt->fetch(
+            PDO::FETCH_ASSOC
+        );
 
     if ($rearingEndRow) {
-        $result['rearing_closing'] = max(
-            0,
-            (int)$rearingEndRow['opening_stock']
-            - (int)$rearingEndRow['mortality']
-        );
+        $result['rearing_closing'] =
+            max(
+                0,
+                (int)$rearingEndRow[
+                    'opening_stock'
+                ]
+                - (int)$rearingEndRow[
+                    'mortality'
+                ]
+            );
+
+        $result[
+            'reconciliation_provenance_sources'
+        ][] =
+            poultry_production_entry_daily_reconciliation_provenance_source(
+                $rearingEndRow,
+                'rearing_end_daily_reconciliation'
+            );
     }
 
     // First establish whether this historical boundary is covered by the
@@ -1221,6 +1313,21 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
     ) {
         $base['provenance_sources'][] =
             $populationSource;
+    }
+
+    /*
+     * Daily Records are reconciliation/boundary evidence only.
+     * Keep them in the generic provenance manifest without adding
+     * them to canonical population provenance.
+     */
+    foreach (
+        $populationBoundary[
+            'reconciliation_provenance_sources'
+        ] ?? []
+        as $reconciliationSource
+    ) {
+        $base['provenance_sources'][] =
+            $reconciliationSource;
     }
 
     foreach (
