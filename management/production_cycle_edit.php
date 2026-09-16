@@ -306,10 +306,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw $error;
         }
 
-        $_SESSION['production_cycle_edit_success'] =
-            $initialCorrectionNeeded
-                ? 'Cycle details and initial flock facts updated. The previous acquisition entry remains in audit history.'
-                : 'Cycle details updated successfully.';
+        if ($initialCorrectionNeeded) {
+            $_SESSION['production_cycle_edit_success'] =
+                $isPoultry
+                    ? 'Cycle details and initial flock facts updated. The previous acquisition entry remains in audit history.'
+                    : 'Cycle details and opening headcount updated. The correction remains traceable in cycle audit history.';
+        } else {
+            $_SESSION['production_cycle_edit_success'] =
+                'Cycle details updated successfully.';
+        }
 
         header(
             'Location: '

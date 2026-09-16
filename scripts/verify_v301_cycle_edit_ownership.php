@@ -415,6 +415,18 @@ $check(
     'Metadata-only edits retain the existing Opening Headcount when acquisition correction is unavailable.'
 );
 
+$check(
+    strpos(
+        $edit,
+        'Cycle details and opening headcount updated. The correction remains traceable in cycle audit history.'
+    ) !== false
+    && strpos(
+        $edit,
+        'Cycle details and initial flock facts updated. The previous acquisition entry remains in audit history.'
+    ) !== false,
+    'Edit Cycle uses acquisition-history success copy only for poultry and generic audit copy for non-poultry opening correction.'
+);
+
 echo "RESULT={$passes}_PASS_{$failures}_FAIL\n";
 
 exit(
