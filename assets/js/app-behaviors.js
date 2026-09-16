@@ -391,6 +391,104 @@
         }
     });
 
+    /*
+     * Pointer-origin arrow-scroll safety.
+     *
+     * Cycle forms opt in through data-arrow-scroll-safe-scope.
+     * Keyboard-only users retain native select/number arrow behavior.
+     * After a pointer interaction:
+     * - a committed select choice releases focus so arrows scroll;
+     * - focused number inputs treat Up/Down as page scrolling instead
+     *   of silently changing the numeric value.
+     */
+    const arrowScrollControl = function (target) {
+        if (!(target instanceof Element)) {
+            return null;
+        }
+
+        const control = target.closest(
+            'select, input[type="number"]'
+        );
+
+        if (
+            !control
+            || !control.closest('[data-arrow-scroll-safe-scope]')
+        ) {
+            return null;
+        }
+
+        return control;
+    };
+
+    document.addEventListener('pointerdown', function (event) {
+        const control = arrowScrollControl(event.target);
+
+        if (!control) {
+            return;
+        }
+
+        control.dataset.arrowScrollPointer = '1';
+    });
+
+    document.addEventListener('change', function (event) {
+        const control = arrowScrollControl(event.target);
+
+        if (
+            !control
+            || control.tagName !== 'SELECT'
+            || control.dataset.arrowScrollPointer !== '1'
+        ) {
+            return;
+        }
+
+        delete control.dataset.arrowScrollPointer;
+
+        window.setTimeout(function () {
+            control.blur();
+        }, 0);
+    });
+
+    document.addEventListener('keydown', function (event) {
+        const control = arrowScrollControl(event.target);
+
+        if (
+            !control
+            || control.tagName !== 'INPUT'
+            || control.type !== 'number'
+            || control.dataset.arrowScrollPointer !== '1'
+            || !['ArrowUp', 'ArrowDown'].includes(event.key)
+            || event.altKey
+            || event.ctrlKey
+            || event.metaKey
+            || event.shiftKey
+        ) {
+            return;
+        }
+
+        event.preventDefault();
+
+        window.scrollBy(
+            0,
+            event.key === 'ArrowDown'
+                ? 48
+                : -48
+        );
+    });
+
+    document.addEventListener(
+        'blur',
+        function (event) {
+            const control = arrowScrollControl(event.target);
+
+            if (!control) {
+                return;
+            }
+
+            delete control.dataset.arrowScrollPointer;
+        },
+        true
+    );
+
     document.addEventListener('error', function (event) {
         const target = event.target;
         if (!(target instanceof HTMLScriptElement)) {

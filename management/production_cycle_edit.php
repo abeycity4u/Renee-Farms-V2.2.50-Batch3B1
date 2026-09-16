@@ -107,6 +107,49 @@ $form = [
         '',
 ];
 
+
+$editCyclePrgKey =
+    'production_cycle_edit_prg_' . $cycleId;
+
+if (
+    $_SERVER['REQUEST_METHOD'] === 'GET'
+    && isset($_SESSION[$editCyclePrgKey])
+    && is_array($_SESSION[$editCyclePrgKey])
+) {
+    $editCyclePrg =
+        $_SESSION[$editCyclePrgKey];
+
+    unset($_SESSION[$editCyclePrgKey]);
+
+    if (
+        isset($editCyclePrg['form'])
+        && is_array($editCyclePrg['form'])
+    ) {
+        foreach (
+            array_keys($form)
+            as $editCycleField
+        ) {
+            if (
+                array_key_exists(
+                    $editCycleField,
+                    $editCyclePrg['form']
+                )
+            ) {
+                $form[$editCycleField] =
+                    (string)$editCyclePrg['form'][$editCycleField];
+            }
+        }
+    }
+
+    $flashError =
+        trim(
+            (string)(
+                $editCyclePrg['error']
+                ?? ''
+            )
+        );
+}
+
 $populationRequestToken = trim(
     (string)(
         $_POST['population_request_token']
@@ -320,7 +363,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'Location: '
             . BASE_URL
             . '/management/production_cycle_edit.php?id='
-            . $cycleId
+            . $cycleId,
+            true,
+            303
         );
         exit();
 
@@ -341,6 +386,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $flashError = $safe
             ? $error->getMessage()
             : 'The cycle details could not be updated. No changes were saved.';
+
+        $_SESSION[$editCyclePrgKey] = [
+            'form' =>
+                $form,
+            'error' =>
+                $flashError,
+        ];
+
+        header(
+            'Location: '
+            . BASE_URL
+            . '/management/production_cycle_edit.php?id='
+            . $cycleId,
+            true,
+            303
+        );
+        exit();
     }
 }
 
@@ -375,7 +437,7 @@ $currentCostPerBird =
     <?php include(dirname(__DIR__) . '/navbar_head.php'); ?>
 </head>
 
-<body>
+<body data-arrow-scroll-safe-scope>
 <?php include(dirname(__DIR__) . '/navbar.php'); ?>
 
 <div class="container-fluid px-3 px-lg-4 py-3">

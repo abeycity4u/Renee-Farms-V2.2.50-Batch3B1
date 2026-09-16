@@ -72,6 +72,135 @@ $createCycleForm = [
     'notes' => '',
 ];
 
+$productionCyclesPrgKey =
+    'production_cycles_prg';
+
+$productionCyclesPrgAction = '';
+
+$productionCyclesPrgAnchors = [
+    'create_cycle' =>
+        '#create-cycle',
+    'update_bird_cost_basis' =>
+        '#cycle-maintenance-tools',
+    'post_batch' =>
+        '#cycle-tools',
+    'confirm_population_cutover' =>
+        '#population-cutover',
+];
+
+$productionCyclesPrgRedirect = static function (
+    string $action,
+    ?array $flashState,
+    array $createFormState,
+    array $cutoverFormState
+) use (
+    $productionCyclesPrgKey,
+    $productionCyclesPrgAnchors
+): void {
+    $_SESSION[$productionCyclesPrgKey] = [
+        'action' =>
+            $action,
+        'flash' =>
+            $flashState,
+        'create_form' =>
+            $createFormState,
+        'cutover_form' =>
+            $cutoverFormState,
+    ];
+
+    $anchor =
+        $productionCyclesPrgAnchors[$action]
+        ?? '';
+
+    header(
+        'Location: '
+        . BASE_URL
+        . '/management/production_cycles.php'
+        . $anchor,
+        true,
+        303
+    );
+
+    exit();
+};
+
+if (
+    $_SERVER['REQUEST_METHOD'] === 'GET'
+    && isset($_SESSION[$productionCyclesPrgKey])
+    && is_array($_SESSION[$productionCyclesPrgKey])
+) {
+    $productionCyclesPrg =
+        $_SESSION[$productionCyclesPrgKey];
+
+    unset(
+        $_SESSION[$productionCyclesPrgKey]
+    );
+
+    $productionCyclesPrgAction =
+        trim(
+            (string)(
+                $productionCyclesPrg['action']
+                ?? ''
+            )
+        );
+
+    if (
+        isset($productionCyclesPrg['flash'])
+        && is_array($productionCyclesPrg['flash'])
+    ) {
+        $flash =
+            $productionCyclesPrg['flash'];
+    }
+
+    if (
+        isset($productionCyclesPrg['create_form'])
+        && is_array(
+            $productionCyclesPrg['create_form']
+        )
+    ) {
+        foreach (
+            array_keys($createCycleForm)
+            as $createCycleField
+        ) {
+            if (
+                array_key_exists(
+                    $createCycleField,
+                    $productionCyclesPrg['create_form']
+                )
+            ) {
+                $createCycleForm[$createCycleField] =
+                    (string)
+                    $productionCyclesPrg['create_form']
+                        [$createCycleField];
+            }
+        }
+    }
+
+    if (
+        isset($productionCyclesPrg['cutover_form'])
+        && is_array(
+            $productionCyclesPrg['cutover_form']
+        )
+    ) {
+        foreach (
+            array_keys($cutoverForm)
+            as $cutoverField
+        ) {
+            if (
+                array_key_exists(
+                    $cutoverField,
+                    $productionCyclesPrg['cutover_form']
+                )
+            ) {
+                $cutoverForm[$cutoverField] =
+                    $productionCyclesPrg['cutover_form']
+                        [$cutoverField];
+            }
+        }
+    }
+}
+
+
 try {
     $cycleTableExists = ($pdo->query("SHOW TABLES LIKE 'production_cycles'")->rowCount() > 0);
     $populationBaselineTableExists = ($pdo->query("SHOW TABLES LIKE 'production_population_baselines'")->rowCount() > 0);
@@ -507,6 +636,21 @@ try {
             }
         }
 
+        if (
+            isset(
+                $productionCyclesPrgAnchors[
+                    (string)$action
+                ]
+            )
+        ) {
+            $productionCyclesPrgRedirect(
+                (string)$action,
+                $flash,
+                $createCycleForm,
+                $cutoverForm
+            );
+        }
+
     }
 
     if ($cycleTableExists) {
@@ -657,8 +801,38 @@ try {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();
     }
-    error_log('Production cycle page error: ' . $exception->getMessage());
-    $errorMessage = 'We could not load the production cycle data right now. Please try again.';
+
+    error_log(
+        'Production cycle page error: '
+        . $exception->getMessage()
+    );
+
+    $errorMessage =
+        'We could not load the production cycle data right now. Please try again.';
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $failedAction =
+            trim(
+                (string)(
+                    $_POST['action']
+                    ?? ''
+                )
+            );
+
+        $productionCyclesPrgRedirect(
+            $failedAction,
+            [
+                'type' =>
+                    'danger',
+                'title' =>
+                    'Production cycle action could not be completed.',
+                'message' =>
+                    $errorMessage,
+            ],
+            $createCycleForm,
+            $cutoverForm
+        );
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -669,7 +843,7 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Production Cycles - Farm Management System</title>
 </head>
-<body>
+<body data-arrow-scroll-safe-scope>
 <?php include(__DIR__ . '/../navbar.php'); ?>
 
 <div class="container-fluid mt-4">
@@ -909,7 +1083,7 @@ try {
                         <?php echo (
                             $flash !== null
                             && in_array(
-                                (string)($_POST['action'] ?? ''),
+                                $productionCyclesPrgAction,
                                 [
                                     'confirm_population_cutover',
                                     'update_bird_cost_basis',
