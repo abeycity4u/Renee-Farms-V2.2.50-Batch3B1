@@ -143,6 +143,13 @@ try {
     $allocationPresentation['created_by'] =
         99;
 
+    $allocationPercentOnly =
+        $allocationA;
+
+    $allocationPercentOnly[
+        'allocation_percent'
+    ] = '41.00';
+
     $allocationEconomic =
         $allocationA;
 
@@ -167,6 +174,11 @@ try {
             $allocationPresentation
         );
 
+    $allocationPercentOnlySource =
+        poultry_production_entry_explicit_allocation_provenance_source(
+            $allocationPercentOnly
+        );
+
     $allocationEconomicSource =
         poultry_production_entry_explicit_allocation_provenance_source(
             $allocationEconomic
@@ -186,6 +198,17 @@ try {
             'source_revision'
         ],
         'Allocation presentation fields changed provenance.'
+    );
+
+    $assert(
+        $allocationSourceA[
+            'source_revision'
+        ]
+            ===
+        $allocationPercentOnlySource[
+            'source_revision'
+        ],
+        'Allocation percent-only metadata changed causal provenance.'
     );
 
     $assert(
@@ -235,6 +258,13 @@ try {
         'description'
     ] = 'Changed display note';
 
+    $sharedExpenseCaseOnly =
+        $sharedExpenseA;
+
+    $sharedExpenseCaseOnly[
+        'production_type'
+    ] = 'LAYER';
+
     $sharedExpenseEconomic =
         $sharedExpenseA;
 
@@ -258,6 +288,11 @@ try {
             $sharedExpensePresentation
         );
 
+    $sharedExpenseCaseOnlySource =
+        poultry_production_entry_shared_pool_expense_provenance_source(
+            $sharedExpenseCaseOnly
+        );
+
     $sharedExpenseEconomicSource =
         poultry_production_entry_shared_pool_expense_provenance_source(
             $sharedExpenseEconomic
@@ -277,6 +312,17 @@ try {
             'source_revision'
         ],
         'Shared-pool expense presentation fields changed provenance.'
+    );
+
+    $assert(
+        $sharedExpenseSourceA[
+            'source_revision'
+        ]
+            ===
+        $sharedExpenseCaseOnlySource[
+            'source_revision'
+        ],
+        'Shared-pool production-type case-only change altered provenance.'
     );
 
     $assert(
@@ -321,6 +367,13 @@ try {
     $sharedAllocationPresentation['notes'] =
         'Changed note';
 
+    $sharedAllocationPercentOnly =
+        $sharedAllocationA;
+
+    $sharedAllocationPercentOnly[
+        'allocation_percent'
+    ] = '26.00';
+
     $sharedAllocationEconomic =
         $sharedAllocationA;
 
@@ -340,6 +393,12 @@ try {
             '2026-09-12'
         );
 
+    $sharedAllocationPercentOnlySource =
+        poultry_production_entry_shared_pool_allocation_provenance_source(
+            $sharedAllocationPercentOnly,
+            '2026-09-12'
+        );
+
     $sharedAllocationEconomicSource =
         poultry_production_entry_shared_pool_allocation_provenance_source(
             $sharedAllocationEconomic,
@@ -355,6 +414,17 @@ try {
             'source_revision'
         ],
         'Shared-pool allocation presentation fields changed provenance.'
+    );
+
+    $assert(
+        $sharedAllocationSourceA[
+            'source_revision'
+        ]
+            ===
+        $sharedAllocationPercentOnlySource[
+            'source_revision'
+        ],
+        'Shared allocation percent-only metadata changed causal provenance.'
     );
 
     $assert(
@@ -599,8 +669,8 @@ try {
     ksort($roleCounts, SORT_STRING);
 
     $assert(
-        count($sources) === 17,
-        'Expected 17 live provenance sources.'
+        count($sources) === 19,
+        'Expected 19 live provenance sources.'
     );
 
     $assert(
@@ -698,6 +768,14 @@ try {
             'SELECT COALESCE(SUM(GREATEST((e.amount*e.unit)-COALESCE(a.allocated,0),0)),0)'
         ) === false,
         'Old shared-pool aggregate remains.'
+    );
+
+    $assert(
+        strpos(
+            $sourceText,
+            'allocation_percent'
+        ) === false,
+        'Production-Entry economics still treats allocation_percent as a causal input.'
     );
 
     if ($failures) {
@@ -802,6 +880,9 @@ try {
         . "\n";
 
     echo "FINANCIAL_PRESENTATION_ONLY_INVARIANCE=PASS\n";
+    echo "SHARED_POOL_PRODUCTION_TYPE_CASE_INVARIANCE=PASS\n";
+    echo "ALLOCATION_PERCENT_NONCAUSAL_INVARIANCE=PASS\n";
+    echo "ALLOCATED_AMOUNT_CAUSAL_SENSITIVITY=PASS\n";
     echo "FINANCIAL_ECONOMIC_FACT_SENSITIVITY=PASS\n";
     echo "ALLOCATION_BOUNDARY_SENSITIVITY=PASS\n";
     echo "SHARED_POOL_DEPENDENCY_CONTRACT=PASS\n";

@@ -217,11 +217,6 @@ function poultry_production_entry_explicit_allocation_provenance_source(
                     || $row['cycle_id'] === ''
                         ? null
                         : (int)$row['cycle_id'],
-                'allocation_percent' =>
-                    $row['allocation_percent'] === null
-                    || $row['allocation_percent'] === ''
-                        ? null
-                        : (string)$row['allocation_percent'],
                 'allocated_amount' =>
                     (string)$row['allocated_amount'],
                 'expense_date' =>
@@ -250,7 +245,9 @@ function poultry_production_entry_shared_pool_expense_provenance_source(
                 'farm_type' =>
                     (string)$row['farm_type'],
                 'production_type' =>
-                    (string)$row['production_type'],
+                    strtolower(
+                        (string)$row['production_type']
+                    ),
                 'cycle_id' =>
                     $row['cycle_id'] === null
                     || $row['cycle_id'] === ''
@@ -287,11 +284,6 @@ function poultry_production_entry_shared_pool_allocation_provenance_source(
                     || $row['cycle_id'] === ''
                         ? null
                         : (int)$row['cycle_id'],
-                'allocation_percent' =>
-                    $row['allocation_percent'] === null
-                    || $row['allocation_percent'] === ''
-                        ? null
-                        : (string)$row['allocation_percent'],
                 'allocated_amount' =>
                     (string)$row['allocated_amount'],
             ]),
@@ -1098,7 +1090,6 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
              fa.id,
              fa.expense_id,
              fa.cycle_id,
-             fa.allocation_percent,
              fa.allocated_amount,
              e.expense_date,
              e.category
@@ -1172,7 +1163,6 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
              e.unit,
              fa.id AS allocation_id,
              fa.cycle_id AS allocation_cycle_id,
-             fa.allocation_percent,
              fa.allocated_amount
          FROM farm_expenses e
          LEFT JOIN financial_allocations fa
@@ -1261,8 +1251,6 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
                     $expenseId,
                 'cycle_id' =>
                     $row['allocation_cycle_id'],
-                'allocation_percent' =>
-                    $row['allocation_percent'],
                 'allocated_amount' =>
                     (string)$row[
                         'allocated_amount'
