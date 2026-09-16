@@ -4,6 +4,7 @@ require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/api_helpers.php');
 require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/../lib/daily_feed_sync.php');
+require_once(__DIR__ . '/../lib/daily_population_sync.php');
 require_once(__DIR__ . '/../lib/sales_allocation.php');
 requireLogin();
 require_http_method('POST');
@@ -54,8 +55,21 @@ try {
         $sourceType = 'daily_broiler_record';
     }
 
-    // Restore inventory consumed by the daily record before removing the record.
+    // Restore inventory and remove the canonical mortality projection
+    // before deleting the durable Daily Record source. All operations share
+    // this transaction, so a later failure rolls the complete deletion back.
     delete_daily_feed_usage($pdo, $farmId, (int)$id, $sourceType);
+
+    daily_population_remove_mortality(
+        $pdo,
+        $farmId,
+        $sourceType,
+        (int)$id,
+        isset($_SESSION['user_id'])
+            ? (int)$_SESSION['user_id']
+            : null
+    );
+
     $stmt->execute([$id, $farmId]);
     if ($stmt->rowCount() !== 1) {
         $pdo->rollBack();
