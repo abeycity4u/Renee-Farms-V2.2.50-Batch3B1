@@ -3,6 +3,7 @@
 if(window.AppConfirm) return;
 let active=null;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+const mountConfirm=el=>{const modal=document.querySelector('.modal.show');(modal||document.body).appendChild(el);};
 function ask(message,opts={}){
  if(active){active.finish(false);}
  const title=opts.title||'Please confirm', confirmText=opts.confirmText||'Continue', tone=opts.tone||(opts.danger===false?'primary':'danger');
@@ -10,7 +11,7 @@ function ask(message,opts={}){
  const context=opts.context?`<div class="app-confirm-context">${esc(opts.context)}</div>`:'';
  const el=document.createElement('div'); el.className='app-confirm-backdrop';
  el.innerHTML=`<div class="app-confirm-card" role="dialog" aria-modal="true" aria-labelledby="appConfirmTitle"><div class="app-confirm-head"><div class="app-confirm-icon"><i class="bi bi-exclamation-triangle-fill"></i></div><div class="app-confirm-title" id="appConfirmTitle">${esc(title)}</div></div><div class="app-confirm-body">${esc(message)}${context}</div><div class="app-confirm-actions"><button type="button" class="app-confirm-btn app-confirm-cancel" data-confirm-cancel>${esc(opts.cancelText||'Cancel')}</button><button type="button" class="app-confirm-btn ${cls}" data-confirm-ok>${esc(confirmText)}</button></div></div>`;
- document.body.appendChild(el); const ok=el.querySelector('[data-confirm-ok]'), cancel=el.querySelector('[data-confirm-cancel]');
+ mountConfirm(el); const ok=el.querySelector('[data-confirm-ok]'), cancel=el.querySelector('[data-confirm-cancel]');
  let resolvePromise; const promise=new Promise(resolve=>resolvePromise=resolve);
  const previous=document.activeElement;
  const finish=value=>{if(!active||active.el!==el)return; document.removeEventListener('keydown',key); active=null; el.remove(); if(previous&&previous.focus)previous.focus(); resolvePromise(value);};
@@ -27,7 +28,7 @@ function askReason(message,opts={}){
  const maxLength=500;
  const el=document.createElement('div'); el.className='app-confirm-backdrop';
  el.innerHTML=`<div class="app-confirm-card" role="dialog" aria-modal="true" aria-labelledby="appReasonTitle"><div class="app-confirm-head"><div class="app-confirm-icon"><i class="bi bi-pencil-square"></i></div><div class="app-confirm-title" id="appReasonTitle">${esc(title)}</div></div><div class="app-confirm-body">${esc(message)}<textarea class="form-control mt-3" rows="3" maxlength="${maxLength}" data-reason-input placeholder="${esc(opts.placeholder||'Enter the reason')}"></textarea><div class="text-danger small mt-2 d-none" data-reason-error>A reason is required.</div></div><div class="app-confirm-actions"><button type="button" class="app-confirm-btn app-confirm-cancel" data-reason-cancel>${esc(opts.cancelText||'Cancel')}</button><button type="button" class="app-confirm-btn ${cls}" data-reason-ok>${esc(confirmText)}</button></div></div>`;
- document.body.appendChild(el);
+ mountConfirm(el);
  const input=el.querySelector('[data-reason-input]'), error=el.querySelector('[data-reason-error]'), ok=el.querySelector('[data-reason-ok]'), cancel=el.querySelector('[data-reason-cancel]');
  let resolvePromise; const promise=new Promise(resolve=>resolvePromise=resolve);
  const previous=document.activeElement;

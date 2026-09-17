@@ -215,6 +215,22 @@ try {
             'maxlength="${maxLength}"'
         ) !== false;
 
+    $checks['CONFIRM_DIALOG_MODAL_FOCUS_COMPATIBILITY'] =
+        strpos(
+            $confirmations,
+            "document.querySelector('.modal.show')"
+        ) !== false
+        &&
+        substr_count(
+            $confirmations,
+            'mountConfirm(el);'
+        ) === 2
+        &&
+        strpos(
+            $confirmations,
+            'document.body.appendChild(el);'
+        ) === false;
+
     $allOperationalClients = true;
 
     foreach ($clients as $text) {
