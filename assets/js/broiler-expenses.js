@@ -41,22 +41,24 @@ async function deleteExpense(expenseId) {
         return;
     }
 
-    const confirmed = await AppConfirm.ask(
-        'Are you sure you want to delete this expense record?',
+    const revisionReason = await AppConfirm.askReason(
+        'Why are you deleting this expense record?',
         {
             title: 'Delete expense record?',
-            confirmText: 'Delete'
+            confirmText: 'Delete',
+            tone: 'danger'
         }
     );
 
-    if (!confirmed) {
+    if (revisionReason === null) {
         return;
     }
 
     try {
         const params = new URLSearchParams({
             id: expenseId,
-            csrf_token: window.BroilerExpensesConfig.csrfToken
+            csrf_token: window.BroilerExpensesConfig.csrfToken,
+            revision_reason: revisionReason
         });
 
         const response = await fetch('../api/delete_expense.php', {
@@ -107,10 +109,27 @@ if (window.BroilerExpensesConfig.canManage) {
         editExpenseForm.addEventListener('submit', async function(e) {
             e.preventDefault();
 
+            const revisionReason = await AppConfirm.askReason(
+                'Why are you changing this expense?',
+                {
+                    title: 'Reason for expense change',
+                    confirmText: 'Save changes',
+                    tone: 'primary'
+                }
+            );
+
+            if (revisionReason === null) {
+                return;
+            }
+
             const formData = new FormData(this);
             formData.append(
                 'csrf_token',
                 window.BroilerExpensesConfig.csrfToken
+            );
+            formData.append(
+                'revision_reason',
+                revisionReason
             );
 
             try {

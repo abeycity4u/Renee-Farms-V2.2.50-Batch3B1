@@ -9,6 +9,7 @@ require_once(__DIR__ . '/../lib/expense_revision_service.php');
 requireLogin(); require_http_method('POST'); require_csrf_token(); require_rate_limit('delete_expense',20,60);
 $id=$_POST['id']??null;
 if(!$id || !ctype_digit((string)$id)) send_json(['success'=>false,'error'=>'A valid record ID is required.'],400);
+$revisionReason=$_POST['revision_reason']??null;
 $farmId=requireCurrentFarmId();
 $permissionScope=trim((string)($_POST['permission_scope']??'operational'));
 if(!in_array($permissionScope,['operational','expense_report'],true)) {
@@ -47,11 +48,15 @@ try {
   $pdo,
   $farmId,
   (int)$id,
-  (int)($_SESSION['user_id']??0)
+  (int)($_SESSION['user_id']??0),
+  $revisionReason
  );
 
  audit_log_event('delete','expense',$id,['before'=>$row]);
  $stmt=$pdo->prepare('DELETE FROM farm_expenses WHERE id=? AND farm_id=?'); $stmt->execute([(int)$id,$farmId]);
  $pdo->commit(); $_SESSION['success'] = 'Expense record deleted successfully.'; send_json(['success'=>true,'message'=>'Expense record deleted successfully.']);
+} catch(InvalidArgumentException $e) {
+ if($pdo->inTransaction()) $pdo->rollBack();
+ send_json(['success'=>false,'error'=>$e->getMessage()],422);
 } catch(Throwable $e) { if($pdo->inTransaction()) $pdo->rollBack(); log_app_error('delete_expense_failed',['error'=>$e->getMessage(),'id'=>$id]); send_json(['success'=>false,'error'=>'Unable to delete the record.'],500); }
 ?>

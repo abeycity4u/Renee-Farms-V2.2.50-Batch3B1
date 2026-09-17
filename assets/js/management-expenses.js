@@ -69,9 +69,22 @@ const expensePermissionScope = 'expense_report';
 
     document.getElementById('editExpenseForm').addEventListener('submit', async function(e) {
         e.preventDefault();
+
+        const revisionReason = await AppConfirm.askReason(
+            'Why are you changing this expense?',
+            {
+                title: 'Reason for expense change',
+                confirmText: 'Save changes',
+                tone: 'primary'
+            }
+        );
+
+        if (revisionReason === null) return;
+
         const formData = new FormData(this);
         formData.append('csrf_token', csrfToken);
         formData.append('permission_scope', expensePermissionScope);
+        formData.append('revision_reason', revisionReason);
 
         try {
             const response = await fetch('../api/update_expense.php', {
@@ -91,26 +104,51 @@ const expensePermissionScope = 'expense_report';
     });
     }
     
-    function deleteExpense(expenseId) {
-        AppConfirm.ask('Are you sure you want to delete this expense record?', {title:'Delete expense record?', confirmText:'Delete'}).then(function(confirmed){ if (confirmed) {
-            const params = new URLSearchParams({
-                id: expenseId,
-                csrf_token: csrfToken,
-                permission_scope: expensePermissionScope
-            });
-            fetch('../api/delete_expense.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: params.toString()
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        location.reload();
-                    } else {
-                        AppNotify.error(data.error || data.message || 'Unable to delete expense');
-                    }
-                });
+    async function deleteExpense(expenseId) {
+        const revisionReason = await AppConfirm.askReason(
+            'Why are you deleting this expense record?',
+            {
+                title: 'Delete expense record?',
+                confirmText: 'Delete',
+                tone: 'danger'
+            }
+        );
+
+        if (revisionReason === null) {
+            return;
         }
+
+        const params = new URLSearchParams({
+            id: expenseId,
+            csrf_token: csrfToken,
+            permission_scope: expensePermissionScope,
+            revision_reason: revisionReason
         });
+
+        try {
+            const response = await fetch('../api/delete_expense.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: params.toString()
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                location.reload();
+            } else {
+                AppNotify.error(
+                    data.error
+                    || data.message
+                    || 'Unable to delete expense'
+                );
+            }
+        } catch (error) {
+            AppNotify.error(
+                'Network error: '
+                + error.message
+            );
+        }
     }

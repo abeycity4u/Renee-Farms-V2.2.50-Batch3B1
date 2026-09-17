@@ -31,6 +31,9 @@ $category = $_POST['category'];
 $amount = $_POST['amount'];
 $unit = $_POST['unit'];
 $description = $_POST['description'] ?? '';
+$revisionReason =
+    $_POST['revision_reason']
+    ?? null;
 
 $permissionScope = trim((string)($_POST['permission_scope'] ?? 'operational'));
 if (!in_array($permissionScope, ['operational', 'expense_report'], true)) {
@@ -153,12 +156,23 @@ try {
         $pdo,
         $farmId,
         (int)$expenseId,
-        (int)($_SESSION['user_id'] ?? 0)
+        (int)($_SESSION['user_id'] ?? 0),
+        $revisionReason
     );
 
     $pdo->commit();
 
     $_SESSION['success'] = 'Expense updated successfully.'; send_json(['success' => true, 'message' => 'Expense updated successfully']);
+} catch (InvalidArgumentException $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+
+    send_json([
+        'success' => false,
+        'error' => $e->getMessage(),
+    ], 422);
+
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
     log_app_error('update_expense_failed', ['error' => safe_api_exception_message($e, 'The expense could not be updated.'), 'expense_id' => $expenseId ?? null]);

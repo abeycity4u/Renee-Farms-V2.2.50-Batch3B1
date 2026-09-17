@@ -29,6 +29,77 @@ function expense_revision_service_require_transaction(
 }
 
 
+
+if (!function_exists('expense_revision_service_reason_for_action')) {
+function expense_revision_service_reason_for_action(
+    string $action,
+    ?string $revisionReason
+): ?string {
+    $action =
+        strtolower(
+            trim($action)
+        );
+
+    if ($action === 'create') {
+        return null;
+    }
+
+    if ($action === 'legacy_baseline') {
+        return
+            'Legacy baseline captured before first controlled revision';
+    }
+
+    $reason =
+        trim(
+            (string)(
+                $revisionReason
+                ?? ''
+            )
+        );
+
+    if (
+        in_array(
+            $action,
+            [
+                'update',
+                'delete',
+            ],
+            true
+        )
+        && $reason === ''
+    ) {
+        throw new InvalidArgumentException(
+            $action === 'delete'
+                ? 'Enter a reason for deleting this expense.'
+                : 'Enter a reason for changing this expense.'
+        );
+    }
+
+    if ($reason === '') {
+        return null;
+    }
+
+    $length =
+        function_exists('mb_strlen')
+            ? mb_strlen(
+                $reason,
+                'UTF-8'
+            )
+            : strlen(
+                $reason
+            );
+
+    if ($length > 500) {
+        throw new InvalidArgumentException(
+            'Expense revision reason cannot exceed 500 characters.'
+        );
+    }
+
+    return $reason;
+}
+}
+
+
 if (!function_exists('expense_revision_service_expense')) {
 function expense_revision_service_expense(
     PDO $pdo,
@@ -282,7 +353,8 @@ function expense_revision_service_insert_revision(
     string $action,
     int $revisionNo,
     ?int $previousRevisionId,
-    ?int $changedByUserId
+    ?int $changedByUserId,
+    ?string $revisionReason = null
 ): array {
     expense_revision_service_require_transaction(
         $pdo
@@ -304,6 +376,32 @@ function expense_revision_service_insert_revision(
     ) {
         throw new InvalidArgumentException(
             'Select a valid expense revision action.'
+        );
+    }
+
+    $revisionReason =
+        expense_revision_service_reason_for_action(
+            $action,
+            $revisionReason
+        );
+
+    if (
+        in_array(
+            $action,
+            [
+                'update',
+                'delete',
+            ],
+            true
+        )
+        &&
+        (
+            $changedByUserId === null
+            || $changedByUserId < 1
+        )
+    ) {
+        throw new RuntimeException(
+            'Expense revision actor is required.'
         );
     }
 
@@ -378,6 +476,7 @@ function expense_revision_service_insert_revision(
                     expense_id,
                     revision_no,
                     revision_action,
+                    revision_reason,
                     previous_revision_id,
                     causal_fingerprint,
                     causal_manifest_json,
@@ -396,6 +495,7 @@ function expense_revision_service_insert_revision(
                     ?,
                     ?,
                     ?,
+                    ?,
                     ?
                 )"
         );
@@ -405,6 +505,7 @@ function expense_revision_service_insert_revision(
         $expenseId,
         $revisionNo,
         $action,
+        $revisionReason,
         $previousRevisionId,
         (string)$built[
             'causal_fingerprint'
@@ -433,6 +534,9 @@ function expense_revision_service_insert_revision(
 
         'revision_action' =>
             $action,
+
+        'revision_reason' =>
+            $revisionReason,
 
         'causal_fingerprint' =>
             (string)$built[
@@ -799,7 +903,8 @@ function expense_revision_service_record_updated(
     PDO $pdo,
     int $farmId,
     int $expenseId,
-    ?int $changedByUserId
+    ?int $changedByUserId,
+    ?string $revisionReason
 ): array {
     expense_revision_service_require_transaction(
         $pdo
@@ -916,7 +1021,8 @@ function expense_revision_service_record_updated(
             'update',
             $nextRevisionNo,
             (int)$latest['id'],
-            $changedByUserId
+            $changedByUserId,
+            $revisionReason
         );
 
     expense_revision_service_sync_projection(
@@ -942,7 +1048,8 @@ function expense_revision_service_record_deleted(
     PDO $pdo,
     int $farmId,
     int $expenseId,
-    ?int $changedByUserId
+    ?int $changedByUserId,
+    ?string $revisionReason
 ): array {
     expense_revision_service_require_transaction(
         $pdo
@@ -1018,7 +1125,8 @@ function expense_revision_service_record_deleted(
                 'revision_no'
             ] + 1,
             (int)$latest['id'],
-            $changedByUserId
+            $changedByUserId,
+            $revisionReason
         );
 
     /*

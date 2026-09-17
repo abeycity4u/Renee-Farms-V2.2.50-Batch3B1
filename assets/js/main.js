@@ -554,10 +554,22 @@ async function deleteSale(saleId) {
  * Delete expense
  */
 async function deleteExpense(expenseId) {
-    if (!await confirmAction('Are you sure you want to delete this expense record?', {title:'Delete expense record?', confirmText:'Delete'})) return;
-    
+    const revisionReason = await AppConfirm.askReason(
+        'Why are you deleting this expense record?',
+        {
+            title: 'Delete expense record?',
+            confirmText: 'Delete',
+            tone: 'danger'
+        }
+    );
+
+    if (revisionReason === null) return;
+
     try {
-        const params = new URLSearchParams({ id: expenseId });
+        const params = new URLSearchParams({
+            id: expenseId,
+            revision_reason: revisionReason
+        });
         const result = await apiFetch('api/delete_expense.php', {
             method: 'POST',
             data: params,

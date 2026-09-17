@@ -56,8 +56,21 @@ window.RuminantExpensesConfig = {
 
     document.getElementById('editExpenseForm').addEventListener('submit', async function(e) {
         e.preventDefault();
+
+        const revisionReason = await AppConfirm.askReason(
+            'Why are you changing this expense?',
+            {
+                title: 'Reason for expense change',
+                confirmText: 'Save changes',
+                tone: 'primary'
+            }
+        );
+
+        if (revisionReason === null) return;
+
         const formData = new FormData(this);
         formData.append('csrf_token', window.RuminantExpensesConfig.csrfToken);
+        formData.append('revision_reason', revisionReason);
 
         try {
             const response = await fetch('../api/update_expense.php', {
@@ -93,11 +106,23 @@ window.RuminantExpensesConfig = {
             return;
         }
 
-        const confirmed = await AppConfirm.ask('Are you sure you want to delete this expense record?', {title:'Delete expense record?', confirmText:'Delete'});
-        if (!confirmed) return;
+        const revisionReason = await AppConfirm.askReason(
+            'Why are you deleting this expense record?',
+            {
+                title: 'Delete expense record?',
+                confirmText: 'Delete',
+                tone: 'danger'
+            }
+        );
+
+        if (revisionReason === null) return;
 
         try {
-            const params = new URLSearchParams({ id: expenseId, csrf_token: window.RuminantExpensesConfig.csrfToken });
+            const params = new URLSearchParams({
+                id: expenseId,
+                csrf_token: window.RuminantExpensesConfig.csrfToken,
+                revision_reason: revisionReason
+            });
             const response = await fetch('../api/delete_expense.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
