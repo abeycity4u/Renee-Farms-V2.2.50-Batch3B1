@@ -178,9 +178,11 @@ $money =
 
         <div class="alert alert-info">
             <strong>Explicit attribution only.</strong>
-            The platform will not automatically or equally spread this cost.
-            Enter only the amount that belongs to each cycle. Any balance left
-            over remains visibly unallocated.
+            Nothing is allocated automatically.
+            Tick <strong>Split total equally across all compatible cycles</strong>
+            only when every compatible cycle shown should share the full parent
+            expense equally. Otherwise leave it unchecked and enter the amounts
+            manually. Any balance left over remains visibly unallocated.
         </div>
 
         <div class="card mb-3">
@@ -348,8 +350,33 @@ $money =
                 ></div>
 
                 <div class="card">
-                    <div class="card-header">
+                    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-3">
                         <strong>Compatible Production Cycles</strong>
+
+                        <div class="form-check mb-0">
+                            <input
+                                class="form-check-input"
+                                type="checkbox"
+                                id="financialAllocationEqualSplit"
+                                <?php echo $animalAllocationCount > 0
+                                    ? 'disabled'
+                                    : ''; ?>
+                            >
+                            <label
+                                class="form-check-label fw-semibold"
+                                for="financialAllocationEqualSplit"
+                            >
+                                Split total equally across all compatible cycles
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="px-3 pt-2 small text-muted">
+                        When checked, the full parent expense is divided as
+                        equally as currency allows across every compatible cycle
+                        shown below. Any unavoidable extra kobo is distributed
+                        across the first rows so the total remains exact.
+                        Uncheck the box to use manual amounts.
                     </div>
 
                     <div class="table-responsive">

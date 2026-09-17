@@ -237,10 +237,74 @@ $checks['PAGE_USES_WORKSPACE_SNAPSHOT'] =
         'financial_allocation_workspace_snapshot('
     ) !== false;
 
-$checks['PAGE_EXPLICIT_NO_AUTO_SPREAD_COPY'] =
+$checks['PAGE_EQUAL_SPLIT_EXPLICIT_OPT_IN_COPY'] =
     strpos(
         $content['page'],
-        'will not automatically or equally spread this cost'
+        'Nothing is allocated automatically.'
+    ) !== false
+    &&
+    strpos(
+        $content['page'],
+        'Split total equally across all compatible cycles'
+    ) !== false;
+
+$checks['PAGE_EQUAL_SPLIT_CHECKBOX'] =
+    strpos(
+        $content['page'],
+        'id="financialAllocationEqualSplit"'
+    ) !== false
+    &&
+    strpos(
+        $content['page'],
+        'Uncheck the box to use manual amounts.'
+    ) !== false;
+
+$checks['JS_EQUAL_SPLIT_CENTS_EXACT'] =
+    strpos(
+        $content['js'],
+        'function moneyStringToCents('
+    ) !== false
+    &&
+    strpos(
+        $content['js'],
+        'Math.floor('
+    ) !== false
+    &&
+    strpos(
+        $content['js'],
+        'remainderCents'
+    ) !== false
+    &&
+    strpos(
+        $content['js'],
+        'index < remainderCents'
+    ) !== false;
+
+$checks['JS_EQUAL_SPLIT_LOCKS_MANUAL_FIELDS'] =
+    strpos(
+        $content['js'],
+        'input.readOnly ='
+    ) !== false
+    &&
+    strpos(
+        $content['js'],
+        'true;'
+    ) !== false;
+
+$checks['JS_EQUAL_SPLIT_UNCHECK_RESTORES_MANUAL'] =
+    strpos(
+        $content['js'],
+        'manualAmountSnapshot'
+    ) !== false
+    &&
+    strpos(
+        $content['js'],
+        'function restoreManualAmounts()'
+    ) !== false
+    &&
+    strpos(
+        $content['js'],
+        'equalSplitCheckbox.checked'
     ) !== false;
 
 $checks['PAGE_VISIBLE_REMAINDER'] =

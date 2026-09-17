@@ -15,6 +15,51 @@
             form.dataset.gross || '0'
         ) || 0;
 
+    function moneyStringToCents(value) {
+        const normalized =
+            String(value || '').trim();
+
+        if (
+            !/^\d+(?:\.\d{1,2})?$/.test(
+                normalized
+            )
+        ) {
+            return 0;
+        }
+
+        const parts =
+            normalized.split('.');
+
+        const whole =
+            Number.parseInt(
+                parts[0] || '0',
+                10
+            );
+
+        const fraction =
+            Number.parseInt(
+                String(
+                    parts[1] || ''
+                ).padEnd(2, '0'),
+                10
+            );
+
+        return (
+            whole * 100
+            +
+            (
+                Number.isFinite(fraction)
+                    ? fraction
+                    : 0
+            )
+        );
+    }
+
+    const grossCents =
+        moneyStringToCents(
+            form.dataset.gross || '0'
+        );
+
     const mutationBlocked =
         form.dataset.mutationBlocked === '1';
 
@@ -56,6 +101,14 @@
         document.getElementById(
             'financialAllocationRevisionReason'
         );
+
+    const equalSplitCheckbox =
+        document.getElementById(
+            'financialAllocationEqualSplit'
+        );
+
+    let manualAmountSnapshot =
+        null;
 
     const noteMap =
         new Map();
@@ -121,6 +174,89 @@
             message;
     }
 
+    function splitGrossEqually() {
+        if (
+            mutationBlocked
+            ||
+            !equalSplitCheckbox
+            ||
+            amountInputs.length < 1
+        ) {
+            return;
+        }
+
+        manualAmountSnapshot =
+            amountInputs.map(
+                (input) => input.value
+            );
+
+        const baseCents =
+            Math.floor(
+                grossCents
+                /
+                amountInputs.length
+            );
+
+        const remainderCents =
+            grossCents
+            %
+            amountInputs.length;
+
+        amountInputs.forEach(
+            (input, index) => {
+                const cycleCents =
+                    baseCents
+                    +
+                    (
+                        index < remainderCents
+                            ? 1
+                            : 0
+                    );
+
+                input.value =
+                    (
+                        cycleCents
+                        /
+                        100
+                    ).toFixed(2);
+
+                input.readOnly =
+                    true;
+            }
+        );
+
+        refreshSummary();
+    }
+
+    function restoreManualAmounts() {
+        amountInputs.forEach(
+            (input, index) => {
+                input.readOnly =
+                    false;
+
+                if (
+                    Array.isArray(
+                        manualAmountSnapshot
+                    )
+                    &&
+                    index
+                        <
+                        manualAmountSnapshot.length
+                ) {
+                    input.value =
+                        manualAmountSnapshot[
+                            index
+                        ];
+                }
+            }
+        );
+
+        manualAmountSnapshot =
+            null;
+
+        refreshSummary();
+    }
+
     function currentTotal() {
         return amountInputs.reduce(
             (total, input) => {
@@ -184,6 +320,21 @@
             refreshSummary
         );
     });
+
+    if (equalSplitCheckbox) {
+        equalSplitCheckbox.addEventListener(
+            'change',
+            function () {
+                if (
+                    equalSplitCheckbox.checked
+                ) {
+                    splitGrossEqually();
+                } else {
+                    restoreManualAmounts();
+                }
+            }
+        );
+    }
 
     refreshSummary();
 
