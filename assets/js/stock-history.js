@@ -71,7 +71,7 @@ function renderTable(transactions) {
     tbody.innerHTML = '';
 
     if (!transactions || transactions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted">No history available for the selected period.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted">No history available for the selected period.</td></tr>';
         return;
     }
 
@@ -80,6 +80,16 @@ function renderTable(transactions) {
         const typeBadge = tx.transaction_type === 'received' ?
             '<span class="badge bg-success">Received</span>' :
             '<span class="badge bg-danger">Used</span>';
+
+        const allocation =
+            tx.consumption_allocation || {};
+
+        const allocationAction =
+            allocation.visible && allocation.url
+                ? '<a class="btn btn-sm btn-outline-primary text-nowrap" href="'
+                    + escapeHtml(allocation.url)
+                    + '"><i class="bi bi-diagram-3 me-1"></i>Allocate Cost</a>'
+                : '<span class="text-muted">—</span>';
 
         row.innerHTML = `
             <td>${formatDate(tx.transaction_date)}</td>
@@ -93,6 +103,7 @@ function renderTable(transactions) {
             <td>${tx.recorded_by_label ? escapeHtml(tx.recorded_by_label) : 'N/A'}</td>
             <td>${Number(tx.is_reversed) === 1 ? '<span class="badge bg-secondary">Reversed</span>' : (tx.reversal_of_id ? '<span class="badge bg-info text-dark">Restoration</span>' : '<span class="badge bg-success">Active</span>')}</td>
             <td>${tx.created_at ? new Date(tx.created_at.replace(' ', 'T') + 'Z').toLocaleString() : 'N/A'}</td>
+            <td>${allocationAction}</td>
         `;
         tbody.appendChild(row);
     });

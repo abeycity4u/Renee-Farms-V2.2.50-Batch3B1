@@ -137,10 +137,11 @@ $pageTitle = 'Stock History - ' . htmlspecialchars($item['item_name']);
                             <th>Recorded By</th>
                             <th>Status</th>
                             <th>Posted</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr><td colspan="11" class="text-center text-muted">Loading history...</td></tr>
+                        <tr><td colspan="12" class="text-center text-muted">Loading history...</td></tr>
                     </tbody>
                 </table>
             </div>

@@ -4,6 +4,7 @@ require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/../lib/stock_service.php');
 require_once(__DIR__ . '/../lib/transaction_actor_display.php');
+require_once(__DIR__ . '/../lib/stock_consumption_allocation_workspace.php');
 requireLogin();
 header('Content-Type: application/json');
 
@@ -23,6 +24,8 @@ try {
     $hasInventoryPermission = hasPermission($userType, 'inventory');
     $hasPoultryAccess = checkAccess('poultry');
     $hasRuminantAccess = checkAccess('ruminant');
+    $canManageStockAllocation =
+        stock_consumption_allocation_workspace_can_manage();
 
     if (!($isOwnerOrAdmin || $hasInventoryPermission || $hasPoultryAccess || $hasRuminantAccess)) {
         http_response_code(403);
@@ -75,6 +78,30 @@ try {
                 $farmId,
                 $transaction
             );
+
+        $allocationAction =
+            stock_consumption_allocation_workspace_action_state(
+                $pdo,
+                $farmId,
+                $transaction,
+                $canManageStockAllocation
+            );
+
+        $transaction['consumption_allocation'] = [
+            'visible' =>
+                !empty(
+                    $allocationAction['visible']
+                ),
+
+            'eligible' =>
+                !empty(
+                    $allocationAction['eligible']
+                ),
+
+            'url' =>
+                $allocationAction['url']
+                ?? null,
+        ];
     }
     unset($transaction);
 
