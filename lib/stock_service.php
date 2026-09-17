@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/stock_costing.php';
 require_once __DIR__ . '/attribution.php';
+require_once __DIR__ . '/stock_consumption_allocation_persistence.php';
 /**
  * Canonical inventory ledger service.
  *
@@ -177,6 +178,21 @@ function stock_reverse_transaction(
     if (!empty($tx['reversal_of_id'])) {
         throw new RuntimeException('A reversal transaction cannot be reversed again.');
     }
+
+    /*
+     * Close any live consumed-stock allocation before this source movement
+     * becomes reversed. The same caller-owned transaction covers allocation
+     * provenance, current allocation projection and stock-ledger correction.
+     *
+     * Movements without allocation history are a no-op here.
+     */
+    stock_consumption_allocation_persistence_before_source_reversal(
+        $pdo,
+        $farmId,
+        $transactionId,
+        $reason,
+        $userId
+    );
 
     $itemStmt = $pdo->prepare("SELECT * FROM stock_items WHERE id = ? AND farm_id = ? FOR UPDATE");
     $itemStmt->execute([(int)$tx['stock_item_id'], $farmId]);
