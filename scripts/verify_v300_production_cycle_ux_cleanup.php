@@ -235,19 +235,27 @@ $check(
 );
 
 $check(
-    substr_count(
+    strpos(
         $page,
         "if (\$action === 'confirm_population_cutover')"
-    ) === 1,
-    'Population Cutover route remains'
+    ) === false
+    && strpos(
+        $page,
+        '/management/legacy_cycle_setup.php'
+    ) !== false,
+    'Population Cutover route is retired from Production Cycles and relocated'
 );
 
 $check(
-    substr_count(
+    strpos(
         $page,
         'value="confirm_population_cutover"'
-    ) === 1,
-    'Population Cutover form remains'
+    ) === false
+    && strpos(
+        $manage,
+        '/management/legacy_cycle_setup.php#population-cutover'
+    ) !== false,
+    'Population Cutover form is removed from normal cycle UI and Manage Cycle links to Legacy Cycle Setup'
 );
 
 $check(

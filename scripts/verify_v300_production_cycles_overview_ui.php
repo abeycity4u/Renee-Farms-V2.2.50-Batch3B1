@@ -173,16 +173,32 @@ if ($toolsSection !== null) {
         strpos(
             $toolsSection,
             'value="confirm_population_cutover"'
+        ) === false
+        && strpos(
+            $toolsSection,
+            '/management/legacy_cycle_setup.php'
+        ) !== false
+        && strpos(
+            $toolsSection,
+            'Legacy Cycle Setup'
         ) !== false,
-        'V3 population cutover remains available inside maintenance tools'
+        'population cutover is retired from normal maintenance and relocated to Legacy Cycle Setup'
     );
 
     $check(
         strpos(
             $toolsSection,
             'value="update_bird_cost_basis"'
-        ) !== false,
-        'poultry bird cost maintenance remains available inside maintenance tools'
+        ) === false
+        && strpos(
+            $toolsSection,
+            'name="bird_unit_cost"'
+        ) === false
+        && strpos(
+            $toolsSection,
+            '<strong>Poultry Bird Cost Basis</strong>'
+        ) === false,
+        'farmer-editable Poultry Bird Cost Basis maintenance is retired'
     );
 
     $check(
@@ -196,9 +212,9 @@ if ($toolsSection !== null) {
         ) !== false
         && strpos(
             $toolsSection,
-            'value="void_poultry_acquisition"'
+            'Use Edit for cycle details and corrections to Opening Headcount or Total Acquisition Cost.'
         ) !== false,
-        'duplicate flock entry is retired while acquisition history and correction remain available'
+        'duplicate flock entry stays retired while acquisition history and Edit-owned correction remain visible'
     );
 
     $check(
@@ -209,8 +225,16 @@ if ($toolsSection !== null) {
         && strpos(
             $toolsSection,
             'value="transition_poultry_phase"'
+        ) === false
+        && strpos(
+            $toolsSection,
+            '<strong>Poultry Lifecycle History</strong>'
+        ) !== false
+        && strpos(
+            $toolsSection,
+            'Lifecycle changes are managed inside the selected cycle.'
         ) !== false,
-        'duplicate initial phase is retired while lifecycle transition remains available'
+        'Production Cycles keeps lifecycle history read-only while selected-cycle lifecycle writes stay elsewhere'
     );
 } else {
     for ($i = 0; $i < 6; $i++) {
@@ -313,24 +337,20 @@ $check(
     strpos(
         $page,
         "'confirm_population_cutover'"
-    ) !== false
+    ) === false
     && strpos(
         $page,
         "'update_bird_cost_basis'"
-    ) !== false
+    ) === false
     && strpos(
         $page,
-        "'transition_poultry_phase'"
-    ) !== false
+        '$productionCyclesPrgAction'
+    ) === false
     && strpos(
         $page,
-        "'end_poultry_phase'"
-    ) !== false
-    && strpos(
-        $page,
-        ") ? 'open' : ''; ?>"
+        '/management/legacy_cycle_setup.php'
     ) !== false,
-    'maintenance feedback can reopen the nested maintenance workspace'
+    'retired cutover and manual bird-cost actions no longer control Production Cycles maintenance state'
 );
 
 echo "\nChecks: {$checks}\n";

@@ -338,7 +338,11 @@ $check(
     && strpos(
         $legacy,
         "if (\$action === 'confirm_population_cutover')"
-    ) !== false
+    ) === false
+    && strpos(
+        $legacy,
+        'value="confirm_population_cutover"'
+    ) === false
     && strpos(
         $legacy,
         "if (\$action === 'record_poultry_acquisition')"
@@ -358,8 +362,16 @@ $check(
     && strpos(
         $legacy,
         "if (\$action === 'end_poultry_phase')"
-    ) === false,
-    'Production Cycles retains controlled cutover while selected-cycle poultry mutations are owned by Manage Cycle'
+    ) === false
+    && strpos(
+        $legacy,
+        '/management/legacy_cycle_setup.php'
+    ) !== false
+    && strpos(
+        $manage,
+        '/management/legacy_cycle_setup.php#population-cutover'
+    ) !== false,
+    'Production Cycles owns no legacy cutover or selected-cycle poultry mutations while Manage Cycle links compatibility setup separately'
 );
 
 $check(

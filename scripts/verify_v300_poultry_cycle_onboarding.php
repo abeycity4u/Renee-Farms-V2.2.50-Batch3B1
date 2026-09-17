@@ -69,7 +69,13 @@ $check($lifecycle !== '', 'canonical poultry lifecycle service is readable');
 $check($js !== '', 'Production Cycles JavaScript is readable');
 
 $createStart = strpos($page, "if (\$action === 'create_cycle')");
-$createEnd = strpos($page, "if (\$action === 'update_bird_cost_basis')");
+$createEnd = strpos(
+    $page,
+    "if (\$action === 'post_batch' && \$stockBatchTableExists)",
+    $createStart === false
+        ? 0
+        : $createStart
+);
 $createSection = '';
 
 if (

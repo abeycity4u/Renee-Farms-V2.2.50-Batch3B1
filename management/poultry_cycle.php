@@ -1737,9 +1737,9 @@ $confirmationText .=
                     <div class="mt-3">
                         <a
                             class="btn btn-outline-warning btn-sm"
-                            href="<?php echo BASE_URL; ?>/management/production_cycles.php#population-cutover"
+                            href="<?php echo BASE_URL; ?>/management/legacy_cycle_setup.php#population-cutover"
                         >
-                            Complete V3 Population Cutover
+                            Complete Legacy Cycle Setup
                         </a>
                     </div>
                 </div>

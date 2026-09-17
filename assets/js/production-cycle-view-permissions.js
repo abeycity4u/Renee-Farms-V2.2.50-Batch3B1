@@ -15,9 +15,6 @@ document.addEventListener('DOMContentLoaded', function () {
         ) {
             const col = form.closest('.col-lg-6');
             if (col) col.remove();
-        } else if (action === 'update_bird_cost_basis') {
-            const card = form.closest('.card');
-            if (card) card.remove();
         }
     });
 

@@ -281,7 +281,7 @@ $routeCreateStart = strpos(
 
 $routeCreateEnd = strpos(
     $routeSource,
-    "if (\$action === 'update_bird_cost_basis')",
+    "if (\$action === 'post_batch' && \$stockBatchTableExists)",
     $routeCreateStart !== false
         ? $routeCreateStart + 1
         : 0

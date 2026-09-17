@@ -74,9 +74,7 @@ $check(
 foreach (
     [
         'create_cycle',
-        'update_bird_cost_basis',
         'post_batch',
-        'confirm_population_cutover',
     ]
     as $action
 ) {
@@ -96,29 +94,37 @@ $check(
     ) !== false
     && strpos(
         $cycles,
-        "'cutover_form' =>"
-    ) !== false
-    && strpos(
-        $cycles,
         'array_keys($createCycleForm)'
     ) !== false
     && strpos(
         $cycles,
-        'array_keys($cutoverForm)'
-    ) !== false,
-    'Production Cycles PRG preserves Create Cycle and population-cutover form state.'
+        "'cutover_form'"
+    ) === false
+    && strpos(
+        $cycles,
+        '$cutoverForm'
+    ) === false,
+    'Production Cycles PRG preserves Create Cycle state without relocated cutover state.'
 );
 
 $check(
     strpos(
         $cycles,
         '$productionCyclesPrgAction'
-    ) !== false
+    ) === false
     && strpos(
-        $compactCycles,
-        'in_array( $productionCyclesPrgAction,'
+        $cycles,
+        "'update_bird_cost_basis' =>"
+    ) === false
+    && strpos(
+        $cycles,
+        "'confirm_population_cutover' =>"
+    ) === false
+    && strpos(
+        $cycles,
+        '/management/legacy_cycle_setup.php'
     ) !== false,
-    'Advanced Maintenance reopens from persisted PRG action rather than POST state.'
+    'Production Cycles PRG no longer persists retired maintenance actions.'
 );
 
 $redirectCallCount =

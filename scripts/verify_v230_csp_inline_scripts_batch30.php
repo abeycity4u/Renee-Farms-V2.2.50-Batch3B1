@@ -82,13 +82,19 @@ $check(
 );
 
 $check(
-    str_contains($js, "action === 'update_bird_cost_basis'"),
-    'External asset retains bird cost basis restriction'
+    !str_contains(
+        $js,
+        "action === 'update_bird_cost_basis'"
+    ),
+    'External asset no longer carries retired manual Bird Cost Basis behavior'
 );
 
 $check(
-    str_contains($js, "action === 'record_poultry_acquisition'"),
-    'External asset retains poultry acquisition restriction'
+    !str_contains(
+        $js,
+        "action === 'record_poultry_acquisition'"
+    ),
+    'External asset keeps retired standalone poultry acquisition behavior absent'
 );
 
 $check(
@@ -130,9 +136,17 @@ $check(
 $check(
     str_contains(
         $php,
-        'production-cycle-readonly-prepaint'
+        "BASE_URL . '/assets/css/prepaint-production-cycle-readonly.css'"
+    )
+    && str_contains(
+        $php,
+        "versioned_asset('/assets/css/prepaint-production-cycle-readonly.css')"
+    )
+    && str_contains(
+        $php,
+        '$style = \'<link rel="stylesheet" href="\''
     ),
-    'Existing read-only prepaint style remains untouched'
+    'Existing read-only prepaint uses the external versioned stylesheet contract'
 );
 
 echo PHP_EOL . $checks . ' checks, ' . $failures . ' failure(s).' . PHP_EOL;

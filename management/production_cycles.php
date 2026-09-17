@@ -26,16 +26,6 @@ $errorMessage = null;
 $flash = null;
 
 $populationBaselineTableExists = false;
-$populationCutoverCycles = [];
-$populationTrackedActiveCount = 0;
-
-$cutoverForm = [
-    'cycle_id' => '',
-    'baseline_date' => '',
-    'baseline_quantity' => '',
-    'notes' => '',
-    'confirmed' => false,
-];
 
 $summary = [
     'active_cycles' => 0,
@@ -75,37 +65,26 @@ $createCycleForm = [
 $productionCyclesPrgKey =
     'production_cycles_prg';
 
-$productionCyclesPrgAction = '';
-
 $productionCyclesPrgAnchors = [
     'create_cycle' =>
         '#create-cycle',
-    'update_bird_cost_basis' =>
-        '#cycle-maintenance-tools',
     'post_batch' =>
         '#cycle-tools',
-    'confirm_population_cutover' =>
-        '#population-cutover',
 ];
 
 $productionCyclesPrgRedirect = static function (
     string $action,
     ?array $flashState,
-    array $createFormState,
-    array $cutoverFormState
+    array $createFormState
 ) use (
     $productionCyclesPrgKey,
     $productionCyclesPrgAnchors
 ): void {
     $_SESSION[$productionCyclesPrgKey] = [
-        'action' =>
-            $action,
         'flash' =>
             $flashState,
         'create_form' =>
             $createFormState,
-        'cutover_form' =>
-            $cutoverFormState,
     ];
 
     $anchor =
@@ -135,14 +114,6 @@ if (
     unset(
         $_SESSION[$productionCyclesPrgKey]
     );
-
-    $productionCyclesPrgAction =
-        trim(
-            (string)(
-                $productionCyclesPrg['action']
-                ?? ''
-            )
-        );
 
     if (
         isset($productionCyclesPrg['flash'])
@@ -175,31 +146,7 @@ if (
             }
         }
     }
-
-    if (
-        isset($productionCyclesPrg['cutover_form'])
-        && is_array(
-            $productionCyclesPrg['cutover_form']
-        )
-    ) {
-        foreach (
-            array_keys($cutoverForm)
-            as $cutoverField
-        ) {
-            if (
-                array_key_exists(
-                    $cutoverField,
-                    $productionCyclesPrg['cutover_form']
-                )
-            ) {
-                $cutoverForm[$cutoverField] =
-                    $productionCyclesPrg['cutover_form']
-                        [$cutoverField];
-            }
-        }
-    }
 }
-
 
 try {
     $cycleTableExists = ($pdo->query("SHOW TABLES LIKE 'production_cycles'")->rowCount() > 0);
@@ -480,33 +427,6 @@ try {
             }
         }
 
-        if ($action === 'update_bird_cost_basis') {
-            $cycleId = (int)($_POST['cycle_id'] ?? 0);
-            $birdUnitCostRaw = trim((string)($_POST['bird_unit_cost'] ?? ''));
-            $birdUnitCost = $birdUnitCostRaw === '' ? null : filter_var($birdUnitCostRaw, FILTER_VALIDATE_FLOAT);
-
-            if ($cycleId <= 0) {
-                $flash = ['type' => 'danger', 'message' => 'Select a poultry cycle to update.', 'title' => 'Cycle is required.'];
-            } elseif ($birdUnitCost === false || ($birdUnitCost !== null && $birdUnitCost < 0)) {
-                $flash = ['type' => 'danger', 'message' => 'Bird cost basis must be blank or 0 and above.', 'title' => 'Invalid bird cost basis.'];
-            } else {
-                $cycleOwnerStmt = $pdo->prepare("SELECT id FROM production_cycles WHERE id = ? AND farm_id = ? AND farm_type = 'poultry' LIMIT 1");
-                $cycleOwnerStmt->execute([$cycleId, $tenantFarmId]);
-                if (!$cycleOwnerStmt->fetchColumn()) {
-                    $flash = ['type' => 'danger', 'message' => 'The selected poultry cycle was not found in this farm.'];
-                } else {
-                    $stmt = $pdo->prepare('UPDATE production_cycles SET bird_unit_cost = ? WHERE id = ? AND farm_id = ?');
-                    $stmt->execute([$birdUnitCost, $cycleId, $tenantFarmId]);
-                    $flash = [
-                        'type' => 'success',
-                        'message' => $birdUnitCost === null
-                            ? 'Bird cost basis cleared. Mortality for this cycle will remain uncosted until a basis is supplied.'
-                            : 'Bird cost basis updated successfully.'
-                    ];
-                }
-            }
-        }
-
         if ($action === 'post_batch' && $stockBatchTableExists) {
             $cycleId = (int)($_POST['cycle_id'] ?? 0);
             $itemDescription = trim((string)($_POST['item_description'] ?? ''));
@@ -548,94 +468,6 @@ try {
         }
 
 
-        if ($action === 'confirm_population_cutover') {
-            $cycleId = (int)($_POST['cycle_id'] ?? 0);
-            $baselineDate = trim(
-                (string)($_POST['baseline_date'] ?? '')
-            );
-            $baselineQuantityRaw = trim(
-                (string)($_POST['baseline_quantity'] ?? '')
-            );
-            $notes = trim(
-                (string)($_POST['notes'] ?? '')
-            );
-            $confirmed =
-                (string)($_POST['confirm_cutover'] ?? '') === '1';
-
-            $cutoverForm = [
-                'cycle_id' => $cycleId > 0 ? (string)$cycleId : '',
-                'baseline_date' => $baselineDate,
-                'baseline_quantity' => $baselineQuantityRaw,
-                'notes' => $notes,
-                // A corrected immutable baseline must be explicitly confirmed
-                // again after any failed submission.
-                'confirmed' => false,
-            ];
-
-            if (!$populationBaselineTableExists) {
-                $flash = [
-                    'type' => 'danger',
-                    'title' => 'Population foundation is not available.',
-                    'message' => 'Run the V3 database migrations before confirming a population cutover.',
-                ];
-            } elseif (!$confirmed) {
-                $flash = [
-                    'type' => 'danger',
-                    'title' => 'Population confirmation is required.',
-                    'message' => 'Confirm that the entered headcount is the physically verified live population for the selected cutover date.',
-                ];
-            } else {
-                try {
-                    production_cycle_cutover_population_v3(
-                        $pdo,
-                        $tenantFarmId,
-                        $cycleId,
-                        $baselineDate,
-                        $baselineQuantityRaw,
-                        $notes !== '' ? $notes : null,
-                        isset($_SESSION['user_id'])
-                            ? (int)$_SESSION['user_id']
-                            : null
-                    );
-
-                    $flash = [
-                        'type' => 'success',
-                        'title' => 'V3 population cutover confirmed.',
-                        'message' => 'The selected cycle now uses the user-confirmed population baseline. Earlier legacy records were not reconstructed or backfilled.',
-                        'tip' => 'Future population changes are tracked from this baseline. Correct later population differences through the canonical adjustment workflow instead of rewriting this baseline.',
-                    ];
-
-                    $cutoverForm = [
-                        'cycle_id' => '',
-                        'baseline_date' => '',
-                        'baseline_quantity' => '',
-                        'notes' => '',
-                        'confirmed' => false,
-                    ];
-                } catch (Throwable $e) {
-                    $safe =
-                        $e instanceof InvalidArgumentException
-                        || $e instanceof ProductionCycleException
-                        || $e instanceof ProductionPopulationException;
-
-                    if (!$safe) {
-                        error_log(
-                            'Production population cutover failed: '
-                            . $e->getMessage()
-                        );
-                    }
-
-                    $flash = [
-                        'type' => 'danger',
-                        'title' => 'Population cutover was not saved.',
-                        'message' => $safe
-                            ? $e->getMessage()
-                            : 'The population cutover could not be completed. No baseline was changed.',
-                    ];
-                }
-            }
-        }
-
         if (
             isset(
                 $productionCyclesPrgAnchors[
@@ -646,8 +478,7 @@ try {
             $productionCyclesPrgRedirect(
                 (string)$action,
                 $flash,
-                $createCycleForm,
-                $cutoverForm
+                $createCycleForm
             );
         }
 
@@ -702,16 +533,6 @@ try {
             $summary['total_current_stock'] +=
                 (int)$cycle['current_stock'];
 
-            if ($populationBaselineTableExists) {
-                if (
-                    $cycle['population_snapshot']['tracking_status']
-                    === 'canonical'
-                ) {
-                    $populationTrackedActiveCount++;
-                } else {
-                    $populationCutoverCycles[] = $cycle;
-                }
-            }
         }
         unset($cycle);
 
@@ -829,8 +650,7 @@ try {
                 'message' =>
                     $errorMessage,
             ],
-            $createCycleForm,
-            $cutoverForm
+            $createCycleForm
         );
     }
 }
@@ -1080,25 +900,14 @@ try {
                     <details
                         class="card mb-3"
                         id="cycle-maintenance-tools"
-                        <?php echo (
-                            $flash !== null
-                            && in_array(
-                                $productionCyclesPrgAction,
-                                [
-                                    'confirm_population_cutover',
-                                    'update_bird_cost_basis',
-                                ],
-                                true
-                            )
-                        ) ? 'open' : ''; ?>
                     >
                         <summary class="card-header">
                             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
                                 <div>
                                     <strong>Advanced Maintenance &amp; History</strong>
                                     <div class="small text-muted">
-                                        Population setup, cost maintenance, acquisition audit,
-                                        and poultry lifecycle history.
+                                        Acquisition audit, poultry lifecycle history,
+                                        and temporary legacy-cycle setup.
                                     </div>
                                 </div>
                                 <span class="badge bg-secondary">Open maintenance</span>
@@ -1107,167 +916,20 @@ try {
 
                         <div class="card-body">
 
-        <?php if (
-            (isPlatformOwner() || hasRole('farm_admin'))
-            && (
-                !$populationBaselineTableExists
-                || !empty($populationCutoverCycles)
-            )
-        ): ?>
-            <div class="card mb-3" id="population-cutover">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <strong>V3 Population Cutover</strong>
-                    <?php if ($populationBaselineTableExists): ?>
-                        <span class="badge bg-secondary">
-                            <?php echo number_format($populationTrackedActiveCount); ?> active cycle(s) already tracked
-                        </span>
-                    <?php endif; ?>
-                </div>
-                <div class="card-body">
-                    <p class="mb-2">
-                        Use this only for an existing active cycle that has not yet entered V3 population tracking.
-                        Enter the <strong>physically verified live headcount</strong>; the platform will not derive it
-                        from Daily Records, Animal Registry, Sales, opening stock, or other historical records.
-                    </p>
-
-                    <div class="alert alert-warning">
-                        <strong>This establishes the cycle's V3 population starting point.</strong>
-                        The baseline is not silently rewritten later. If the selected date already has
-                        population-changing activity recorded, choose a clean cutover date and confirm the
-                        live headcount before recording that date's V3 population-changing activity.
-                    </div>
-
-                    <?php if (!$populationBaselineTableExists): ?>
-                        <div class="alert alert-danger mb-0">
-                            <strong>V3 population foundation is not available.</strong>
-                            Run the database migrations before confirming a population cutover.
-                        </div>
-                    <?php else: ?>
-                        <form method="post" class="row g-3">
-                            <input
-                                type="hidden"
-                                name="csrf_token"
-                                value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>"
-                            >
-                            <input
-                                type="hidden"
-                                name="action"
-                                value="confirm_population_cutover"
-                            >
-
-                            <div class="col-md-6">
-                                <label class="form-label">Active Cycle</label>
-                                <select class="form-select" name="cycle_id" required>
-                                    <option value="">Select cycle requiring cutover</option>
-                                    <?php foreach ($populationCutoverCycles as $cycle): ?>
-                                        <option
-                                            value="<?php echo (int)$cycle['id']; ?>"
-                                            <?php echo (string)$cutoverForm['cycle_id'] === (string)$cycle['id'] ? 'selected' : ''; ?>
-                                        >
-                                            <?php
-                                            echo htmlspecialchars(
-                                                $cycle['cycle_code']
-                                                . ' — '
-                                                . ucfirst((string)$cycle['production_type'])
-                                                . ' — started '
-                                                . (string)$cycle['start_date']
-                                            );
-                                            ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-
-                            <div class="col-md-3">
-                                <label class="form-label">Cutover Date</label>
-                                <input
-                                    class="form-control"
-                                    type="date"
-                                    name="baseline_date"
-                                    value="<?php echo htmlspecialchars($cutoverForm['baseline_date'], ENT_QUOTES); ?>"
-                                    required
-                                >
-                            </div>
-
-                            <div class="col-md-3">
-                                <label class="form-label">Confirmed Live Population</label>
-                                <input
-                                    class="form-control"
-                                    type="number"
-                                    min="0"
-                                    step="1"
-                                    name="baseline_quantity"
-                                    value="<?php echo htmlspecialchars($cutoverForm['baseline_quantity'], ENT_QUOTES); ?>"
-                                    required
-                                >
-                            </div>
-
-                            <div class="col-12">
-                                <label class="form-label">Cutover Notes</label>
-                                <textarea
-                                    class="form-control"
-                                    name="notes"
-                                    rows="2"
-                                    placeholder="Optional: how the live headcount was physically confirmed"
-                                ><?php echo htmlspecialchars($cutoverForm['notes']); ?></textarea>
-                            </div>
-
-                            <div class="col-12">
-                                <div class="form-check">
-                                    <input
-                                        class="form-check-input"
-                                        type="checkbox"
-                                        value="1"
-                                        name="confirm_cutover"
-                                        id="confirmPopulationCutover"
-                                        <?php echo $cutoverForm['confirmed'] ? 'checked' : ''; ?>
-                                        required
-                                    >
-                                    <label
-                                        class="form-check-label"
-                                        for="confirmPopulationCutover"
-                                    >
-                                        I confirm this is the physically verified live population for this
-                                        cycle at the start of the selected cutover date, before that date's
-                                        V3 population-changing activity is recorded.
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div class="col-12">
-                                <button class="btn btn-warning" type="submit">
-                                    Confirm V3 Population Cutover
-                                </button>
-                            </div>
-                        </form>
-                    <?php endif; ?>
+        <div class="alert alert-light border d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+            <div>
+                <strong>Legacy cycle setup has moved.</strong>
+                <div class="small text-muted mt-1">
+                    Population starting-point setup for older active cycles is kept separate
+                    from normal Production Cycles work.
                 </div>
             </div>
-        <?php endif; ?>
-
-        <div class="card mb-3">
-            <div class="card-header"><strong>Poultry Bird Cost Basis</strong></div>
-            <div class="card-body">
-                <p class="text-muted small">Set or correct the traceable per-bird value used for mortality cost. This does not alter stock, expenses, sales, or feed records.</p>
-                <form method="post" class="row g-3 align-items-end">
-                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>">
-                    <input type="hidden" name="action" value="update_bird_cost_basis">
-                    <div class="col-md-6">
-                        <label class="form-label">Poultry Cycle</label>
-                        <select class="form-select" name="cycle_id" required>
-                            <option value="">Select poultry cycle</option>
-                            <?php foreach ($poultryCycles as $cycle): ?>
-                                <option value="<?php echo (int)$cycle['id']; ?>"><?php echo htmlspecialchars($cycle['cycle_code'] . ' — ' . ucfirst($cycle['production_type']) . ' (' . $cycle['status'] . ')'); ?><?php echo $cycle['bird_unit_cost'] !== null ? ' — ₦' . number_format((float)$cycle['bird_unit_cost'], 2) . '/bird' : ' — no cost basis'; ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Bird Cost Basis (₦ / bird)</label>
-                        <input class="form-control" type="number" min="0" step="0.01" name="bird_unit_cost" placeholder="Blank clears the cost basis">
-                    </div>
-                    <div class="col-md-2"><button class="btn btn-primary w-100" type="submit">Update</button></div>
-                </form>
-            </div>
+            <a
+                class="btn btn-sm btn-outline-warning"
+                href="<?php echo BASE_URL; ?>/management/legacy_cycle_setup.php"
+            >
+                <i class="bi bi-tools"></i> Legacy Cycle Setup
+            </a>
         </div>
 
         <div class="card mb-3" id="poultry-entry-acquisition">
@@ -1465,7 +1127,6 @@ try {
                             <th>Status</th>
                             <th>Start Date</th>
                             <th class="text-end">Opening Headcount</th>
-                            <th class="text-end">Bird Cost Basis</th>
                             <th>Expected End</th>
                             <th>Closed Date</th>
                             <th>Actions</th>
@@ -1473,7 +1134,7 @@ try {
                         </thead>
                         <tbody>
                         <?php if (empty($recentCycles)): ?>
-                            <tr><td colspan="10" class="text-center text-muted py-4">No cycles yet. Create your first cycle above.</td></tr>
+                            <tr><td colspan="9" class="text-center text-muted py-4">No cycles yet. Create your first cycle above.</td></tr>
                         <?php else: ?>
                             <?php foreach ($recentCycles as $cycle): ?>
                                 <tr>
@@ -1483,7 +1144,6 @@ try {
                                     <td><span class="badge bg-secondary text-uppercase"><?php echo htmlspecialchars($cycle['status']); ?></span></td>
                                     <td><?php echo htmlspecialchars($cycle['start_date']); ?></td>
                                     <td class="text-end"><?php echo number_format(max(0, (int)($cycle['opening_headcount'] ?? 0))); ?></td>
-                                    <td class="text-end"><?php echo $cycle['farm_type'] === 'poultry' && $cycle['bird_unit_cost'] !== null ? '₦' . number_format((float)$cycle['bird_unit_cost'], 2) : '-'; ?></td>
                                     <td><?php echo htmlspecialchars($cycle['expected_end_date'] ?? '-'); ?></td>
                                     <td><?php echo htmlspecialchars($cycle['close_date'] ?? '-'); ?></td>
                                     <td>
