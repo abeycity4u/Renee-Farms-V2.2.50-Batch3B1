@@ -539,7 +539,7 @@ $_SESSION['success'] = "Daily record saved successfully!"
                                                 <div class="d-flex flex-wrap gap-1 justify-content-center mt-1">
                                                     <span class="badge text-bg-primary">O/S: <?php echo number_format($dayOpeningStock, 0); ?></span>
                                                     <span class="badge text-bg-danger">Mort: <?php echo number_format($dayMortality, 0); ?></span>
-                                                    <span class="badge text-bg-success">Feed: <?php echo number_format($dayFeedConsumption, 1); ?></span>
+                                                    <span class="badge text-bg-success">Feed: <?php echo number_format($dayFeedConsumption, 2); ?></span>
                                                 </div>
                                                 <?php endif; ?>
                                                 <?php else: ?>

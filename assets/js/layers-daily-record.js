@@ -54,7 +54,7 @@ const layerDailyConfig = {
 
         if (openingStock > 0) {
             const layingRate = (eggProduction / openingStock) * 100;
-            document.getElementById('layingRate').value = layingRate.toFixed(1);
+            document.getElementById('layingRate').value = layingRate.toFixed(2);
         }
     }
 

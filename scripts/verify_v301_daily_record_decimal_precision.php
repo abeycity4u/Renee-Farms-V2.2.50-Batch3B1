@@ -88,6 +88,38 @@ $checks['RUMINANT_BACKEND_ACCEPTS_DECIMAL'] =
         "\$feedConsumption = \$nonNegative("
     ) !== false;
 
+$layerJsPath =
+    $root . '/assets/js/layers-daily-record.js';
+
+$layerJs =
+    is_file($layerJsPath)
+        ? file_get_contents($layerJsPath)
+        : '';
+
+$checks['LAYER_BROWSER_RATE_TWO_DECIMAL'] =
+    strpos(
+        $layerJs,
+        "layingRate.toFixed(2)"
+    ) !== false;
+
+$checks['RUMINANT_CALENDAR_FEED_TWO_DECIMAL'] =
+    strpos(
+        $ruminant,
+        'number_format($dayFeedConsumption, 2)'
+    ) !== false;
+
+$checks['LAYER_CALENDAR_FEED_TWO_DECIMAL'] =
+    strpos(
+        $layer,
+        'number_format($dayFeedConsumption, 2)'
+    ) !== false;
+
+$checks['BROILER_CALENDAR_FEED_TWO_DECIMAL'] =
+    strpos(
+        $broiler,
+        'number_format($dayFeedConsumption, 2)'
+    ) !== false;
+
 $failed = [];
 
 foreach ($checks as $name => $passed) {
