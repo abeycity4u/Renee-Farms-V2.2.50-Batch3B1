@@ -6,6 +6,7 @@ requireLogin();
 require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/../includes/permission_catalog.php');
 require_once(__DIR__ . '/../lib/attribution.php');
+require_once(__DIR__ . '/../lib/financial_allocation_integrity.php');
 require_once(__DIR__ . '/../lib/ruminant_expense_allocation.php');
 require_once(__DIR__ . '/../lib/expense_revision_service.php');
 require_http_method('POST');
@@ -114,6 +115,53 @@ try {
     }
 
     $pdo->beginTransaction();
+
+    financial_allocation_integrity_assert_parent_update(
+        $pdo,
+        $farmId,
+        (int)$expenseId,
+        [
+            'id' =>
+                (int)$expenseId,
+
+            'farm_id' =>
+                $farmId,
+
+            'expense_date' =>
+                $expenseDate,
+
+            'farm_type' =>
+                $farmType,
+
+            'production_type' =>
+                $productionType,
+
+            'attribution_scope' =>
+                $scope,
+
+            'cycle_id' =>
+                $cycleId > 0
+                    ? $cycleId
+                    : null,
+
+            'poultry_category' =>
+                $poultryCategory,
+
+            'category' =>
+                $category,
+
+            'amount' =>
+                $amount,
+
+            'unit' =>
+                $unit,
+
+            'description' =>
+                $description,
+        ],
+        $animalAllocation
+            ?? []
+    );
 
     expense_revision_service_prepare_existing_mutation(
         $pdo,

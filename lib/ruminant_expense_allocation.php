@@ -1,4 +1,8 @@
 <?php
+
+require_once __DIR__
+    . '/financial_allocation_integrity.php';
+
 /**
  * V2.2.48 — direct/shared animal allocation for ruminant non-stock expenses.
  *
@@ -92,6 +96,13 @@ function ruminant_expense_build_animal_allocations(PDO $pdo, int $farmId, string
 
 function ruminant_expense_save_animal_allocations(PDO $pdo, int $farmId, int $expenseId, array $allocation, ?int $createdBy): void
 {
+    financial_allocation_integrity_assert_animal_mutation(
+        $pdo,
+        $farmId,
+        $expenseId,
+        $allocation
+    );
+
     $delete = $pdo->prepare('DELETE FROM ruminant_expense_animal_allocations WHERE farm_id=? AND expense_id=?');
     $delete->execute([$farmId, $expenseId]);
 
