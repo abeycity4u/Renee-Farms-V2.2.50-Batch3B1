@@ -3,6 +3,7 @@ require_once __DIR__ . '/../lib/stock_reporting.php';
 require_once __DIR__ . '/../lib/stock_costing.php';
 require_once __DIR__ . '/../lib/attribution.php';
 require_once __DIR__ . '/../lib/inventory_financial.php';
+require_once __DIR__ . '/../lib/stock_consumption_economics.php';
 /**
  * Traceable profitability engine.
  *
@@ -87,20 +88,34 @@ function getProfitabilitySummary(
         $stmt=$pdo->prepare($expenseSql); $stmt->execute($expenseParams); $expenseRows=$stmt->fetchAll(PDO::FETCH_KEY_PAIR);
     }
 
-    // Compatibility contract: transaction_type='used' AND is_reversed = 0 AND reversal_of_id IS NULL
-    $effectiveStockSql=stock_effective_sql_predicate();
-    $feedItemSql=stock_feed_item_sql_predicate('s','c');
-    $feedSql="SELECT COALESCE(SUM(t.total_cost),0)
-              FROM stock_transactions t
-              JOIN stock_items s ON s.id=t.stock_item_id AND s.farm_id=t.farm_id
-              LEFT JOIN inventory_categories c ON c.id=s.category_id AND c.farm_id=s.farm_id
-              WHERE t.farm_id=? AND t.transaction_type='used' AND {$effectiveStockSql}
-                AND {$feedItemSql} AND t.transaction_date BETWEEN ? AND ? AND t.total_cost IS NOT NULL";
-    $feedParams=[$farmId,$startDate,$endDate];
-    if ($farmType !== 'all') { $feedSql.=" AND t.farm_type=?"; $feedParams[]=$farmType; }
-    if ($productionType !== '') { $feedSql.=" AND t.production_type=?"; $feedParams[]=$productionType; }
-    if ($cycleId) { $feedSql.=" AND t.cycle_id=?"; $feedParams[]=$cycleId; }
-    $stmt=$pdo->prepare($feedSql); $stmt->execute($feedParams); $feedCost=(float)$stmt->fetchColumn();
+    /*
+     * Consumed-stock operating cost has one canonical economic reader.
+     *
+     * Farm-wide reports retain each parent movement once. Narrower module,
+     * production-type and cycle reports receive only the explicitly attributed
+     * share where the parent itself lives at a broader scope.
+     */
+    $stockConsumption =
+        stock_consumption_economics_summary(
+            $pdo,
+            $farmId,
+            $startDate,
+            $endDate,
+            $farmType,
+            $productionType !== ''
+                ? $productionType
+                : null,
+            $cycleId
+        );
+
+    $feedCost =
+        (float)(
+            $stockConsumption[
+                'feed_consumption_cost'
+            ]
+            ?? 0
+        );
+
 
     // Feed purchases are cash-flow records, not an additional operating cost
     // when consumed-feed snapshots are present.
@@ -114,30 +129,25 @@ function getProfitabilitySummary(
     if ($cycleId) { $cashFeedSql.=" AND cycle_id=?"; $cashFeedParams[]=$cycleId; }
     $stmt=$pdo->prepare($cashFeedSql); $stmt->execute($cashFeedParams); $cashFeed=(float)$stmt->fetchColumn();
 
-    // Non-feed stocked operating items become period cost when USED, not when purchased.
-    // The transaction's financial_classification and total_cost are immutable historical
-    // snapshots, so later category/price changes do not rewrite prior profitability.
-    $operatingClasses = array_keys(inventory_operating_consumption_classifications());
-    $inventoryConsumptionBreakdown = [];
-    $inventoryOperatingConsumption = 0.0;
-    if ($operatingClasses) {
-        $placeholders = implode(',', array_fill(0, count($operatingClasses), '?'));
-        $inventorySql = "SELECT t.financial_classification, COALESCE(SUM(t.total_cost),0) total
-                         FROM stock_transactions t
-                         WHERE t.farm_id=? AND t.transaction_type='used' AND {$effectiveStockSql}
-                           AND t.transaction_date BETWEEN ? AND ? AND t.total_cost IS NOT NULL
-                           AND t.financial_classification IN ({$placeholders})";
-        $inventoryParams = array_merge([$farmId,$startDate,$endDate], $operatingClasses);
-        if ($farmType !== 'all') { $inventorySql .= " AND t.farm_type=?"; $inventoryParams[]=$farmType; }
-        if ($productionType !== '') { $inventorySql .= " AND t.production_type=?"; $inventoryParams[]=$productionType; }
-        if ($cycleId) { $inventorySql .= " AND t.cycle_id=?"; $inventoryParams[]=$cycleId; }
-        $inventorySql .= " GROUP BY t.financial_classification";
-        $stmt=$pdo->prepare($inventorySql); $stmt->execute($inventoryParams);
-        foreach($stmt->fetchAll(PDO::FETCH_KEY_PAIR) as $classification=>$amount) {
-            $inventoryConsumptionBreakdown[$classification]=(float)$amount;
-            $inventoryOperatingConsumption+=(float)$amount;
-        }
-    }
+    /*
+     * Non-feed consumed inventory comes from the same canonical reader as Feed.
+     * Do not independently re-query stock_transactions here: doing so would
+     * bypass explicit consumed-stock allocation and reintroduce competing
+     * attribution formulas.
+     */
+    $inventoryConsumptionBreakdown =
+        $stockConsumption[
+            'inventory_operating_consumption_breakdown'
+        ]
+        ?? [];
+
+    $inventoryOperatingConsumption =
+        (float)(
+            $stockConsumption[
+                'inventory_operating_consumption_cost'
+            ]
+            ?? 0
+        );
 
     $manualNonFeedExpenses=0.0;
     foreach($expenseRows as $category=>$amount) if($category!=='feeds') $manualNonFeedExpenses+=(float)$amount;

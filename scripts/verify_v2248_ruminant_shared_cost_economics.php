@@ -4,6 +4,7 @@ function chk2($label,$ok){global $checks;$checks[]=[$label,(bool)$ok];}
 $migration=file_get_contents($root.'/migrations/032_ruminant_animal_cycle_memberships.sql');
 $membership=file_get_contents($root.'/lib/ruminant_cycle_membership.php');
 $shared=file_get_contents($root.'/lib/ruminant_shared_cost_economics.php');
+$stockEconomics=file_get_contents($root.'/lib/stock_consumption_economics.php');
 $econ=file_get_contents($root.'/lib/ruminant_animal_economics.php');
 $view=file_get_contents($root.'/ruminant/animal_view.php');
 chk2('Membership migration exists',is_file($root.'/migrations/032_ruminant_animal_cycle_memberships.sql'));
@@ -14,8 +15,8 @@ chk2('Eligibility requires explicit membership',strpos($membership,'FROM ruminan
 chk2('Sale exit date caps later shared allocation',strpos($membership,'xe.exit_date < ?')!==false);
 chk2('Shared expense excludes explicit animal allocations',strpos($shared,'NOT EXISTS (SELECT 1 FROM ruminant_expense_animal_allocations')!==false);
 chk2('Manual feed purchases excluded from operating allocation',strpos($shared,"e.category<>'feeds'")!==false);
-chk2('Inventory allocation uses effective USED movements',strpos($shared,"transaction_type='used'")!==false && strpos($shared,'stock_effective_sql_predicate')!==false);
-chk2('Inventory pool limited to feed plus operating classifications',strpos($shared,"array_merge(['feed'],array_keys(inventory_operating_consumption_classifications()))")!==false);
+chk2('Inventory allocation uses canonical effective USED economics',strpos($shared,'stock_consumption_economics_rows')!==false && strpos($stockEconomics,'stock_effective_sql_predicate')!==false);
+chk2('Inventory pool limited to feed plus operating classifications',strpos($stockEconomics,'stock_feed_item_sql_predicate')!==false && strpos($stockEconomics,'inventory_operating_consumption_classifications')!==false);
 chk2('Cent-exact deterministic allocation implemented',strpos($shared,'intdiv($totalCents,$count)')!==false && strpos($shared,'sort($eligibleAnimalIds,SORT_NUMERIC)')!==false);
 chk2('Fully allocated formula is separate from direct formula',strpos($econ,'$fullyAllocatedNet = round($revenueTotal - $fullyAllocatedCost, 2)')!==false);
 chk2('No weight interpolation is used',strpos($shared,'weight_kg')===false);

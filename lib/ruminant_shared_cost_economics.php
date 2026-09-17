@@ -2,6 +2,7 @@
 require_once __DIR__.'/ruminant_cycle_membership.php';
 require_once __DIR__.'/inventory_financial.php';
 require_once __DIR__.'/stock_reporting.php';
+require_once __DIR__.'/stock_consumption_economics.php';
 
 /**
  * Analytical allocation of shared ruminant operating costs.
@@ -23,6 +24,244 @@ function ruminant_shared_cost_share_for_target(float $poolAmount, array $eligibl
     $base=intdiv($totalCents,$count);
     $remainder=$totalCents-($base*$count);
     return ($base + ($idx < $remainder ? 1 : 0))/100;
+}
+
+
+function ruminant_shared_cost_stock_row_from_economics(
+    array $row,
+    string $species
+): ?array {
+    $species =
+        strtolower(
+            trim($species)
+        );
+
+    $mode =
+        strtolower(
+            trim(
+                (string)(
+                    $row[
+                        'attribution_mode'
+                    ]
+                    ?? ''
+                )
+            )
+        );
+
+    if (
+        !in_array(
+            $mode,
+            [
+                'native_parent',
+                'explicit_allocation',
+                'unallocated_remainder',
+            ],
+            true
+        )
+    ) {
+        throw new RuntimeException(
+            'Consumed-stock economics returned an unsupported Ruminant attribution mode.'
+        );
+    }
+
+    $amount =
+        round(
+            (float)(
+                $row[
+                    'economic_amount'
+                ]
+                ?? 0
+            ),
+            2
+        );
+
+    if ($amount <= 0) {
+        return null;
+    }
+
+    $stockTransactionId =
+        (int)(
+            $row[
+                'stock_transaction_id'
+            ]
+            ?? $row['id']
+            ?? 0
+        );
+
+    if ($stockTransactionId < 1) {
+        throw new RuntimeException(
+            'Consumed-stock economics returned an invalid stock source identity.'
+        );
+    }
+
+    $date =
+        substr(
+            (string)(
+                $row[
+                    'transaction_date'
+                ]
+                ?? ''
+            ),
+            0,
+            10
+        );
+
+    if (
+        preg_match(
+            '/^\d{4}-\d{2}-\d{2}$/',
+            $date
+        ) !== 1
+    ) {
+        throw new RuntimeException(
+            'Consumed-stock economics returned an invalid stock source date.'
+        );
+    }
+
+    $classification =
+        strtolower(
+            trim(
+                (string)(
+                    $row[
+                        'cost_classification'
+                    ]
+                    ?? $row[
+                        'financial_classification'
+                    ]
+                    ?? ''
+                )
+            )
+        );
+
+    if ($classification === '') {
+        throw new RuntimeException(
+            'Consumed-stock economics returned no operating classification.'
+        );
+    }
+
+    /*
+     * Cycle boundary policy:
+     *
+     * explicit allocation:
+     *     allocation target controls animal membership;
+     *
+     * native parent:
+     *     preserve an already-direct cycle where present;
+     *
+     * unallocated remainder:
+     *     stays species-wide and must never inherit an allocation cycle.
+     */
+    $cycleId = null;
+
+    if ($mode === 'explicit_allocation') {
+        $cycleId =
+            (int)(
+                $row[
+                    'target_cycle_id'
+                ]
+                ?? 0
+            );
+
+        if ($cycleId < 1) {
+            throw new RuntimeException(
+                'Explicit consumed-stock allocation has no target Ruminant cycle.'
+            );
+        }
+
+    } elseif ($mode === 'native_parent') {
+        $nativeCycleId =
+            (int)(
+                $row[
+                    'cycle_id'
+                ]
+                ?? 0
+            );
+
+        $cycleId =
+            $nativeCycleId > 0
+                ? $nativeCycleId
+                : null;
+    }
+
+    $cycleCode = null;
+
+    if ($cycleId !== null) {
+        $cycleCode =
+            $row[
+                'target_cycle_code'
+            ]
+            ?? $row[
+                'cycle_code'
+            ]
+            ?? null;
+    }
+
+    $label =
+        trim(
+            (string)(
+                $row[
+                    'item_name'
+                ]
+                ?? ''
+            )
+        );
+
+    if ($label === '') {
+        $label =
+            'Inventory use #'
+            . $stockTransactionId;
+    }
+
+    return [
+        'source_id' =>
+            $stockTransactionId,
+
+        'source_date' =>
+            $date,
+
+        /*
+         * Preserve the existing consumer/UI source-type contract.
+         */
+        'source_type' =>
+            'inventory_use',
+
+        'source_label' =>
+            $label,
+
+        'classification' =>
+            $classification,
+
+        'pool_amount' =>
+            $amount,
+
+        'cycle_id' =>
+            $cycleId,
+
+        'cycle_code' =>
+            $cycleCode,
+
+        'production_type' =>
+            $species,
+
+        /*
+         * Supplemental audit fields. Existing consumers can ignore them.
+         */
+        'stock_attribution_mode' =>
+            $mode,
+
+        'stock_allocation_id' =>
+            (
+                (int)(
+                    $row[
+                        'allocation_id'
+                    ]
+                    ?? 0
+                ) > 0
+            )
+                ? (int)$row[
+                    'allocation_id'
+                ]
+                : null,
+    ];
 }
 
 function ruminant_shared_cost_economics(PDO $pdo, int $farmId, int $animalId, string $species): array
@@ -58,23 +297,58 @@ function ruminant_shared_cost_economics(PDO $pdo, int $farmId, int $animalId, st
     $stmt=$pdo->prepare($allocSql); $stmt->execute([$farmId,$species]);
     foreach($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) $rows[]=$r;
 
-    // Shared operating inventory actually USED: feed + eligible non-feed operating inventory.
-    $effective=stock_effective_sql_predicate('t');
-    $allowed=array_merge(['feed'],array_keys(inventory_operating_consumption_classifications()));
-    $ph=implode(',',array_fill(0,count($allowed),'?'));
-    $stockSql="SELECT t.id source_id,t.transaction_date source_date,'inventory_use' source_type,
-                     s.item_name source_label,t.financial_classification classification,t.total_cost pool_amount,
-                     t.cycle_id,pc.cycle_code,LOWER(COALESCE(pc.production_type,t.production_type,'')) production_type
-              FROM stock_transactions t
-              JOIN stock_items s ON s.id=t.stock_item_id AND s.farm_id=t.farm_id
-              LEFT JOIN production_cycles pc ON pc.id=t.cycle_id AND pc.farm_id=t.farm_id
-              WHERE t.farm_id=? AND t.farm_type='ruminant' AND t.transaction_type='used'
-                AND {$effective} AND t.total_cost IS NOT NULL
-                AND t.financial_classification IN ({$ph})
-                AND LOWER(COALESCE(pc.production_type,t.production_type,''))=?";
-    $params=array_merge([$farmId],$allowed,[$species]);
-    $stmt=$pdo->prepare($stockSql); $stmt->execute($params);
-    foreach($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) $rows[]=$r;
+    /*
+     * Shared consumed inventory comes from the single canonical economics
+     * reader instead of rebuilding effective-ledger / classification /
+     * allocation policy here.
+     *
+     * Ruminant Shared Cost is a historical all-date analytical reader, so the
+     * complete MySQL DATE range is requested. Animal membership continues to
+     * be evaluated on each source transaction date below.
+     *
+     * Decomposition is required:
+     * - native species parent + cycle allocations
+     *      => explicit cycle pieces + species-wide remainder;
+     * - broader farm/module parent
+     *      => only explicit Ruminant/species attribution enters this reader;
+     * - conservation remains owned by stock_consumption_economics.php.
+     */
+    $stockStartDate =
+        '1000-01-01';
+
+    $stockEndDate =
+        '9999-12-31';
+
+    $decomposeNativeStockAllocations =
+        true;
+
+    $stockEconomicRows =
+        stock_consumption_economics_rows(
+            $pdo,
+            $farmId,
+            $stockStartDate,
+            $stockEndDate,
+            'ruminant',
+            $species,
+            null,
+            $decomposeNativeStockAllocations
+        );
+
+    foreach (
+        $stockEconomicRows
+        as $stockEconomicRow
+    ) {
+        $mappedStockRow =
+            ruminant_shared_cost_stock_row_from_economics(
+                $stockEconomicRow,
+                $species
+            );
+
+        if ($mappedStockRow !== null) {
+            $rows[] =
+                $mappedStockRow;
+        }
+    }
 
     usort($rows,static function($a,$b){
         $d=strcmp((string)$a['source_date'],(string)$b['source_date']);

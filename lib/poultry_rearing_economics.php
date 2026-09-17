@@ -2,6 +2,7 @@
 require_once __DIR__ . '/stock_reporting.php';
 require_once __DIR__ . '/stock_costing.php';
 require_once __DIR__ . '/inventory_financial.php';
+require_once __DIR__ . '/stock_consumption_economics.php';
 require_once __DIR__ . '/poultry_cycle_lifecycle.php';
 require_once __DIR__ . '/poultry_cycle_acquisition.php';
 require_once __DIR__ . '/production_population.php';
@@ -167,6 +168,255 @@ function poultry_production_entry_stock_use_provenance_source(
         'effective_date' =>
             (string)$row['transaction_date'],
     ]);
+}
+}
+
+
+if (!function_exists('poultry_production_entry_stock_allocation_provenance_source')) {
+function poultry_production_entry_stock_allocation_provenance_source(
+    array $row,
+    string $role
+): array {
+    $role =
+        strtolower(
+            trim($role)
+        );
+
+    if (
+        !in_array(
+            $role,
+            [
+                'feed_use',
+                'operating_inventory_use',
+            ],
+            true
+        )
+    ) {
+        throw new InvalidArgumentException(
+            'Select a valid allocated stock-use provenance role.'
+        );
+    }
+
+    $allocationId =
+        (int)(
+            $row['allocation_id']
+            ?? 0
+        );
+
+    $stockTransactionId =
+        (int)(
+            $row['stock_transaction_id']
+            ?? 0
+        );
+
+    $targetCycleId =
+        (int)(
+            $row['target_cycle_id']
+            ?? $row['effective_cycle_id']
+            ?? 0
+        );
+
+    if (
+        $allocationId < 1
+        ||
+        $stockTransactionId < 1
+        ||
+        $targetCycleId < 1
+    ) {
+        throw new InvalidArgumentException(
+            'Allocated stock provenance identity is invalid.'
+        );
+    }
+
+    $amount =
+        trim(
+            (string)(
+                $row['economic_amount']
+                ?? ''
+            )
+        );
+
+    if (
+        $amount === ''
+        ||
+        !is_numeric($amount)
+    ) {
+        throw new InvalidArgumentException(
+            'Allocated stock provenance amount is invalid.'
+        );
+    }
+
+    $nullableString =
+        static function ($value): ?string {
+            if (
+                $value === null
+                ||
+                $value === ''
+            ) {
+                return null;
+            }
+
+            return
+                (string)$value;
+        };
+
+    /*
+     * The provenance revision is economic/causal:
+     * immutable parent stock facts + this explicit target amount.
+     *
+     * Allocation notes are presentation/audit metadata and therefore do not
+     * alter the economic revision digest.
+     */
+    $revisionFacts = [
+        'stock_transaction_id' =>
+            $stockTransactionId,
+
+        'stock_item_id' =>
+            (int)(
+                $row['stock_item_id']
+                ?? 0
+            ),
+
+        'transaction_date' =>
+            (string)(
+                $row['transaction_date']
+                ?? ''
+            ),
+
+        'transaction_type' =>
+            (string)(
+                $row['transaction_type']
+                ?? ''
+            ),
+
+        'quantity' =>
+            (string)(
+                $row['quantity']
+                ?? ''
+            ),
+
+        'unit_cost' =>
+            $nullableString(
+                $row['unit_cost']
+                ?? null
+            ),
+
+        'parent_total_cost' =>
+            $nullableString(
+                $row['total_cost']
+                ?? null
+            ),
+
+        'financial_classification' =>
+            $nullableString(
+                $row[
+                    'financial_classification'
+                ]
+                ?? null
+            ),
+
+        'parent_source_type' =>
+            $nullableString(
+                $row['source_type']
+                ?? null
+            ),
+
+        'parent_source_id' =>
+            $nullableString(
+                $row['source_id']
+                ?? null
+            ),
+
+        'parent_farm_type' =>
+            $nullableString(
+                $row['farm_type']
+                ?? null
+            ),
+
+        'parent_production_type' =>
+            $nullableString(
+                $row['production_type']
+                ?? null
+            ),
+
+        'parent_attribution_scope' =>
+            $nullableString(
+                $row['attribution_scope']
+                ?? null
+            ),
+
+        'target_cycle_id' =>
+            $targetCycleId,
+
+        'allocated_amount' =>
+            $amount,
+    ];
+
+    /*
+     * Feed eligibility depends on mutable joined item/category metadata.
+     * Preserve exactly the same semantic inputs used by direct Feed
+     * provenance so eligibility changes cannot leave provenance unchanged.
+     */
+    if ($role === 'feed_use') {
+        $revisionFacts['feed_category'] =
+            $nullableString(
+                $row['feed_category']
+                ?? null
+            );
+
+        $revisionFacts[
+            'feed_category_name_normalized'
+        ] =
+            strtolower(
+                (string)(
+                    $row['category_name']
+                    ?? ''
+                )
+            );
+    }
+
+    $revisionNo =
+        (int)(
+            $row[
+                'allocation_revision_no'
+            ]
+            ?? 0
+        );
+
+    return
+        poultry_production_entry_provenance_source([
+            'role' =>
+                $role,
+
+            'source_type' =>
+                'stock_consumption_allocation',
+
+            'source_id' =>
+                $allocationId,
+
+            /*
+             * Event/version identity is kept separately from the causal
+             * digest. A later allocation revision is therefore auditable even
+             * when its economic amount remains unchanged.
+             */
+            'source_version' =>
+                $revisionNo > 0
+                    ? (string)$revisionNo
+                    : null,
+
+            'source_revision' =>
+                poultry_production_entry_provenance_revision(
+                    $revisionFacts
+                ),
+
+            'effective_date' =>
+                (string)(
+                    $row[
+                        'transaction_date'
+                    ]
+                    ?? ''
+                ),
+        ]);
 }
 }
 
@@ -1138,6 +1388,190 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
         $base['inventory_operating_cost'] =
             round(
                 $base['inventory_operating_cost'],
+                2
+            );
+    }
+
+    /*
+     * Explicit consumed-stock allocations are defensible cycle attribution.
+     *
+     * Existing direct-cycle stock logic above remains authoritative for
+     * native rows, including uncosted-use disclosure and its established
+     * provenance. The central consumed-stock economics reader contributes
+     * only broader-parent allocations that explicitly target this cycle.
+     *
+     * Filtering to explicit_allocation is essential: native_parent rows are
+     * already counted above and must never be counted twice.
+     */
+    $allocatedStockRows =
+        stock_consumption_economics_rows(
+            $pdo,
+            $farmId,
+            $start,
+            $end,
+            'poultry',
+            'layer',
+            $cycleId,
+            false
+        );
+
+    foreach (
+        $allocatedStockRows
+        as $row
+    ) {
+        if (
+            (string)(
+                $row[
+                    'attribution_mode'
+                ]
+                ?? ''
+            )
+            !== 'explicit_allocation'
+        ) {
+            continue;
+        }
+
+        if (
+            (int)(
+                $row[
+                    'target_cycle_id'
+                ]
+                ?? 0
+            )
+            !== $cycleId
+        ) {
+            throw new RuntimeException(
+                'Consumed-stock allocation escaped the requested Rearing cycle.'
+            );
+        }
+
+        $value =
+            round(
+                (float)(
+                    $row[
+                        'economic_amount'
+                    ]
+                    ?? 0
+                ),
+                2
+            );
+
+        if ($value <= 0) {
+            continue;
+        }
+
+        if (
+            (string)(
+                $row[
+                    'cost_kind'
+                ]
+                ?? ''
+            )
+            === 'feed'
+        ) {
+            $base[
+                'feed_consumed_cost'
+            ] +=
+                $value;
+
+            $base[
+                'provenance_sources'
+            ][] =
+                poultry_production_entry_stock_allocation_provenance_source(
+                    $row,
+                    'feed_use'
+                );
+
+            continue;
+        }
+
+        $classification =
+            strtolower(
+                trim(
+                    (string)(
+                        $row[
+                            'cost_classification'
+                        ]
+                        ?? ''
+                    )
+                )
+            );
+
+        if (
+            !inventory_financial_classification_is_operating_consumption(
+                $classification
+            )
+        ) {
+            throw new RuntimeException(
+                'Consumed-stock allocation has a non-operating Rearing classification.'
+            );
+        }
+
+        if (
+            !array_key_exists(
+                $classification,
+                $base[
+                    'inventory_operating_breakdown'
+                ]
+            )
+        ) {
+            $base[
+                'inventory_operating_breakdown'
+            ][
+                $classification
+            ] = 0.0;
+        }
+
+        $base[
+            'inventory_operating_breakdown'
+        ][
+            $classification
+        ] +=
+            $value;
+
+        $base[
+            'inventory_operating_cost'
+        ] +=
+            $value;
+
+        $base[
+            'provenance_sources'
+        ][] =
+            poultry_production_entry_stock_allocation_provenance_source(
+                $row,
+                'operating_inventory_use'
+            );
+    }
+
+    $base['feed_consumed_cost'] =
+        round(
+            (float)$base[
+                'feed_consumed_cost'
+            ],
+            2
+        );
+
+    $base['inventory_operating_cost'] =
+        round(
+            (float)$base[
+                'inventory_operating_cost'
+            ],
+            2
+        );
+
+    foreach (
+        $base[
+            'inventory_operating_breakdown'
+        ]
+        as $classification => $value
+    ) {
+        $base[
+            'inventory_operating_breakdown'
+        ][
+            $classification
+        ] =
+            round(
+                (float)$value,
                 2
             );
     }
