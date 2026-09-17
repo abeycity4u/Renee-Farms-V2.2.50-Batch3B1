@@ -194,6 +194,31 @@ try {
             $e->getMessage(),
     ], 422);
 
+} catch (PDOException $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+
+    log_app_error(
+        'update_financial_allocation_database_failed',
+        [
+            'error' =>
+                safe_api_exception_message(
+                    $e,
+                    'The shared cost allocation could not be saved.'
+                ),
+
+            'expense_id' =>
+                $expenseId,
+        ]
+    );
+
+    send_json([
+        'success' => false,
+        'error' =>
+            'The shared cost allocation could not be saved.',
+    ], 500);
+
 } catch (RuntimeException $e) {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();

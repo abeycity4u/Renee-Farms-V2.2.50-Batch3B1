@@ -180,6 +180,46 @@ $checks['API_CALLER_OWNS_TRANSACTION'] =
         '$pdo->rollBack();'
     ) !== false;
 
+$pdoCatchPosition =
+    strpos(
+        $content['api'],
+        '} catch (PDOException $e) {'
+    );
+
+$runtimeCatchPosition =
+    strpos(
+        $content['api'],
+        '} catch (RuntimeException $e) {'
+    );
+
+$checks['API_DATABASE_EXCEPTION_SANITIZED'] =
+    $pdoCatchPosition !== false
+    &&
+    $runtimeCatchPosition !== false
+    &&
+    $pdoCatchPosition < $runtimeCatchPosition
+    &&
+    strpos(
+        $content['api'],
+        "'The shared cost allocation could not be saved.'"
+    ) !== false;
+
+$checks['PAGE_DATABASE_EXCEPTION_SANITIZED'] =
+    strpos(
+        $content['page'],
+        '$e instanceof PDOException'
+    ) !== false
+    &&
+    strpos(
+        $content['page'],
+        "'The allocation workspace could not be opened.'"
+    ) !== false
+    &&
+    strpos(
+        $content['page'],
+        'http_response_code(500);'
+    ) !== false;
+
 $checks['PAGE_THIN_NO_SQL'] =
     strpos(
         $content['page'],

@@ -67,17 +67,28 @@ if ($expenseId < 1) {
             );
 
     } catch (Throwable $e) {
-        $workspaceError =
-            $e->getMessage() !== ''
-                ? $e->getMessage()
-                : 'The allocation workspace could not be opened.';
+        if ($e instanceof PDOException) {
+            /*
+             * Never disclose database/SQL diagnostics in tenant-facing HTML.
+             */
+            $workspaceError =
+                'The allocation workspace could not be opened.';
 
-        http_response_code(
-            $e->getMessage()
-                === 'Expense record not found.'
-                    ? 404
-                    : 422
-        );
+            http_response_code(500);
+
+        } else {
+            $workspaceError =
+                $e->getMessage() !== ''
+                    ? $e->getMessage()
+                    : 'The allocation workspace could not be opened.';
+
+            http_response_code(
+                $e->getMessage()
+                    === 'Expense record not found.'
+                        ? 404
+                        : 422
+            );
+        }
     }
 }
 
