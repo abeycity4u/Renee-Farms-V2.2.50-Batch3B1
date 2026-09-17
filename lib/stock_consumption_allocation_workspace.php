@@ -274,6 +274,87 @@ function stock_consumption_allocation_workspace_action_state(
 }
 
 if (!function_exists(
+    'stock_consumption_allocation_workspace_source_state'
+)) {
+function stock_consumption_allocation_workspace_source_state(
+    array $parent,
+    array $resolution
+): array {
+    $status =
+        strtoupper(
+            trim(
+                (string)(
+                    $parent[
+                        'source_attribution_status'
+                    ]
+                    ?? ''
+                )
+            )
+        );
+
+    $resolverMode =
+        strtolower(
+            trim(
+                (string)(
+                    $resolution['mode']
+                    ?? ''
+                )
+            )
+        );
+
+    $label =
+        'Source attribution verified';
+
+    $message =
+        'The canonical source-attribution contract has accepted this consumed-stock source.';
+
+    if (
+        $status === 'NO_AUTHORITATIVE_SOURCE'
+        &&
+        $resolverMode === 'movement_authority'
+    ) {
+        $label =
+            'Movement-defined shared source';
+
+        $message =
+            'This stock movement owns its attribution. It passed the canonical shared-cost contract as a pooled source and may be explicitly assigned only to compatible production cycles.';
+
+    } elseif (
+        $status === 'SOURCE_HAS_NO_CYCLE'
+    ) {
+        $label =
+            'Linked source has no cycle';
+
+        $message =
+            'The authoritative linked source does not identify a production cycle, so this eligible pooled cost may be explicitly assigned only to compatible production cycles.';
+
+    } elseif (
+        $status === 'SOURCE_ATTRIBUTION_MATCH'
+    ) {
+        $label =
+            'Source attribution matches';
+
+        $message =
+            'The authoritative linked source and the stock movement identify the same production-cycle attribution.';
+    }
+
+    return [
+        'status' =>
+            $status,
+
+        'resolver_mode' =>
+            $resolverMode,
+
+        'label' =>
+            $label,
+
+        'message' =>
+            $message,
+    ];
+}
+}
+
+if (!function_exists(
     'stock_consumption_allocation_workspace_current_rows'
 )) {
 function stock_consumption_allocation_workspace_current_rows(
@@ -398,6 +479,12 @@ function stock_consumption_allocation_workspace_snapshot(
     $resolution =
         $eligibility['resolution'];
 
+    $sourceState =
+        stock_consumption_allocation_workspace_source_state(
+            $parent,
+            $resolution
+        );
+
     $stockItemId =
         (int)(
             $movement['stock_item_id']
@@ -487,6 +574,7 @@ function stock_consumption_allocation_workspace_snapshot(
         ) ?: [];
 
     $eligibleCycles = [];
+    $incompatibleCycles = [];
 
     foreach ($candidateCycles as $cycle) {
         try {
@@ -498,8 +586,70 @@ function stock_consumption_allocation_workspace_snapshot(
             $eligibleCycles[] =
                 $cycle;
 
-        } catch (Throwable $ignored) {
-            continue;
+        } catch (Throwable $e) {
+            $reason =
+                trim(
+                    (string)$e->getMessage()
+                );
+
+            $incompatibleCycles[] = [
+                'id' =>
+                    (int)(
+                        $cycle['id']
+                        ?? 0
+                    ),
+
+                'cycle_code' =>
+                    (string)(
+                        $cycle['cycle_code']
+                        ?? (
+                            'Cycle '
+                            . (int)(
+                                $cycle['id']
+                                ?? 0
+                            )
+                        )
+                    ),
+
+                'farm_type' =>
+                    strtolower(
+                        trim(
+                            (string)(
+                                $cycle['farm_type']
+                                ?? ''
+                            )
+                        )
+                    ),
+
+                'production_type' =>
+                    strtolower(
+                        trim(
+                            (string)(
+                                $cycle['production_type']
+                                ?? ''
+                            )
+                        )
+                    ),
+
+                'status' =>
+                    strtolower(
+                        trim(
+                            (string)(
+                                $cycle['status']
+                                ?? ''
+                            )
+                        )
+                    ),
+
+                'start_date' =>
+                    $cycle['start_date']
+                    ?? null,
+
+                'reason' =>
+                    $reason !== ''
+                        ? $reason
+                        : 'This cycle is not compatible with the consumed-stock source.',
+            ];
         }
     }
 
@@ -688,11 +838,17 @@ function stock_consumption_allocation_workspace_snapshot(
         'source_resolution' =>
             $resolution,
 
+        'source_state' =>
+            $sourceState,
+
         'allocation_rows' =>
             $summary['rows'],
 
         'cycles' =>
             $cycleRows,
+
+        'incompatible_cycles' =>
+            $incompatibleCycles,
 
         'parent_amount' =>
             $summary[

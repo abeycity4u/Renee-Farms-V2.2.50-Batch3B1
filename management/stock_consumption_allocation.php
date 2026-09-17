@@ -239,6 +239,10 @@ $scopeLabel =
 
         $hasRevision =
             $latestRevision !== null;
+
+        $sourceState =
+            $workspace['source_state']
+            ?? [];
         ?>
 
         <div class="alert alert-info">
@@ -248,6 +252,23 @@ $scopeLabel =
             cycle. Any balance you leave unassigned remains visibly
             unallocated. Use equal split only when every compatible cycle
             shown should share the full consumed cost equally.
+        </div>
+
+        <div class="alert alert-light border">
+            <strong>
+                Source attribution:
+                <?php echo $escape(
+                    $sourceState['label']
+                    ?? 'Source attribution verified'
+                ); ?>
+            </strong>
+
+            <div class="mt-1">
+                <?php echo $escape(
+                    $sourceState['message']
+                    ?? 'The canonical source-attribution contract has accepted this consumed-stock source.'
+                ); ?>
+            </div>
         </div>
 
         <div class="card mb-3">
@@ -740,6 +761,109 @@ $scopeLabel =
                 </div>
 
             </form>
+
+        <?php endif; ?>
+
+        <?php if (!empty(
+            $workspace['incompatible_cycles']
+        )): ?>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <strong>
+                        Incompatible Production Cycles
+                    </strong>
+                </div>
+
+                <div class="card-body pb-2">
+                    <p class="text-muted mb-0">
+                        These cycles are shown for clarity only.
+                        The canonical allocation contract rejected them,
+                        so no amount can be assigned to them from this
+                        consumed-stock source.
+                    </p>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Cycle</th>
+                                <th>Module</th>
+                                <th>Status</th>
+                                <th>Why it is incompatible</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                        <?php foreach (
+                            $workspace['incompatible_cycles']
+                            as $cycle
+                        ): ?>
+                            <tr>
+                                <td>
+                                    <strong>
+                                        <?php echo $escape(
+                                            $cycle['cycle_code']
+                                            ?? (
+                                                'Cycle '
+                                                . (int)(
+                                                    $cycle['id']
+                                                    ?? 0
+                                                )
+                                            )
+                                        ); ?>
+                                    </strong>
+
+                                    <?php if (!empty(
+                                        $cycle['start_date']
+                                    )): ?>
+                                        <div class="small text-muted">
+                                            <?php echo $escape(
+                                                $cycle['start_date']
+                                            ); ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </td>
+
+                                <td>
+                                    <?php echo $escape(
+                                        $scopeLabel(
+                                            (string)(
+                                                $cycle['farm_type']
+                                                ?? ''
+                                            ),
+                                            (string)(
+                                                $cycle['production_type']
+                                                ?? ''
+                                            )
+                                        )
+                                    ); ?>
+                                </td>
+
+                                <td>
+                                    <?php echo $escape(
+                                        ucfirst(
+                                            (string)(
+                                                $cycle['status']
+                                                ?? 'Unknown'
+                                            )
+                                        )
+                                    ); ?>
+                                </td>
+
+                                <td>
+                                    <?php echo $escape(
+                                        $cycle['reason']
+                                        ?? 'Not compatible with this source.'
+                                    ); ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
         <?php endif; ?>
 

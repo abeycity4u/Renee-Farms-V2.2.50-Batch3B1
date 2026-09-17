@@ -89,7 +89,11 @@ function renderTable(transactions) {
                 ? '<a class="btn btn-sm btn-outline-primary text-nowrap" href="'
                     + escapeHtml(allocation.url)
                     + '"><i class="bi bi-diagram-3 me-1"></i>Allocate Cost</a>'
-                : '<span class="text-muted">—</span>';
+                : allocation.reason
+                    ? '<span class="small text-muted">'
+                        + escapeHtml(allocation.reason)
+                        + '</span>'
+                    : '<span class="text-muted">—</span>';
 
         row.innerHTML = `
             <td>${formatDate(tx.transaction_date)}</td>

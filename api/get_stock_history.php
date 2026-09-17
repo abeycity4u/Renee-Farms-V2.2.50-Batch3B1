@@ -101,6 +101,10 @@ try {
             'url' =>
                 $allocationAction['url']
                 ?? null,
+
+            'reason' =>
+                $allocationAction['reason']
+                ?? null,
         ];
     }
     unset($transaction);

@@ -360,6 +360,7 @@ function financial_allocation_workspace_snapshot(
         ) ?: [];
 
     $eligibleCycles = [];
+    $incompatibleCycles = [];
 
     foreach ($candidateCycles as $cycle) {
         try {
@@ -371,8 +372,70 @@ function financial_allocation_workspace_snapshot(
             $eligibleCycles[] =
                 $cycle;
 
-        } catch (Throwable $ignored) {
-            continue;
+        } catch (Throwable $e) {
+            $reason =
+                trim(
+                    (string)$e->getMessage()
+                );
+
+            $incompatibleCycles[] = [
+                'id' =>
+                    (int)(
+                        $cycle['id']
+                        ?? 0
+                    ),
+
+                'cycle_code' =>
+                    (string)(
+                        $cycle['cycle_code']
+                        ?? (
+                            'Cycle '
+                            . (int)(
+                                $cycle['id']
+                                ?? 0
+                            )
+                        )
+                    ),
+
+                'farm_type' =>
+                    strtolower(
+                        trim(
+                            (string)(
+                                $cycle['farm_type']
+                                ?? ''
+                            )
+                        )
+                    ),
+
+                'production_type' =>
+                    strtolower(
+                        trim(
+                            (string)(
+                                $cycle['production_type']
+                                ?? ''
+                            )
+                        )
+                    ),
+
+                'status' =>
+                    strtolower(
+                        trim(
+                            (string)(
+                                $cycle['status']
+                                ?? ''
+                            )
+                        )
+                    ),
+
+                'start_date' =>
+                    $cycle['start_date']
+                    ?? null,
+
+                'reason' =>
+                    $reason !== ''
+                        ? $reason
+                        : 'This cycle is not compatible with the shared expense.',
+            ];
         }
     }
 
@@ -494,6 +557,9 @@ function financial_allocation_workspace_snapshot(
 
         'cycles' =>
             $cycleRows,
+
+        'incompatible_cycles' =>
+            $incompatibleCycles,
 
         'animal_allocation_count' =>
             $animalAllocationCount,
