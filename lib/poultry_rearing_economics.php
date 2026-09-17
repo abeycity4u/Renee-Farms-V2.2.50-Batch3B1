@@ -170,30 +170,117 @@ function poultry_production_entry_stock_use_provenance_source(
 }
 }
 
+if (!function_exists('poultry_production_entry_expense_causal_revision')) {
+function poultry_production_entry_expense_causal_revision(
+    array $row
+): ?string {
+    $revisionNo =
+        $row['expense_revision_no']
+        ?? null;
+
+    $fingerprintRaw =
+        $row['expense_causal_fingerprint']
+        ?? null;
+
+    $hasRevisionNo =
+        $revisionNo !== null
+        && trim((string)$revisionNo) !== '';
+
+    $hasFingerprint =
+        $fingerprintRaw !== null
+        && trim((string)$fingerprintRaw) !== '';
+
+    if ($hasRevisionNo !== $hasFingerprint) {
+        throw new RuntimeException(
+            'Expense revision provenance metadata is incomplete.'
+        );
+    }
+
+    if (!$hasRevisionNo) {
+        return null;
+    }
+
+    $revisionText =
+        trim(
+            (string)$revisionNo
+        );
+
+    $fingerprint =
+        strtolower(
+            trim(
+                (string)$fingerprintRaw
+            )
+        );
+
+    if (
+        preg_match(
+            '/^[1-9][0-9]*$/',
+            $revisionText
+        ) !== 1
+        ||
+        preg_match(
+            '/^[a-f0-9]{64}$/',
+            $fingerprint
+        ) !== 1
+    ) {
+        throw new RuntimeException(
+            'Expense revision provenance metadata is invalid.'
+        );
+    }
+
+    return $fingerprint;
+}
+}
+
+if (!function_exists('poultry_production_entry_expense_source_revision')) {
+function poultry_production_entry_expense_source_revision(
+    array $row,
+    array $legacyFacts
+): string {
+    $canonical =
+        poultry_production_entry_expense_causal_revision(
+            $row
+        );
+
+    if ($canonical !== null) {
+        return $canonical;
+    }
+
+    return poultry_production_entry_provenance_revision(
+        $legacyFacts
+    );
+}
+}
+
 if (!function_exists('poultry_production_entry_direct_expense_provenance_source')) {
 function poultry_production_entry_direct_expense_provenance_source(
     array $row
 ): array {
+    $legacyFacts = [
+        'expense_date' =>
+            (string)$row['expense_date'],
+        'cycle_id' =>
+            $row['cycle_id'] === null
+            || $row['cycle_id'] === ''
+                ? null
+                : (int)$row['cycle_id'],
+        'category' =>
+            (string)$row['category'],
+        'amount' =>
+            (string)$row['amount'],
+        'unit' =>
+            (string)$row['unit'],
+    ];
+
     return poultry_production_entry_provenance_source([
         'role' => 'direct_expense',
         'source_type' => 'farm_expense',
         'source_id' => (int)$row['id'],
         'source_revision' =>
-            poultry_production_entry_provenance_revision([
-                'expense_date' =>
-                    (string)$row['expense_date'],
-                'cycle_id' =>
-                    $row['cycle_id'] === null
-                    || $row['cycle_id'] === ''
-                        ? null
-                        : (int)$row['cycle_id'],
-                'category' =>
-                    (string)$row['category'],
-                'amount' =>
-                    (string)$row['amount'],
-                'unit' =>
-                    (string)$row['unit'],
-            ]),
+            poultry_production_entry_expense_source_revision(
+                $row,
+                $legacyFacts
+            ),
         'effective_date' =>
             (string)$row['expense_date'],
     ]);
@@ -204,26 +291,42 @@ if (!function_exists('poultry_production_entry_explicit_allocation_provenance_so
 function poultry_production_entry_explicit_allocation_provenance_source(
     array $row
 ): array {
+    $revisionFacts = [
+        'expense_id' =>
+            (int)$row['expense_id'],
+        'cycle_id' =>
+            $row['cycle_id'] === null
+            || $row['cycle_id'] === ''
+                ? null
+                : (int)$row['cycle_id'],
+        'allocated_amount' =>
+            (string)$row['allocated_amount'],
+        'expense_date' =>
+            (string)$row['expense_date'],
+        'expense_category' =>
+            (string)$row['category'],
+    ];
+
+    $parentExpenseRevision =
+        poultry_production_entry_expense_causal_revision(
+            $row
+        );
+
+    if ($parentExpenseRevision !== null) {
+        $revisionFacts[
+            'expense_causal_fingerprint'
+        ] =
+            $parentExpenseRevision;
+    }
+
     return poultry_production_entry_provenance_source([
         'role' => 'explicit_shared_allocation',
         'source_type' => 'financial_allocation',
         'source_id' => (int)$row['id'],
         'source_revision' =>
-            poultry_production_entry_provenance_revision([
-                'expense_id' =>
-                    (int)$row['expense_id'],
-                'cycle_id' =>
-                    $row['cycle_id'] === null
-                    || $row['cycle_id'] === ''
-                        ? null
-                        : (int)$row['cycle_id'],
-                'allocated_amount' =>
-                    (string)$row['allocated_amount'],
-                'expense_date' =>
-                    (string)$row['expense_date'],
-                'expense_category' =>
-                    (string)$row['category'],
-            ]),
+            poultry_production_entry_provenance_revision(
+                $revisionFacts
+            ),
         'effective_date' =>
             (string)$row['expense_date'],
     ]);
@@ -234,32 +337,37 @@ if (!function_exists('poultry_production_entry_shared_pool_expense_provenance_so
 function poultry_production_entry_shared_pool_expense_provenance_source(
     array $row
 ): array {
+    $legacyFacts = [
+        'expense_date' =>
+            (string)$row['expense_date'],
+        'farm_type' =>
+            (string)$row['farm_type'],
+        'production_type' =>
+            strtolower(
+                (string)$row['production_type']
+            ),
+        'cycle_id' =>
+            $row['cycle_id'] === null
+            || $row['cycle_id'] === ''
+                ? null
+                : (int)$row['cycle_id'],
+        'category' =>
+            (string)$row['category'],
+        'amount' =>
+            (string)$row['amount'],
+        'unit' =>
+            (string)$row['unit'],
+    ];
+
     return poultry_production_entry_provenance_source([
         'role' => 'shared_pool_expense',
         'source_type' => 'farm_expense',
         'source_id' => (int)$row['id'],
         'source_revision' =>
-            poultry_production_entry_provenance_revision([
-                'expense_date' =>
-                    (string)$row['expense_date'],
-                'farm_type' =>
-                    (string)$row['farm_type'],
-                'production_type' =>
-                    strtolower(
-                        (string)$row['production_type']
-                    ),
-                'cycle_id' =>
-                    $row['cycle_id'] === null
-                    || $row['cycle_id'] === ''
-                        ? null
-                        : (int)$row['cycle_id'],
-                'category' =>
-                    (string)$row['category'],
-                'amount' =>
-                    (string)$row['amount'],
-                'unit' =>
-                    (string)$row['unit'],
-            ]),
+            poultry_production_entry_expense_source_revision(
+                $row,
+                $legacyFacts
+            ),
         'effective_date' =>
             (string)$row['expense_date'],
     ]);
@@ -271,22 +379,38 @@ function poultry_production_entry_shared_pool_allocation_provenance_source(
     array $row,
     string $expenseDate
 ): array {
+    $revisionFacts = [
+        'expense_id' =>
+            (int)$row['expense_id'],
+        'cycle_id' =>
+            $row['cycle_id'] === null
+            || $row['cycle_id'] === ''
+                ? null
+                : (int)$row['cycle_id'],
+        'allocated_amount' =>
+            (string)$row['allocated_amount'],
+    ];
+
+    $parentExpenseRevision =
+        poultry_production_entry_expense_causal_revision(
+            $row
+        );
+
+    if ($parentExpenseRevision !== null) {
+        $revisionFacts[
+            'expense_causal_fingerprint'
+        ] =
+            $parentExpenseRevision;
+    }
+
     return poultry_production_entry_provenance_source([
         'role' => 'shared_pool_allocation',
         'source_type' => 'financial_allocation',
         'source_id' => (int)$row['id'],
         'source_revision' =>
-            poultry_production_entry_provenance_revision([
-                'expense_id' =>
-                    (int)$row['expense_id'],
-                'cycle_id' =>
-                    $row['cycle_id'] === null
-                    || $row['cycle_id'] === ''
-                        ? null
-                        : (int)$row['cycle_id'],
-                'allocated_amount' =>
-                    (string)$row['allocated_amount'],
-            ]),
+            poultry_production_entry_provenance_revision(
+                $revisionFacts
+            ),
         'effective_date' => $expenseDate,
     ]);
 }
@@ -1030,7 +1154,9 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
              cycle_id,
              category,
              amount,
-             unit
+             unit,
+             expense_revision_no,
+             expense_causal_fingerprint
          FROM farm_expenses
          WHERE farm_id = ?
            AND cycle_id = ?
@@ -1092,7 +1218,9 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
              fa.cycle_id,
              fa.allocated_amount,
              e.expense_date,
-             e.category
+             e.category,
+             e.expense_revision_no,
+             e.expense_causal_fingerprint
          FROM financial_allocations fa
          JOIN farm_expenses e
            ON e.id = fa.expense_id
@@ -1161,6 +1289,8 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
              e.category,
              e.amount,
              e.unit,
+             e.expense_revision_no,
+             e.expense_causal_fingerprint,
              fa.id AS allocation_id,
              fa.cycle_id AS allocation_cycle_id,
              fa.allocated_amount
@@ -1225,6 +1355,10 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
                     (string)$row['amount'],
                 'unit' =>
                     (string)$row['unit'],
+                'expense_revision_no' =>
+                    $row['expense_revision_no'],
+                'expense_causal_fingerprint' =>
+                    $row['expense_causal_fingerprint'],
             ];
 
             $sharedPoolExpenses[$expenseId] = [
@@ -1255,6 +1389,10 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
                     (string)$row[
                         'allocated_amount'
                     ],
+                'expense_revision_no' =>
+                    $row['expense_revision_no'],
+                'expense_causal_fingerprint' =>
+                    $row['expense_causal_fingerprint'],
             ];
 
             $sharedPoolExpenses[
