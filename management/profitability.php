@@ -45,6 +45,42 @@ if ($cycleId && !in_array($cycleId, $validCycleIds, true)) $cycleId = 0;
 
 $summary = getProfitabilitySummary($pdo, $farmId, $start, $end, $farmType, $cycleId ?: null, $productionType === 'all' ? null : $productionType);
 
+$profitabilityAttribution =
+    $summary['attribution_composition']
+    ?? [];
+
+$revenueAttribution =
+    $profitabilityAttribution['revenue']
+    ?? [];
+
+$feedAttribution =
+    $profitabilityAttribution['feed_consumption']
+    ?? [];
+
+$operatingStockAttribution =
+    $profitabilityAttribution['operating_inventory_consumption']
+    ?? [];
+
+$manualExpenseAttribution =
+    $profitabilityAttribution['manual_non_feed_expenses']
+    ?? [];
+
+$stockSourceCounts =
+    $profitabilityAttribution['stock_source_counts']
+    ?? [];
+
+$allocatedSharedRevenue =
+    (float)(
+        $summary['allocated_shared_revenue']
+        ?? 0
+    );
+
+$unallocatedPooledRevenue =
+    (float)(
+        $summary['unallocated_pooled_revenue']
+        ?? 0
+    );
+
 $poultryEconomics = ['available' => false];
 if ($farmType === 'poultry' && in_array($productionType, ['layer', 'broiler'], true)) {
     $poultryEconomics = getPoultryUnitEconomics(
@@ -66,39 +102,8 @@ $summary['mortality_value'] = !empty($poultryEconomics['available'])
     ? (float)$poultryEconomics['mortality_cost']
     : 0.0;
 
-// Cycle-level profitability deliberately excludes pooled revenue until it is
-// allocated. Surface the amount still waiting for allocation so a zero/low
-// cycle revenue cannot be mistaken for a complete result.
-$unallocatedPooledRevenue = 0.0;
-$allocatedSharedRevenue = 0.0;
-if ($cycleId) {
-    $selectedCycle = null;
-    foreach ($cycles as $cycle) {
-        if ((int)$cycle['id'] === $cycleId) { $selectedCycle = $cycle; break; }
-    }
-    if ($selectedCycle) {
-        $pooledSql = "SELECT COALESCE(SUM(GREATEST(s.total_amount - COALESCE(a.allocated_amount,0),0)),0)
-                      FROM sales_records s
-                      LEFT JOIN (
-                          SELECT farm_id,sale_id,SUM(allocated_amount) allocated_amount
-                          FROM sales_allocations GROUP BY farm_id,sale_id
-                      ) a ON a.farm_id=s.farm_id AND a.sale_id=s.id
-                      WHERE s.farm_id=? AND s.sale_date BETWEEN ? AND ?
-                        AND s.cycle_id IS NULL AND s.farm_type=? AND s.production_type=?";
-        $pooledStmt = $pdo->prepare($pooledSql);
-        $pooledStmt->execute([$farmId,$start,$end,strtolower((string)$selectedCycle['farm_type']),strtolower((string)$selectedCycle['production_type'])]);
-        $unallocatedPooledRevenue = (float)$pooledStmt->fetchColumn();
-
-        $sharedIncludedSql = "SELECT COALESCE(SUM(sa.allocated_amount),0)
-                              FROM sales_allocations sa
-                              JOIN sales_records s ON s.id=sa.sale_id AND s.farm_id=sa.farm_id
-                              WHERE sa.farm_id=? AND sa.cycle_id=? AND s.cycle_id IS NULL
-                                AND s.sale_date BETWEEN ? AND ?";
-        $sharedIncludedStmt = $pdo->prepare($sharedIncludedSql);
-        $sharedIncludedStmt->execute([$farmId,$cycleId,$start,$end]);
-        $allocatedSharedRevenue = (float)$sharedIncludedStmt->fetchColumn();
-    }
-}
+// Shared-revenue inclusion and unallocated pooled revenue are provided
+// by the central profitability read model above.
 
 // Use the same effective-transaction predicate as feed movement summaries and feed-cost reporting.
 // Compatibility contract: transaction_type='used' AND is_reversed = 0 AND reversal_of_id IS NULL
@@ -173,6 +178,88 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
         <div class="col-12 col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-muted">Feed consumed</div><h3 class="mt-2">₦<?php echo number_format($summary['feed_consumption_cost'],2); ?></h3></div></div></div>
         <div class="col-12 col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-muted">Other operating cost</div><h3 class="mt-2">₦<?php echo number_format($summary['non_feed_expenses'],2); ?></h3></div></div></div>
         <div class="col-12 col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-muted">Profit / Loss</div><h3 class="mt-2 <?php echo $summary['profit']>=0?'text-success':'text-danger'; ?>">₦<?php echo number_format($summary['profit'],2); ?></h3></div></div></div>
+    </div>
+
+    <div class="card mb-4" id="profitability-attribution">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                <strong>Attribution &amp; Source Breakdown</strong>
+                <div class="small text-muted">Explains which recorded source supplied each amount already included in Profitability.</div>
+            </div>
+            <span class="badge bg-light text-dark">Read-only economic trace</span>
+        </div>
+
+        <div class="card-body">
+            <div class="alert alert-light border py-2 small">
+                <strong>Source / provenance:</strong>
+                direct/native amounts come from records already owned by the selected reporting scope.
+                Explicit allocations are narrower shares assigned from a broader parent source.
+                This breakdown explains the canonical totals above; it does not recalculate Profit / Loss.
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Profitability component</th>
+                            <th>Included source composition</th>
+                            <th>Source / provenance</th>
+                            <th class="text-end">Canonical total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="fw-semibold">Revenue</td>
+                            <td>
+                                <div>Direct sales: ₦<?php echo number_format((float)($revenueAttribution['direct_sales'] ?? 0),2); ?></div>
+                                <div>Explicit pooled-sale allocation: ₦<?php echo number_format((float)($revenueAttribution['explicit_sale_allocation'] ?? 0),2); ?></div>
+                            </td>
+                            <td class="small text-muted">Sales records / sales allocations</td>
+                            <td class="text-end fw-semibold">₦<?php echo number_format((float)($revenueAttribution['total'] ?? $summary['revenue']),2); ?></td>
+                        </tr>
+
+                        <tr>
+                            <td class="fw-semibold">Feed consumed</td>
+                            <td>
+                                <div>Direct/native consumed stock: ₦<?php echo number_format((float)($feedAttribution['direct_native_stock'] ?? 0),2); ?></div>
+                                <div>Explicit consumed-stock allocation: ₦<?php echo number_format((float)($feedAttribution['explicit_stock_allocation'] ?? 0),2); ?></div>
+                            </td>
+                            <td class="small text-muted">Consumed stock ledger / stock allocations</td>
+                            <td class="text-end fw-semibold">₦<?php echo number_format((float)($feedAttribution['total'] ?? $summary['feed_consumption_cost']),2); ?></td>
+                        </tr>
+
+                        <tr>
+                            <td class="fw-semibold">Other operating cost</td>
+                            <td>
+                                <div>Direct farm expenses: ₦<?php echo number_format((float)($manualExpenseAttribution['direct_expense'] ?? 0),2); ?></div>
+                                <div>Explicit shared-expense allocation: ₦<?php echo number_format((float)($manualExpenseAttribution['explicit_shared_expense_allocation'] ?? 0),2); ?></div>
+                                <div>Direct/native consumed stock: ₦<?php echo number_format((float)($operatingStockAttribution['direct_native_stock'] ?? 0),2); ?></div>
+                                <div>Explicit consumed-stock allocation: ₦<?php echo number_format((float)($operatingStockAttribution['explicit_stock_allocation'] ?? 0),2); ?></div>
+                            </td>
+                            <td class="small text-muted">Farm expenses / financial allocations / consumed stock ledger / stock allocations</td>
+                            <td class="text-end fw-semibold">₦<?php echo number_format((float)$summary['non_feed_expenses'],2); ?></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="small text-muted mt-3">
+                Consumed-stock provenance in this selection:
+                <?php echo number_format((int)($stockSourceCounts['native_parent_rows'] ?? 0)); ?>
+                native source row(s) and
+                <?php echo number_format((int)($stockSourceCounts['explicit_allocation_rows'] ?? 0)); ?>
+                explicit allocation row(s).
+            </div>
+
+            <?php if($cycleId): ?>
+                <div class="alert alert-secondary py-2 small mt-3 mb-0">
+                    <strong>Cycle attribution boundary:</strong>
+                    Unallocated broader shared cost remains outside the selected cycle until an explicit compatible allocation is recorded.
+                    Profitability does not force the remainder into this cycle or guess a distribution.
+                    Remaining parent balances stay visible in the allocation workspaces.
+                </div>
+            <?php endif; ?>
+        </div>
     </div>
 
     <?php if($uncosted>0): ?><div class="alert alert-warning"><strong>Cost data notice:</strong> <?php echo $uncosted; ?> effective feed-use transaction(s) in this period have no cost snapshot. They are excluded from feed-consumption cost so the platform does not invent a cost.</div><?php endif; ?>

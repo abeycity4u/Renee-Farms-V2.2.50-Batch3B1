@@ -26,6 +26,21 @@ function getProfitabilitySummary(
     $productionType = strtolower(trim((string)$productionType));
     if ($productionType === 'all') $productionType = '';
 
+    /*
+     * Attribution-composition presentation state.
+     *
+     * These values do not create a second accounting engine. They preserve
+     * the same source rows already used by this canonical profitability
+     * reader and explain whether included value is native/direct or arrived
+     * through an explicit allocation.
+     */
+    $directRevenue = 0.0;
+    $allocatedRevenue = 0.0;
+    $allocatedSharedRevenue = 0.0;
+    $unallocatedPooledRevenue = 0.0;
+    $directExpenseRows = [];
+    $allocatedExpenseRows = [];
+
     // Revenue: exact source records at farm/production level. At cycle level,
     // include direct cycle sales plus any explicit allocation of pooled sales.
     if ($cycleId) {
@@ -33,7 +48,7 @@ function getProfitabilitySummary(
         $salesParams = [$farmId,$startDate,$endDate,$cycleId];
         if ($farmType !== 'all') { $salesSql .= " AND farm_type=?"; $salesParams[]=$farmType; }
         if ($productionType !== '') { $salesSql .= " AND production_type=?"; $salesParams[]=$productionType; }
-        $stmt=$pdo->prepare($salesSql); $stmt->execute($salesParams); $revenue=(float)$stmt->fetchColumn();
+        $stmt=$pdo->prepare($salesSql); $stmt->execute($salesParams); $directRevenue=(float)$stmt->fetchColumn(); $revenue=$directRevenue;
 
         $allocSql = "SELECT COALESCE(SUM(sa.allocated_amount),0)
                      FROM sales_allocations sa
@@ -43,13 +58,117 @@ function getProfitabilitySummary(
         $allocParams=[$farmId,$cycleId,$startDate,$endDate];
         if ($farmType !== 'all') { $allocSql .= " AND pc.farm_type=?"; $allocParams[]=$farmType; }
         if ($productionType !== '') { $allocSql .= " AND pc.production_type=?"; $allocParams[]=$productionType; }
-        $stmt=$pdo->prepare($allocSql); $stmt->execute($allocParams); $revenue += (float)$stmt->fetchColumn();
+        $stmt=$pdo->prepare($allocSql); $stmt->execute($allocParams); $allocatedRevenue=(float)$stmt->fetchColumn(); $revenue += $allocatedRevenue;
+
+        /*
+         * Shared-revenue disclosure previously lived in the Profitability
+         * page. Keep it central so the page does not own allocation SQL.
+         */
+        $sharedIncludedSql =
+            "SELECT COALESCE(SUM(sa.allocated_amount),0)
+             FROM sales_allocations sa
+             JOIN sales_records s
+               ON s.id=sa.sale_id
+              AND s.farm_id=sa.farm_id
+             WHERE sa.farm_id=?
+               AND sa.cycle_id=?
+               AND s.cycle_id IS NULL
+               AND s.sale_date BETWEEN ? AND ?";
+
+        $stmt =
+            $pdo->prepare(
+                $sharedIncludedSql
+            );
+
+        $stmt->execute(
+            [
+                $farmId,
+                $cycleId,
+                $startDate,
+                $endDate,
+            ]
+        );
+
+        $allocatedSharedRevenue =
+            (float)$stmt->fetchColumn();
+
+        $pooledSql =
+            "SELECT COALESCE(
+                SUM(
+                    GREATEST(
+                        s.total_amount
+                        -
+                        COALESCE(
+                            a.allocated_amount,
+                            0
+                        ),
+                        0
+                    )
+                ),
+                0
+             )
+             FROM sales_records s
+             JOIN production_cycles target_pc
+               ON target_pc.id=?
+              AND target_pc.farm_id=s.farm_id
+             LEFT JOIN (
+                 SELECT
+                     farm_id,
+                     sale_id,
+                     SUM(allocated_amount) AS allocated_amount
+                 FROM sales_allocations
+                 GROUP BY farm_id,sale_id
+             ) a
+               ON a.farm_id=s.farm_id
+              AND a.sale_id=s.id
+             WHERE s.farm_id=?
+               AND s.sale_date BETWEEN ? AND ?
+               AND s.cycle_id IS NULL
+               AND s.farm_type=target_pc.farm_type
+               AND s.production_type=target_pc.production_type";
+
+        $stmt =
+            $pdo->prepare(
+                $pooledSql
+            );
+
+        $stmt->execute(
+            [
+                $cycleId,
+                $farmId,
+                $startDate,
+                $endDate,
+            ]
+        );
+
+        $unallocatedPooledRevenue =
+            (float)$stmt->fetchColumn();
+
     } else {
         $salesSql = "SELECT COALESCE(SUM(total_amount),0) FROM sales_records WHERE farm_id=? AND sale_date BETWEEN ? AND ?";
         $salesParams=[$farmId,$startDate,$endDate];
         if ($farmType !== 'all') { $salesSql .= " AND farm_type=?"; $salesParams[]=$farmType; }
         if ($productionType !== '') { $salesSql .= " AND production_type=?"; $salesParams[]=$productionType; }
         $stmt=$pdo->prepare($salesSql); $stmt->execute($salesParams); $revenue=(float)$stmt->fetchColumn();
+        $directRevenue = $revenue;
+    }
+
+    if (
+        (int)round(
+            (
+                $directRevenue
+                +
+                $allocatedRevenue
+            ) * 100
+        )
+        !==
+        (int)round(
+            $revenue * 100
+        )
+    ) {
+        throw new RuntimeException(
+            'Profitability revenue attribution composition does not conserve its canonical total.'
+        );
     }
 
     $expenseRows=[];
@@ -63,7 +182,16 @@ function getProfitabilitySummary(
         if ($productionType !== '') { $expenseSql.=" AND production_type=?"; $expenseParams[]=$productionType; }
         $expenseSql.=" GROUP BY category";
         $stmt=$pdo->prepare($expenseSql); $stmt->execute($expenseParams);
-        foreach($stmt->fetchAll(PDO::FETCH_KEY_PAIR) as $cat=>$amount) $expenseRows[$cat]=(float)$amount;
+        foreach(
+            $stmt->fetchAll(PDO::FETCH_KEY_PAIR)
+            as $cat=>$amount
+        ) {
+            $directExpenseRows[$cat] =
+                (float)$amount;
+
+            $expenseRows[$cat] =
+                (float)$amount;
+        }
 
         $allocSql="SELECT e.category,COALESCE(SUM(fa.allocated_amount),0) total
                    FROM financial_allocations fa
@@ -75,7 +203,21 @@ function getProfitabilitySummary(
         if ($productionType !== '') { $allocSql.=" AND pc.production_type=?"; $allocParams[]=$productionType; }
         $allocSql.=" GROUP BY e.category";
         $stmt=$pdo->prepare($allocSql); $stmt->execute($allocParams);
-        foreach($stmt->fetchAll(PDO::FETCH_KEY_PAIR) as $cat=>$amount) $expenseRows[$cat]=($expenseRows[$cat]??0)+(float)$amount;
+        foreach(
+            $stmt->fetchAll(PDO::FETCH_KEY_PAIR)
+            as $cat=>$amount
+        ) {
+            $allocatedExpenseRows[$cat] =
+                (float)$amount;
+
+            $expenseRows[$cat] =
+                (
+                    $expenseRows[$cat]
+                    ?? 0
+                )
+                +
+                (float)$amount;
+        }
     } else {
         $expenseSql="SELECT category,COALESCE(SUM(amount * unit),0) total FROM farm_expenses WHERE farm_id=? AND expense_date BETWEEN ? AND ?";
         $expenseParams=[$farmId,$startDate,$endDate];
@@ -86,6 +228,7 @@ function getProfitabilitySummary(
         if ($productionType !== '') { $expenseSql.=" AND production_type=?"; $expenseParams[]=$productionType; }
         $expenseSql.=" GROUP BY category";
         $stmt=$pdo->prepare($expenseSql); $stmt->execute($expenseParams); $expenseRows=$stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+        $directExpenseRows = $expenseRows;
     }
 
     /*
@@ -116,6 +259,107 @@ function getProfitabilitySummary(
             ?? 0
         );
 
+    /*
+     * Attribution composition is derived only from rows returned by the
+     * canonical consumed-stock economics reader. No stock SQL or competing
+     * scope policy is introduced here.
+     */
+    $feedDirectNativeCents = 0;
+    $feedExplicitAllocationCents = 0;
+    $operatingDirectNativeCents = 0;
+    $operatingExplicitAllocationCents = 0;
+
+    $stockSourceCounts = [
+        'native_parent' => 0,
+        'explicit_allocation' => 0,
+    ];
+
+    foreach(
+        $stockConsumption['rows']
+        ?? []
+        as $stockEconomicRow
+    ) {
+        $mode =
+            (string)(
+                $stockEconomicRow[
+                    'attribution_mode'
+                ]
+                ?? ''
+            );
+
+        if (
+            !array_key_exists(
+                $mode,
+                $stockSourceCounts
+            )
+        ) {
+            throw new RuntimeException(
+                'Profitability received an unsupported consumed-stock attribution mode.'
+            );
+        }
+
+        $amountCents =
+            (int)(
+                $stockEconomicRow[
+                    'economic_amount_cents'
+                ]
+                ?? 0
+            );
+
+        if ($amountCents < 0) {
+            throw new RuntimeException(
+                'Profitability received a negative consumed-stock economic amount.'
+            );
+        }
+
+        $stockSourceCounts[$mode]++;
+
+        $costKind =
+            (string)(
+                $stockEconomicRow[
+                    'cost_kind'
+                ]
+                ?? ''
+            );
+
+        if ($costKind === 'feed') {
+            if ($mode === 'explicit_allocation') {
+                $feedExplicitAllocationCents +=
+                    $amountCents;
+            } else {
+                $feedDirectNativeCents +=
+                    $amountCents;
+            }
+
+            continue;
+        }
+
+        if ($costKind === 'operating') {
+            if ($mode === 'explicit_allocation') {
+                $operatingExplicitAllocationCents +=
+                    $amountCents;
+            } else {
+                $operatingDirectNativeCents +=
+                    $amountCents;
+            }
+        }
+    }
+
+    if (
+        (
+            $feedDirectNativeCents
+            +
+            $feedExplicitAllocationCents
+        )
+        !==
+        (int)round(
+            $feedCost * 100
+        )
+    ) {
+        throw new RuntimeException(
+            'Profitability Feed attribution composition does not conserve its canonical total.'
+        );
+    }
 
     // Feed purchases are cash-flow records, not an additional operating cost
     // when consumed-feed snapshots are present.
@@ -149,10 +393,76 @@ function getProfitabilitySummary(
             ?? 0
         );
 
+    if (
+        (
+            $operatingDirectNativeCents
+            +
+            $operatingExplicitAllocationCents
+        )
+        !==
+        (int)round(
+            $inventoryOperatingConsumption
+            * 100
+        )
+    ) {
+        throw new RuntimeException(
+            'Profitability operating-stock attribution composition does not conserve its canonical total.'
+        );
+    }
+
     $manualNonFeedExpenses=0.0;
     foreach($expenseRows as $category=>$amount) if($category!=='feeds') $manualNonFeedExpenses+=(float)$amount;
+
+    $directManualNonFeedExpenses = 0.0;
+
+    foreach(
+        $directExpenseRows
+        as $category=>$amount
+    ) {
+        if ($category === 'feeds') {
+            continue;
+        }
+
+        $directManualNonFeedExpenses +=
+            (float)$amount;
+    }
+
+    $allocatedManualNonFeedExpenses = 0.0;
+
+    foreach(
+        $allocatedExpenseRows
+        as $category=>$amount
+    ) {
+        if ($category === 'feeds') {
+            continue;
+        }
+
+        $allocatedManualNonFeedExpenses +=
+            (float)$amount;
+    }
+
+    if (
+        (int)round(
+            (
+                $directManualNonFeedExpenses
+                +
+                $allocatedManualNonFeedExpenses
+            ) * 100
+        )
+        !==
+        (int)round(
+            $manualNonFeedExpenses
+            * 100
+        )
+    ) {
+        throw new RuntimeException(
+            'Profitability manual-expense attribution composition does not conserve its canonical total.'
+        );
+    }
+
     $nonFeedExpenses=$manualNonFeedExpenses+$inventoryOperatingConsumption;
     $totalCost=$nonFeedExpenses+$feedCost;
+
     return [
         'revenue'=>$revenue,
         'feed_consumption_cost'=>$feedCost,
@@ -164,6 +474,43 @@ function getProfitabilitySummary(
         'profit'=>$revenue-$totalCost,
         'cash_feed_expenses'=>$cashFeed,
         'expense_breakdown'=>$expenseRows,
+        'allocated_shared_revenue'=>$allocatedSharedRevenue,
+        'unallocated_pooled_revenue'=>$unallocatedPooledRevenue,
+        'attribution_composition'=>[
+            'revenue'=>[
+                'direct_sales'=>$directRevenue,
+                'explicit_sale_allocation'=>$allocatedRevenue,
+                'allocated_shared_revenue'=>$allocatedSharedRevenue,
+                'unallocated_pooled_revenue'=>$unallocatedPooledRevenue,
+                'total'=>$revenue,
+            ],
+            'feed_consumption'=>[
+                'direct_native_stock'=>$feedDirectNativeCents / 100,
+                'explicit_stock_allocation'=>$feedExplicitAllocationCents / 100,
+                'total'=>$feedCost,
+            ],
+            'operating_inventory_consumption'=>[
+                'direct_native_stock'=>$operatingDirectNativeCents / 100,
+                'explicit_stock_allocation'=>$operatingExplicitAllocationCents / 100,
+                'total'=>$inventoryOperatingConsumption,
+            ],
+            'manual_non_feed_expenses'=>[
+                'direct_expense'=>$directManualNonFeedExpenses,
+                'explicit_shared_expense_allocation'=>$allocatedManualNonFeedExpenses,
+                'total'=>$manualNonFeedExpenses,
+            ],
+            'other_operating_cost'=>[
+                'manual_non_feed_expenses'=>$manualNonFeedExpenses,
+                'inventory_operating_consumption'=>$inventoryOperatingConsumption,
+                'total'=>$nonFeedExpenses,
+            ],
+            'stock_source_counts'=>[
+                'native_parent_rows'=>$stockSourceCounts['native_parent'],
+                'explicit_allocation_rows'=>$stockSourceCounts['explicit_allocation'],
+            ],
+            'total_operating_cost'=>$totalCost,
+            'profit'=>$revenue-$totalCost,
+        ],
     ];
 }}
 
