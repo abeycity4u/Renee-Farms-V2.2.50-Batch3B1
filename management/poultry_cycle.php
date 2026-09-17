@@ -8,6 +8,7 @@ require_once(__DIR__ . '/../lib/poultry_cycle_lifecycle.php');
 require_once(__DIR__ . '/../lib/poultry_cycle_acquisition.php');
 require_once(__DIR__ . '/../lib/poultry_rearing_economics.php');
 require_once(__DIR__ . '/../lib/poultry_production_entry_snapshots.php');
+require_once(__DIR__ . '/../lib/poultry_production_entry_clarity.php');
 require_once(__DIR__ . '/../lib/poultry_cycle_completion.php');
 
 requireLogin();
@@ -325,6 +326,21 @@ $productionEntrySnapshots =
 
 $latestProductionEntrySnapshot =
     $productionEntrySnapshots[0] ?? null;
+
+$productionEntryCurrentClarity =
+    $type === 'layer'
+    && is_array($productionEntryCandidate)
+        ? poultry_production_entry_clarity_candidate_summary(
+            $productionEntryCandidate
+        )
+        : null;
+
+$productionEntryApprovedClarity =
+    $type === 'layer'
+        ? poultry_production_entry_clarity_snapshot_summary(
+            $latestProductionEntrySnapshot
+        )
+        : null;
 
 $productionEntryComparison = null;
 
@@ -1184,6 +1200,340 @@ $confirmationText .=
     <div class="card-header d-flex justify-content-between align-items-center"><strong>Production-Entry Economic Basis</strong></div>
     <div class="card-body">
       <div class="small text-muted mb-3">Production-Entry Economic Basis is accumulated attributable rearing investment per surviving bird at production entry. It is a separate management-costing measure and does not replace Bird Cost Basis used for mortality valuation.</div>
+
+      <?php if(
+          is_array($productionEntryCurrentClarity)
+          && !empty($productionEntryCurrentClarity['recorded'])
+      ): ?>
+        <div class="card border-secondary mb-3">
+          <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <strong>Provenance Source Breakdown</strong>
+            <span class="badge text-bg-light border">
+              <?php echo number_format((int)$productionEntryCurrentClarity['source_count']); ?>
+              current source records
+            </span>
+          </div>
+
+          <div class="card-body">
+            <div class="alert alert-light border py-2 small">
+              <strong>Provenance is evidence, not an amount ledger.</strong>
+              Monetary values remain owned by the canonical Production-Entry economics reader.
+              The source rows below explain which recorded evidence supports the current basis,
+              its inclusion window, population boundary, reconciliation and outside-cycle disclosure.
+              They are never summed here to recreate the money.
+            </div>
+
+            <?php
+            $currentContext =
+                $productionEntryCurrentClarity['context']
+                ?? [];
+
+            $currentRearingStart =
+                $currentContext['rearing_start_date']
+                ?? null;
+
+            $currentRearingEnd =
+                $currentContext['rearing_end_date']
+                ?? null;
+
+            $currentProductionEntry =
+                $currentContext['production_entry_date']
+                ?? null;
+            ?>
+
+            <div class="row g-3 mb-3">
+              <div class="col-md-4">
+                <div class="small text-muted">Current Source Provenance</div>
+                <strong>
+                  <?php echo number_format((int)$productionEntryCurrentClarity['source_count']); ?>
+                  canonical source records
+                </strong>
+              </div>
+
+              <div class="col-md-4">
+                <div class="small text-muted">Inclusion boundary</div>
+                <strong>
+                  <?php
+                  echo htmlspecialchars(
+                      $currentRearingStart && $currentRearingEnd
+                          ? (
+                              $currentRearingStart
+                              . ' → '
+                              . $currentRearingEnd
+                          )
+                          : 'No Rearing window'
+                  );
+                  ?>
+                </strong>
+              </div>
+
+              <div class="col-md-4">
+                <div class="small text-muted">Production entry</div>
+                <strong>
+                  <?php echo htmlspecialchars(
+                      $currentProductionEntry
+                          ?: 'Not recorded'
+                  ); ?>
+                </strong>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Source family</th>
+                    <th>Source system</th>
+                    <th class="text-end">Records</th>
+                    <th>Effective date span</th>
+                    <th>Role in Production-Entry basis</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                <?php foreach(
+                    $productionEntryCurrentClarity['groups']
+                    as $group
+                ): ?>
+                  <tr>
+                    <td>
+                      <div class="fw-semibold">
+                        <?php echo htmlspecialchars((string)$group['label']); ?>
+                      </div>
+                      <div class="small text-muted">
+                        <?php echo htmlspecialchars((string)$group['category_label']); ?>
+                      </div>
+                    </td>
+
+                    <td>
+                      <?php echo htmlspecialchars((string)$group['source_type_label']); ?>
+                    </td>
+
+                    <td class="text-end">
+                      <?php echo number_format((int)$group['count']); ?>
+                    </td>
+
+                    <td>
+                      <?php
+                      $groupStart =
+                          $group['effective_date_start']
+                          ?? null;
+
+                      $groupEnd =
+                          $group['effective_date_end']
+                          ?? null;
+
+                      if (!$groupStart) {
+                          echo '<span class="text-muted">—</span>';
+                      } elseif (
+                          !$groupEnd
+                          || $groupStart === $groupEnd
+                      ) {
+                          echo htmlspecialchars(
+                              (string)$groupStart
+                          );
+                      } else {
+                          echo htmlspecialchars(
+                              $groupStart
+                              . ' → '
+                              . $groupEnd
+                          );
+                      }
+                      ?>
+                    </td>
+
+                    <td>
+                      <div class="fw-semibold small">
+                        <?php echo htmlspecialchars((string)$group['basis_effect']); ?>
+                      </div>
+                      <div class="small text-muted">
+                        <?php echo htmlspecialchars((string)$group['description']); ?>
+                      </div>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="small text-muted mt-3">
+              Lifecycle provenance defines the Rearing inclusion window.
+              Population provenance establishes the Production-Entry flock used by the
+              per-bird basis. Daily Records are reconciliation evidence.
+              Shared-pool disclosure dependencies explain cost that remains outside the
+              cycle and are not silently added to Attributed Rearing Investment.
+            </div>
+          </div>
+        </div>
+      <?php endif; ?>
+
+      <?php if(
+          is_array($productionEntryApprovedClarity)
+          && !empty($latestProductionEntrySnapshot)
+      ): ?>
+        <?php if(!empty($productionEntryApprovedClarity['recorded'])): ?>
+          <div class="card mb-3">
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+              <strong>
+                Approved Provenance · V<?php echo (int)$productionEntryApprovedClarity['version_no']; ?>
+              </strong>
+              <span class="badge text-bg-light border">
+                <?php echo number_format((int)$productionEntryApprovedClarity['source_count']); ?>
+                source records
+              </span>
+            </div>
+
+            <div class="card-body">
+              <?php
+              $approvedContext =
+                  $productionEntryApprovedClarity['context']
+                  ?? [];
+              ?>
+
+              <div class="small text-muted mb-2">
+                This is the immutable provenance manifest recorded with the approved version.
+                It is shown for comparison only and is not reconstructed from today's source data.
+              </div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                  <div class="small text-muted">Approved Rearing boundary</div>
+                  <strong>
+                    <?php
+                    $approvedStart =
+                        $approvedContext['rearing_start_date']
+                        ?? null;
+
+                    $approvedEnd =
+                        $approvedContext['rearing_end_date']
+                        ?? null;
+
+                    echo htmlspecialchars(
+                        $approvedStart && $approvedEnd
+                            ? (
+                                $approvedStart
+                                . ' → '
+                                . $approvedEnd
+                            )
+                            : 'No Rearing window'
+                    );
+                    ?>
+                  </strong>
+                </div>
+
+                <div class="col-md-4">
+                  <div class="small text-muted">Approved Production entry</div>
+                  <strong>
+                    <?php echo htmlspecialchars(
+                        (string)(
+                            $approvedContext['production_entry_date']
+                            ?? 'Not recorded'
+                        )
+                    ); ?>
+                  </strong>
+                </div>
+
+                <div class="col-md-4">
+                  <div class="small text-muted">Approved source identity</div>
+                  <strong>
+                    <?php echo number_format((int)$productionEntryApprovedClarity['source_count']); ?>
+                    immutable source records
+                  </strong>
+                </div>
+              </div>
+
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Source family</th>
+                      <th>Source system</th>
+                      <th class="text-end">Records</th>
+                      <th>Effective date span</th>
+                      <th>Role in approved basis</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                  <?php foreach(
+                      $productionEntryApprovedClarity['groups']
+                      as $group
+                  ): ?>
+                    <tr>
+                      <td>
+                        <div class="fw-semibold">
+                          <?php echo htmlspecialchars((string)$group['label']); ?>
+                        </div>
+                        <div class="small text-muted">
+                          <?php echo htmlspecialchars((string)$group['category_label']); ?>
+                        </div>
+                      </td>
+
+                      <td>
+                        <?php echo htmlspecialchars((string)$group['source_type_label']); ?>
+                      </td>
+
+                      <td class="text-end">
+                        <?php echo number_format((int)$group['count']); ?>
+                      </td>
+
+                      <td>
+                        <?php
+                        $groupStart =
+                            $group['effective_date_start']
+                            ?? null;
+
+                        $groupEnd =
+                            $group['effective_date_end']
+                            ?? null;
+
+                        if (!$groupStart) {
+                            echo '<span class="text-muted">—</span>';
+                        } elseif (
+                            !$groupEnd
+                            || $groupStart === $groupEnd
+                        ) {
+                            echo htmlspecialchars(
+                                (string)$groupStart
+                            );
+                        } else {
+                            echo htmlspecialchars(
+                                $groupStart
+                                . ' → '
+                                . $groupEnd
+                            );
+                        }
+                        ?>
+                      </td>
+
+                      <td>
+                        <div class="fw-semibold small">
+                          <?php echo htmlspecialchars((string)$group['basis_effect']); ?>
+                        </div>
+                        <div class="small text-muted">
+                          <?php echo htmlspecialchars((string)$group['description']); ?>
+                        </div>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+        <?php elseif(
+            ($productionEntryApprovedClarity['state'] ?? '')
+            === 'legacy_not_recorded'
+        ): ?>
+          <div class="alert alert-secondary">
+            <strong>Approved Provenance:</strong>
+            This historical approved version predates canonical provenance recording.
+            Its source manifest is not reconstructed or backfilled later.
+          </div>
+        <?php endif; ?>
+      <?php endif; ?>
+
       <?php if($latestProductionEntrySnapshot): ?>
         <?php
           $changed=$productionEntryComparison !== null && !empty($productionEntryComparison['changed']);
