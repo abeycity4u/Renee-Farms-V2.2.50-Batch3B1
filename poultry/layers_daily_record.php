@@ -780,7 +780,7 @@ $_SESSION['success'] = "Daily record saved successfully!"
                                 <label>Laying Rate (%)</label>
                                 <div class="input-group">
                                     <input type="number" name="laying_rate" class="form-control"
-                                           id="layingRate" step="0.1" min="0" max="100" required>
+                                           id="layingRate" step="0.01" min="0" max="100" readonly required>
                                     <span class="input-group-text">%</span>
                                 </div>
                                 <small class="text-muted">Calculated automatically from eggs/stock</small>

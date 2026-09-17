@@ -867,7 +867,7 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!"
                             <div class="col-md-6 mb-3">
                                 <label id="feedConsumptionLabel">Feed Consumption (kg)</label>
                                 <input type="number" name="feed_consumption" class="form-control"
-                                       id="feedConsumption" step="0.1" min="0" required>
+                                       id="feedConsumption" step="0.01" min="0" required>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label>Feed Item</label>
