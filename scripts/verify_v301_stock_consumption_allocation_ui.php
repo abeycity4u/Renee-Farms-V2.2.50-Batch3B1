@@ -322,6 +322,19 @@ record_check(
 
 record_check(
     $checks,
+    'HISTORY_JS_ERROR_ROW_COLSPAN_12',
+    strpos(
+        $sources['history_js'],
+        'colspan="12" class="text-danger text-center"'
+    ) !== false
+    &&
+    strpos(
+        $sources['history_js'],
+        'colspan="11" class="text-danger text-center"'
+    ) === false
+);
+record_check(
+    $checks,
     'WORKSPACE_JS_EQUAL_SPLIT',
     strpos(
         $sources['workspace_js'],

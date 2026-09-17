@@ -132,7 +132,7 @@ async function loadHistory(days = 30) {
     const data = await response.json();
 
     if (data.error) {
-        document.querySelector('#historyTable tbody').innerHTML = `<tr><td colspan="11" class="text-danger text-center">${escapeHtml(data.error)}</td></tr>`;
+        document.querySelector('#historyTable tbody').innerHTML = `<tr><td colspan="12" class="text-danger text-center">${escapeHtml(data.error)}</td></tr>`;
         return;
     }
 
