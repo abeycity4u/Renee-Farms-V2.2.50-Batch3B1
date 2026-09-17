@@ -1144,9 +1144,28 @@ $confirmationText .=
         </div>
         <div class="explain-row"><span class="label">Bird acquisition basis</span><strong><?php echo $moneyOrDash($rearingEconomics['acquisition_cost']); ?></strong></div>
         <div class="explain-row"><span class="label">Feed actually consumed during Rearing</span><strong><?php echo $moneyOrDash($rearingEconomics['feed_consumed_cost']); ?></strong></div>
+        <div class="small text-muted ms-3 mb-2">
+          Direct/native cycle stock use:
+          <strong><?php echo $moneyOrDash($rearingEconomics['direct_feed_consumed_cost']); ?></strong>
+          · Explicit consumed-stock allocation:
+          <strong><?php echo $moneyOrDash($rearingEconomics['allocated_feed_consumed_cost']); ?></strong>
+        </div>
         <div class="explain-row"><span class="label">Medication/Vaccine, supplements & consumables USED</span><strong><?php echo $moneyOrDash($rearingEconomics['inventory_operating_cost']); ?></strong></div>
+        <div class="small text-muted ms-3 mb-2">
+          Direct/native cycle stock use:
+          <strong><?php echo $moneyOrDash($rearingEconomics['direct_inventory_operating_cost']); ?></strong>
+          · Explicit consumed-stock allocation:
+          <strong><?php echo $moneyOrDash($rearingEconomics['allocated_inventory_operating_cost']); ?></strong>
+        </div>
         <div class="explain-row"><span class="label">Direct non-feed expenses</span><strong><?php echo $moneyOrDash($rearingEconomics['direct_expenses']); ?></strong></div>
         <div class="explain-row"><span class="label">Explicit shared-expense allocations to this cycle</span><strong><?php echo $moneyOrDash($rearingEconomics['allocated_shared_expenses']); ?></strong></div>
+        <div class="alert alert-light border py-2 mt-3 mb-2 small">
+          <strong>Cost attribution:</strong>
+          Direct/native stock use is consumption already recorded against this cycle.
+          An explicit consumed-stock allocation is a share deliberately assigned from a broader pooled stock-use source.
+          Direct non-feed expenses are farm expenses recorded against this cycle, while explicit shared-expense allocations come from shared expense parents.
+          Any unallocated shared balance remains outside this cycle and is not included in Attributed Rearing Investment.
+        </div>
         <div class="explain-row"><span class="label">Surviving flock at Production entry</span><strong><?php echo $rearingEconomics['production_entry_headcount']===null?'-':number_format((int)$rearingEconomics['production_entry_headcount']); ?></strong></div>
         <?php if($rearingEconomics['production_entry_headcount_source']): ?><div class="small text-muted mt-2">Headcount source: <?php echo htmlspecialchars($rearingEconomics['production_entry_headcount_source']); ?></div><?php endif; ?>
         <?php if((float)$rearingEconomics['unallocated_shared_expense_pool']>0): ?><div class="alert alert-warning mt-3 mb-0"><strong>Unallocated shared Layer expense pool in this rearing window:</strong> <?php echo $moneyOrDash($rearingEconomics['unallocated_shared_expense_pool']); ?>. It is disclosed but not silently assigned to this cycle.</div><?php endif; ?>

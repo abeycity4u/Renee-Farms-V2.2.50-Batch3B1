@@ -1036,7 +1036,11 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
         'acquisition_cost' => 0.0,
         'acquisition_quantity' => 0,
         'feed_consumed_cost' => 0.0,
+        'direct_feed_consumed_cost' => 0.0,
+        'allocated_feed_consumed_cost' => 0.0,
         'inventory_operating_cost' => 0.0,
+        'direct_inventory_operating_cost' => 0.0,
+        'allocated_inventory_operating_cost' => 0.0,
         'inventory_operating_breakdown' => [],
         'direct_expenses' => 0.0,
         'allocated_shared_expenses' => 0.0,
@@ -1248,8 +1252,16 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
         ) {
             $base['uncosted_feed_uses']++;
         } else {
-            $base['feed_consumed_cost'] +=
+            $value =
                 (float)$row['total_cost'];
+
+            $base[
+                'direct_feed_consumed_cost'
+            ] +=
+                $value;
+
+            $base['feed_consumed_cost'] +=
+                $value;
         }
 
         $base['provenance_sources'][] =
@@ -1361,6 +1373,11 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
                 ][$key] += $value;
 
                 $base[
+                    'direct_inventory_operating_cost'
+                ] +=
+                    $value;
+
+                $base[
                     'inventory_operating_cost'
                 ] += $value;
             }
@@ -1470,6 +1487,11 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
             === 'feed'
         ) {
             $base[
+                'allocated_feed_consumed_cost'
+            ] +=
+                $value;
+
+            $base[
                 'feed_consumed_cost'
             ] +=
                 $value;
@@ -1530,6 +1552,11 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
             $value;
 
         $base[
+            'allocated_inventory_operating_cost'
+        ] +=
+            $value;
+
+        $base[
             'inventory_operating_cost'
         ] +=
             $value;
@@ -1558,6 +1585,54 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
             ],
             2
         );
+
+    foreach (
+        [
+            'direct_feed_consumed_cost',
+            'allocated_feed_consumed_cost',
+            'direct_inventory_operating_cost',
+            'allocated_inventory_operating_cost',
+        ]
+        as $compositionKey
+    ) {
+        $base[$compositionKey] =
+            round(
+                (float)$base[$compositionKey],
+                2
+            );
+    }
+
+    if (
+        abs(
+            (
+                $base['direct_feed_consumed_cost']
+                +
+                $base['allocated_feed_consumed_cost']
+            )
+            -
+            $base['feed_consumed_cost']
+        ) > 0.009
+    ) {
+        throw new RuntimeException(
+            'Rearing Feed attribution composition does not conserve the Feed total.'
+        );
+    }
+
+    if (
+        abs(
+            (
+                $base['direct_inventory_operating_cost']
+                +
+                $base['allocated_inventory_operating_cost']
+            )
+            -
+            $base['inventory_operating_cost']
+        ) > 0.009
+    ) {
+        throw new RuntimeException(
+            'Rearing operating-stock attribution composition does not conserve the operating-stock total.'
+        );
+    }
 
     foreach (
         $base[
