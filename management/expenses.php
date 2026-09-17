@@ -5,6 +5,7 @@ require_once(__DIR__ . '/../includes/pdf/PdfReportService.php');
 require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/../lib/attribution.php');
 require_once(__DIR__ . '/../lib/transaction_actor_display.php');
+require_once(__DIR__ . '/../lib/financial_allocation_workspace.php');
 requireLogin();
 $pdfRequested = pdf_report_is_requested();
 if ($pdfRequested) { pdf_report_begin(); }
@@ -317,6 +318,20 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                             </td>
                                             <?php if ($canManageExpenses): ?>
                                             <td>
+                                                <?php if (
+                                                    $expenseActionPermission['edit']
+                                                    &&
+                                                    financial_allocation_workspace_parent_is_eligible($expense)
+                                                    &&
+                                                    financial_allocation_workspace_can_access($expense, 'expense_report')
+                                                ): ?>
+                                                <a class="btn btn-sm btn-outline-secondary"
+                                                   href="<?php echo htmlspecialchars(financial_allocation_workspace_url((int)$expense['id'], 'expense_report'), ENT_QUOTES); ?>"
+                                                   title="Allocate shared cost"
+                                                   aria-label="Allocate shared cost">
+                                                    <i class="bi bi-diagram-3"></i>
+                                                </a>
+                                                <?php endif; ?>
                                                 <?php if ($expenseActionPermission['edit']): ?>
                                                 <button class="btn btn-sm btn-outline-primary edit-expense-btn"
                                                         data-id="<?php echo $expense['id']; ?>"

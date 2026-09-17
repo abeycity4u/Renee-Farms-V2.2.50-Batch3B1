@@ -8,6 +8,7 @@ require_once(__DIR__ . '/../lib/transaction_actor_display.php');
 require_once(__DIR__ . '/../lib/inventory_financial.php');
 require_once(__DIR__ . '/../lib/ruminant_expense_allocation.php');
 require_once(__DIR__ . '/../lib/expense_revision_service.php');
+require_once(__DIR__ . '/../lib/financial_allocation_workspace.php');
 requireLogin();
 $pdfRequested = pdf_report_is_requested();
 if ($pdfRequested) { pdf_report_begin(); }
@@ -308,6 +309,18 @@ $pdfReportUrl = pdf_report_current_url();
                                             </td>
                                             <?php if ($canManageExpenses): ?>
                                             <td class="no-print">
+                                                <?php if (
+                                                    financial_allocation_workspace_parent_is_eligible($expense)
+                                                    &&
+                                                    financial_allocation_workspace_can_access($expense, 'operational')
+                                                ): ?>
+                                                <a class="btn btn-sm btn-outline-secondary"
+                                                   href="<?php echo htmlspecialchars(financial_allocation_workspace_url((int)$expense['id'], 'operational'), ENT_QUOTES); ?>"
+                                                   title="Allocate shared cost"
+                                                   aria-label="Allocate shared cost">
+                                                    <i class="bi bi-diagram-3"></i>
+                                                </a>
+                                                <?php endif; ?>
                                                 <button class="btn btn-sm btn-outline-primary edit-expense-btn"
                                                         data-id="<?php echo $expense['id']; ?>"
                                                         data-date="<?php echo $expense['expense_date']; ?>"
