@@ -226,6 +226,9 @@ function _v301_financial_allocation_parent_contract_legacy(
             'other',
             'shared',
         ],
+        'both' => [
+            'shared',
+        ],
     ];
 
     if (!isset($supported[$farmType])) {
@@ -391,9 +394,34 @@ function _v301_financial_allocation_target_contract_legacy(
             ?? ''
         );
 
+    $parentFarmType =
+        (string)$parentContract[
+            'farm_type'
+        ];
+
+    $crossModuleParent =
+        $parentFarmType === 'both';
+
     if (
-        $cycleFarmType
-        !== (string)$parentContract['farm_type']
+        (
+            !$crossModuleParent
+            &&
+            $cycleFarmType
+                !== $parentFarmType
+        )
+        ||
+        (
+            $crossModuleParent
+            &&
+            !in_array(
+                $cycleFarmType,
+                [
+                    'poultry',
+                    'ruminant',
+                ],
+                true
+            )
+        )
     ) {
         throw new RuntimeException(
             'The target production cycle does not match the expense farm type.'
