@@ -175,6 +175,17 @@ function stock_consumption_allocation_workspace_eligibility(
         ];
 
     } catch (
+        PDOException
+        $e
+    ) {
+        /*
+         * PDOException extends RuntimeException. Database failures must
+         * escape this business-eligibility adapter so the outer API boundary
+         * can replace database diagnostics with its safe generic message.
+         */
+        throw $e;
+
+    } catch (
         InvalidArgumentException
         |
         RuntimeException
