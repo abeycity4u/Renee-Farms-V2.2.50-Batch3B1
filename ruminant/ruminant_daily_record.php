@@ -62,6 +62,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_record']) && $
         if ($record && in_array(strtolower($record['animal_type']), $managedTypes, true)) {
             try {
                 $pdo->beginTransaction();
+                /*
+                 * Establish the authoritative Daily Record -> stock lock
+                 * order before touching downstream population projection.
+                 */
+                delete_daily_feed_usage(
+                    $pdo,
+                    $tenantFarmId,
+                    $recordId,
+                    'daily_ruminant_record'
+                );
+
                 daily_population_remove_mortality(
                     $pdo,
                     $tenantFarmId,
@@ -69,7 +80,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_record']) && $
                     $recordId,
                     (int)$_SESSION['user_id']
                 );
-                delete_daily_feed_usage($pdo, $tenantFarmId, $recordId, 'daily_ruminant_record');
                 $deleteStmt = $pdo->prepare("DELETE FROM ruminant_daily_records WHERE id = ? AND farm_id = ?");
                 $deleteStmt->execute([$recordId, $tenantFarmId]);
                 if ($deleteStmt->rowCount() !== 1) {
