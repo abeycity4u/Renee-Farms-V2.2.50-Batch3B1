@@ -5,6 +5,7 @@ require_once(__DIR__ . '/../includes/financial.php');
 require_once(__DIR__ . '/../lib/stock_reporting.php');
 require_once(__DIR__ . '/../lib/stock_costing.php');
 require_once(__DIR__ . '/../lib/attribution.php');
+require_once(__DIR__ . '/../lib/profitability_unallocated_shared.php');
 requireLogin();
 requireBusinessReportAccess();
 
@@ -44,6 +45,14 @@ $validCycleIds = array_map('intval', array_column($visibleCycles,'id'));
 if ($cycleId && !in_array($cycleId, $validCycleIds, true)) $cycleId = 0;
 
 $summary = getProfitabilitySummary($pdo, $farmId, $start, $end, $farmType, $cycleId ?: null, $productionType === 'all' ? null : $productionType);
+
+$unallocatedShared =
+    profitability_unallocated_shared_summary(
+        $pdo,
+        $farmId,
+        $start,
+        $end
+    );
 
 $profitabilityAttribution =
     $summary['attribution_composition']
@@ -156,7 +165,13 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
             <div class="col-md-3"><label class="form-label">Production cycle (optional)</label><select name="cycle_id" id="profitCycleId" class="form-select"><option value="0"><?php echo $productionType !== 'all' ? 'All ' . htmlspecialchars(attribution_label($productionType)) . ' cycles' : 'All cycles'; ?></option><?php foreach($visibleCycles as $c): ?><option value="<?php echo (int)$c['id']; ?>" <?php echo $cycleId===(int)$c['id']?'selected':''; ?>><?php echo htmlspecialchars($c['cycle_code'].' — '.$c['production_type'].' ('.$c['status'].')'); ?></option><?php endforeach; ?></select></div>
             <div class="col-md-1"><button class="btn btn-primary w-100">Apply</button></div>
         </div>
-        <div class="col-12 profitability-filter-help"><i class="bi bi-info-circle me-1"></i>Production type narrows Layer, Broiler or ruminant species; choose a cycle only when you need cycle-level analysis.</div>
+        <div class="col-12 profitability-filter-help">
+            <i class="bi bi-info-circle me-1"></i>
+            Production type narrows Layer, Broiler, a ruminant species, or the recorded Shared Operation.
+            Shared Operation is a source attribution; it is not the same as unallocated remainder.
+            Unallocated shared balances remain at their parent scope until an explicit compatible allocation is recorded.
+            Choose a cycle only when you need cycle-level analysis.
+        </div>
     </form>
 
     <?php if ($cycleId && $allocatedSharedRevenue > 0.009): ?>
@@ -178,6 +193,175 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
         <div class="col-12 col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-muted">Feed consumed</div><h3 class="mt-2">₦<?php echo number_format($summary['feed_consumption_cost'],2); ?></h3></div></div></div>
         <div class="col-12 col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-muted">Other operating cost</div><h3 class="mt-2">₦<?php echo number_format($summary['non_feed_expenses'],2); ?></h3></div></div></div>
         <div class="col-12 col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-muted">Profit / Loss</div><h3 class="mt-2 <?php echo $summary['profit']>=0?'text-success':'text-danger'; ?>">₦<?php echo number_format($summary['profit'],2); ?></h3></div></div></div>
+    </div>
+
+
+    <div class="card mb-4" id="unallocated-shared-balances">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                <strong>Unallocated Shared Balances</strong>
+                <div class="small text-muted">
+                    Farm-level allocation queue for the selected period.
+                    These balances are disclosed separately and do not create another Profit / Loss formula.
+                </div>
+            </div>
+
+            <?php if ((int)($unallocatedShared['stock_attribution_exception_count'] ?? 0) > 0): ?>
+                <span class="badge bg-danger">
+                    <?php echo number_format((int)$unallocatedShared['stock_attribution_exception_count']); ?>
+                    attribution exception(s)
+                </span>
+            <?php endif; ?>
+        </div>
+
+        <div class="card-body">
+            <div class="row g-3 mb-3">
+
+                <div class="col-sm-6 col-xl-3">
+                    <div class="border rounded p-3 h-100">
+                        <div class="text-muted small">
+                            Shared revenue awaiting allocation
+                        </div>
+
+                        <div class="fs-5 fw-semibold">
+                            ₦<?php echo number_format((float)($unallocatedShared['revenue_unallocated'] ?? 0),2); ?>
+                        </div>
+
+                        <div class="small text-muted">
+                            Pooled Poultry/Ruminant revenue only.
+                            General income is not treated as a shared allocation parent.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-sm-6 col-xl-3">
+                    <div class="border rounded p-3 h-100">
+                        <div class="text-muted small">
+                            Operating shared cost awaiting allocation
+                        </div>
+
+                        <div class="fs-5 fw-semibold">
+                            ₦<?php echo number_format((float)($unallocatedShared['operating_shared_unallocated'] ?? 0),2); ?>
+                        </div>
+
+                        <div class="small text-muted">
+                            Manual operating expense + consumed Feed + consumed operating inventory.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-sm-6 col-xl-3">
+                    <div class="border rounded p-3 h-100">
+                        <div class="text-muted small">
+                            Feed-purchase cash balance
+                        </div>
+
+                        <div class="fs-5 fw-semibold">
+                            ₦<?php echo number_format((float)($unallocatedShared['cash_feed_purchase_unallocated'] ?? 0),2); ?>
+                        </div>
+
+                        <div class="small text-muted">
+                            Cash/spending disclosure only.
+                            It is not added again to consumed-feed Profitability.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-sm-6 col-xl-3">
+                    <div class="border rounded p-3 h-100">
+                        <div class="text-muted small">
+                            Attribution exceptions
+                        </div>
+
+                        <div class="fs-5 fw-semibold">
+                            <?php echo number_format((int)($unallocatedShared['stock_attribution_exception_count'] ?? 0)); ?>
+                        </div>
+
+                        <div class="small text-muted">
+                            ₦<?php echo number_format((float)($unallocatedShared['stock_attribution_exception_amount'] ?? 0),2); ?>
+                            requires source-attribution correction rather than allocation.
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="small text-muted mb-3">
+                <strong>Important:</strong>
+                Shared Operation is a recorded source scope.
+                Unallocated remainder is the portion of a broader parent that has not yet been explicitly assigned.
+                A source-attribution exception is neither of those and must be corrected at its authoritative source.
+            </div>
+
+            <?php if (!empty($unallocatedShared['rows'])): ?>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                        <tr>
+                            <th>Source</th>
+                            <th>Scope</th>
+                            <th>Description</th>
+                            <th class="text-end">Parent</th>
+                            <th class="text-end">Allocated</th>
+                            <th class="text-end">Unallocated</th>
+                            <th>Status</th>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                        <?php foreach ($unallocatedShared['rows'] as $sharedRow): ?>
+                            <tr>
+                                <td>
+                                    <?php echo htmlspecialchars((string)$sharedRow['source_type']); ?>
+                                    #<?php echo (int)$sharedRow['source_id']; ?>
+                                </td>
+
+                                <td>
+                                    <?php echo htmlspecialchars((string)$sharedRow['scope']); ?>
+                                </td>
+
+                                <td>
+                                    <?php echo htmlspecialchars((string)$sharedRow['description']); ?>
+                                </td>
+
+                                <td class="text-end">
+                                    ₦<?php echo number_format((float)$sharedRow['parent_amount'],2); ?>
+                                </td>
+
+                                <td class="text-end">
+                                    ₦<?php echo number_format((float)$sharedRow['allocated_amount'],2); ?>
+                                </td>
+
+                                <td class="text-end">
+                                    ₦<?php echo number_format((float)$sharedRow['unallocated_amount'],2); ?>
+                                </td>
+
+                                <td>
+                                    <?php if (($sharedRow['status'] ?? '') === 'attribution_exception'): ?>
+                                        <span class="badge bg-danger">
+                                            Correct source attribution
+                                        </span>
+                                    <?php elseif (($sharedRow['status'] ?? '') === 'cash_only_waiting_allocation'): ?>
+                                        <span class="badge bg-secondary">
+                                            Cash-only balance
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="badge bg-warning text-dark">
+                                            Awaiting allocation
+                                        </span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php else: ?>
+                <div class="alert alert-success mb-0">
+                    No shared allocation remainder or attribution exception exists in this period.
+                </div>
+            <?php endif; ?>
+        </div>
     </div>
 
     <div class="card mb-4" id="profitability-attribution">

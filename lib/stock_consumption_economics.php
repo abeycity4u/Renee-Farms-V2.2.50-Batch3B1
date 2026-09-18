@@ -116,17 +116,19 @@ function stock_consumption_economics_scope(
             )
         );
 
-    if (
-        $productionType === 'all'
-        ||
-        $productionType === 'shared'
-    ) {
-        /*
-         * "shared" is a parent attribution value, not a narrower reporting
-         * production target. A shared report remains at module scope.
-         */
+    if ($productionType === 'all') {
         $productionType = '';
     }
+
+    /*
+     * IMPORTANT:
+     *
+     * "shared" is a real production/source attribution and must remain
+     * distinguishable from the whole Poultry/Ruminant module.
+     *
+     * Unallocated remainder is an allocation state, not a production type.
+     * Do not collapse production_type=shared into module scope here.
+     */
 
     $cycleId =
         (int)(

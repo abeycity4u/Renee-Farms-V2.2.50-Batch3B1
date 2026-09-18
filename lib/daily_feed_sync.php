@@ -7,9 +7,114 @@
 require_once __DIR__ . '/stock_service.php';
 require_once __DIR__ . '/stock_consumption_source_resolver.php';
 
+/**
+ * The saved Daily Record is authoritative for cycle attribution.
+ *
+ * All Daily Record feed writers pass through this guard:
+ * - Layer
+ * - Broiler
+ * - Ruminant
+ *
+ * Lock order is source Daily Record -> stock movement, matching the
+ * consumed-stock allocation authority boundary.
+ */
+function daily_feed_sync_authoritative_cycle_guard(
+    PDO $pdo,
+    int $farmId,
+    int $recordId,
+    ?int $requestedCycleId,
+    string $sourceType
+): ?int {
+    if (!$pdo->inTransaction()) {
+        throw new RuntimeException(
+            'Daily feed synchronization requires an active transaction.'
+        );
+    }
+
+    $definition =
+        stock_consumption_source_resolver_definition(
+            $sourceType
+        );
+
+    if (
+        empty($definition['supported'])
+        ||
+        empty($definition['allocatable'])
+        ||
+        ($definition['mode'] ?? '')
+            !== 'linked_daily_record'
+    ) {
+        throw new RuntimeException(
+            'Daily feed synchronization requires a supported Daily Record source.'
+        );
+    }
+
+    /*
+     * FOR UPDATE makes the saved Daily Record the first lock in the
+     * synchronization boundary. We do not trust a page parameter alone.
+     */
+    $resolution =
+        stock_consumption_source_resolver_resolve(
+            $pdo,
+            [
+                'farm_id' =>
+                    $farmId,
+
+                'source_type' =>
+                    $sourceType,
+
+                'source_id' =>
+                    $recordId,
+            ],
+            true
+        );
+
+    $authoritativeCycleId =
+        (int)(
+            $resolution[
+                'authoritative_source'
+            ]['cycle_id']
+            ?? 0
+        );
+
+    $requestedCycleId =
+        (int)(
+            $requestedCycleId
+            ?? 0
+        );
+
+    if (
+        $requestedCycleId
+        !== $authoritativeCycleId
+    ) {
+        throw new RuntimeException(
+            'The saved Daily Record cycle does not match the feed synchronization request. '
+            . 'No stock movement was changed.'
+        );
+    }
+
+    return $authoritativeCycleId > 0
+        ? $authoritativeCycleId
+        : null;
+}
+
 function sync_daily_feed_usage(PDO $pdo, int $farmId, int $recordId, ?int $feedItemId, float $quantity, ?int $cycleId, string $transactionDate, string $farmType, string $feedCategory, string $sourceType): void
 {
     $quantity = round($quantity, 2);
+
+    /*
+     * Central safety boundary:
+     * resolve and lock the authoritative Daily Record before reading or
+     * reversing any stock movement. Layer, Broiler and Ruminant all use it.
+     */
+    $cycleId =
+        daily_feed_sync_authoritative_cycle_guard(
+            $pdo,
+            $farmId,
+            $recordId,
+            $cycleId,
+            $sourceType
+        );
     $oldStmt = $pdo->prepare("SELECT * FROM stock_transactions
         WHERE farm_id = ? AND source_type = ? AND source_id = ?
           AND transaction_type = 'used' AND is_reversed = 0

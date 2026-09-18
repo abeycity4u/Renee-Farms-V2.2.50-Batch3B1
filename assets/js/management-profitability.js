@@ -6,8 +6,8 @@
 (function () {
     const productionTypes = {
         all: {},
-        poultry: {layer:'Layer', broiler:'Broiler', shared:'Shared / Unallocated Poultry'},
-        ruminant: {cattle:'Cattle', goat:'Goat', sheep:'Sheep', other:'Other', shared:'Shared / Unallocated Ruminant'},
+        poultry: {layer:'Layer', broiler:'Broiler', shared:'Shared Poultry / Other Poultry'},
+        ruminant: {cattle:'Cattle', goat:'Goat', sheep:'Sheep', other:'Other', shared:'Shared Ruminant / Other Ruminant'},
         general: {general:'General / Other Farm Income'}
     };
     const configElement =
@@ -39,7 +39,14 @@
         const farm = farmSelect.value;
         const production = productionSelect.value;
         cycleSelect.innerHTML = '';
-        const allCycleLabel = production !== 'all' ? `All ${production.replace(/_/g,' ')} cycles` : 'All cycles';
+        const allCycleLabel =
+            production === 'shared'
+                ? 'No specific cycle'
+                : (
+                    production !== 'all'
+                        ? `All ${production.replace(/_/g,' ')} cycles`
+                        : 'All cycles'
+                );
         cycleSelect.add(new Option(allCycleLabel, '0'));
         cycles.filter(c => (farm === 'all' || c.farm_type === farm) &&
                            (production === 'all' || c.production_type === production))
