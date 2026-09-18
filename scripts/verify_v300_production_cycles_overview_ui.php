@@ -1,17 +1,26 @@
 <?php
 
 /**
- * V3.0 focused static verifier:
- * Production Cycles overview simplification.
+ * Production Cycles dashboard consolidation verifier.
  *
- * No database connection is opened.
- * No production data is written.
+ * Source-only.
+ * No database connection.
+ * No database writes.
  */
 
 $root = dirname(__DIR__);
 
-$pagePath = $root . '/management/production_cycles.php';
-$jsPath = $root . '/assets/js/production-cycles.js';
+$page =
+    (string)file_get_contents(
+        $root
+        . '/management/production_cycles.php'
+    );
+
+$js =
+    (string)file_get_contents(
+        $root
+        . '/assets/js/production-cycles.js'
+    );
 
 $checks = 0;
 $failures = 0;
@@ -19,110 +28,141 @@ $failures = 0;
 $check = static function (
     bool $ok,
     string $message
-) use (&$checks, &$failures): void {
+) use (
+    &$checks,
+    &$failures
+): void {
     $checks++;
 
-    if ($ok) {
-        echo "PASS: {$message}\n";
-        return;
-    }
+    echo (
+        $ok
+            ? 'PASS: '
+            : 'FAIL: '
+    )
+    . $message
+    . PHP_EOL;
 
-    $failures++;
-    echo "FAIL: {$message}\n";
+    if (!$ok) {
+        $failures++;
+    }
 };
 
-$page = is_file($pagePath)
-    ? file_get_contents($pagePath)
-    : false;
+$compactPage =
+    preg_replace(
+        '/\s+/',
+        ' ',
+        $page
+    )
+    ?? $page;
 
-$js = is_file($jsPath)
-    ? file_get_contents($jsPath)
-    : false;
+$compactJs =
+    preg_replace(
+        '/\s+/',
+        ' ',
+        $js
+    )
+    ?? $js;
+
+$createMarker =
+    strpos(
+        $page,
+        'id="create-cycle"'
+    );
+
+$maintenanceMarker =
+    strpos(
+        $page,
+        'id="cycle-maintenance-tools"'
+    );
+
+$recentMarker =
+    strpos(
+        $page,
+        'id="recent-cycles"'
+    );
 
 $check(
-    $page !== false,
+    $page !== '',
     'Production Cycles page exists and is readable'
 );
 
 $check(
-    $js !== false,
+    $js !== '',
     'Production Cycles JavaScript exists and is readable'
 );
 
-if ($page === false || $js === false) {
-    echo "\nChecks: {$checks}\n";
-    echo "Failures: {$failures}\n";
-    echo "V3.0 PRODUCTION CYCLES OVERVIEW UX: FAILED\n";
-    echo "DATABASE_CONNECTION_USED=NO\n";
-    echo "DATABASE_WRITE_PERFORMED=NO\n";
-    exit(1);
-}
-
-$pageCompact = preg_replace('/\s+/', ' ', $page) ?? $page;
-$jsCompact = preg_replace('/\s+/', ' ', $js) ?? $js;
-
-$toolsMarker = strpos($page, 'id="cycle-tools"');
-$maintenanceMarker = strpos(
-    $page,
-    'id="cycle-maintenance-tools"'
+$check(
+    strpos(
+        $compactPage,
+        'Create a new production cycle here or manage an existing cycle below.'
+    ) !== false,
+    'overview copy matches the direct dashboard workflow'
 );
-$recentMarker = strpos($page, 'id="recent-cycles"');
-$createMarker = strpos($page, 'id="create-cycle"');
 
 $check(
     strpos(
-        $pageCompact,
-        'Start here to see the production cycles in this farm.'
-    ) !== false
-    && strpos(
-        $pageCompact,
-        'Choose a cycle below to work on it.'
-    ) !== false,
-    'overview copy directs users toward choosing a cycle rather than scanning forms'
-);
-
-$check(
-    strpos($page, 'href="#recent-cycles"') !== false
-    && strpos($page, 'Choose a Cycle') !== false,
-    'overview provides one clear Choose a Cycle action'
-);
-
-$check(
-    strpos($page, 'data-open-cycle-tools') !== false
-    && strpos($page, 'href="#create-cycle"') !== false
-    && strpos($page, 'New Cycle') !== false,
-    'privileged users retain one deliberate New Cycle action'
-);
-
-$check(
-    $toolsMarker !== false
-    && strpos($page, '<details', max(0, $toolsMarker - 200)) !== false,
-    'setup and maintenance tools are inside a collapsible details container'
-);
-
-$check(
-    strpos($page, 'Create New Cycle') !== false
+        $page,
+        'Choose a Cycle'
+    ) === false
     && strpos(
         $page,
-        'Advanced Maintenance &amp; History'
-    ) !== false,
-    'creation and advanced-maintenance workspaces have clear user-facing labels'
+        'href="#recent-cycles"'
+    ) === false,
+    'Choose a Cycle shortcut is retired'
+);
+
+$check(
+    strpos(
+        $page,
+        'data-open-cycle-tools'
+    ) === false
+    && strpos(
+        $page,
+        'href="#create-cycle"'
+    ) === false
+    && strpos(
+        $page,
+        'id="cycle-tools"'
+    ) === false,
+    'New Cycle trigger and outer Create Cycle collapse are retired'
 );
 
 $check(
     $createMarker !== false
-    && $toolsMarker !== false
-    && $createMarker > $toolsMarker,
-    'Create Cycle form remains inside the privileged cycle workspace'
+    && substr_count(
+        $page,
+        'value="create_cycle"'
+    ) === 1,
+    'Create Cycle form remains exactly once'
 );
 
 $check(
-    $maintenanceMarker !== false
-    && $createMarker !== false
+    $createMarker !== false
+    && $maintenanceMarker !== false
     && $recentMarker !== false
-    && $maintenanceMarker > $createMarker
+    && $createMarker < $maintenanceMarker
     && $maintenanceMarker < $recentMarker,
-    'advanced maintenance is nested after Create Cycle and before the cycle list'
+    'Create Cycle is direct before Advanced Maintenance and cycle list'
+);
+
+$adminWindow =
+    $createMarker !== false
+        ? substr(
+            $page,
+            max(
+                0,
+                $createMarker - 600
+            ),
+            700
+        )
+        : '';
+
+$check(
+    strpos(
+        $adminWindow,
+        "isPlatformOwner() || hasRole('farm_admin')"
+    ) !== false,
+    'direct Create Cycle form remains privileged'
 );
 
 $check(
@@ -130,141 +170,98 @@ $check(
     && strpos(
         $page,
         '<details',
-        max(0, $maintenanceMarker - 250)
+        max(
+            0,
+            $maintenanceMarker - 200
+        )
     ) !== false,
-    'advanced maintenance is independently collapsible'
+    'Advanced Maintenance remains independently collapsible'
 );
+
+$maintenanceSection =
+    (
+        $maintenanceMarker !== false
+        && $recentMarker !== false
+        && $recentMarker > $maintenanceMarker
+    )
+        ? substr(
+            $page,
+            $maintenanceMarker,
+            $recentMarker
+                - $maintenanceMarker
+        )
+        : '';
 
 $check(
-    $recentMarker !== false
-    && $toolsMarker !== false
-    && $recentMarker > $toolsMarker,
-    'Production Cycles list remains after the maintenance area'
-);
-
-$toolsEnd = $recentMarker !== false
-    ? $recentMarker
-    : strlen($page);
-
-$toolsSection = (
-    $toolsMarker !== false
-    && $toolsEnd > $toolsMarker
-)
-    ? substr($page, $toolsMarker, $toolsEnd - $toolsMarker)
-    : null;
-
-$check(
-    $toolsSection !== null,
-    'maintenance section is statically discoverable'
-);
-
-if ($toolsSection !== null) {
-    $check(
-        strpos($toolsSection, 'value="create_cycle"') !== false,
-        'Create Cycle form remains available inside maintenance tools'
-    );
-
-    $check(
-        strpos($toolsSection, 'value="close_cycle"') === false,
-        'legacy Close Cycle form remains retired from Production Cycles maintenance tools'
-    );
-
-    $check(
-        strpos(
-            $toolsSection,
-            'value="confirm_population_cutover"'
-        ) === false
-        && strpos(
-            $toolsSection,
-            '/management/legacy_cycle_setup.php'
-        ) !== false
-        && strpos(
-            $toolsSection,
-            'Legacy Cycle Setup'
-        ) !== false,
-        'population cutover is retired from normal maintenance and relocated to Legacy Cycle Setup'
-    );
-
-    $check(
-        strpos(
-            $toolsSection,
-            'value="update_bird_cost_basis"'
-        ) === false
-        && strpos(
-            $toolsSection,
-            'name="bird_unit_cost"'
-        ) === false
-        && strpos(
-            $toolsSection,
-            '<strong>Poultry Bird Cost Basis</strong>'
-        ) === false,
-        'farmer-editable Poultry Bird Cost Basis maintenance is retired'
-    );
-
-    $check(
-        strpos(
-            $toolsSection,
-            'value="record_poultry_acquisition"'
-        ) === false
-        && strpos(
-            $toolsSection,
-            '<strong>Poultry Acquisition History</strong>'
-        ) !== false
-        && strpos(
-            $toolsSection,
-            'Use Edit for cycle details and corrections to Opening Headcount or Total Acquisition Cost.'
-        ) !== false,
-        'duplicate flock entry stays retired while acquisition history and Edit-owned correction remain visible'
-    );
-
-    $check(
-        strpos(
-            $toolsSection,
-            'value="set_initial_poultry_phase"'
-        ) === false
-        && strpos(
-            $toolsSection,
-            'value="transition_poultry_phase"'
-        ) === false
-        && strpos(
-            $toolsSection,
-            '<strong>Poultry Lifecycle History</strong>'
-        ) !== false
-        && strpos(
-            $toolsSection,
-            'Lifecycle changes are managed inside the selected cycle.'
-        ) !== false,
-        'Production Cycles keeps lifecycle history read-only while selected-cycle lifecycle writes stay elsewhere'
-    );
-} else {
-    for ($i = 0; $i < 6; $i++) {
-        $check(false, 'maintenance form contract unavailable');
-    }
-}
-
-$adminWindowStart = $toolsMarker !== false
-    ? max(0, $toolsMarker - 1500)
-    : 0;
-
-$adminWindow = substr(
-    $page,
-    $adminWindowStart,
-    $toolsMarker !== false
-        ? ($toolsMarker - $adminWindowStart + 100)
-        : 0
+    strpos(
+        $maintenanceSection,
+        '/management/legacy_cycle_setup.php'
+    ) !== false
+    && strpos(
+        $maintenanceSection,
+        'Legacy Cycle Setup'
+    ) !== false,
+    'Legacy Cycle Setup remains available in Advanced Maintenance'
 );
 
 $check(
     strpos(
-        $adminWindow,
-        "isPlatformOwner() || hasRole('farm_admin')"
-    ) !== false,
-    'maintenance area remains restricted to Platform Owner/Farm Admin'
+        $maintenanceSection,
+        'value="confirm_population_cutover"'
+    ) === false
+    && strpos(
+        $maintenanceSection,
+        'value="update_bird_cost_basis"'
+    ) === false
+    && strpos(
+        $maintenanceSection,
+        'name="bird_unit_cost"'
+    ) === false,
+    'retired cutover and manual Bird Cost Basis writes stay absent'
 );
 
 $check(
-    strpos($page, '<h5 class="mb-0">Production Cycles</h5>') !== false,
-    'cycle list is labelled as the primary Production Cycles section'
+    substr_count(
+        $maintenanceSection,
+        '<strong>Poultry Acquisition History</strong>'
+    ) === 1
+    && strpos(
+        $maintenanceSection,
+        'Recorded Acquisition History'
+    ) === false
+    && strpos(
+        $maintenanceSection,
+        'Cost / Bird</th>'
+    ) !== false,
+    'acquisition summary and audit history are consolidated into one table'
+);
+
+$check(
+    substr_count(
+        $maintenanceSection,
+        '<strong>Poultry Lifecycle History</strong>'
+    ) === 1
+    && strpos(
+        $maintenanceSection,
+        'Recorded Phase History'
+    ) === false
+    && strpos(
+        $maintenanceSection,
+        '<th>Phase Status</th>'
+    ) !== false,
+    'lifecycle summary and phase history are consolidated into one table'
+);
+
+$check(
+    strpos(
+        $page,
+        '$poultryAcquisitionSummaryByCycle'
+    ) === false
+    && strpos(
+        $page,
+        '$poultryLifecycleByCycle'
+    ) === false,
+    'duplicate presentation-only summary maps are retired'
 );
 
 $check(
@@ -272,97 +269,84 @@ $check(
         $page,
         '/management/poultry_cycle.php?id='
     ) !== false
-    && strpos($page, 'Manage Cycle') !== false,
-    'existing poultry Manage Cycle route remains intact'
-);
-
-$check(
-    substr_count($js, 'openTargetedCycleTools') >= 2,
-    'JavaScript contains the maintenance-target opening helper and its calls'
-);
-
-$check(
-    strpos(
-        $jsCompact,
-        "document.querySelectorAll('[data-open-cycle-tools]')"
-    ) !== false
     && strpos(
-        $jsCompact,
-        'tools.open = true'
+        $page,
+        'Manage Cycle'
     ) !== false,
-    'New Cycle action deliberately opens the Create Cycle workspace'
+    'selected-cycle Manage Cycle route remains intact'
 );
 
 $check(
     strpos(
-        $jsCompact,
-        "document.getElementById('cycle-maintenance-tools')"
+        $compactJs,
+        "document.getElementById('cycle-tools')"
+    ) === false
+    && strpos(
+        $compactJs,
+        'data-open-cycle-tools'
+    ) === false
+    && strpos(
+        $compactJs,
+        'openTargetedCycleTools'
+    ) === false,
+    'JavaScript no longer owns removed Create Cycle triggers'
+);
+
+$check(
+    strpos(
+        $compactJs,
+        'openTargetedMaintenance'
     ) !== false
     && strpos(
-        $jsCompact,
+        $compactJs,
         'maintenanceTools.contains(target)'
     ) !== false
     && strpos(
-        $jsCompact,
+        $compactJs,
         'maintenanceTools.open = true'
     ) !== false,
-    'maintenance deep links open the nested maintenance workspace'
-);
-
-$check(
-    strpos(
-        $jsCompact,
-        "window.addEventListener('hashchange', openTargetedCycleTools)"
-    ) !== false,
-    'deep links to maintenance tools reopen the collapsed area'
-);
-
-$check(
-    strpos(
-        $jsCompact,
-        'if (target && tools.contains(target))'
-    ) !== false,
-    'hash navigation opens maintenance only for targets inside that area'
+    'Advanced Maintenance deep links still open the maintenance workspace'
 );
 
 $check(
     strpos(
         $page,
-        "<?php echo \$flash !== null ? 'open' : ''; ?>"
-    ) !== false,
-    'validation/error feedback automatically keeps the outer cycle workspace open'
-);
-
-$check(
-    strpos(
-        $page,
-        "'confirm_population_cutover'"
+        "if (\$action === 'record_poultry_acquisition')"
     ) === false
     && strpos(
         $page,
-        "'update_bird_cost_basis'"
+        "if (\$action === 'set_initial_poultry_phase')"
     ) === false
     && strpos(
         $page,
-        '$productionCyclesPrgAction'
-    ) === false
-    && strpos(
-        $page,
-        '/management/legacy_cycle_setup.php'
-    ) !== false,
-    'retired cutover and manual bird-cost actions no longer control Production Cycles maintenance state'
+        "if (\$action === 'transition_poultry_phase')"
+    ) === false,
+    'dashboard consolidation does not restore retired poultry mutations'
 );
 
-echo "\nChecks: {$checks}\n";
-echo "Failures: {$failures}\n";
+echo PHP_EOL
+    . 'Checks: '
+    . $checks
+    . PHP_EOL;
+
+echo 'Failures: '
+    . $failures
+    . PHP_EOL;
+
+echo 'DATABASE_CONNECTION_USED=NO'
+    . PHP_EOL;
+
+echo 'DATABASE_WRITE_PERFORMED=NO'
+    . PHP_EOL;
 
 if ($failures > 0) {
-    echo "V3.0 PRODUCTION CYCLES OVERVIEW UX: FAILED\n";
-    echo "DATABASE_CONNECTION_USED=NO\n";
-    echo "DATABASE_WRITE_PERFORMED=NO\n";
+    echo 'V3.0 PRODUCTION CYCLES OVERVIEW UX: FAILED'
+        . PHP_EOL;
+
     exit(1);
 }
 
-echo "V3.0 PRODUCTION CYCLES OVERVIEW UX: PASSED\n";
-echo "DATABASE_CONNECTION_USED=NO\n";
-echo "DATABASE_WRITE_PERFORMED=NO\n";
+echo 'V3.0 PRODUCTION CYCLES OVERVIEW UX: PASSED'
+    . PHP_EOL;
+
+exit(0);

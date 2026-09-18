@@ -39,10 +39,8 @@ $poultryCycles = [];
 $activeCycles = [];
 $closedCycleDetails = [];
 $recentStockBatches = [];
-$poultryLifecycleByCycle = [];
 $poultryPhaseHistoryByCycle = [];
 $poultryAcquisitionHistoryByCycle = [];
-$poultryAcquisitionSummaryByCycle = [];
 
 // Preserve the Create Cycle form after validation/duplicate errors so the user
 // can correct only the problematic field instead of re-entering everything.
@@ -577,9 +575,6 @@ try {
             foreach ($phaseStmt->fetchAll(PDO::FETCH_ASSOC) as $phaseRow) {
                 $phaseCycleId = (int)$phaseRow['cycle_id'];
                 $poultryPhaseHistoryByCycle[$phaseCycleId][] = $phaseRow;
-                if ($phaseRow['end_date'] === null) {
-                    $poultryLifecycleByCycle[$phaseCycleId] = $phaseRow;
-                }
             }
         }
 
@@ -597,10 +592,6 @@ try {
             foreach ($acquisitionStmt->fetchAll(PDO::FETCH_ASSOC) as $acquisitionRow) {
                 $acquisitionCycleId = (int)$acquisitionRow['cycle_id'];
                 $poultryAcquisitionHistoryByCycle[$acquisitionCycleId][] = $acquisitionRow;
-            }
-            foreach ($poultryCycles as $cycle) {
-                $cycleIdForSummary = (int)$cycle['id'];
-                $poultryAcquisitionSummaryByCycle[$cycleIdForSummary] = poultry_acquisition_summary($poultryAcquisitionHistoryByCycle[$cycleIdForSummary] ?? []);
             }
         }
 
@@ -673,9 +664,9 @@ try {
                 <div class="card-body">
                     <h4 class="mb-2"><i class="bi bi-arrow-repeat"></i> Production Cycles</h4>
                     <p class="mb-0 text-muted">
-                        Start here to see the production cycles in this farm.
-                        Choose a cycle below to work on it. Setup and maintenance
-                        tools stay out of the way until you need them.
+                        Create a new production cycle here or manage an existing cycle below.
+                        Advanced audit and legacy-maintenance tools remain available separately
+                        when they are needed.
                     </p>
                 </div>
             </div>
@@ -710,45 +701,9 @@ try {
             <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted">Closed Cycles</div><h4><?php echo $summary['closed_cycles']; ?></h4></div></div></div>
         </div>
 
-        <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
-            <a class="btn btn-outline-primary" href="#recent-cycles">
-                <i class="bi bi-list-ul"></i> Choose a Cycle
-            </a>
-
-            <?php if (isPlatformOwner() || hasRole('farm_admin')): ?>
-                <a
-                    class="btn btn-success"
-                    href="#create-cycle"
-                    data-open-cycle-tools
-                >
-                    <i class="bi bi-plus-circle"></i> New Cycle
-                </a>
-            <?php endif; ?>
-        </div>
-
         <?php if (isPlatformOwner() || hasRole('farm_admin')): ?>
-            <details
-                class="card mb-3"
-                id="cycle-tools"
-                <?php echo $flash !== null ? 'open' : ''; ?>
-            >
-                <summary class="card-header">
-                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-                        <div>
-                            <strong>Create New Cycle</strong>
-                            <div class="small text-muted">
-                                Start a new production cycle here. Existing-cycle setup,
-                                cost maintenance and aggregate history stay under Advanced Maintenance.
-                                Selected-cycle poultry operations stay inside Manage Cycle.
-                            </div>
-                        </div>
-                        <span class="badge bg-secondary">Open</span>
-                    </div>
-                </summary>
-
-                <div class="card-body">
                     <div class="row g-3 mb-3" id="create-cycle">
-                        <div class="col-lg-6">
+                        <div class="col-12">
                             <div class="card h-100">
                                 <div class="card-header"><strong>Create Cycle</strong></div>
                     <div class="card-body">
@@ -906,8 +861,8 @@ try {
                                 <div>
                                     <strong>Advanced Maintenance &amp; History</strong>
                                     <div class="small text-muted">
-                                        Acquisition audit, poultry lifecycle history,
-                                        and temporary legacy-cycle setup.
+                                        Acquisition and lifecycle audit history,
+                                        plus temporary legacy-cycle setup.
                                     </div>
                                 </div>
                                 <span class="badge bg-secondary">Open maintenance</span>
@@ -933,172 +888,284 @@ try {
         </div>
 
         <div class="card mb-3" id="poultry-entry-acquisition">
-            <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="card-header">
                 <strong>Poultry Acquisition History</strong>
-                
             </div>
             <div class="card-body">
-                <p class="text-muted small mb-3">The starting flock for new poultry cycles is recorded once during Create Cycle. This section keeps aggregate acquisition history visible for audit. Use Edit for cycle details and corrections to Opening Headcount or Total Acquisition Cost.</p>
+                <p class="text-muted small mb-3">
+                    Each cycle's flock-entry facts and audit history are shown together.
+                    Corrections remain visible as voided rows rather than being deleted.
+                    Use Edit for cycle details and corrections to Opening Headcount or Total Acquisition Cost.
+                </p>
+
                 <?php if (!$poultryAcquisitionTableExists): ?>
                     <div class="alert alert-warning mb-0">
-                        <strong>Poultry acquisition migration is not available.</strong> Run <code>php scripts/run_migrations.php</code> before recording flock entry facts.
+                        <strong>Poultry acquisition migration is not available.</strong>
+                        Run <code>php scripts/run_migrations.php</code> before using acquisition history.
                         <?php if ($migration038Recorded): ?>
-                            <div class="mt-2"><strong>Detected mismatch:</strong> migration 038 is recorded but <code>poultry_cycle_acquisitions</code> is missing. Re-run migrations using the same database credentials as the web app.</div>
+                            <div class="mt-2">
+                                <strong>Detected mismatch:</strong>
+                                migration 038 is recorded but
+                                <code>poultry_cycle_acquisitions</code> is missing.
+                                Re-run migrations using the same database credentials as the web app.
+                            </div>
                         <?php endif; ?>
                     </div>
                 <?php else: ?>
-                    <div class="table-responsive mb-3">
+                    <div class="table-responsive">
                         <table class="table table-sm align-middle mb-0">
-                            <thead><tr><th>Cycle</th><th>Type</th><th>Entry status</th><th class="text-end">Recorded qty</th><th class="text-end">Acquisition cost</th><th class="text-end">Effective cost / bird</th></tr></thead>
+                            <thead>
+                            <tr>
+                                <th>Cycle</th>
+                                <th>Type</th>
+                                <th>Entry</th>
+                                <th>Date</th>
+                                <th>Age</th>
+                                <th class="text-end">Qty</th>
+                                <th class="text-end">Cost</th>
+                                <th class="text-end">Cost / Bird</th>
+                                <th>Status</th>
+                                <th>Source / Ref</th>
+                            </tr>
+                            </thead>
                             <tbody>
-                            <?php foreach ($poultryCycles as $cycle): ?>
-                                <?php $acqSummary = $poultryAcquisitionSummaryByCycle[(int)$cycle['id']] ?? ['entry_count'=>0,'quantity'=>0,'total_cost'=>null,'effective_cost_per_bird'=>null,'has_uncosted_entry'=>false]; ?>
+                            <?php if (empty($poultryCycles)): ?>
                                 <tr>
-                                    <td><?php echo htmlspecialchars($cycle['cycle_code']); ?></td>
-                                    <td><?php echo htmlspecialchars(ucfirst($cycle['production_type'])); ?></td>
-                                    <td>
-                                        <?php if ((int)$acqSummary['entry_count'] === 0): ?>
-                                            <span class="badge bg-warning text-dark">Not recorded</span>
-                                        <?php elseif (!empty($acqSummary['has_uncosted_entry'])): ?>
-                                            <span class="badge bg-secondary">Recorded · basis incomplete</span>
-                                        <?php else: ?>
-                                            <span class="badge bg-success">Recorded</span>
-                                        <?php endif; ?>
+                                    <td colspan="10" class="text-center text-muted py-3">
+                                        No poultry production cycle exists yet.
                                     </td>
-                                    <td class="text-end"><?php echo (int)$acqSummary['entry_count'] > 0 ? number_format((int)$acqSummary['quantity']) : '-'; ?></td>
-                                    <td class="text-end"><?php echo $acqSummary['total_cost'] !== null ? '₦' . number_format((float)$acqSummary['total_cost'], 2) : '-'; ?></td>
-                                    <td class="text-end"><?php echo $acqSummary['effective_cost_per_bird'] !== null ? '₦' . number_format((float)$acqSummary['effective_cost_per_bird'], 2) : '-'; ?></td>
                                 </tr>
-                            <?php endforeach; ?>
+                            <?php else: ?>
+                                <?php foreach ($poultryCycles as $cycle): ?>
+                                    <?php
+                                    $cycleAcquisitionHistory =
+                                        $poultryAcquisitionHistoryByCycle[
+                                            (int)$cycle['id']
+                                        ]
+                                        ?? [];
+                                    ?>
+
+                                    <?php if (empty($cycleAcquisitionHistory)): ?>
+                                        <tr>
+                                            <td><?php echo htmlspecialchars($cycle['cycle_code']); ?></td>
+                                            <td><?php echo htmlspecialchars(ucfirst($cycle['production_type'])); ?></td>
+                                            <td colspan="8">
+                                                <span class="badge bg-warning text-dark">
+                                                    Not recorded
+                                                </span>
+                                                <span class="small text-muted ms-2">
+                                                    Legacy cycle with no recorded acquisition history.
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    <?php else: ?>
+                                        <?php foreach ($cycleAcquisitionHistory as $acquisitionRow): ?>
+                                            <?php
+                                            $rowTotalCost =
+                                                $acquisitionRow['total_cost'] !== null
+                                                && $acquisitionRow['total_cost'] !== ''
+                                                    ? (float)$acquisitionRow['total_cost']
+                                                    : null;
+
+                                            $rowCostPerBird =
+                                                $rowTotalCost !== null
+                                                    ? poultry_acquisition_cost_per_bird(
+                                                        $rowTotalCost,
+                                                        (int)$acquisitionRow['quantity']
+                                                    )
+                                                    : null;
+                                            ?>
+                                            <tr>
+                                                <td><?php echo htmlspecialchars($cycle['cycle_code']); ?></td>
+                                                <td><?php echo htmlspecialchars(ucfirst($cycle['production_type'])); ?></td>
+                                                <td>
+                                                    <?php echo htmlspecialchars(
+                                                        poultry_acquisition_type_label(
+                                                            $cycle['production_type'],
+                                                            $acquisitionRow['acquisition_type']
+                                                        )
+                                                    ); ?>
+                                                </td>
+                                                <td><?php echo htmlspecialchars($acquisitionRow['acquisition_date']); ?></td>
+                                                <td><?php echo number_format((int)$acquisitionRow['age_days']); ?> days</td>
+                                                <td class="text-end"><?php echo number_format((int)$acquisitionRow['quantity']); ?></td>
+                                                <td class="text-end">
+                                                    <?php echo $rowTotalCost !== null
+                                                        ? '₦' . number_format($rowTotalCost, 2)
+                                                        : 'Basis pending'; ?>
+                                                </td>
+                                                <td class="text-end">
+                                                    <?php echo $rowCostPerBird !== null
+                                                        ? '₦' . number_format($rowCostPerBird, 2)
+                                                        : '-'; ?>
+                                                </td>
+                                                <td>
+                                                    <?php if (!empty($acquisitionRow['voided_at'])): ?>
+                                                        <span class="badge bg-secondary">Voided</span>
+                                                        <?php if (trim((string)($acquisitionRow['void_reason'] ?? '')) !== ''): ?>
+                                                            <div class="small text-muted">
+                                                                <?php echo htmlspecialchars((string)$acquisitionRow['void_reason']); ?>
+                                                            </div>
+                                                        <?php endif; ?>
+                                                    <?php else: ?>
+                                                        <span class="badge bg-success">Active</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td>
+                                                    <?php
+                                                    $sourceReference =
+                                                        trim(
+                                                            (string)($acquisitionRow['source_name'] ?? '')
+                                                            . (
+                                                                (string)($acquisitionRow['reference_no'] ?? '') !== ''
+                                                                    ? ' · ' . $acquisitionRow['reference_no']
+                                                                    : ''
+                                                            )
+                                                        );
+
+                                                    echo htmlspecialchars(
+                                                        $sourceReference !== ''
+                                                            ? $sourceReference
+                                                            : '-'
+                                                    );
+                                                    ?>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
 
-                    <div class="row g-3">
-                        <div class="col-12">
-                            <div class="border rounded p-3 h-100">
-                                <h6>Recorded Acquisition History</h6>
-                                <p class="text-muted small">History is auditable. Erroneous entries are voided rather than deleted; voided rows remain visible and are excluded from active acquisition totals. It is not inferred from opening stock, Bird Cost Basis, Daily Records, Inventory, Expenses, or lifecycle phases.</p>
-                                <div class="table-responsive">
-                                    <table class="table table-sm mb-0">
-                                        <thead><tr><th>Cycle</th><th>Entry</th><th>Date</th><th>Age</th><th class="text-end">Qty</th><th class="text-end">Cost</th><th>Status</th><th>Source / Ref</th></tr></thead>
-                                        <tbody>
-                                        <?php $acquisitionRows = 0; ?>
-                                        <?php foreach ($poultryCycles as $cycle): ?>
-                                            <?php foreach (($poultryAcquisitionHistoryByCycle[(int)$cycle['id']] ?? []) as $acquisitionRow): $acquisitionRows++; ?>
-                                                <tr>
-                                                    <td><?php echo htmlspecialchars($cycle['cycle_code']); ?></td>
-                                                    <td><?php echo htmlspecialchars(poultry_acquisition_type_label($cycle['production_type'], $acquisitionRow['acquisition_type'])); ?></td>
-                                                    <td><?php echo htmlspecialchars($acquisitionRow['acquisition_date']); ?></td>
-                                                    <td><?php echo number_format((int)$acquisitionRow['age_days']); ?> days</td>
-                                                    <td class="text-end"><?php echo number_format((int)$acquisitionRow['quantity']); ?></td>
-                                                    <td class="text-end"><?php echo $acquisitionRow['total_cost'] !== null ? '₦' . number_format((float)$acquisitionRow['total_cost'], 2) : 'Basis pending'; ?></td>
-                                                    <td><?php if (!empty($acquisitionRow['voided_at'])): ?><span class="badge bg-secondary">Voided</span><div class="small text-muted"><?php echo htmlspecialchars((string)($acquisitionRow['void_reason'] ?? '')); ?></div><?php else: ?><span class="badge bg-success">Active</span><?php endif; ?></td>
-                                                    <td><?php echo htmlspecialchars(trim((string)($acquisitionRow['source_name'] ?? '') . ((string)($acquisitionRow['reference_no'] ?? '') !== '' ? ' · ' . $acquisitionRow['reference_no'] : '')) ?: '-'); ?></td>
-                                                </tr>
-                                            <?php endforeach; ?>
-                                        <?php endforeach; ?>
-                                        <?php if ($acquisitionRows === 0): ?>
-                                            <tr><td colspan="8" class="text-center text-muted py-3">No poultry acquisition history is recorded for this legacy cycle. New V3 poultry cycles record the starting flock during Create Cycle.</td></tr>
-                                        <?php endif; ?>
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <div class="alert alert-info mt-3 mb-0">
-                                    Use <strong>Edit</strong> in the Production Cycles table for cycle details and initial-entry corrections.
-                                    Corrected acquisition facts remain auditable: the erroneous row is voided rather than deleted.
-                                </div>
-                            </div>
-                        </div>
+                    <div class="alert alert-info mt-3 mb-0">
+                        Acquisition corrections remain auditable:
+                        the erroneous row is voided rather than deleted,
+                        and the corrected fact remains visible here.
                     </div>
                 <?php endif; ?>
             </div>
         </div>
 
         <div class="card mb-3" id="poultry-lifecycle-history">
-            <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="card-header">
                 <strong>Poultry Lifecycle History</strong>
-                
             </div>
             <div class="card-body">
                 <p class="text-muted small mb-3">
-                    Biological lifecycle is recorded separately from the production cycle's operational status. The platform does not infer a phase from bird age, eggs, feed, mortality, or cycle closure.
+                    Current biological stage and historical phase changes are shown in one audit table.
+                    Lifecycle remains separate from the production cycle's operational status and is never inferred
+                    from age, eggs, feed, mortality, or cycle closure.
                 </p>
 
                 <?php if (!$poultryPhaseTableExists): ?>
                     <div class="alert alert-warning mb-0">
                         <strong>Poultry lifecycle migration is not available.</strong>
-                        Run <code>php scripts/run_migrations.php</code> to apply <code>037_poultry_cycle_phase_history.sql</code>.
+                        Run <code>php scripts/run_migrations.php</code> to apply
+                        <code>037_poultry_cycle_phase_history.sql</code>.
                         <?php if ($migration037Recorded): ?>
-                            <div class="mt-2"><strong>Detected mismatch:</strong> migration 037 is recorded but <code>production_cycle_phases</code> is missing. Re-run migrations using the same database credentials as the web app.</div>
+                            <div class="mt-2">
+                                <strong>Detected mismatch:</strong>
+                                migration 037 is recorded but
+                                <code>production_cycle_phases</code> is missing.
+                                Re-run migrations using the same database credentials as the web app.
+                            </div>
                         <?php endif; ?>
                     </div>
+
                 <?php elseif (empty($poultryCycles)): ?>
-                    <div class="text-muted">No poultry production cycle exists yet.</div>
+                    <div class="text-muted">
+                        No poultry production cycle exists yet.
+                    </div>
+
                 <?php else: ?>
-                    <div class="table-responsive mb-3">
+                    <div class="table-responsive">
                         <table class="table table-sm align-middle mb-0">
                             <thead>
                             <tr>
                                 <th>Cycle</th>
                                 <th>Type</th>
                                 <th>Operational Status</th>
-                                <th>Lifecycle</th>
-                                <th>Phase Start</th>
+                                <th>Phase</th>
+                                <th>Start</th>
+                                <th>End</th>
+                                <th>Phase Status</th>
+                                <th>Notes</th>
                             </tr>
                             </thead>
                             <tbody>
                             <?php foreach ($poultryCycles as $cycle): ?>
-                                <?php $currentPhase = $poultryLifecycleByCycle[(int)$cycle['id']] ?? null; ?>
-                                <tr>
-                                    <td><?php echo htmlspecialchars($cycle['cycle_code']); ?></td>
-                                    <td><?php echo htmlspecialchars(ucfirst($cycle['production_type'])); ?></td>
-                                    <td><span class="badge bg-secondary text-uppercase"><?php echo htmlspecialchars($cycle['status']); ?></span></td>
-                                    <td>
-                                        <?php if ($currentPhase): ?>
-                                            <span class="badge bg-primary"><?php echo htmlspecialchars(poultry_lifecycle_phase_label($cycle['production_type'], $currentPhase['phase'])); ?></span>
-                                        <?php elseif (!empty($poultryPhaseHistoryByCycle[(int)$cycle['id']])): ?>
-                                            <span class="badge bg-secondary">No open phase</span>
-                                        <?php else: ?>
-                                            <span class="badge bg-warning text-dark">Not yet defined</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td><?php echo $currentPhase ? htmlspecialchars($currentPhase['start_date']) : '-'; ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
+                                <?php
+                                $cyclePhaseHistory =
+                                    $poultryPhaseHistoryByCycle[
+                                        (int)$cycle['id']
+                                    ]
+                                    ?? [];
+                                ?>
 
-                    <div class="alert alert-info mb-3">
-                        Lifecycle changes are managed inside the selected cycle.
-                        Use <strong>Manage Cycle</strong> in the Production Cycles table below
-                        to record the next biological transition or to end production.
-                    </div>
-
-                    <hr>
-                    <h6>Recorded Phase History</h6>
-                    <div class="table-responsive">
-                        <table class="table table-sm mb-0">
-                            <thead><tr><th>Cycle</th><th>Phase</th><th>Start</th><th>End</th><th>Notes</th></tr></thead>
-                            <tbody>
-                            <?php $phaseHistoryRows = 0; ?>
-                            <?php foreach ($poultryCycles as $cycle): ?>
-                                <?php foreach (($poultryPhaseHistoryByCycle[(int)$cycle['id']] ?? []) as $phaseRow): $phaseHistoryRows++; ?>
+                                <?php if (empty($cyclePhaseHistory)): ?>
                                     <tr>
                                         <td><?php echo htmlspecialchars($cycle['cycle_code']); ?></td>
-                                        <td><?php echo htmlspecialchars(poultry_lifecycle_phase_label($cycle['production_type'], $phaseRow['phase'])); ?></td>
-                                        <td><?php echo htmlspecialchars($phaseRow['start_date']); ?></td>
-                                        <td><?php echo htmlspecialchars($phaseRow['end_date'] ?? 'Open'); ?></td>
-                                        <td><?php echo htmlspecialchars($phaseRow['notes'] ?? '-'); ?></td>
+                                        <td><?php echo htmlspecialchars(ucfirst($cycle['production_type'])); ?></td>
+                                        <td>
+                                            <span class="badge bg-secondary text-uppercase">
+                                                <?php echo htmlspecialchars($cycle['status']); ?>
+                                            </span>
+                                        </td>
+                                        <td colspan="5">
+                                            <span class="badge bg-warning text-dark">
+                                                Not yet defined
+                                            </span>
+                                            <span class="small text-muted ms-2">
+                                                No lifecycle history is recorded for this legacy cycle.
+                                            </span>
+                                        </td>
                                     </tr>
-                                <?php endforeach; ?>
+                                <?php else: ?>
+                                    <?php foreach ($cyclePhaseHistory as $phaseRow): ?>
+                                        <tr>
+                                            <td><?php echo htmlspecialchars($cycle['cycle_code']); ?></td>
+                                            <td><?php echo htmlspecialchars(ucfirst($cycle['production_type'])); ?></td>
+                                            <td>
+                                                <span class="badge bg-secondary text-uppercase">
+                                                    <?php echo htmlspecialchars($cycle['status']); ?>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <?php echo htmlspecialchars(
+                                                    poultry_lifecycle_phase_label(
+                                                        $cycle['production_type'],
+                                                        $phaseRow['phase']
+                                                    )
+                                                ); ?>
+                                            </td>
+                                            <td><?php echo htmlspecialchars($phaseRow['start_date']); ?></td>
+                                            <td>
+                                                <?php echo $phaseRow['end_date'] !== null
+                                                    ? htmlspecialchars($phaseRow['end_date'])
+                                                    : 'Open'; ?>
+                                            </td>
+                                            <td>
+                                                <?php if ($phaseRow['end_date'] === null): ?>
+                                                    <span class="badge bg-primary">Current</span>
+                                                <?php else: ?>
+                                                    <span class="badge bg-secondary">Completed</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td><?php echo htmlspecialchars($phaseRow['notes'] ?? '-'); ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
                             <?php endforeach; ?>
-                            <?php if ($phaseHistoryRows === 0): ?>
-                                <tr><td colspan="5" class="text-center text-muted py-3">No poultry lifecycle history is recorded for this legacy cycle. New V3 poultry cycles record the starting biological stage during Create Cycle.</td></tr>
-                            <?php endif; ?>
                             </tbody>
                         </table>
+                    </div>
+
+                    <div class="alert alert-info mt-3 mb-0">
+                        Lifecycle changes are managed inside the selected cycle.
+                        Use <strong>Manage Cycle</strong> below to record the next biological
+                        transition or to end poultry production.
                     </div>
                 <?php endif; ?>
             </div>
@@ -1106,9 +1173,6 @@ try {
 
                         </div>
                     </details>
-
-                </div>
-            </details>
         <?php endif; ?>
 
         <div class="card" id="recent-cycles">

@@ -154,16 +154,32 @@ $check(
     substr_count(
         $page,
         '<strong>Poultry Acquisition History</strong>'
-    ) === 1,
-    'surviving acquisition section is explicitly history'
+    ) === 1
+    && strpos(
+        $page,
+        'Recorded Acquisition History'
+    ) === false
+    && strpos(
+        $page,
+        'Cost / Bird</th>'
+    ) !== false,
+    'acquisition summary and audit rows are consolidated into one history table'
 );
 
 $check(
     substr_count(
         $page,
-        '<h6>Recorded Acquisition History</h6>'
-    ) === 1,
-    'recorded acquisition history remains visible'
+        '<strong>Poultry Lifecycle History</strong>'
+    ) === 1
+    && strpos(
+        $page,
+        'Recorded Phase History'
+    ) === false
+    && strpos(
+        $page,
+        '<th>Phase Status</th>'
+    ) !== false,
+    'lifecycle summary and phase rows are consolidated into one history table'
 );
 
 $check(
@@ -339,19 +355,35 @@ $check(
 );
 
 $check(
-    substr_count(
+    strpos(
         $page,
-        'New V3 poultry cycles record the starting flock during Create Cycle.'
-    ) === 1,
-    'legacy missing-acquisition copy no longer implies a second entry form'
+        'Legacy cycle with no recorded acquisition history.'
+    ) !== false
+    && strpos(
+        $page,
+        '<h6>Record Flock Entry</h6>'
+    ) === false
+    && strpos(
+        $page,
+        'value="record_poultry_acquisition"'
+    ) === false,
+    'legacy missing-acquisition state is informational and does not imply a second entry form'
 );
 
 $check(
-    substr_count(
+    strpos(
         $page,
-        'New V3 poultry cycles record the starting biological stage during Create Cycle.'
-    ) === 1,
-    'legacy missing-lifecycle copy no longer implies a second initial-phase form'
+        'No lifecycle history is recorded for this legacy cycle.'
+    ) !== false
+    && strpos(
+        $page,
+        '<h6>Set Initial Phase</h6>'
+    ) === false
+    && strpos(
+        $page,
+        'value="set_initial_poultry_phase"'
+    ) === false,
+    'legacy missing-lifecycle state is informational and does not imply a second initial-phase form'
 );
 
 $check(

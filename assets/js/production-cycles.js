@@ -135,48 +135,49 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 /**
- * Keep the cycle workspaces out of the way by default while still opening
- * the exact workspace an admin deliberately targets.
+ * Open Advanced Maintenance only when a deep link targets something inside it.
+ * Create Cycle is intentionally visible directly on the page.
  */
 (function () {
-    const openTargetedCycleTools = function () {
-        const tools = document.getElementById('cycle-tools');
-        const maintenanceTools = document.getElementById('cycle-maintenance-tools');
+    const openTargetedMaintenance = function () {
+        const maintenanceTools =
+            document.getElementById(
+                'cycle-maintenance-tools'
+            );
 
-        if (!tools || !window.location.hash) return;
+        if (
+            !maintenanceTools
+            || !window.location.hash
+        ) {
+            return;
+        }
 
         let target = null;
 
         try {
-            target = document.querySelector(window.location.hash);
+            target =
+                document.querySelector(
+                    window.location.hash
+                );
         } catch (error) {
             return;
         }
 
-        if (target && tools.contains(target)) {
-            tools.open = true;
-        }
-
         if (
             target
-            && maintenanceTools
             && maintenanceTools.contains(target)
         ) {
             maintenanceTools.open = true;
         }
     };
 
-    document.addEventListener('DOMContentLoaded', function () {
-        const tools = document.getElementById('cycle-tools');
+    document.addEventListener(
+        'DOMContentLoaded',
+        openTargetedMaintenance
+    );
 
-        document.querySelectorAll('[data-open-cycle-tools]').forEach(function (link) {
-            link.addEventListener('click', function () {
-                if (tools) tools.open = true;
-            });
-        });
-
-        openTargetedCycleTools();
-    });
-
-    window.addEventListener('hashchange', openTargetedCycleTools);
+    window.addEventListener(
+        'hashchange',
+        openTargetedMaintenance
+    );
 })();
