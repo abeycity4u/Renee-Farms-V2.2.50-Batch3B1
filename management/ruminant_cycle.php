@@ -3,6 +3,7 @@ require_once(dirname(__DIR__) . '/init.php');
 require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/../includes/audit_helpers.php');
+require_once(__DIR__ . '/../includes/notifications.php');
 require_once(__DIR__ . '/../lib/production_cycle_service.php');
 require_once(__DIR__ . '/../lib/production_population.php');
 require_once(__DIR__ . '/../lib/ruminant_cycle_membership.php');
@@ -263,15 +264,21 @@ $confirmationText =
 <div class="container-fluid px-3 px-lg-4 py-3">
 
     <?php if ($flashSuccess !== ''): ?>
-        <div class="alert alert-success">
-            <?php echo htmlspecialchars($flashSuccess); ?>
-        </div>
+        <?php
+        renderNotification(
+            'success',
+            $flashSuccess
+        );
+        ?>
     <?php endif; ?>
 
     <?php if ($flashError !== ''): ?>
-        <div class="alert alert-danger">
-            <?php echo htmlspecialchars($flashError); ?>
-        </div>
+        <?php
+        renderNotification(
+            'error',
+            $flashError
+        );
+        ?>
     <?php endif; ?>
 
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">

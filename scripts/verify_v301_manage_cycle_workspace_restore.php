@@ -326,9 +326,13 @@ $check(
     ) !== false
     && strpos(
         $manage,
+        'Approval or revision is available to a Farm Admin.'
+    ) !== false
+    && strpos(
+        $manage,
         'Approval or revision is available to the Platform Owner or Farm Admin.'
-    ) !== false,
-    'permitted non-admin users retain read-only economic-basis visibility'
+    ) === false,
+    'permitted non-admin users retain read-only economic-basis visibility without advertising Platform Owner access'
 );
 
 $check(
@@ -371,17 +375,25 @@ $check(
 $check(
     strpos(
         $overview,
-        '<h6>Recorded Acquisition History</h6>'
+        '<strong>Poultry Acquisition History</strong>'
     ) !== false
     && strpos(
         $overview,
-        '<h6>Recorded Phase History</h6>'
+        '<strong>Poultry Lifecycle History</strong>'
     ) !== false
     && strpos(
         $overview,
         '>Manage Cycle</a>'
-    ) !== false,
-    'Production Cycles retains aggregate history and navigation into Manage Cycle'
+    ) !== false
+    && strpos(
+        $overview,
+        '<h6>Recorded Acquisition History</h6>'
+    ) === false
+    && strpos(
+        $overview,
+        '<h6>Recorded Phase History</h6>'
+    ) === false,
+    'Production Cycles retains consolidated aggregate history and navigation into Manage Cycle'
 );
 
 echo PHP_EOL;

@@ -545,11 +545,11 @@ try {
         $closedCycleDetails = $closedCycleStmt->fetchAll(PDO::FETCH_ASSOC);
 
         $recentStmt = $pdo->prepare(
-            "SELECT id, cycle_code, farm_type, production_type, status, start_date, opening_headcount, bird_unit_cost, expected_end_date, close_date
+            "SELECT id, cycle_code, farm_type, production_type, status, start_date, opening_headcount, bird_unit_cost, expected_end_date
              FROM production_cycles
              WHERE farm_id = ?
-             ORDER BY created_at DESC
-             LIMIT 12"
+               AND status <> 'closed'
+             ORDER BY created_at DESC"
         );
         $recentStmt->execute([$tenantFarmId]);
         $recentCycles = $recentStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1192,13 +1192,12 @@ try {
                             <th>Start Date</th>
                             <th class="text-end">Opening Headcount</th>
                             <th>Expected End</th>
-                            <th>Closed Date</th>
                             <th>Actions</th>
                         </tr>
                         </thead>
                         <tbody>
                         <?php if (empty($recentCycles)): ?>
-                            <tr><td colspan="9" class="text-center text-muted py-4">No cycles yet. Create your first cycle above.</td></tr>
+                            <tr><td colspan="8" class="text-center text-muted py-4">No open cycles. Create a new cycle or review closed cycles below.</td></tr>
                         <?php else: ?>
                             <?php foreach ($recentCycles as $cycle): ?>
                                 <tr>
@@ -1209,7 +1208,6 @@ try {
                                     <td><?php echo htmlspecialchars($cycle['start_date']); ?></td>
                                     <td class="text-end"><?php echo number_format(max(0, (int)($cycle['opening_headcount'] ?? 0))); ?></td>
                                     <td><?php echo htmlspecialchars($cycle['expected_end_date'] ?? '-'); ?></td>
-                                    <td><?php echo htmlspecialchars($cycle['close_date'] ?? '-'); ?></td>
                                     <td>
                                         <div class="d-flex flex-wrap gap-1">
                                             <?php $hasCycleAction = false; ?>

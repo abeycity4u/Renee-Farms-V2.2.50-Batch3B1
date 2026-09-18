@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/poultry_rearing_economics.php';
 require_once dirname(__DIR__) . '/includes/audit_helpers.php';
+require_once __DIR__ . '/transaction_actor_display.php';
 
 /**
  * V2.2.50 Batch 3B — approved Production-Entry Economic Basis.
@@ -251,12 +252,74 @@ function poultry_production_entry_snapshot_comparison(
 if (!function_exists('poultry_production_entry_snapshots')) {
 function poultry_production_entry_snapshots(PDO $pdo,int $farmId,int $cycleId): array
 {
-    $s=$pdo->prepare("SELECT s.*,u.username approved_by_name
-        FROM poultry_production_entry_snapshots s
-        LEFT JOIN users u ON u.id=s.approved_by
-        WHERE s.farm_id=? AND s.cycle_id=? ORDER BY s.version_no DESC");
+    $s=$pdo->prepare(
+        "SELECT
+            s.*,
+            u.full_name approved_by_name,
+            u.username approved_by_username,
+            u.user_type approved_by_user_type
+         FROM poultry_production_entry_snapshots s
+         LEFT JOIN users u ON u.id=s.approved_by
+         WHERE s.farm_id=?
+           AND s.cycle_id=?
+         ORDER BY s.version_no DESC"
+    );
+
     $s->execute([$farmId,$cycleId]);
-    return $s->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    $rows =
+        $s->fetchAll(PDO::FETCH_ASSOC)
+        ?: [];
+
+    foreach ($rows as &$row) {
+        if ((int)($row['approved_by'] ?? 0) < 1) {
+            $row['approved_by_name'] = '';
+            continue;
+        }
+
+        $fullName =
+            trim(
+                (string)(
+                    $row['approved_by_name']
+                    ?? ''
+                )
+            );
+
+        /*
+         * Respect the actual Full Name entered for the user.
+         * Only fall back to the shared canonical actor helper
+         * when historical/user data has no Full Name.
+         */
+        if ($fullName !== '') {
+            $row['approved_by_name'] =
+                $fullName;
+
+            continue;
+        }
+
+        $username =
+            trim(
+                (string)(
+                    $row['approved_by_username']
+                    ?? ''
+                )
+            );
+
+        $row['approved_by_name'] =
+            transaction_recorded_by_label_for_farm(
+                $pdo,
+                $farmId,
+                $username !== ''
+                    ? $username
+                    : null,
+                $row['approved_by_user_type']
+                    ?? null
+            );
+    }
+
+    unset($row);
+
+    return $rows;
 }
 }
 

@@ -353,21 +353,34 @@ $money =
                     <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-3">
                         <strong>Compatible Production Cycles</strong>
 
-                        <div class="form-check mb-0">
-                            <input
-                                class="form-check-input"
-                                type="checkbox"
-                                id="financialAllocationEqualSplit"
+                        <div class="d-flex flex-wrap gap-3 align-items-center">
+                            <div class="form-check mb-0">
+                                <input
+                                    class="form-check-input"
+                                    type="checkbox"
+                                    id="financialAllocationEqualSplit"
+                                    <?php echo $animalAllocationCount > 0
+                                        ? 'disabled'
+                                        : ''; ?>
+                                >
+                                <label
+                                    class="form-check-label fw-semibold"
+                                    for="financialAllocationEqualSplit"
+                                >
+                                    Split total equally across all compatible cycles
+                                </label>
+                            </div>
+
+                            <button
+                                type="button"
+                                class="btn btn-sm btn-outline-secondary"
+                                id="financialAllocationClearAmounts"
                                 <?php echo $animalAllocationCount > 0
                                     ? 'disabled'
                                     : ''; ?>
                             >
-                            <label
-                                class="form-check-label fw-semibold"
-                                for="financialAllocationEqualSplit"
-                            >
-                                Split total equally across all compatible cycles
-                            </label>
+                                Clear amounts
+                            </button>
                         </div>
                     </div>
 

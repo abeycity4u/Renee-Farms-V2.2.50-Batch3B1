@@ -107,6 +107,11 @@
             'financialAllocationEqualSplit'
         );
 
+    const clearAmountsButton =
+        document.getElementById(
+            'financialAllocationClearAmounts'
+        );
+
     let manualAmountSnapshot =
         null;
 
@@ -332,6 +337,37 @@
                 } else {
                     restoreManualAmounts();
                 }
+            }
+        );
+    }
+
+    if (clearAmountsButton) {
+        clearAmountsButton.addEventListener(
+            'click',
+            function () {
+                if (mutationBlocked) {
+                    return;
+                }
+
+                if (equalSplitCheckbox) {
+                    equalSplitCheckbox.checked =
+                        false;
+                }
+
+                manualAmountSnapshot =
+                    null;
+
+                amountInputs.forEach(
+                    (input) => {
+                        input.readOnly =
+                            false;
+
+                        input.value =
+                            '0.00';
+                    }
+                );
+
+                refreshSummary();
             }
         );
     }

@@ -3,6 +3,7 @@ require_once(dirname(__DIR__) . '/init.php');
 require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/../includes/audit_helpers.php');
+require_once(__DIR__ . '/../includes/notifications.php');
 require_once(__DIR__ . '/../lib/production_cycle_service.php');
 require_once(__DIR__ . '/../lib/poultry_cycle_lifecycle.php');
 require_once(__DIR__ . '/../lib/poultry_cycle_acquisition.php');
@@ -461,15 +462,21 @@ $confirmationText .=
 <div class="container-fluid px-3 px-lg-4 py-3">
 
     <?php if ($flashSuccess): ?>
-        <div class="alert alert-success">
-            <?php echo htmlspecialchars($flashSuccess); ?>
-        </div>
+        <?php
+        renderNotification(
+            'success',
+            (string)$flashSuccess
+        );
+        ?>
     <?php endif; ?>
 
     <?php if ($flashError): ?>
-        <div class="alert alert-danger">
-            <?php echo htmlspecialchars($flashError); ?>
-        </div>
+        <?php
+        renderNotification(
+            'error',
+            (string)$flashError
+        );
+        ?>
     <?php endif; ?>
 
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
@@ -1120,8 +1127,7 @@ $confirmationText .=
             ): ?>
                 <div class="alert alert-secondary mb-0">
                     You can review lifecycle history here.
-                    Stage changes are available to the Platform Owner
-                    or Farm Admin.
+                    Stage changes are available to a Farm Admin.
                 </div>
 
             <?php elseif (!$isClosed && $currentPhase === null): ?>
@@ -1625,7 +1631,7 @@ $confirmationText .=
         <?php elseif($needsApproval): ?>
         <div class="alert alert-secondary">
           You can review the current and approved economic basis here.
-          Approval or revision is available to the Platform Owner or Farm Admin.
+          Approval or revision is available to a Farm Admin.
         </div>
         <?php endif; ?>
       <?php else: ?>
@@ -1700,8 +1706,7 @@ $confirmationText .=
 
                 <div class="alert alert-secondary mb-0">
                     This cycle is active.
-                    Only the Platform Owner or Farm Admin
-                    can end production.
+                    Only a Farm Admin can end production.
                 </div>
 
             <?php elseif ($populationReadError !== ''): ?>
