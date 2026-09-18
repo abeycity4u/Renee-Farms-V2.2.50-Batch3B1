@@ -425,25 +425,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $pdo->prepare("UPDATE stock_items SET financial_classification=? WHERE id=? AND farm_id=?")
                     ->execute([$financialClassification, $itemId, $currentFarmId]);
             }
-            $movementProductionType = inventory_normalize_default_production_type(
-                (string)$movementItem['farm_type'],
-                (string)$movementItem['feed_category'],
-                $_POST['production_type'] ?? ($movementItem['default_production_type'] ?? 'shared')
-            );
-            $movementCycleId = null;
-            if ($type === 'used' && (string)$movementItem['feed_category'] === 'general' && $movementProductionType !== 'shared') {
-                $requestedCycleId = (int)($_POST['cycle_id'] ?? 0);
-                if ($requestedCycleId > 0) {
-                    attribution_validate_cycle(
-                        $pdo,
-                        $currentFarmId,
-                        $requestedCycleId,
-                        (string)$movementItem['farm_type'],
-                        $movementProductionType
-                    );
-                    $movementCycleId = $requestedCycleId;
-                }
-            }
+            $requestedProductionType =
+                isset(
+                    $_POST['production_type']
+                )
+                    ? trim(
+                        (string)$_POST[
+                            'production_type'
+                        ]
+                    )
+                    : null;
+
+            $requestedCycleId =
+                $type === 'used'
+                    ? (int)(
+                        $_POST['cycle_id']
+                        ?? 0
+                    )
+                    : 0;
+
+            $requestedCycleId =
+                $requestedCycleId > 0
+                    ? $requestedCycleId
+                    : null;
+
             stock_apply_movement(
                 $pdo,
                 $currentFarmId,
@@ -455,11 +460,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 (int)($_SESSION['user_id'] ?? 0),
                 (string)$movementItem['farm_type'],
                 (string)$movementItem['feed_category'],
-                $movementCycleId,
+                $requestedCycleId,
                 'inventory_manual',
                 null,
                 $type === 'received' ? $incomingUnitCost : null,
-                $movementProductionType
+                $requestedProductionType
             );
             $pdo->commit();
             $_SESSION['success'] = "Stock updated successfully!";

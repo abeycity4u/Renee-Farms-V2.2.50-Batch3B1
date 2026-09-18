@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/stock_costing.php';
 require_once __DIR__ . '/attribution.php';
+require_once __DIR__ . '/stock_movement_attribution.php';
 require_once __DIR__ . '/stock_consumption_allocation_persistence.php';
 require_once __DIR__ . '/record_reference_persistence.php';
 /**
@@ -66,6 +67,46 @@ function stock_apply_movement(
         throw new RuntimeException('The selected inventory item is inactive. Please select an active item.');
     }
 
+    /*
+     * Resolve operational ownership exactly once.
+     *
+     * Controllers may request a production type / cycle, but only this
+     * canonical resolver decides what is persisted to the stock ledger.
+     */
+    $attribution =
+        stock_movement_attribution_resolve(
+            $pdo,
+            $farmId,
+            $item,
+            $type,
+            $farmType,
+            $feedCategory,
+            $cycleId,
+            $productionTypeOverride
+        );
+
+    $movementFarmType =
+        (string)$attribution[
+            'farm_type'
+        ];
+
+    $productionType =
+        (string)$attribution[
+            'production_type'
+        ];
+
+    $cycleId =
+        $attribution['cycle_id'] === null
+            ? null
+            : (int)$attribution[
+                'cycle_id'
+            ];
+
+    $attributionScope =
+        (string)$attribution[
+            'attribution_scope'
+        ];
+
     $previous = round((float)$item['current_stock'], 2);
     $unitCost = (float)($item['unit_cost'] ?? 0);
     $newUnitCost = $unitCost;
@@ -103,29 +144,7 @@ function stock_apply_movement(
     $snapshotUnitCost = round(max(0.0, $snapshotUnitCost), 4);
     $totalCost = round($quantity * $snapshotUnitCost, 2);
 
-    // Snapshot operational ownership as well as cost. Inventory items can be
-    // shared; the movement says which operation/cycle actually consumed them.
-    $movementFarmType = $farmType ?: (string)$item['farm_type'];
-    if ($movementFarmType === 'both') {
-        $movementFarmType = $farmType ?: 'general';
-    }
-    $requestedProductionType = $productionTypeOverride;
-    if ($requestedProductionType === null || trim($requestedProductionType) === '') {
-        $requestedProductionType = $feedCategory === 'ruminant' ? 'shared' : $feedCategory;
-    }
-    $productionType = attribution_normalize_production_type(
-        $movementFarmType,
-        $requestedProductionType
-    );
-    if (($cycleId ?? 0) > 0) {
-        $cycleStmt = $pdo->prepare("SELECT production_type, farm_type FROM production_cycles WHERE id=? AND farm_id=? LIMIT 1");
-        $cycleStmt->execute([(int)$cycleId, $farmId]);
-        if ($cycle = $cycleStmt->fetch(PDO::FETCH_ASSOC)) {
-            $productionType = strtolower((string)$cycle['production_type']);
-            $movementFarmType = strtolower((string)$cycle['farm_type']);
-        }
-    }
-    $attributionScope = attribution_scope($cycleId, $movementFarmType, $productionType);
+
 
     $insert = $pdo->prepare("INSERT INTO stock_transactions
         (farm_id, cycle_id, stock_item_id, transaction_type, quantity, unit_cost, total_cost,

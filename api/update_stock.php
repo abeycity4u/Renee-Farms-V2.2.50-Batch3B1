@@ -39,6 +39,56 @@ try {
         throw new RuntimeException('Please provide a valid transaction date that is not in the future.');
     }
 
+    $incomingUnitCost = null;
+
+    if ($type === 'received') {
+        $incomingUnitCostRaw =
+            trim(
+                (string)(
+                    $data['unit_cost']
+                    ?? ''
+                )
+            );
+
+        if ($incomingUnitCostRaw === '') {
+            throw new RuntimeException(
+                'Received stock requires the actual unit cost.'
+            );
+        }
+
+        $incomingUnitCostNormalized =
+            str_replace(
+                ',',
+                '',
+                $incomingUnitCostRaw
+            );
+
+        if (
+            !is_numeric(
+                $incomingUnitCostNormalized
+            )
+        ) {
+            throw new RuntimeException(
+                'Received stock unit cost must be a valid amount.'
+            );
+        }
+
+        $incomingUnitCost =
+            (float)$incomingUnitCostNormalized;
+
+        if (
+            !is_finite(
+                $incomingUnitCost
+            )
+            ||
+            $incomingUnitCost < 0
+        ) {
+            throw new RuntimeException(
+                'Received stock unit cost cannot be negative or invalid.'
+            );
+        }
+    }
+
     $pdo->beginTransaction();
     $itemStmt = $pdo->prepare("SELECT * FROM stock_items WHERE id = ? AND farm_id = ? FOR UPDATE");
     $itemStmt->execute([$itemId, $farmId]);
@@ -52,19 +102,30 @@ try {
         send_json(['success' => false, 'error' => 'You do not have permission to update this Inventory item.'], 403);
     }
 
-    $movementProductionType = inventory_normalize_default_production_type(
-        (string)$item['farm_type'],
-        (string)$item['feed_category'],
-        $data['production_type'] ?? ($item['default_production_type'] ?? 'shared')
-    );
-    $movementCycleId = null;
-    if ($type === 'used' && (string)$item['feed_category'] === 'general' && $movementProductionType !== 'shared') {
-        $requestedCycleId = (int)($data['cycle_id'] ?? 0);
-        if ($requestedCycleId > 0) {
-            attribution_validate_cycle($pdo, $farmId, $requestedCycleId, (string)$item['farm_type'], $movementProductionType);
-            $movementCycleId = $requestedCycleId;
-        }
-    }
+    $requestedProductionType =
+        array_key_exists(
+            'production_type',
+            $data
+        )
+            ? trim(
+                (string)$data[
+                    'production_type'
+                ]
+            )
+            : null;
+
+    $requestedCycleId =
+        $type === 'used'
+            ? (int)(
+                $data['cycle_id']
+                ?? 0
+            )
+            : 0;
+
+    $requestedCycleId =
+        $requestedCycleId > 0
+            ? $requestedCycleId
+            : null;
 
     $newStock = null;
     // The canonical service performs the authoritative balance update.
@@ -79,13 +140,11 @@ try {
         (int)$_SESSION['user_id'],
         (string)$item['farm_type'],
         (string)$item['feed_category'],
-        $movementCycleId,
+        $requestedCycleId,
         'inventory_api',
         null,
-        $type === 'received' && isset($data['unit_cost']) && $data['unit_cost'] !== ''
-            ? (float)$data['unit_cost']
-            : null,
-        $movementProductionType
+        $incomingUnitCost,
+        $requestedProductionType
     );
 
     $stockStmt = $pdo->prepare("SELECT current_stock FROM stock_items WHERE id = ? AND farm_id = ?");

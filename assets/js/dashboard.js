@@ -24,6 +24,12 @@ const dashboardConfig = {
     ),
     farmAccess:
         dashboardConfigElement?.dataset.farmAccess || '',
+    activeCycles: dashboardParseJson(
+        dashboardConfigElement?.dataset.activeCycles,
+        []
+    ),
+    csrfToken:
+        dashboardConfigElement?.dataset.csrfToken || '',
     lowStockItems: dashboardParseJson(
         dashboardConfigElement?.dataset.lowStockItems,
         []
@@ -115,75 +121,364 @@ let dashboardLowStockCount = dashboardConfig.lowStockCount;
     })();
     
     // Quick stock update
-    function quickStockUpdate(itemId) {
-        // Fetch item details
-        fetch(`api/get_item_details.php?id=${itemId}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data) {
-                    document.getElementById('stockItemId').value = itemId;
-                    document.getElementById('stockItemName').value = data.item_name;
-                    document.getElementById('stockItemDetails').textContent = 
-                        `Current stock: ${data.current_stock} ${data.unit} • Min: ${data.min_stock_level} ${data.unit}`;
-                    
-                    const modal = new bootstrap.Modal(document.getElementById('quickStockModal'));
-                    modal.show();
+    let dashboardQuickStockItem = null;
+
+    function dashboardQuickStockProductionOptions(item) {
+        const farmType =
+            String(item?.farm_type || 'both')
+                .toLowerCase();
+
+        if (farmType === 'poultry') {
+            return [
+                ['shared', 'Shared Poultry'],
+                ['layer', 'Layer'],
+                ['broiler', 'Broiler']
+            ];
+        }
+
+        if (farmType === 'ruminant') {
+            return [
+                ['shared', 'Shared Ruminant'],
+                ['cattle', 'Cattle'],
+                ['goat', 'Goat'],
+                ['sheep', 'Sheep'],
+                ['other', 'Other']
+            ];
+        }
+
+        return [
+            ['shared', 'Shared / Farm-wide']
+        ];
+    }
+
+    function dashboardPopulateQuickStockProduction(item) {
+        const select =
+            document.getElementById(
+                'quickStockProductionType'
+            );
+
+        if (!select) {
+            return;
+        }
+
+        const options =
+            dashboardQuickStockProductionOptions(
+                item
+            );
+
+        select.replaceChildren();
+
+        options.forEach(function(option) {
+            select.add(
+                new Option(
+                    option[1],
+                    option[0]
+                )
+            );
+        });
+
+        const requestedDefault =
+            String(
+                item?.default_production_type
+                || 'shared'
+            ).toLowerCase();
+
+        const hasRequestedDefault =
+            options.some(function(option) {
+                return option[0]
+                    === requestedDefault;
+            });
+
+        select.value =
+            hasRequestedDefault
+                ? requestedDefault
+                : 'shared';
+    }
+
+    function dashboardUpdateQuickStockFields() {
+        const item =
+            dashboardQuickStockItem;
+
+        if (!item) {
+            return;
+        }
+
+        const typeSelect =
+            document.getElementById(
+                'transType'
+            );
+
+        const productionWrap =
+            document.getElementById(
+                'quickStockProductionWrap'
+            );
+
+        const productionSelect =
+            document.getElementById(
+                'quickStockProductionType'
+            );
+
+        const cycleWrap =
+            document.getElementById(
+                'quickStockCycleWrap'
+            );
+
+        const cycleSelect =
+            document.getElementById(
+                'quickStockCycleId'
+            );
+
+        const transactionType =
+            String(
+                typeSelect?.value
+                || 'received'
+            ).toLowerCase();
+
+        const usage =
+            String(
+                item.feed_category
+                || 'general'
+            ).toLowerCase();
+
+        const farmType =
+            String(
+                item.farm_type
+                || 'both'
+            ).toLowerCase();
+
+        const generalStock =
+            usage === 'general';
+
+        if (productionWrap) {
+            productionWrap.classList.toggle(
+                'd-none',
+                !generalStock
+            );
+        }
+
+        const productionType =
+            generalStock
+                ? String(
+                    productionSelect?.value
+                    || 'shared'
+                ).toLowerCase()
+                : 'shared';
+
+        const showCycle =
+            transactionType === 'used'
+            &&
+            generalStock
+            &&
+            productionType !== 'shared'
+            &&
+            farmType !== 'both';
+
+        if (cycleSelect) {
+            const previousCycle =
+                cycleSelect.value;
+
+            cycleSelect.replaceChildren(
+                new Option(
+                    'No specific cycle / pooled usage',
+                    ''
+                )
+            );
+
+            if (showCycle) {
+                dashboardConfig.activeCycles
+                    .filter(function(cycle) {
+                        return (
+                            String(
+                                cycle.farm_type
+                                || ''
+                            ).toLowerCase()
+                                === farmType
+                            &&
+                            String(
+                                cycle.production_type
+                                || ''
+                            ).toLowerCase()
+                                === productionType
+                        );
+                    })
+                    .forEach(function(cycle) {
+                        cycleSelect.add(
+                            new Option(
+                                String(
+                                    cycle.cycle_code
+                                    || ''
+                                ),
+                                String(
+                                    cycle.id
+                                    || ''
+                                )
+                            )
+                        );
+                    });
+
+                const previousStillExists =
+                    Array.from(
+                        cycleSelect.options
+                    ).some(function(option) {
+                        return option.value
+                            === previousCycle;
+                    });
+
+                if (previousStillExists) {
+                    cycleSelect.value =
+                        previousCycle;
                 }
+            }
+        }
+
+        if (cycleWrap) {
+            cycleWrap.classList.toggle(
+                'd-none',
+                !showCycle
+            );
+        }
+
+
+    }
+
+    function quickStockUpdate(itemId) {
+        fetch(
+            `api/get_item_details.php?id=${encodeURIComponent(itemId)}`
+        )
+            .then(function(response) {
+                return response.json()
+                    .then(function(data) {
+                        return {
+                            ok: response.ok,
+                            data: data
+                        };
+                    });
             })
-            .catch(error => {
-                showAlert('danger', 'Error loading item details: ' + error.message);
+            .then(function(result) {
+                const data =
+                    result.data || {};
+
+                if (
+                    !result.ok
+                    ||
+                    data.error
+                ) {
+                    throw new Error(
+                        data.error
+                        || 'Unable to load inventory item.'
+                    );
+                }
+
+                dashboardQuickStockItem =
+                    data;
+
+                const quickStockForm =
+                    document.getElementById(
+                        'quickStockForm'
+                    );
+
+                if (quickStockForm) {
+                    quickStockForm.dataset.feedCategory =
+                        String(
+                            data.feed_category
+                            || 'general'
+                        ).toLowerCase();
+                }
+
+                const itemIdInput =
+                    document.getElementById(
+                        'stockItemId'
+                    );
+
+                const itemNameInput =
+                    document.getElementById(
+                        'stockItemName'
+                    );
+
+                const details =
+                    document.getElementById(
+                        'stockItemDetails'
+                    );
+
+                const quantityInput =
+                    document.getElementById(
+                        'quantity'
+                    );
+
+                const remarksInput =
+                    document.getElementById(
+                        'remarks'
+                    );
+
+                if (itemIdInput) {
+                    itemIdInput.value =
+                        itemId;
+                }
+
+                if (itemNameInput) {
+                    itemNameInput.value =
+                        data.item_name || '';
+                }
+
+                if (details) {
+                    details.textContent =
+                        `Current stock: ${data.current_stock} ${data.unit}`
+                        + ` • Min: ${data.min_stock_level} ${data.unit}`;
+                }
+
+                if (quantityInput) {
+                    quantityInput.value = '';
+                }
+
+                if (remarksInput) {
+                    remarksInput.value = '';
+                }
+
+                dashboardPopulateQuickStockProduction(
+                    data
+                );
+
+                dashboardUpdateQuickStockFields();
+
+                const modal =
+                    new bootstrap.Modal(
+                        document.getElementById(
+                            'quickStockModal'
+                        )
+                    );
+
+                modal.show();
+            })
+            .catch(function(error) {
+                showAlert(
+                    'danger',
+                    'Error loading item details: '
+                    + error.message
+                );
             });
     }
-    
-    // Handle quick stock form submission
-    document.getElementById('quickStockForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        const formData = {
-            item_id: document.getElementById('stockItemId').value,
-            type: document.getElementById('transType').value,
-            quantity: document.getElementById('quantity').value,
-            remarks: document.getElementById('remarks').value,
-            farm_type: dashboardConfig.farmAccess
-        };
-        
-        // Show loading state
-        const submitBtn = this.querySelector('button[type="submit"]');
-        const originalText = submitBtn.innerHTML;
-        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Updating...';
-        submitBtn.disabled = true;
-        
-        // Send request
-        fetch('api/update_stock.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(formData)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showAlert('success', 'Stock updated successfully!');
-                
-                // Close modal
-                bootstrap.Modal.getInstance(document.getElementById('quickStockModal')).hide();
-                
-                // Reload page after 1 second
-                setTimeout(() => location.reload(), 1000);
-            } else {
-                showAlert('danger', 'Error: ' + data.message);
-                submitBtn.innerHTML = originalText;
-                submitBtn.disabled = false;
-            }
-        })
-        .catch(error => {
-            showAlert('danger', 'Network error: ' + error.message);
-            submitBtn.innerHTML = originalText;
-            submitBtn.disabled = false;
-        });
-    });
-    
+
+    document.getElementById(
+        'transType'
+    )?.addEventListener(
+        'change',
+        dashboardUpdateQuickStockFields
+    );
+
+    document.getElementById(
+        'quickStockProductionType'
+    )?.addEventListener(
+        'change',
+        dashboardUpdateQuickStockFields
+    );
+
+    /*
+     * Mutation submission belongs exclusively to
+     * dashboard-quick-stock.js, which is injected by the
+     * Dashboard permission bridge for users allowed to update stock.
+     *
+     * dashboard.js owns only item loading and attribution UI composition.
+     */
     // Refresh low-stock status in the background without changing scroll position.
     function refreshStockData() {
         fetch(`api/get_stock_summary.php?farm_type=${encodeURIComponent(dashboardConfig.farmAccess)}`)

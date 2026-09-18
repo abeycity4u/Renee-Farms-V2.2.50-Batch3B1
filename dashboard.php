@@ -34,6 +34,85 @@ $includeGeneralSales = in_array($farmAccess, enabledFarmTypes(), true)
 
 // Get current stock levels
 $tenantFarmId = requireCurrentFarmId();
+
+/*
+ * Dashboard Smart Stock Control uses the same optional cycle attribution
+ * contract as Inventory Update Stock.
+ *
+ * Do not expose cycle ids/codes in page configuration to a user who cannot
+ * mutate stock. The API remains authoritative even when this UI is visible.
+ */
+$dashboardPrivileged =
+    isPlatformOwner()
+    ||
+    hasRole(
+        'farm_admin'
+    );
+
+$dashboardCanUpdateStock =
+    $dashboardPrivileged
+    ||
+    (
+        hasPermission(
+            $userType,
+            'inventory'
+        )
+        &&
+        hasPermission(
+            $userType,
+            'update_stock'
+        )
+    );
+
+$dashboardActiveCycles = [];
+
+if ($dashboardCanUpdateStock) {
+    if ($farmAccess === 'both') {
+        $dashboardCycleStmt =
+            $pdo->prepare(
+                "SELECT
+                     id,
+                     cycle_code,
+                     farm_type,
+                     production_type
+                 FROM production_cycles
+                 WHERE farm_id=?
+                   AND status='active'
+                   AND farm_type IN ('poultry','ruminant')
+                 ORDER BY start_date DESC,id DESC"
+            );
+
+        $dashboardCycleStmt->execute([
+            $tenantFarmId,
+        ]);
+
+    } else {
+        $dashboardCycleStmt =
+            $pdo->prepare(
+                "SELECT
+                     id,
+                     cycle_code,
+                     farm_type,
+                     production_type
+                 FROM production_cycles
+                 WHERE farm_id=?
+                   AND status='active'
+                   AND farm_type=?
+                 ORDER BY start_date DESC,id DESC"
+            );
+
+        $dashboardCycleStmt->execute([
+            $tenantFarmId,
+            $farmAccess,
+        ]);
+    }
+
+    $dashboardActiveCycles =
+        $dashboardCycleStmt->fetchAll(
+            PDO::FETCH_ASSOC
+        ) ?: [];
+}
+
 if ($farmAccess === 'both') {
     $stockQuery = "SELECT * FROM stock_items 
                    WHERE farm_id = ? AND farm_type IN ('poultry', 'ruminant', 'both')
@@ -886,15 +965,64 @@ $pageTitle = "Dashboard";
                                         <option value="used">⬇ Used Stock (-)</option>
                                     </select>
                                 </div>
+
                                 <div class="col-md-6 mb-3">
                                     <label>Quantity</label>
-                                    <input type="number" class="form-control" id="quantity" step="0.01" required>
+                                    <input
+                                        type="number"
+                                        class="form-control"
+                                        id="quantity"
+                                        step="0.01"
+                                        min="0.01"
+                                        required>
                                 </div>
                             </div>
-                            
+
+                            <div
+                                class="mb-3 d-none"
+                                id="quickStockProductionWrap">
+                                <label>Production Attribution</label>
+
+                                <select
+                                    id="quickStockProductionType"
+                                    class="form-select">
+                                </select>
+
+                                <small class="text-muted">
+                                    General / Non-feed stock may be assigned to
+                                    the operation that receives or consumes it.
+                                </small>
+                            </div>
+
+                            <div
+                                class="mb-3 d-none"
+                                id="quickStockCycleWrap">
+                                <label>
+                                    Production Cycle
+                                    <span class="text-muted">(optional)</span>
+                                </label>
+
+                                <select
+                                    id="quickStockCycleId"
+                                    class="form-select">
+                                    <option value="">
+                                        No specific cycle / pooled usage
+                                    </option>
+                                </select>
+
+                                <small class="text-muted">
+                                    Choose a cycle only when this usage belongs
+                                    directly to one production cycle.
+                                </small>
+                            </div>
+
                             <div class="mb-3">
                                 <label>Remarks (Optional)</label>
-                                <input type="text" class="form-control" id="remarks" placeholder="Enter remarks">
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    id="remarks"
+                                    placeholder="Enter remarks">
                             </div>
                             
                             <div class="alert alert-info">
@@ -922,6 +1050,16 @@ $pageTitle = "Dashboard";
     <div
     id="dashboardConfig"
     hidden
+    data-active-cycles="<?php echo htmlspecialchars(
+        app_json_script($dashboardActiveCycles),
+        ENT_QUOTES | ENT_SUBSTITUTE,
+        'UTF-8'
+    ); ?>"
+    data-csrf-token="<?php echo htmlspecialchars(
+        csrf_token(),
+        ENT_QUOTES | ENT_SUBSTITUTE,
+        'UTF-8'
+    ); ?>"
     data-low-stock-count="<?php echo (int)$lowStockCount; ?>"
     data-farm-access="<?php echo htmlspecialchars(
         (string)$farmAccess,
