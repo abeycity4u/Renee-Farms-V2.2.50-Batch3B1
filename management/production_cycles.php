@@ -1220,6 +1220,12 @@ try {
                                                     class="btn btn-sm btn-outline-primary"
                                                     href="<?php echo BASE_URL; ?>/management/poultry_cycle.php?id=<?php echo (int)$cycle['id']; ?>"
                                                 >Manage Cycle</a>
+                                            <?php elseif (strtolower((string)$cycle['farm_type']) === 'ruminant'): ?>
+                                                <?php $hasCycleAction = true; ?>
+                                                <a
+                                                    class="btn btn-sm btn-outline-primary"
+                                                    href="<?php echo BASE_URL; ?>/management/ruminant_cycle.php?id=<?php echo (int)$cycle['id']; ?>"
+                                                >Manage Cycle</a>
                                             <?php endif; ?>
 
                                             <?php if (isPlatformOwner() || hasRole('farm_admin')): ?>

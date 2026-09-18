@@ -67,7 +67,7 @@ function ruminant_cycle_membership_add(PDO $pdo, int $farmId, int $animalId, int
     $animal=$animalStmt->fetch(PDO::FETCH_ASSOC);
     if(!$animal) throw new RuntimeException('Animal not found.');
 
-    $cycleStmt=$pdo->prepare("SELECT id,cycle_code,production_type,start_date,close_date FROM production_cycles WHERE id=? AND farm_id=? AND farm_type='ruminant' LIMIT 1");
+    $cycleStmt=$pdo->prepare("SELECT id,cycle_code,production_type,start_date,close_date FROM production_cycles WHERE id=? AND farm_id=? AND farm_type='ruminant' LIMIT 1 FOR UPDATE");
     $cycleStmt->execute([$cycleId,$farmId]);
     $cycle=$cycleStmt->fetch(PDO::FETCH_ASSOC);
     if(!$cycle) throw new RuntimeException('Choose a valid ruminant production cycle.');
@@ -183,4 +183,78 @@ function ruminant_cycle_eligible_animal_ids(PDO $pdo, int $farmId, string $speci
     $params[]=$date;
     $stmt=$pdo->prepare($sql); $stmt->execute($params);
     return array_map('intval',$stmt->fetchAll(PDO::FETCH_COLUMN));
+}
+
+
+/**
+ * Return memberships that would cross a proposed production-cycle end date.
+ *
+ * End Production must never rewrite these rows automatically. The animal's
+ * real lifecycle/transfer/membership workflow owns those boundaries.
+ */
+function ruminant_cycle_completion_membership_blockers(
+    PDO $pdo,
+    int $farmId,
+    int $cycleId,
+    string $endDate,
+    bool $forUpdate = false
+): array {
+    if ($farmId <= 0 || $cycleId <= 0) {
+        throw new InvalidArgumentException(
+            'Select a valid ruminant production cycle.'
+        );
+    }
+
+    if (
+        !preg_match(
+            '/^\d{4}-\d{2}-\d{2}$/',
+            $endDate
+        )
+    ) {
+        throw new InvalidArgumentException(
+            'Enter a valid production end date.'
+        );
+    }
+
+    $sql =
+        'SELECT
+             m.id,
+             m.animal_id,
+             m.start_date,
+             m.end_date,
+             m.closed_by_exit_event_id,
+             m.opened_by_transfer_id,
+             m.closed_by_transfer_id,
+             a.tag_no,
+             a.species,
+             a.status
+         FROM ruminant_animal_cycle_memberships m
+         INNER JOIN ruminant_animals a
+           ON a.id = m.animal_id
+          AND a.farm_id = m.farm_id
+         WHERE m.farm_id = ?
+           AND m.cycle_id = ?
+           AND (
+               m.end_date IS NULL
+               OR m.end_date > ?
+           )
+         ORDER BY
+             m.start_date,
+             m.id';
+
+    if ($forUpdate) {
+        $sql .= ' FOR UPDATE';
+    }
+
+    $stmt = $pdo->prepare($sql);
+
+    $stmt->execute([
+        $farmId,
+        $cycleId,
+        $endDate,
+    ]);
+
+    return $stmt->fetchAll(
+        PDO::FETCH_ASSOC
+    );
 }
