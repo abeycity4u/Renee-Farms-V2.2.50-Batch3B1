@@ -17,6 +17,7 @@ require_once(__DIR__ . '/../lib/ruminant_animal_exit.php');
 require_once(__DIR__ . '/../lib/sale_population_effects.php');
 require_once(__DIR__ . '/../lib/sales_units.php');
 require_once(__DIR__ . '/../lib/transaction_actor_display.php');
+require_once(__DIR__ . '/../lib/record_reference_persistence.php');
 $tenantFarmId = requireCurrentFarmId();
 
 $userType = getUserType();
@@ -361,6 +362,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         ]);
 
         $saleId = (int)$pdo->lastInsertId();
+
+        record_reference_persistence_assign_existing(
+            $pdo,
+            'sale',
+            $tenantFarmId,
+            $saleId
+        );
+
         ruminant_sale_save_animal_allocations($pdo, $tenantFarmId, $saleId, $animalRevenueAllocation, (int)$_SESSION['user_id']);
         if ($saleFarmType === 'ruminant') {
             ruminant_sale_apply_exit_outcomes($pdo, $tenantFarmId, $saleId, (string)$_POST['sale_date'], $animalRevenueAllocation, $_POST, (int)$_SESSION['user_id']);

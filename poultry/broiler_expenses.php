@@ -7,6 +7,7 @@ require_once(__DIR__ . '/../lib/attribution.php');
 require_once(__DIR__ . '/../lib/transaction_actor_display.php');
 require_once(__DIR__ . '/../lib/inventory_financial.php');
 require_once(__DIR__ . '/../lib/expense_revision_service.php');
+require_once(__DIR__ . '/../lib/record_reference_persistence.php');
 require_once(__DIR__ . '/../lib/financial_allocation_workspace.php');
 requireLogin();
 $pdfRequested = pdf_report_is_requested();
@@ -109,6 +110,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_expense'])) {
 
         $expenseId =
             (int)$pdo->lastInsertId();
+
+        record_reference_persistence_assign_existing(
+            $pdo,
+            'expense',
+            $tenantFarmId,
+            $expenseId
+        );
 
         expense_revision_service_record_created(
             $pdo,

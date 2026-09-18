@@ -2,6 +2,7 @@
 require_once __DIR__ . '/stock_costing.php';
 require_once __DIR__ . '/attribution.php';
 require_once __DIR__ . '/stock_consumption_allocation_persistence.php';
+require_once __DIR__ . '/record_reference_persistence.php';
 /**
  * Canonical inventory ledger service.
  *
@@ -27,6 +28,15 @@ function stock_apply_movement(
     ?float $incomingUnitCost = null,
     ?string $productionTypeOverride = null
 ): int {
+    /*
+     * Stock mutations and their human-facing reference assignment must be
+     * atomic. Fail before touching inventory when a caller forgot to open
+     * the transaction boundary.
+     */
+    record_reference_persistence_require_transaction(
+        $pdo
+    );
+
     $quantity = round($quantity, 2);
     if (!in_array($type, ['received', 'used'], true)) {
         throw new RuntimeException('Invalid stock transaction type.');
@@ -144,6 +154,13 @@ function stock_apply_movement(
     ]);
     $transactionId = (int)$pdo->lastInsertId();
 
+    record_reference_persistence_assign_existing(
+        $pdo,
+        'stock_movement',
+        $farmId,
+        $transactionId
+    );
+
     // For manual movements the transaction id is the durable source id.
     if ($sourceType !== null && $sourceId === null) {
         $pdo->prepare("UPDATE stock_transactions SET source_id = ? WHERE id = ? AND farm_id = ?")
@@ -166,6 +183,14 @@ function stock_reverse_transaction(
     ?string $sourceType = null,
     ?int $sourceId = null
 ): int {
+    /*
+     * Reversal creation is a stock mutation too. Require the caller-owned
+     * transaction before taking locks or changing ledger state.
+     */
+    record_reference_persistence_require_transaction(
+        $pdo
+    );
+
     $stmt = $pdo->prepare("SELECT * FROM stock_transactions WHERE id = ? AND farm_id = ? FOR UPDATE");
     $stmt->execute([$transactionId, $farmId]);
     $tx = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -245,6 +270,13 @@ function stock_reverse_transaction(
         (int)$tx['id'],
     ]);
     $reversalId = (int)$pdo->lastInsertId();
+
+    record_reference_persistence_assign_existing(
+        $pdo,
+        'stock_movement',
+        $farmId,
+        $reversalId
+    );
 
     $pdo->prepare("UPDATE stock_transactions
         SET is_reversed = 1, reversal_of_id = ?, reversed_at = NOW()
