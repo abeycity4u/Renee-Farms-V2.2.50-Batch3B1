@@ -127,6 +127,7 @@ $pageTitle = 'Stock History - ' . htmlspecialchars($item['item_name']);
                     <thead>
                         <tr>
                             <th>Date</th>
+                            <th>Reference</th>
                             <th>Type</th>
                             <th class="text-end">Quantity</th>
                             <th class="text-end">Previous Stock</th>
@@ -141,7 +142,7 @@ $pageTitle = 'Stock History - ' . htmlspecialchars($item['item_name']);
                         </tr>
                     </thead>
                     <tbody>
-                        <tr><td colspan="12" class="text-center text-muted">Loading history...</td></tr>
+                        <tr><td colspan="13" class="text-center text-muted">Loading history...</td></tr>
                     </tbody>
                 </table>
             </div>

@@ -287,6 +287,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_transaction']) &
                                 <thead class="table-dark">
                                     <tr>
                                         <th>Date</th>
+                                        <th>Reference</th>
                                         <th>Feed Item</th>
                                         <th>Type</th>
                                         <th>Quantity</th>
@@ -307,6 +308,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_transaction']) &
                                     <?php foreach ($displayTransactions as $trans): ?>
                                     <tr class="<?php echo (!empty($trans['is_reversed']) || !empty($trans['reversal_of_id'])) ? 'feed-audit-row' : 'feed-operational-row'; ?>">
                                         <td><?php echo date('d/m/Y', strtotime($trans['transaction_date'])); ?></td>
+                                        <td class="text-nowrap"><code><?php echo htmlspecialchars((string)($trans['public_reference'] ?? '—')); ?></code></td>
                                         <td><?php echo app_html($trans['item_name']); ?></td>
                                         <td>
                                             <span class="badge bg-<?php echo $trans['transaction_type'] == 'received' ? 'success' : 'danger'; ?>">

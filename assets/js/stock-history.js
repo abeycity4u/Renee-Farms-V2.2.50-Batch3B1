@@ -71,7 +71,7 @@ function renderTable(transactions) {
     tbody.innerHTML = '';
 
     if (!transactions || transactions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted">No history available for the selected period.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="13" class="text-center text-muted">No history available for the selected period.</td></tr>';
         return;
     }
 
@@ -97,6 +97,7 @@ function renderTable(transactions) {
 
         row.innerHTML = `
             <td>${formatDate(tx.transaction_date)}</td>
+            <td class="text-nowrap"><code>${escapeHtml(tx.public_reference || '—')}</code></td>
             <td>${typeBadge}</td>
             <td class="text-end">${Number(tx.quantity).toLocaleString()}</td>
             <td class="text-end">${Number(tx.previous_stock).toLocaleString()}</td>
@@ -136,7 +137,7 @@ async function loadHistory(days = 30) {
     const data = await response.json();
 
     if (data.error) {
-        document.querySelector('#historyTable tbody').innerHTML = `<tr><td colspan="12" class="text-danger text-center">${escapeHtml(data.error)}</td></tr>`;
+        document.querySelector('#historyTable tbody').innerHTML = `<tr><td colspan="13" class="text-danger text-center">${escapeHtml(data.error)}</td></tr>`;
         return;
     }
 

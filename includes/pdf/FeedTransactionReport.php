@@ -75,6 +75,7 @@ function stream_feed_transaction_report_pdf(
                 <thead>
                     <tr>
                         <th>Date</th>
+                        <th>Reference</th>
                         <th>Feed Item</th>
                         <th>Type / Status</th>
                         <th>Quantity</th>
@@ -92,7 +93,7 @@ function stream_feed_transaction_report_pdf(
                 <tbody>
                 <?php if (!$transactions): ?>
                     <tr>
-                        <td colspan="12">
+                        <td colspan="13">
                             No feed transactions recorded for this period
                             in <?php echo htmlspecialchars($viewLabel); ?>.
                         </td>
@@ -154,6 +155,12 @@ function stream_feed_transaction_report_pdf(
                                             (string)$trans['transaction_date']
                                         )
                                     )
+                                ); ?>
+                            </td>
+
+                            <td>
+                                <?php echo htmlspecialchars(
+                                    (string)($trans['public_reference'] ?? '—')
                                 ); ?>
                             </td>
 

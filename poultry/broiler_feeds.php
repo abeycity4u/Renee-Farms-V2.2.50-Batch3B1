@@ -286,6 +286,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_transaction']) &
                                 <thead class="table-dark">
                                     <tr>
                                         <th>Date</th>
+                                        <th>Reference</th>
                                         <th>Feed Item</th>
                                         <th>Type</th>
                                         <th>Quantity</th>
@@ -305,7 +306,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_transaction']) &
                                 <tbody>
                                     <?php if (empty($displayTransactions)): ?>
                                     <tr>
-                                        <td colspan="<?php echo ($isOwner && $ledgerView === 'operational') ? '13' : '12'; ?>" class="text-center text-muted py-4">
+                                        <td colspan="<?php echo ($isOwner && $ledgerView === 'operational') ? '14' : '13'; ?>" class="text-center text-muted py-4">
                                             <i class="bi bi-inbox display-4 d-block mb-2"></i>
                                             No transactions recorded for this month
                                         </td>
@@ -318,6 +319,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_transaction']) &
                                                     <?php echo date('d/m/Y', strtotime($trans['transaction_date'])); ?>
                                                 </span>
                                             </td>
+                                            <td class="text-nowrap"><code><?php echo htmlspecialchars((string)($trans['public_reference'] ?? '—')); ?></code></td>
                                             <td><?php echo app_html($trans['item_name']); ?></td>
                                             <td>
                                                 <span class="badge bg-<?php echo $trans['transaction_type'] == 'received' ? 'success' : 'danger'; ?>">
