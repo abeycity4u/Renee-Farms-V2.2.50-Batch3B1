@@ -71,10 +71,10 @@ ob_start();
 <?php endfor; ?>
 </tbody></table>
 <h3>Detailed Expenses</h3>
-<table class="table"><thead><tr><th>Date</th><th>Farm Type</th><th>Production Type</th><th>Category</th><th>Unit</th><th>Amount</th><th>Total</th><th>Description</th><th>Recorded By</th></tr></thead><tbody>
-<?php if(!$expenses): ?><tr><td colspan="9">No expenses recorded for this period.</td></tr>
+<table class="table"><thead><tr><th>Date</th><th>Reference</th><th>Farm Type</th><th>Production Type</th><th>Category</th><th>Unit</th><th>Amount</th><th>Total</th><th>Description</th><th>Recorded By</th></tr></thead><tbody>
+<?php if(!$expenses): ?><tr><td colspan="10">No expenses recorded for this period.</td></tr>
 <?php else: foreach($expenses as $expense): $line=(float)($expense['amount']??0)*(float)($expense['unit']??1); ?>
-<tr><td><?php echo htmlspecialchars(date('d/m/Y',strtotime((string)$expense['expense_date']))); ?></td><td><?php echo htmlspecialchars(ucfirst((string)$expense['farm_type'])); ?></td><td><?php echo htmlspecialchars(
+<tr><td><?php echo htmlspecialchars(date('d/m/Y',strtotime((string)$expense['expense_date']))); ?></td><td><?php echo htmlspecialchars((string)($expense['public_reference'] ?? '—')); ?></td><td><?php echo htmlspecialchars(ucfirst((string)$expense['farm_type'])); ?></td><td><?php echo htmlspecialchars(
     attribution_production_label(
         (string)(
             $expense['farm_type']

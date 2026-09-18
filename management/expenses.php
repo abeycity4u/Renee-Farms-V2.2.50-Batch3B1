@@ -245,6 +245,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                 <thead class="table-dark">
                                     <tr>
                                         <th>Date</th>
+                                        <th>Reference</th>
                                         <th>Farm Type</th>
                                         <th>Production Type</th>
                                         <th>Category</th>
@@ -261,7 +262,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                 <tbody>
                                     <?php if (empty($expenses)): ?>
                                     <tr>
-                                        <td colspan="<?php echo $canManageExpenses ? '10' : '9'; ?>" class="text-center text-muted py-4">
+                                        <td colspan="<?php echo $canManageExpenses ? '11' : '10'; ?>" class="text-center text-muted py-4">
                                             <i class="bi bi-receipt display-4 d-block mb-2"></i>
                                             No expenses recorded for this period
                                         </td>
@@ -278,6 +279,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                             <td>
                                                 <strong><?php echo date('d/m/Y', strtotime($expense['expense_date'])); ?></strong>
                                             </td>
+                                            <td class="text-nowrap"><code><?php echo htmlspecialchars((string)($expense['public_reference'] ?? '—')); ?></code></td>
                                             <td>
                                                 <span class="badge bg-<?php
                                                     echo $expense['farm_type'] == 'poultry' ? 'info' :

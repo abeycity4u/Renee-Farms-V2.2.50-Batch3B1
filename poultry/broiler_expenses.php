@@ -260,6 +260,7 @@ $pdfReportUrl = pdf_report_current_url();
                                 <thead class="table-dark">
                                     <tr>
                                         <th>Date</th>
+                                        <th>Reference</th>
                                         <th>Category</th>
                                         <th>Unit</th>
                                         <th>Amount (₦/unit)</th>
@@ -275,7 +276,7 @@ $pdfReportUrl = pdf_report_current_url();
                                 <tbody>
                                     <?php if (empty($expenses)): ?>
                                     <tr>
-                                        <td colspan="<?php echo $canManageExpenses ? 9 : 8; ?>" class="text-center text-muted py-4">
+                                        <td colspan="<?php echo $canManageExpenses ? 10 : 9; ?>" class="text-center text-muted py-4">
                                             No expenses recorded for this month
                                         </td>
                                     </tr>
@@ -283,6 +284,7 @@ $pdfReportUrl = pdf_report_current_url();
                                         <?php foreach ($expenses as $expense): ?>
                                         <tr>
                                             <td><?php echo date('d/m/Y', strtotime($expense['expense_date'])); ?></td>
+                                            <td class="text-nowrap"><code><?php echo htmlspecialchars((string)($expense['public_reference'] ?? '—')); ?></code></td>
                                             <td>
                                                 <span class="badge bg-primary">
                                                     <?php echo ucfirst($expense['category']); ?>
@@ -340,7 +342,7 @@ $pdfReportUrl = pdf_report_current_url();
                                 </tbody>
                                 <tfoot class="table-secondary">
                                     <tr>
-                                        <td colspan="4"><strong>TOTAL</strong></td>
+                                        <td colspan="5"><strong>TOTAL</strong></td>
                                         <td class="text-danger fw-bold">₦<?php echo number_format($manualExpenseTotal, 2); ?></td>
                                         <td colspan="<?php echo $canManageExpenses ? 4 : 3; ?>"></td>
                                     </tr>
