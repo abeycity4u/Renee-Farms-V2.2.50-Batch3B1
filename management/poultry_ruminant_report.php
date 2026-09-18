@@ -41,11 +41,10 @@ if ($reportMode === 'yearly') {
 }
 
 $farmFilterSql = $farmType === '' ? ' AND 1 = 0' : '';
-$farmParams = [];
 if ($farmType === 'poultry') {
-    $farmFilterSql = " AND farm_type IN ('poultry', 'general')";
+    $farmFilterSql = " AND farm_type = 'poultry'";
 } elseif ($farmType === 'ruminant') {
-    $farmFilterSql = " AND farm_type IN ('ruminant', 'general')";
+    $farmFilterSql = " AND farm_type = 'ruminant'";
 }
 
 $salesStmt = $pdo->prepare("SELECT farm_type, SUM(total_amount) AS total_sales
@@ -54,10 +53,6 @@ $salesStmt = $pdo->prepare("SELECT farm_type, SUM(total_amount) AS total_sales
                            GROUP BY farm_type");
 $salesStmt->execute([$tenantFarmId, $startDate, $endDate]);
 $salesSummary = $salesStmt->fetchAll(PDO::FETCH_KEY_PAIR);
-if ($farmType !== 'all' && isset($salesSummary['general'])) {
-    $salesSummary[$farmType] = (float)($salesSummary[$farmType] ?? 0) + (float)$salesSummary['general'];
-    unset($salesSummary['general']);
-}
 
 $expenseStmt = $pdo->prepare("SELECT farm_type, SUM(amount * unit) AS total_expenses
                               FROM farm_expenses
@@ -70,17 +65,50 @@ if ($farmType !== '' && $farmType !== 'all') {
 }
 $expenseStmt->execute($expenseParams);
 $expenseRows = $expenseStmt->fetchAll();
-$expenseSummary = ['poultry' => 0, 'ruminant' => 0];
+$expenseSummary = [
+    'poultry' => 0.0,
+    'ruminant' => 0.0,
+    'shared' => 0.0,
+];
+
 foreach ($expenseRows as $row) {
-    if ($row['farm_type'] === 'both') {
-        if ($farmType === 'all') {
-            $expenseSummary['poultry'] += (float)$row['total_expenses'];
-            $expenseSummary['ruminant'] += (float)$row['total_expenses'];
-        } else {
-            $expenseSummary[$farmType] += (float)$row['total_expenses'];
-        }
-    } else {
-        $expenseSummary[$row['farm_type']] = (float)$row['total_expenses'];
+    $rowFarmType =
+        strtolower(
+            trim(
+                (string)(
+                    $row['farm_type']
+                    ?? ''
+                )
+            )
+        );
+
+    $amount =
+        (float)(
+            $row['total_expenses']
+            ?? 0
+        );
+
+    if ($rowFarmType === 'both') {
+        /*
+         * Cross-module source parents remain visible once.
+         * Do not invent a Poultry/Ruminant split here.
+         */
+        $expenseSummary['shared'] +=
+            $amount;
+
+        continue;
+    }
+
+    if (
+        array_key_exists(
+            $rowFarmType,
+            $expenseSummary
+        )
+        &&
+        $rowFarmType !== 'shared'
+    ) {
+        $expenseSummary[$rowFarmType] +=
+            $amount;
     }
 }
 
@@ -133,18 +161,88 @@ $ruminant = $ruminantStatStmt->fetch();
 $ruminantMortality = (int)($ruminant['mortality'] ?? 0);
 $ruminantClosingStock = max(0, $ruminantOpeningStock - $ruminantMortality);
 
-$stockStmt = $pdo->query("SELECT farm_type, COUNT(*) AS items, SUM(current_stock * unit_cost) AS stock_value
-                          FROM stock_items WHERE farm_id = $tenantFarmId AND is_active = 1 GROUP BY farm_type");
-$stockRows = $stockStmt->fetchAll();
-$stockSummary = ['poultry' => ['items' => 0, 'stock_value' => 0], 'ruminant' => ['items' => 0, 'stock_value' => 0]];
+$stockStmt =
+    $pdo->prepare(
+        "SELECT
+             farm_type,
+             COUNT(*) AS items,
+             SUM(current_stock * unit_cost) AS stock_value
+         FROM stock_items
+         WHERE farm_id=?
+           AND is_active=1
+         GROUP BY farm_type"
+    );
+
+$stockStmt->execute([
+    $tenantFarmId,
+]);
+
+$stockRows =
+    $stockStmt->fetchAll(
+        PDO::FETCH_ASSOC
+    );
+
+$stockSummary = [
+    'poultry' => [
+        'items' => 0,
+        'stock_value' => 0.0,
+    ],
+    'ruminant' => [
+        'items' => 0,
+        'stock_value' => 0.0,
+    ],
+];
+
+$sharedStockSummary = [
+    'items' => 0,
+    'stock_value' => 0.0,
+];
+
 foreach ($stockRows as $row) {
-    if ($row['farm_type'] === 'both') {
-        $stockSummary['poultry']['items'] += (int)$row['items'];
-        $stockSummary['ruminant']['items'] += (int)$row['items'];
-        $stockSummary['poultry']['stock_value'] += (float)$row['stock_value'];
-        $stockSummary['ruminant']['stock_value'] += (float)$row['stock_value'];
-    } else {
-        $stockSummary[$row['farm_type']] = ['items' => (int)$row['items'], 'stock_value' => (float)$row['stock_value']];
+    $rowFarmType =
+        strtolower(
+            trim(
+                (string)(
+                    $row['farm_type']
+                    ?? ''
+                )
+            )
+        );
+
+    if ($rowFarmType === 'both') {
+        /*
+         * Shared inventory remains one farm-level availability pool.
+         * It must not be duplicated into both module totals.
+         */
+        $sharedStockSummary['items'] +=
+            (int)(
+                $row['items']
+                ?? 0
+            );
+
+        $sharedStockSummary['stock_value'] +=
+            (float)(
+                $row['stock_value']
+                ?? 0
+            );
+
+        continue;
+    }
+
+    if (isset($stockSummary[$rowFarmType])) {
+        $stockSummary[$rowFarmType] = [
+            'items' =>
+                (int)(
+                    $row['items']
+                    ?? 0
+                ),
+
+            'stock_value' =>
+                (float)(
+                    $row['stock_value']
+                    ?? 0
+                ),
+        ];
     }
 }
 $pdfReportUrl = pdf_report_current_url();
@@ -184,15 +282,32 @@ $pdfReportUrl = pdf_report_current_url();
             </div>
         </div>
         <div class="card-body">
+            <div class="alert alert-light border small mb-3">
+                <strong>Operational source report.</strong>
+                Sales are grouped by their recorded farm source.
+                Recorded Spending shows cash/expense source attribution,
+                not Profitability operating cost.
+                Farm-wide Shared Spending is shown once and is never
+                automatically split between Poultry and Ruminant.
+                Use Profitability and Shared Cost Allocation when you need
+                operating-cost economics or explicit cycle allocation.
+            </div>
+
             <div class="row g-3 mb-3">
                 <?php if (in_array('poultry', $visibleFarmTypes, true)): ?>
                 <div class="col-md-6"><div class="card border-info"><div class="card-body"><h6>Poultry Sales</h6><h3>₦<?php echo number_format($salesSummary['poultry'] ?? 0, 2); ?></h3></div></div></div>
-                <div class="col-md-6"><div class="card border-danger"><div class="card-body"><h6>Poultry Expenses</h6><h3>₦<?php echo number_format($expenseSummary['poultry'] ?? 0, 2); ?></h3></div></div></div>
+                <div class="col-md-6"><div class="card border-danger"><div class="card-body"><h6>Poultry Recorded Spending</h6><h3>₦<?php echo number_format($expenseSummary['poultry'] ?? 0, 2); ?></h3></div></div></div>
                 <?php endif; ?>
+
                 <?php if (in_array('ruminant', $visibleFarmTypes, true)): ?>
                 <div class="col-md-6"><div class="card border-warning"><div class="card-body"><h6>Ruminant Sales</h6><h3>₦<?php echo number_format($salesSummary['ruminant'] ?? 0, 2); ?></h3></div></div></div>
-                <div class="col-md-6"><div class="card border-danger"><div class="card-body"><h6>Ruminant Expenses</h6><h3>₦<?php echo number_format($expenseSummary['ruminant'] ?? 0, 2); ?></h3></div></div></div>
+                <div class="col-md-6"><div class="card border-danger"><div class="card-body"><h6>Ruminant Recorded Spending</h6><h3>₦<?php echo number_format($expenseSummary['ruminant'] ?? 0, 2); ?></h3></div></div></div>
                 <?php endif; ?>
+
+                <?php if (($expenseSummary['shared'] ?? 0) > 0.009): ?>
+                <div class="col-md-6"><div class="card border-secondary"><div class="card-body"><h6>Farm-wide Shared Spending</h6><h3>₦<?php echo number_format($expenseSummary['shared'], 2); ?></h3><div class="small text-muted">Recorded once at its cross-module source scope; no Poultry/Ruminant split is inferred.</div></div></div></div>
+                <?php endif; ?>
+
                 <?php if ($farmType === 'all' && isset($salesSummary['general'])): ?>
                 <div class="col-md-6"><div class="card border-success"><div class="card-body"><h6>General Sales</h6><h3>₦<?php echo number_format($salesSummary['general'], 2); ?></h3></div></div></div>
                 <?php endif; ?>
@@ -210,8 +325,25 @@ $pdfReportUrl = pdf_report_current_url();
                         <?php if (in_array('ruminant', $visibleFarmTypes, true)): ?><tr>
                             <td>Ruminants</td><td><?php echo $ruminantOpeningStock; ?></td><td><?php echo $ruminantMortality; ?></td><td><?php echo $ruminantClosingStock; ?></td><td><?php echo number_format((float)($ruminant['feed'] ?? 0), 2); ?> kg</td><td>N/A</td><td><?php echo $stockSummary['ruminant']['items']; ?></td><td>₦<?php echo number_format($stockSummary['ruminant']['stock_value'], 2); ?></td>
                         </tr><?php endif; ?>
+
+                        <?php if (
+                            ($sharedStockSummary['items'] ?? 0) > 0
+                            ||
+                            abs((float)($sharedStockSummary['stock_value'] ?? 0)) > 0.009
+                        ): ?><tr>
+                            <td>Shared Farm Inventory</td>
+                            <td colspan="5" class="text-muted">Cross-module inventory available at farm scope; shown once.</td>
+                            <td><?php echo (int)$sharedStockSummary['items']; ?></td>
+                            <td>₦<?php echo number_format((float)$sharedStockSummary['stock_value'], 2); ?></td>
+                        </tr><?php endif; ?>
                     </tbody>
                 </table>
+
+                <div class="small text-muted mt-2">
+                    Inventory columns are availability context, not additive production totals.
+                    Layer and Broiler rows both reference the Poultry module inventory snapshot;
+                    Shared Farm Inventory is listed separately once.
+                </div>
             </div>
         </div>
     </div>
