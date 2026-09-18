@@ -214,8 +214,12 @@ if ($debtFeatureEnabled) {
     $customerBalances = $customerBalancesStmt->fetchAll();
 
     if ($selectedCustomer !== '') {
-        $ledgerStmt = $pdo->prepare("SELECT l.*, u.full_name AS recorded_by_name, u.user_type AS recorded_by_user_type
+        $ledgerStmt = $pdo->prepare("SELECT l.*,
+            s.public_reference AS sale_public_reference,
+            u.full_name AS recorded_by_name,
+            u.user_type AS recorded_by_user_type
             FROM customer_ledger_entries l
+            LEFT JOIN sales_records s ON s.id = l.sale_id AND s.farm_id = l.farm_id
             LEFT JOIN users u ON l.user_id = u.id AND u.farm_id = l.farm_id
             WHERE l.farm_id = ? AND l.customer_name = ?
             ORDER BY l.entry_date ASC, l.id ASC");
@@ -259,7 +263,7 @@ if ($debtFeatureEnabled && $selectedCustomer !== '') {
         $saleBalanceMap[(int)$row['sale_id']] = (float)$row['sale_balance'];
     }
 
-    $openSalesStmt = $pdo->prepare("SELECT s.id, s.sale_date, s.product_type, s.quantity, s.unit_of_measure
+    $openSalesStmt = $pdo->prepare("SELECT s.id, s.public_reference, s.sale_date, s.product_type, s.quantity, s.unit_of_measure
         FROM sales_records s
         INNER JOIN customer_ledger_entries l ON l.sale_id = s.id AND l.farm_id = s.farm_id
         WHERE s.farm_id = ? AND l.farm_id = ? AND l.customer_name = ?
@@ -474,16 +478,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     throw new RuntimeException("Payment is greater than selected sale outstanding (₦" . number_format($saleOutstanding, 2) . ").");
                 }
 
-                $saleContextText = " | Applied to Sale #{$settleSaleId}";
+                $saleReferenceStmt = $pdo->prepare("SELECT public_reference
+                    FROM sales_records
+                    WHERE id = ? AND farm_id = ?
+                    LIMIT 1");
+                $saleReferenceStmt->execute([$settleSaleId, $tenantFarmId]);
+                $salePublicReference = (string)($saleReferenceStmt->fetchColumn() ?: '');
+
+                if ($salePublicReference === '') {
+                    throw new RuntimeException("Selected sale reference is unavailable.");
+                }
+
+                $saleContextText = " | Applied to Sale {$salePublicReference}";
                 $insertPaymentEntry($paymentAmount, $settleSaleId, $defaultNote . $saleContextText);
                 $allocationCount = 1;
             } else {
                 $remainingPayment = $paymentAmount;
-                $openSalesStmt = $pdo->prepare("SELECT s.id, s.sale_date, SUM(l.amount) AS balance
+                $openSalesStmt = $pdo->prepare("SELECT s.id, s.public_reference, s.sale_date, SUM(l.amount) AS balance
                     FROM customer_ledger_entries l
                     INNER JOIN sales_records s ON s.id = l.sale_id AND s.farm_id = l.farm_id
                     WHERE s.farm_id = ? AND l.farm_id = ? AND l.customer_name = ? AND l.sale_id IS NOT NULL
-                    GROUP BY s.id, s.sale_date
+                    GROUP BY s.id, s.public_reference, s.sale_date
                     HAVING SUM(l.amount) > 0
                     ORDER BY s.sale_date ASC, s.id ASC");
                 $openSalesStmt->execute([$tenantFarmId, $tenantFarmId, $customerName]);
@@ -507,6 +522,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     }
 
                     $saleId = (int)$openSale['id'];
+                    $salePublicReference = (string)($openSale['public_reference'] ?? '');
+
+                    if ($salePublicReference === '') {
+                        throw new RuntimeException("Sale reference is unavailable for FIFO allocation.");
+                    }
+
                     $openBalance = (float)$openSale['balance'];
                     $allocation = min($openBalance, $remainingPayment);
                     if ($allocation <= 0) {
@@ -516,7 +537,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $insertPaymentEntry(
                         $allocation,
                         $saleId,
-                        $defaultNote . " | FIFO Auto-allocation Sale #{$saleId}"
+                        $defaultNote . " | FIFO Auto-allocation Sale {$salePublicReference}"
                     );
                     $remainingPayment -= $allocation;
                     $allocationCount++;
@@ -894,6 +915,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                                 <tr>
                                                     <th>Date</th>
                                                     <th>Type</th>
+                                                    <th>Sale Reference</th>
                                                     <th>Description</th>
                                                     <th>Amount (₦)</th>
                                                     <th>Running Balance (₦)</th>
@@ -905,7 +927,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                             </thead>
                                             <tbody>
                                                 <?php if (empty($customerLedger)): ?>
-                                                <tr><td colspan="<?php echo $canManageLedger ? '7' : '6'; ?>" class="text-center text-muted">No debt ledger entries for this customer.</td></tr>
+                                                <tr><td colspan="<?php echo $canManageLedger ? '8' : '7'; ?>" class="text-center text-muted">No debt ledger entries for this customer.</td></tr>
                                                 <?php else: ?>
                                                     <?php $runningBalance = 0; ?>
                                                     <?php foreach ($customerLedger as $entry): ?>
@@ -920,6 +942,13 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                                         <tr>
                                                             <td><?php echo date('d/m/Y', strtotime($entry['entry_date'])); ?></td>
                                                             <td><span class="badge bg-<?php echo $entry['entry_type'] === 'payment' ? 'success' : ($entry['entry_type'] === 'sale' ? 'danger' : 'secondary'); ?>"><?php echo ucfirst($entry['entry_type']); ?></span></td>
+                                                            <td class="text-nowrap">
+                                                                <?php if (!empty($entry['sale_public_reference'])): ?>
+                                                                    <code><?php echo htmlspecialchars((string)$entry['sale_public_reference']); ?></code>
+                                                                <?php else: ?>
+                                                                    <span class="text-muted">—</span>
+                                                                <?php endif; ?>
+                                                            </td>
                                                             <td>
                                                                 <?php echo htmlspecialchars($entry['notes'] ?? '--'); ?>
                                                                 <?php if ($saleStatusLabel !== null): ?>
@@ -1294,7 +1323,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 <option value="">General customer payment</option>
                                 <?php foreach ($openCreditSales as $creditSale): ?>
                                 <option value="<?php echo (int)$creditSale['id']; ?>">
-                                    Sale #<?php echo (int)$creditSale['id']; ?> | <?php echo htmlspecialchars($creditSale['product_type']); ?> - <?php echo number_format((float)$creditSale['quantity'], 2); ?> <?php echo htmlspecialchars(sales_unit_label($creditSale['unit_of_measure'] ?? null)); ?> | Open: ₦<?php echo number_format((float)$creditSale['open_balance'], 2); ?>
+                                    <?php echo htmlspecialchars((string)($creditSale['public_reference'] ?? '—')); ?> | <?php echo htmlspecialchars($creditSale['product_type']); ?> - <?php echo number_format((float)$creditSale['quantity'], 2); ?> <?php echo htmlspecialchars(sales_unit_label($creditSale['unit_of_measure'] ?? null)); ?> | Open: ₦<?php echo number_format((float)$creditSale['open_balance'], 2); ?>
                                 </option>
                                 <?php endforeach; ?>
                             </select>

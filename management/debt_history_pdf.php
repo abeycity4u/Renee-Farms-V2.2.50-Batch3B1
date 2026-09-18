@@ -14,9 +14,11 @@ $customer = trim((string)($_GET['customer'] ?? ''));
 if ($customer === '') { http_response_code(400); exit('Customer is required.'); }
 
 $stmt = $pdo->prepare("SELECT cle.*,
+    s.public_reference AS sale_public_reference,
     u.full_name AS recorded_by_name,
     u.user_type AS recorded_by_user_type
     FROM customer_ledger_entries cle
+    LEFT JOIN sales_records s ON s.id = cle.sale_id AND s.farm_id = cle.farm_id
     LEFT JOIN users u ON u.id = cle.user_id AND u.farm_id = cle.farm_id
     WHERE cle.farm_id = ? AND cle.customer_name = ?
     ORDER BY cle.entry_date ASC, cle.id ASC");
@@ -40,10 +42,10 @@ ob_start(); ?>
 <div class="card"><div class="card-header"><h2>Customer Debt History</h2><div><?php echo htmlspecialchars($customer); ?></div></div><div class="card-body">
 <table class="table" style="margin-bottom:12px"><thead><tr><th>Current Outstanding</th><th>Total Credit Taken</th><th>Total Paid (Upfront + Debt)</th><th>Debt Settlements</th></tr></thead>
 <tbody><tr><td>₦<?php echo number_format($balance,2); ?></td><td>₦<?php echo number_format($credit,2); ?></td><td>₦<?php echo number_format($totalPaid,2); ?></td><td>₦<?php echo number_format($debtPayments,2); ?></td></tr></tbody></table>
-<h4>Ledger History</h4><table class="table"><thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Amount (₦)</th><th>Running Balance (₦)</th><th>Recorded By</th></tr></thead><tbody>
-<?php if (!$ledger): ?><tr><td colspan="6">No debt ledger entries for this customer.</td></tr>
+<h4>Ledger History</h4><table class="table"><thead><tr><th>Date</th><th>Type</th><th>Sale Reference</th><th>Description</th><th>Amount (₦)</th><th>Running Balance (₦)</th><th>Recorded By</th></tr></thead><tbody>
+<?php if (!$ledger): ?><tr><td colspan="7">No debt ledger entries for this customer.</td></tr>
 <?php else: $running=0.0; foreach($ledger as $row): $running+=(float)$row['amount']; ?>
-<tr><td><?php echo htmlspecialchars(date('d/m/Y',strtotime((string)$row['entry_date']))); ?></td><td><?php echo htmlspecialchars(ucfirst((string)$row['entry_type'])); ?></td><td><?php echo htmlspecialchars((string)($row['notes']??'')); ?></td><td><?php echo number_format((float)$row['amount'],2); ?></td><td><?php echo number_format($running,2); ?></td><td><?php echo htmlspecialchars(transaction_recorded_by_label_from_row(
+<tr><td><?php echo htmlspecialchars(date('d/m/Y',strtotime((string)$row['entry_date']))); ?></td><td><?php echo htmlspecialchars(ucfirst((string)$row['entry_type'])); ?></td><td><?php echo htmlspecialchars((string)($row['sale_public_reference'] ?? '—')); ?></td><td><?php echo htmlspecialchars((string)($row['notes']??'')); ?></td><td><?php echo number_format((float)$row['amount'],2); ?></td><td><?php echo number_format($running,2); ?></td><td><?php echo htmlspecialchars(transaction_recorded_by_label_from_row(
     $pdo,
     $tenantFarmId,
     $row
