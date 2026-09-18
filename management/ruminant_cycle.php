@@ -44,8 +44,8 @@ if ($cycleId <= 0) {
 }
 
 $canEndProduction =
-    isPlatformOwner()
-    || hasRole('farm_admin');
+    !isPlatformOwner()
+    && hasRole('farm_admin');
 
 $today =
     function_exists('app_today')
@@ -603,8 +603,7 @@ $confirmationText =
 
                 <div class="alert alert-secondary mb-0">
                     This cycle is active.
-                    Only the Platform Owner or Farm Admin
-                    can end production.
+                    Only a Farm Admin can end production.
                 </div>
 
             <?php elseif ($populationReadError !== ''): ?>

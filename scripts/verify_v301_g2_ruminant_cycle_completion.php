@@ -263,11 +263,19 @@ $check(
 );
 
 $check(
-    'PAGE_ADMIN_MUTATION_BOUNDARY',
+    'PAGE_FARM_ADMIN_ONLY_MUTATION_BOUNDARY',
     strpos(
         $page,
-        '$canEndProduction ='
+        "\$canEndProduction =\n    !isPlatformOwner()\n    && hasRole('farm_admin');"
     ) !== false
+    && strpos(
+        $page,
+        'Only a Farm Admin can end production.'
+    ) !== false
+    && strpos(
+        $page,
+        'Only the Platform Owner or Farm Admin'
+    ) === false
     && strpos(
         $page,
         'Production-cycle management access required.'
