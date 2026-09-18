@@ -94,15 +94,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ' The open biological stage was ended on the same date.';
             }
 
-            $_SESSION['poultry_cycle_flash'] = $message;
-
-            header(
-                'Location: '
-                . BASE_URL
-                . '/management/poultry_cycle.php?id='
-                . $cycleId
+            redirectWithNotification(
+                'success',
+                $message,
+                '/management/poultry_cycle.php?id='
+                    . $cycleId
             );
-            exit();
         }
 
         if ($action === 'transition_poultry_phase') {

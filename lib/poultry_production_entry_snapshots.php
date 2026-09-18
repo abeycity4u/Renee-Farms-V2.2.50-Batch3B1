@@ -255,8 +255,6 @@ function poultry_production_entry_snapshots(PDO $pdo,int $farmId,int $cycleId): 
     $s=$pdo->prepare(
         "SELECT
             s.*,
-            u.full_name approved_by_name,
-            u.username approved_by_username,
             u.user_type approved_by_user_type
          FROM poultry_production_entry_snapshots s
          LEFT JOIN users u ON u.id=s.approved_by
@@ -277,41 +275,19 @@ function poultry_production_entry_snapshots(PDO $pdo,int $farmId,int $cycleId): 
             continue;
         }
 
-        $fullName =
-            trim(
-                (string)(
-                    $row['approved_by_name']
-                    ?? ''
-                )
-            );
-
         /*
-         * Respect the actual Full Name entered for the user.
-         * Only fall back to the shared canonical actor helper
-         * when historical/user data has no Full Name.
+         * Approval history intentionally identifies the farm and
+         * approving role rather than exposing a username or personal
+         * full name:
+         *
+         *     Farm A LLC — Farm Admin
+         *     Farm A LLC — Poultry Manager
          */
-        if ($fullName !== '') {
-            $row['approved_by_name'] =
-                $fullName;
-
-            continue;
-        }
-
-        $username =
-            trim(
-                (string)(
-                    $row['approved_by_username']
-                    ?? ''
-                )
-            );
-
         $row['approved_by_name'] =
             transaction_recorded_by_label_for_farm(
                 $pdo,
                 $farmId,
-                $username !== ''
-                    ? $username
-                    : null,
+                null,
                 $row['approved_by_user_type']
                     ?? null
             );

@@ -108,7 +108,7 @@ if (
                     : null
             );
 
-        $_SESSION[$flashKey] =
+        $message =
             'Production ended successfully on '
             . (string)$result['end_date']
             . '. Closing live population: '
@@ -119,16 +119,12 @@ if (
             )
             . '. No animal lifecycle status or membership was changed automatically.';
 
-        header(
-            'Location: '
-            . BASE_URL
-            . '/management/ruminant_cycle.php?id='
-            . $cycleId,
-            true,
-            303
+        redirectWithNotification(
+            'success',
+            $message,
+            '/management/ruminant_cycle.php?id='
+                . $cycleId
         );
-
-        exit();
 
     } catch (Throwable $error) {
         $safe =

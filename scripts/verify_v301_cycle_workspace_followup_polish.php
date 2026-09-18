@@ -53,20 +53,35 @@ $check = static function (
 };
 
 $check(
-    'APPROVER_HISTORY_USES_FULL_NAME',
+    'APPROVER_HISTORY_USES_CANONICAL_ROLE_LABEL',
     strpos(
         $snapshots,
-        'u.full_name approved_by_name'
+        'u.user_type approved_by_user_type'
     ) !== false
     &&
     strpos(
         $snapshots,
-        'u.username approved_by_name'
+        'u.full_name approved_by_name'
     ) === false
+    &&
+    strpos(
+        $snapshots,
+        'u.username approved_by_username'
+    ) === false
+    &&
+    strpos(
+        $snapshots,
+        'transaction_recorded_by_label_for_farm('
+    ) !== false
+    &&
+    strpos(
+        $snapshots,
+        "                null,\n                \$row['approved_by_user_type']"
+    ) !== false
 );
 
 $check(
-    'APPROVER_SHARED_HELPER_FALLBACK',
+    'APPROVER_SHARED_HELPER_CANONICAL',
     strpos(
         $snapshots,
         'transaction_actor_display.php'
@@ -102,6 +117,42 @@ $check(
         $ruminant,
         "renderNotification(\n            'error'"
     ) !== false
+);
+
+$check(
+    'POULTRY_END_PRODUCTION_USES_TOP_CENTER_SESSION_NOTIFICATION',
+    strpos(
+        $poultry,
+        "redirectWithNotification(\n                'success',\n                \$message,"
+    ) !== false
+    &&
+    strpos(
+        $poultry,
+        "'/management/poultry_cycle.php?id='"
+    ) !== false
+    &&
+    strpos(
+        $poultry,
+        "\$_SESSION['poultry_cycle_flash'] = \$message;"
+    ) === false
+);
+
+$check(
+    'RUMINANT_END_PRODUCTION_USES_TOP_CENTER_SESSION_NOTIFICATION',
+    strpos(
+        $ruminant,
+        "redirectWithNotification(\n            'success',\n            \$message,"
+    ) !== false
+    &&
+    strpos(
+        $ruminant,
+        "'/management/ruminant_cycle.php?id='"
+    ) !== false
+    &&
+    strpos(
+        $ruminant,
+        "\$_SESSION[\$flashKey] ="
+    ) === false
 );
 
 $check(
