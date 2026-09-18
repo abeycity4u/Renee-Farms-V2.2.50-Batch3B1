@@ -56,7 +56,14 @@ ob_start();
 ?>
 <!doctype html><html lang="en"><head><meta charset="UTF-8"><title>Expense Report - Renee Farms</title></head><body>
 <h2>Expense Report - <?php echo htmlspecialchars($periodLabel); ?></h2>
-<table class="table" style="margin-bottom:12px"><thead><tr><th>Total Expenses</th><th>Farm Scope</th><th>Production Type</th><th>Category</th></tr></thead><tbody><tr><td>₦<?php echo number_format($totalExpenses,2); ?></td><td><?php echo htmlspecialchars($farmType==='all'?'All Farms':ucfirst($farmType)); ?></td><td><?php echo htmlspecialchars($productionType==='all'?'All Production Types':ucfirst($productionType)); ?></td><td><?php echo htmlspecialchars($category==='all'?'All Categories':ucfirst($category)); ?></td></tr></tbody></table>
+<table class="table" style="margin-bottom:12px"><thead><tr><th>Total Expenses</th><th>Farm Scope</th><th>Production Type</th><th>Category</th></tr></thead><tbody><tr><td>₦<?php echo number_format($totalExpenses,2); ?></td><td><?php echo htmlspecialchars($farmType==='all'?'All Farms':ucfirst($farmType)); ?></td><td><?php echo htmlspecialchars(
+    $productionType === 'all'
+        ? 'All Production Types'
+        : attribution_production_label(
+            $farmType,
+            $productionType
+        )
+); ?></td><td><?php echo htmlspecialchars($category==='all'?'All Categories':ucfirst($category)); ?></td></tr></tbody></table>
 <h3>Breakdown</h3>
 <table class="table" style="margin-bottom:12px"><thead><tr><th>Farm Type</th><th>Total</th><th>Category</th><th>Total</th></tr></thead><tbody>
 <?php $fk=array_keys($farmTypeTotals);$fv=array_values($farmTypeTotals);$ck=array_keys($categoryTotals);$cv=array_values($categoryTotals);$n=max(count($fk),count($ck),1);for($i=0;$i<$n;$i++): ?>
@@ -67,7 +74,16 @@ ob_start();
 <table class="table"><thead><tr><th>Date</th><th>Farm Type</th><th>Production Type</th><th>Category</th><th>Unit</th><th>Amount</th><th>Total</th><th>Description</th><th>Recorded By</th></tr></thead><tbody>
 <?php if(!$expenses): ?><tr><td colspan="9">No expenses recorded for this period.</td></tr>
 <?php else: foreach($expenses as $expense): $line=(float)($expense['amount']??0)*(float)($expense['unit']??1); ?>
-<tr><td><?php echo htmlspecialchars(date('d/m/Y',strtotime((string)$expense['expense_date']))); ?></td><td><?php echo htmlspecialchars(ucfirst((string)$expense['farm_type'])); ?></td><td><?php echo htmlspecialchars(ucfirst((string)($expense['production_type']??'--'))); ?></td><td><?php echo htmlspecialchars(ucfirst((string)$expense['category'])); ?></td><td><?php echo number_format((float)($expense['unit']??1),2); ?></td><td>₦<?php echo number_format((float)($expense['amount']??0),2); ?></td><td>₦<?php echo number_format($line,2); ?></td><td><?php echo htmlspecialchars((string)($expense['description']?:'--')); ?></td><td><?php echo htmlspecialchars(transaction_recorded_by_label_from_row(
+<tr><td><?php echo htmlspecialchars(date('d/m/Y',strtotime((string)$expense['expense_date']))); ?></td><td><?php echo htmlspecialchars(ucfirst((string)$expense['farm_type'])); ?></td><td><?php echo htmlspecialchars(
+    attribution_production_label(
+        (string)(
+            $expense['farm_type']
+            ?? ''
+        ),
+        $expense['production_type']
+            ?? null
+    )
+); ?></td><td><?php echo htmlspecialchars(ucfirst((string)$expense['category'])); ?></td><td><?php echo number_format((float)($expense['unit']??1),2); ?></td><td>₦<?php echo number_format((float)($expense['amount']??0),2); ?></td><td>₦<?php echo number_format($line,2); ?></td><td><?php echo htmlspecialchars((string)($expense['description']?:'--')); ?></td><td><?php echo htmlspecialchars(transaction_recorded_by_label_from_row(
         $pdo,
         $tenantFarmId,
         $expense

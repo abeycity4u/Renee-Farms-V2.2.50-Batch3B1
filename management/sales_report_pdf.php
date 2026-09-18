@@ -75,6 +75,54 @@ foreach ($sales as $row) {
 }
 $transactionCount = count($sales);
 
+$saleProductionLabel =
+    static function (array $sale): string {
+        return attribution_production_label(
+            (string)(
+                $sale['farm_type']
+                ?? ''
+            ),
+            $sale['production_type']
+                ?? null
+        );
+    };
+
+$saleCycleLabel =
+    static function (array $sale): string {
+        $cycleCode =
+            trim(
+                (string)(
+                    $sale['cycle_code']
+                    ?? ''
+                )
+            );
+
+        if ($cycleCode !== '') {
+            return $cycleCode;
+        }
+
+        $saleFarmType =
+            strtolower(
+                trim(
+                    (string)(
+                        $sale['farm_type']
+                        ?? ''
+                    )
+                )
+            );
+
+        if ($saleFarmType === 'general') {
+            return 'No production cycle';
+        }
+
+        return attribution_cycle_label(
+            $saleFarmType,
+            $sale['production_type']
+                ?? null,
+            null
+        );
+    };
+
 $ledger = [];
 $outstanding = 0.0;
 $totalCredit = 0.0;
@@ -109,7 +157,14 @@ ob_start();
 <h2>Sales Records - <?php echo htmlspecialchars($periodLabel); ?></h2>
 <table class="table" style="margin-bottom:12px">
 <thead><tr><th>Total Sales</th><th>Transactions</th><th>Farm Scope</th><th>Production Type</th></tr></thead>
-<tbody><tr><td>₦<?php echo number_format($totalSales,2); ?></td><td><?php echo $transactionCount; ?></td><td><?php echo htmlspecialchars($farmType==='all'?'All Farms':ucfirst($farmType)); ?></td><td><?php echo htmlspecialchars($productionType==='all'?'All Production Types':ucfirst($productionType)); ?></td></tr></tbody>
+<tbody><tr><td>₦<?php echo number_format($totalSales,2); ?></td><td><?php echo $transactionCount; ?></td><td><?php echo htmlspecialchars($farmType==='all'?'All Farms':ucfirst($farmType)); ?></td><td><?php echo htmlspecialchars(
+    $productionType === 'all'
+        ? 'All Production Types'
+        : attribution_production_label(
+            $farmType,
+            $productionType
+        )
+); ?></td></tr></tbody>
 </table>
 <?php if ($selectedCustomer !== ''): ?>
 <h3>Customer Debt Management — <?php echo htmlspecialchars($selectedCustomer); ?></h3>
@@ -131,9 +186,9 @@ ob_start();
 <?php endif; ?>
 <h3>Sales Records</h3>
 <table class="table"><thead><tr><th>Date</th><th>Farm Type</th><th>Production Type</th><th>Cycle</th><th>Product</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>Total Amount</th><th>Customer</th><th>Remarks</th><th>Recorded By</th></tr></thead><tbody>
-<?php if (!$sales): ?><tr><td colspan="11">No sales records for this period.</td></tr>
+<?php if (!$sales): ?><tr><td colspan="12">No sales records for this period.</td></tr>
 <?php else: foreach($sales as $sale): $rowTotal=(float)($sale['total_amount'] ?? ((float)$sale['quantity']*(float)$sale['unit_price'])); ?>
-<tr><td><?php echo htmlspecialchars(date('d/m/Y',strtotime((string)$sale['sale_date']))); ?></td><td><?php echo htmlspecialchars(ucfirst((string)$sale['farm_type'])); ?></td><td><?php echo htmlspecialchars(ucfirst((string)($sale['production_type']??'--'))); ?></td><td><?php echo htmlspecialchars((string)($sale['cycle_code'] ?: 'Shared / Unassigned')); ?></td><td><?php echo htmlspecialchars((string)$sale['product_type']); ?></td><td><?php echo number_format((float)$sale['quantity'],2); ?></td><td><?php echo htmlspecialchars(sales_unit_label($sale['unit_of_measure'] ?? null)); ?></td><td>₦<?php echo number_format((float)$sale['unit_price'],2); ?></td><td>₦<?php echo number_format($rowTotal,2); ?></td><td><?php echo htmlspecialchars((string)($sale['customer_name']?:'--')); ?></td><td><?php echo htmlspecialchars((string)($sale['remarks']?:'--')); ?></td><td><?php echo htmlspecialchars(transaction_recorded_by_label(
+<tr><td><?php echo htmlspecialchars(date('d/m/Y',strtotime((string)$sale['sale_date']))); ?></td><td><?php echo htmlspecialchars(ucfirst((string)$sale['farm_type'])); ?></td><td><?php echo htmlspecialchars($saleProductionLabel($sale)); ?></td><td><?php echo htmlspecialchars($saleCycleLabel($sale)); ?></td><td><?php echo htmlspecialchars((string)$sale['product_type']); ?></td><td><?php echo number_format((float)$sale['quantity'],2); ?></td><td><?php echo htmlspecialchars(sales_unit_label($sale['unit_of_measure'] ?? null)); ?></td><td>₦<?php echo number_format((float)$sale['unit_price'],2); ?></td><td>₦<?php echo number_format($rowTotal,2); ?></td><td><?php echo htmlspecialchars((string)($sale['customer_name']?:'--')); ?></td><td><?php echo htmlspecialchars((string)($sale['remarks']?:'--')); ?></td><td><?php echo htmlspecialchars(transaction_recorded_by_label(
         transaction_actor_farm_name(
             $pdo,
             $tenantFarmId

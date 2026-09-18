@@ -452,13 +452,13 @@ $pdfReportUrl = pdf_report_current_url();
                         <div class="mb-3">
                             <label>Production Type</label>
                             <select name="production_type" id="ruminantExpenseProduction" class="form-select" required>
-                                <option value="cattle">Cattle</option><option value="goat">Goat</option><option value="sheep">Sheep</option><option value="other">Other</option><option value="shared" selected>Shared / Unallocated Ruminant</option>
+                                <option value="cattle">Cattle</option><option value="goat">Goat</option><option value="sheep">Sheep</option><option value="other">Other</option><option value="shared" selected>Shared Ruminant / Other Ruminant</option>
                             </select>
                         </div>
                         <div class="mb-3">
                             <label>Production Cycle (optional)</label>
                             <select name="cycle_id" id="ruminantExpenseCycle" class="form-select"><option value="0">Shared between ruminant cycles</option></select>
-                            <small class="text-muted">A shared feed or expense can remain unallocated; choose a species cycle only when known.</small>
+                            <small class="text-muted">Shared Ruminant records the source attribution. Leave the cycle blank when no specific species cycle owns this expense; any unallocated remainder is handled separately in the allocation workspace.</small>
                         </div>
                         <div class="mb-3">
                             <label>Category</label>

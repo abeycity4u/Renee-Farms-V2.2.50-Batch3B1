@@ -287,16 +287,7 @@ $scopeLabel =
                         </div>
                     </div>
 
-                    <div class="col-md-2">
-                        <div class="small text-muted">
-                            Stock Movement
-                        </div>
-                        <div class="fw-semibold">
-                            #<?php echo (int)$movement['id']; ?>
-                        </div>
-                    </div>
-
-                    <div class="col-md-2">
+                    <div class="col-md-3">
                         <div class="small text-muted">
                             Date
                         </div>
@@ -308,7 +299,7 @@ $scopeLabel =
                         </div>
                     </div>
 
-                    <div class="col-md-2">
+                    <div class="col-md-3">
                         <div class="small text-muted">
                             Financial Type
                         </div>

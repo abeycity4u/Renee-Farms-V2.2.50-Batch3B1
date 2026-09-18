@@ -189,10 +189,8 @@ $money =
             <div class="card-body">
                 <div class="row g-3">
                     <div class="col-md-3">
-                        <div class="small text-muted">Expense</div>
+                        <div class="small text-muted">Expense Category</div>
                         <div class="fw-semibold">
-                            #<?php echo (int)$expense['id']; ?>
-                            ·
                             <?php echo $escape(
                                 ucfirst(
                                     (string)$expense['category']

@@ -27,8 +27,8 @@ const expensePermissionScope = 'expense_report';
     }
 
     const expenseAttributionTypes = {
-        poultry: {layer:'Layer', broiler:'Broiler', shared:'Shared / Unallocated Poultry'},
-        ruminant: {cattle:'Cattle', goat:'Goat', sheep:'Sheep', other:'Other', shared:'Shared / Unallocated Ruminant'},
+        poultry: {layer:'Layer', broiler:'Broiler', shared:'Shared Poultry / Other Poultry'},
+        ruminant: {cattle:'Cattle', goat:'Goat', sheep:'Sheep', other:'Other', shared:'Shared Ruminant / Other Ruminant'},
         general: {general:'General / Other Farm Expense'}
     };
     function refreshExpenseProductionTypes(selected = 'all') {
