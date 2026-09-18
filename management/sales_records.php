@@ -984,6 +984,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 <thead class="table-dark">
                                     <tr>
                                         <th>Date</th>
+                                        <th>Reference</th>
                                         <th>Farm Type</th>
                                         <th>Production Type</th>
                                         <th>Cycle</th>
@@ -1006,7 +1007,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 <tbody>
                                     <?php if (empty($salesRecords)): ?>
                                     <tr>
-                                        <td colspan="<?php echo $showActions ? '16' : '15'; ?>" class="text-center text-muted py-4">
+                                        <td colspan="<?php echo $showActions ? '17' : '16'; ?>" class="text-center text-muted py-4">
                                             <i class="bi bi-cart display-4 d-block mb-2"></i>
                                             No sales recorded for this period
                                         </td>
@@ -1016,6 +1017,9 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                         <tr>
                                             <td>
                                                 <strong><?php echo date('d/m/Y', strtotime($sale['sale_date'])); ?></strong>
+                                            </td>
+                                            <td class="text-nowrap">
+                                                <code><?php echo htmlspecialchars((string)($sale['public_reference'] ?? '—')); ?></code>
                                             </td>
                                             <td>
                                                 <span class="badge bg-<?php echo $sale['farm_type'] === 'poultry' ? 'info' : ($sale['farm_type'] === 'ruminant' ? 'warning' : 'secondary'); ?>">
