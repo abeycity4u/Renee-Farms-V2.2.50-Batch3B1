@@ -51,8 +51,34 @@ check_contains('Receivable sale lookup scopes by sale id and farm id', 'lib/sale
 check_contains('Sales allocation scopes sale lookup by id and farm id', 'lib/sales_allocation.php', 'WHERE id=? AND farm_id=? LIMIT 1');
 check_contains('Ruminant animal edit lookup scopes by id and farm id', 'ruminant/animal_registry.php', 'WHERE id=? AND farm_id=? LIMIT 1');
 check_contains('Poultry health event update lookup scopes by id and farm id', 'poultry/health.php', 'WHERE id=? AND farm_id=? LIMIT 1');
-check_contains('Production-cycle close resolves selected cycle inside tenant', 'management/production_cycles.php', 'WHERE id = ? AND farm_id = ? AND status = ?');
-check_contains('Poultry cycle workspace resolves cycle inside current farm', 'management/poultry_cycle.php', "SELECT * FROM production_cycles WHERE id=? AND farm_id=? AND farm_type='poultry' LIMIT 1");
+check_regex(
+    'Canonical production-cycle resolver scopes selected cycle by id and farm',
+    'lib/production_cycle_service.php',
+    '/function\s+production_cycle_get\s*\([\s\S]*?FROM\s+production_cycles[\s\S]*?WHERE\s+id\s*=\s*\?[\s\S]*?AND\s+farm_id\s*=\s*\?/i'
+);
+
+check_regex(
+    'Canonical production-cycle close locks through tenant-scoped resolver',
+    'lib/production_cycle_service.php',
+    '/function\s+production_cycle_close_v3\s*\([\s\S]*?production_cycle_get\s*\(\s*\$pdo\s*,\s*\$farmId\s*,\s*\$cycleId\s*,\s*true\s*\)/i'
+);
+
+check_regex(
+    'Canonical production-cycle close mutation remains id farm and status scoped',
+    'lib/production_cycle_service.php',
+    '/function\s+production_cycle_close_v3\s*\([\s\S]*?UPDATE\s+production_cycles[\s\S]*?WHERE\s+id\s*=\s*\?[\s\S]*?AND\s+farm_id\s*=\s*\?[\s\S]*?AND\s+status\s*=\s*\?/i'
+);
+check_regex(
+    'Poultry cycle workspace delegates cycle lookup to canonical resolver',
+    'management/poultry_cycle.php',
+    '/production_cycle_get\s*\(\s*\$pdo\s*,\s*\$farmId\s*,\s*\$cycleId\s*\)/'
+);
+
+check_regex(
+    'Ruminant cycle workspace delegates cycle lookup to canonical resolver',
+    'management/ruminant_cycle.php',
+    '/production_cycle_get\s*\(\s*\$pdo\s*,\s*\$farmId\s*,\s*\$cycleId\s*\)/'
+);
 check_contains('Poultry investigation passes current farm into diagnostics', 'management/investigation.php', 'poultry_diagnostic_investigate($pdo,$farmId,$cycleId,$type,$issue,$asOf)');
 check_contains('Ruminant investigation passes current farm into diagnostics', 'management/ruminant_investigation.php', 'ruminant_diagnostic_investigate_weight($pdo,$farmId,$animalId,$asOf)');
 check_regex('Billing return resolves payment attempt with tenant farm id', 'billing/return.php', '/billing_audit_attempt_by_reference\(\$pdo,\s*\$provider,\s*\$providerReference,\s*\$farmId,/');
