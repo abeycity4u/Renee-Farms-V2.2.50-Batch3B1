@@ -222,9 +222,23 @@ $check(
     'Entity validation rejects a reference from another record type'
 );
 
+$validDateControl =
+    'RA-SM-20260918-ABCDEFGHJK';
+
+$invalidDateControl =
+    'RA-SM-20261340-ABCDEFGHJK';
+
+$check(
+    record_reference_is_valid(
+        $validDateControl,
+        'stock_movement'
+    ),
+    'Date validation control is otherwise a valid reference'
+);
+
 $check(
     !record_reference_is_valid(
-        'RA-SM-20261340-ABCDEFGHJKLMNPQR',
+        $invalidDateControl,
         'stock_movement'
     ),
     'Reference validation rejects impossible dates'
