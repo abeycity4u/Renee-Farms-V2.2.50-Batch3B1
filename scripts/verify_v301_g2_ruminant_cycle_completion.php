@@ -263,10 +263,10 @@ $check(
 );
 
 $check(
-    'PAGE_FARM_ADMIN_ONLY_MUTATION_BOUNDARY',
+    'PAGE_OWNER_OR_FARM_ADMIN_MUTATION_BOUNDARY_WITH_TENANT_SAFE_COPY',
     strpos(
         $page,
-        "\$canEndProduction =\n    !isPlatformOwner()\n    && hasRole('farm_admin');"
+        "\$canEndProduction =\n    isPlatformOwner()\n    || hasRole('farm_admin');"
     ) !== false
     && strpos(
         $page,

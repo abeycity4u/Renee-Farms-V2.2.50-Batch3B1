@@ -44,8 +44,8 @@ if ($cycleId <= 0) {
 }
 
 $canEndProduction =
-    !isPlatformOwner()
-    && hasRole('farm_admin');
+    isPlatformOwner()
+    || hasRole('farm_admin');
 
 $today =
     function_exists('app_today')
