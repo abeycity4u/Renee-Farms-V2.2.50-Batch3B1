@@ -229,6 +229,16 @@ $(document).ready(function() {
         form.submit();
     }
     
+    function refreshCategoryFinancialTypeGuidance() {
+        const select = document.getElementById('categoryFinancialTypeSelect');
+        const help = document.getElementById('categoryFinancialTypeHelp');
+
+        if (!select || !help) return;
+
+        const option = select.selectedOptions?.[0];
+        help.textContent = option?.dataset?.help || '';
+    }
+
     function refreshDefaultProductionAttribution() {
         const farmSelect = document.getElementById('addItemFarmType');
         const usageSelect = document.getElementById('addItemUsageClassification');
@@ -273,6 +283,14 @@ $(document).ready(function() {
 
     document.addEventListener('DOMContentLoaded', function () {
         updateQuantityLabel();
+
+        refreshCategoryFinancialTypeGuidance();
+        document.getElementById('categoryFinancialTypeSelect')
+            ?.addEventListener(
+                'change',
+                refreshCategoryFinancialTypeGuidance
+            );
+
         refreshDefaultProductionAttribution();
         document.getElementById('addItemFarmType')?.addEventListener('change', refreshDefaultProductionAttribution);
         document.getElementById('addItemUsageClassification')?.addEventListener('change', refreshDefaultProductionAttribution);

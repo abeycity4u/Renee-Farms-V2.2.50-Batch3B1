@@ -31,6 +31,142 @@ function inventory_financial_classification_label(string $value): string
     return $labels[$value] ?? 'Other Stock';
 }
 
+/**
+ * Farmer-facing guidance for each Financial Type.
+ *
+ * Keep the classification meaning in one shared policy so pages do not
+ * invent their own examples or accounting explanation.
+ */
+function inventory_financial_classification_guidance(): array
+{
+    return [
+        'feed' => 'Animal or bird feed consumed in production. Examples: Layer Mash, Broiler Starter/Grower/Finisher, cattle, goat or sheep feed and concentrates. Feed purchase remains inventory/cash spending; Feed cost enters Profitability when consumed.',
+        'medication_vaccine' => 'Animal-health products used for disease prevention or treatment. Examples: EDS vaccine, Lasota, Gumboro vaccine, antibiotics, dewormers and veterinary medicines.',
+        'supplement' => 'Nutritional products used in addition to normal feed. Examples: vitamins, minerals, electrolytes, calcium, premixes and amino-acid supplements.',
+        'consumables' => 'Routine farm items that are used up during operations. Examples: disinfectants, Hydrogen Peroxide, gloves, syringes, detergents, litter materials and cleaning supplies.',
+        'equipment_tools' => 'Reusable or durable farm items. Examples: wheelbarrows, weighing scales, sprayers, shovels, feeders, drinkers and hand tools.',
+        'spare_parts' => 'Items kept for repairs and maintenance. Examples: generator parts, pump parts, belts, bearings, plumbing fittings and electrical repair materials.',
+        'other_stock' => 'Use for stocked items that do not fit another Financial Type. These items are not automatically treated as Feed, Medication/Vaccine, Supplement or routine Consumables.',
+    ];
+}
+
+function inventory_financial_classification_guidance_text(string $value): string
+{
+    $guidance = inventory_financial_classification_guidance();
+
+    return $guidance[$value]
+        ?? $guidance['other_stock'];
+}
+
+/**
+ * Category Farm Type is an eligibility boundary, not transaction attribution.
+ *
+ * A "both" category can contain Poultry, Ruminant or Both items. A module-
+ * specific category cannot silently contain stock owned by another module.
+ */
+function inventory_category_allows_item_farm_type(
+    string $categoryFarmType,
+    string $itemFarmType
+): bool {
+    $categoryFarmType = strtolower(trim($categoryFarmType));
+    $itemFarmType = strtolower(trim($itemFarmType));
+
+    if ($categoryFarmType === 'both') {
+        return in_array(
+            $itemFarmType,
+            ['poultry', 'ruminant', 'both'],
+            true
+        );
+    }
+
+    return $categoryFarmType !== ''
+        && $categoryFarmType === $itemFarmType;
+}
+
+/**
+ * Canonical Category -> Item contract.
+ *
+ * Financial Type owns accounting classification.
+ * Feed Usage owns Feed production specialization.
+ * Category Farm Type owns the allowed module boundary.
+ */
+function inventory_category_item_contract_errors(
+    string $categoryFarmType,
+    string $financialType,
+    string $itemFarmType,
+    string $feedCategory
+): array {
+    $categoryFarmType = strtolower(trim($categoryFarmType));
+    $financialType = strtolower(trim($financialType));
+    $itemFarmType = strtolower(trim($itemFarmType));
+    $feedCategory = strtolower(trim($feedCategory));
+
+    $errors = [];
+
+    if (!inventory_financial_classification_is_valid($financialType)) {
+        $errors[] = 'The Inventory Category has an invalid Financial Type.';
+    }
+
+    if (
+        !inventory_category_allows_item_farm_type(
+            $categoryFarmType,
+            $itemFarmType
+        )
+    ) {
+        $errors[] =
+            'The item Farm Type is not allowed by the selected Inventory Category.';
+    }
+
+    $feedUsages = [
+        'layer',
+        'broiler',
+        'ruminant',
+    ];
+
+    $isFeedUsage =
+        in_array(
+            $feedCategory,
+            $feedUsages,
+            true
+        );
+
+    if ($financialType === 'feed' && !$isFeedUsage) {
+        $errors[] =
+            'Financial Type Feed requires Layer Feed, Broiler Feed or Ruminant Feed usage.';
+    }
+
+    if ($financialType !== 'feed' && $isFeedUsage) {
+        $errors[] =
+            'Layer, Broiler and Ruminant Feed usage requires Financial Type Feed.';
+    }
+
+    if (
+        in_array(
+            $feedCategory,
+            ['layer', 'broiler'],
+            true
+        )
+        &&
+        $itemFarmType !== 'poultry'
+    ) {
+        $errors[] =
+            'Layer Feed and Broiler Feed items must use Farm Type Poultry.';
+    }
+
+    if (
+        $feedCategory === 'ruminant'
+        &&
+        $itemFarmType !== 'ruminant'
+    ) {
+        $errors[] =
+            'Ruminant Feed items must use Farm Type Ruminant.';
+    }
+
+    return array_values(
+        array_unique($errors)
+    );
+}
+
 /** Stock financial types whose USED movements are period operating costs. */
 function inventory_operating_consumption_classifications(): array
 {

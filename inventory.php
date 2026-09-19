@@ -199,18 +199,65 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
         try {
             $pdo->beginTransaction();
-            if ($financialType !== 'feed') {
-                $feedItemStmt = $pdo->prepare("SELECT COUNT(*) FROM stock_items WHERE category_id=? AND farm_id=? AND feed_category IN ('layer','broiler','ruminant')");
-                $feedItemStmt->execute([$categoryId, $currentFarmId]);
-                if ((int)$feedItemStmt->fetchColumn() > 0) {
-                    throw new RuntimeException('This category contains Layer, Broiler or Ruminant Feed items, so its Financial Type must remain Feed.');
-                }
-            }
-            $stmt = $pdo->prepare('UPDATE inventory_categories SET financial_type=? WHERE id=? AND farm_id=?');
-            $stmt->execute([$financialType, $categoryId, $currentFarmId]);
-            if ($stmt->rowCount() === 0) {
+
+            $categoryLockStmt = $pdo->prepare(
+                'SELECT id, farm_type FROM inventory_categories WHERE id=? AND farm_id=? FOR UPDATE'
+            );
+            $categoryLockStmt->execute([
+                $categoryId,
+                $currentFarmId,
+            ]);
+
+            $lockedCategory = $categoryLockStmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$lockedCategory) {
                 throw new RuntimeException('Inventory category not found.');
             }
+
+            $categoryItemStmt = $pdo->prepare(
+                'SELECT id, item_name, farm_type, feed_category
+                 FROM stock_items
+                 WHERE category_id=? AND farm_id=?
+                 ORDER BY id'
+            );
+            $categoryItemStmt->execute([
+                $categoryId,
+                $currentFarmId,
+            ]);
+
+            foreach (
+                $categoryItemStmt->fetchAll(PDO::FETCH_ASSOC)
+                as $categoryItem
+            ) {
+                $contractErrors =
+                    inventory_category_item_contract_errors(
+                        (string)$lockedCategory['farm_type'],
+                        $financialType,
+                        (string)$categoryItem['farm_type'],
+                        (string)$categoryItem['feed_category']
+                    );
+
+                if ($contractErrors) {
+                    throw new RuntimeException(
+                        'Cannot apply that Financial Type while item "' .
+                        (string)$categoryItem['item_name'] .
+                        '" remains in this category. ' .
+                        $contractErrors[0]
+                    );
+                }
+            }
+
+            $stmt = $pdo->prepare(
+                'UPDATE inventory_categories
+                 SET financial_type=?
+                 WHERE id=? AND farm_id=?'
+            );
+            $stmt->execute([
+                $financialType,
+                $categoryId,
+                $currentFarmId,
+            ]);
+
             // Category is the source of truth for future receipts. Existing stock
             // transaction snapshots are intentionally left unchanged for audit history.
             $pdo->prepare('UPDATE stock_items SET financial_classification=? WHERE category_id=? AND farm_id=?')
@@ -295,22 +342,43 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         $categoryId = (int)($_POST['category_id'] ?? 0);
-        $categoryStmt = $pdo->prepare('SELECT id, financial_type FROM inventory_categories WHERE id = ? AND farm_id = ?');
-        $categoryStmt->execute([$categoryId, $currentFarmId]);
+        $categoryStmt = $pdo->prepare(
+            'SELECT id, farm_type, financial_type
+             FROM inventory_categories
+             WHERE id = ? AND farm_id = ?'
+        );
+        $categoryStmt->execute([
+            $categoryId,
+            $currentFarmId,
+        ]);
+
         $selectedCategory = $categoryStmt->fetch(PDO::FETCH_ASSOC);
+
         if (!$selectedCategory) {
             $_SESSION['error'] = 'The selected category does not belong to this farm.';
             header('Location: inventory.php');
             exit();
         }
-        $financialClassification = (string)($selectedCategory['financial_type'] ?? 'other_stock');
-        if (!inventory_financial_classification_is_valid($financialClassification)) {
-            $_SESSION['error'] = 'The selected category needs a valid Financial Type before items can be added.';
-            header('Location: inventory.php');
-            exit();
-        }
-        if ($feedCategory !== 'general' && $financialClassification !== 'feed') {
-            $_SESSION['error'] = 'Layer, Broiler and Ruminant Feed usage must use an Inventory Category whose Financial Type is Feed.';
+
+        $financialClassification =
+            (string)(
+                $selectedCategory['financial_type']
+                ?? 'other_stock'
+            );
+
+        $categoryItemErrors =
+            inventory_category_item_contract_errors(
+                (string)(
+                    $selectedCategory['farm_type']
+                    ?? ''
+                ),
+                $financialClassification,
+                $farmType,
+                $feedCategory
+            );
+
+        if ($categoryItemErrors) {
+            $_SESSION['error'] = $categoryItemErrors[0];
             header('Location: inventory.php');
             exit();
         }
@@ -905,12 +973,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                     </div>
                                     <div class="mb-3">
                                         <label>Financial Type</label>
-                                        <select name="category_financial_type" class="form-select" required>
+                                        <select name="category_financial_type" id="categoryFinancialTypeSelect" class="form-select" required>
                                             <?php foreach (inventory_financial_classifications() as $financialKey => $financialLabel): ?>
-                                                <option value="<?php echo htmlspecialchars($financialKey); ?>" <?php echo $financialKey === 'other_stock' ? 'selected' : ''; ?>><?php echo htmlspecialchars($financialLabel); ?></option>
+                                                <option
+                                                    value="<?php echo htmlspecialchars($financialKey); ?>"
+                                                    data-help="<?php echo htmlspecialchars(inventory_financial_classification_guidance_text($financialKey), ENT_QUOTES); ?>"
+                                                    <?php echo $financialKey === 'other_stock' ? 'selected' : ''; ?>
+                                                ><?php echo htmlspecialchars($financialLabel); ?></option>
                                             <?php endforeach; ?>
                                         </select>
-                                        <small class="text-muted">Choose once for this category. Items inherit it automatically for spending reports.</small>
+                                        <small id="categoryFinancialTypeHelp" class="text-muted">
+                                            <?php echo htmlspecialchars(inventory_financial_classification_guidance_text('other_stock')); ?>
+                                        </small>
                                     </div>
                                     <div class="mb-3">
                                         <label>Unit (optional)</label>

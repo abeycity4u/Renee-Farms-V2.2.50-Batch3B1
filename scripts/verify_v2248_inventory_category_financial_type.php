@@ -3,7 +3,8 @@ $root = dirname(__DIR__);
 $checks = [
     'migration 026 category financial type' => [$root.'/migrations/026_inventory_category_financial_type.sql', 'ADD COLUMN financial_type'],
     'category add captures financial type' => [$root.'/inventory.php', 'name="category_financial_type"'],
-    'category is add-item source of truth' => [$root.'/inventory.php', 'SELECT id, financial_type FROM inventory_categories'],
+    'category add-item loads farm and financial authority' => [$root.'/inventory.php', 'SELECT id, farm_type, financial_type'],
+    'category add-item uses canonical category/item contract' => [$root.'/inventory.php', 'inventory_category_item_contract_errors('],
     'feed/category consistency validation' => [$root.'/inventory.php', 'Financial Type is Feed'],
     'inventory financial controlled list' => [$root.'/lib/inventory_financial.php', "'medication_vaccine' => 'Medication / Vaccine'"],
     'single release notes' => [$root.'/RELEASE_NOTES.txt', 'CONSOLIDATED RELEASE NOTES'],
