@@ -114,7 +114,12 @@ $checks['WORKSPACE_VISIBLE_REMAINDER'] =
 $checks['WORKSPACE_NO_CYCLE_STATUS_RESTRICTION'] =
     strpos(
         $content['workspace'],
-        'Closed cycles remain visible'
+        'production_cycle_list_for_farm('
+    ) !== false
+    &&
+    strpos(
+        $content['workspace'],
+        'financial_allocation_service_target_contract('
     ) !== false;
 
 $checks['API_POST_ONLY'] =

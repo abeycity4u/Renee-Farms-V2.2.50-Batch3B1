@@ -136,10 +136,15 @@ check_result(
 check_result(
     $checks,
     'BROAD_TENANT_CYCLE_DISCOVERY',
-    preg_match(
-        '/FROM\s+production_cycles\s+WHERE\s+farm_id=\?/is',
-        $source
-    ) === 1
+    strpos(
+        $source,
+        'production_cycle_list_for_farm('
+    ) !== false
+    &&
+    strpos(
+        $source,
+        'stock_consumption_allocation_service_target_contract'
+    ) !== false
 );
 
 check_result(

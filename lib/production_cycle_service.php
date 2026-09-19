@@ -384,6 +384,50 @@ if (!function_exists('production_cycle_get')) {
     }
 }
 
+
+if (!function_exists('production_cycle_list_for_farm')) {
+    /**
+     * Canonical farm-scoped production-cycle reader.
+     *
+     * This is intentionally a broad read. Allocation-specific services remain
+     * responsible for deciding whether any returned cycle is compatible with
+     * an Expense, consumed Stock movement, or Sale revenue parent.
+     */
+    function production_cycle_list_for_farm(
+        PDO $pdo,
+        int $farmId
+    ): array {
+        production_cycle_assert_farm_id(
+            $farmId
+        );
+
+        $stmt =
+            $pdo->prepare(
+                'SELECT
+                     id,
+                     farm_id,
+                     cycle_code,
+                     farm_type,
+                     production_type,
+                     status,
+                     start_date
+                 FROM production_cycles
+                 WHERE farm_id = ?
+                 ORDER BY start_date DESC, id DESC'
+            );
+
+        $stmt->execute([
+            $farmId,
+        ]);
+
+        return
+            $stmt->fetchAll(
+                PDO::FETCH_ASSOC
+            ) ?: [];
+    }
+}
+
+
 if (!function_exists('production_cycle_display_type')) {
     function production_cycle_display_type(
         PDO $pdo,

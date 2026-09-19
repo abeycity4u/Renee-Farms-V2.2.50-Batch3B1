@@ -9,6 +9,9 @@ require_once __DIR__
 require_once __DIR__
     . '/stock_consumption_allocation_persistence.php';
 
+require_once __DIR__
+    . '/production_cycle_service.php';
+
 /*
  * V3.0.1 Consumed Stock Allocation Workspace
  *
@@ -555,34 +558,14 @@ function stock_consumption_allocation_workspace_snapshot(
         );
 
     /*
-     * Candidate discovery is intentionally broad.
-     * Canonical target compatibility remains in the shared-cost service.
-     *
-     * Closed cycles remain visible for legitimate historical correction.
+     * Candidate discovery is shared across allocation workspaces.
+     * Each allocation service still owns target compatibility policy.
      */
-    $cycleStmt =
-        $pdo->prepare(
-            "SELECT
-                 id,
-                 farm_id,
-                 cycle_code,
-                 farm_type,
-                 production_type,
-                 status,
-                 start_date
-             FROM production_cycles
-             WHERE farm_id=?
-             ORDER BY start_date DESC,id DESC"
-        );
-
-    $cycleStmt->execute([
-        $farmId,
-    ]);
-
     $candidateCycles =
-        $cycleStmt->fetchAll(
-            PDO::FETCH_ASSOC
-        ) ?: [];
+        production_cycle_list_for_farm(
+            $pdo,
+            $farmId
+        );
 
     $eligibleCycles = [];
     $incompatibleCycles = [];

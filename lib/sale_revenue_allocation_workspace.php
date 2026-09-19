@@ -3,6 +3,9 @@
 require_once __DIR__
     . '/sale_revenue_allocation_persistence.php';
 
+require_once __DIR__
+    . '/production_cycle_service.php';
+
 require_once dirname(__DIR__)
     . '/includes/permission_catalog.php';
 
@@ -299,34 +302,14 @@ function sale_revenue_allocation_workspace_snapshot(
         );
 
     /*
-     * Candidate discovery is intentionally broad.
-     * Canonical revenue target policy decides eligibility.
-     * Closed historical cycles remain discoverable; future-start and
-     * incompatible cycles are rejected by the shared service.
+     * Candidate discovery is shared across allocation workspaces.
+     * Each allocation service still owns target compatibility policy.
      */
-    $stmt =
-        $pdo->prepare(
-            "SELECT
-                 id,
-                 farm_id,
-                 cycle_code,
-                 farm_type,
-                 production_type,
-                 status,
-                 start_date
-             FROM production_cycles
-             WHERE farm_id=?
-             ORDER BY start_date DESC,id DESC"
-        );
-
-    $stmt->execute([
-        $farmId,
-    ]);
-
     $candidateCycles =
-        $stmt->fetchAll(
-            PDO::FETCH_ASSOC
-        ) ?: [];
+        production_cycle_list_for_farm(
+            $pdo,
+            $farmId
+        );
 
     $eligibleCycles = [];
     $incompatibleCycles = [];
