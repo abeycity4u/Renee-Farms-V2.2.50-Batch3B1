@@ -7,7 +7,7 @@ $head = file_get_contents($headPath);
 $dashboard = file_get_contents($root . '/dashboard.php');
 $health = file_get_contents($root . '/poultry/health.php');
 $investigation = file_get_contents($root . '/management/investigation.php');
-$category = file_get_contents($root . '/inventory/category_list.php');
+$category = file_get_contents($root . '/inventory.php');
 
 $checks = [
  'responsive.css is globally linked' => strpos($head, "/assets/css/responsive.css") !== false,
@@ -24,7 +24,9 @@ $checks = [
  'Farm Intelligence action layout is centralized' => strpos($css, '.intel-row .intel-action') !== false,
  'Poultry Health page uses shared toolbar primitive' => strpos($health, 'app-responsive-toolbar') !== false,
  'Investigation page uses shared toolbar primitive' => strpos($investigation, 'app-responsive-toolbar') !== false,
- 'Inventory category table has responsive wrapper' => strpos($category, '<div class="table-responsive">') !== false,
+ 'Canonical Inventory category table has responsive wrapper' =>
+    strpos($category, 'id="addCategoryModal"') !== false
+    && strpos($category, 'table-responsive app-scroll-max-320') !== false,
 ];
 
 $pass = 0;

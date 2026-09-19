@@ -125,24 +125,54 @@ function inventory_permission_handle_delegated_add_item(PDO $pdo): void
     }
 
     $categoryId = (int)($_POST['category_id'] ?? 0);
-    $categoryStmt = $pdo->prepare('SELECT id, financial_type FROM inventory_categories WHERE id = ? AND farm_id = ?');
-    $categoryStmt->execute([$categoryId, $farmId]);
-    $selectedCategory = $categoryStmt->fetch(PDO::FETCH_ASSOC);
+    $categoryStmt = $pdo->prepare(
+        'SELECT id, farm_type, financial_type
+         FROM inventory_categories
+         WHERE id = ? AND farm_id = ?'
+    );
+    $categoryStmt->execute([
+        $categoryId,
+        $farmId,
+    ]);
+
+    $selectedCategory =
+        $categoryStmt->fetch(
+            PDO::FETCH_ASSOC
+        );
+
     if (!$selectedCategory) {
         $_SESSION['error'] = 'The selected category does not belong to this farm.';
         header('Location: ' . BASE_URL . '/inventory.php');
         exit();
     }
 
-    $financialClassification = (string)($selectedCategory['financial_type'] ?? 'other_stock');
-    if (!inventory_financial_classification_is_valid($financialClassification)) {
-        $_SESSION['error'] = 'The selected category needs a valid Financial Type before items can be added.';
-        header('Location: ' . BASE_URL . '/inventory.php');
-        exit();
-    }
-    if ($feedCategory !== 'general' && $financialClassification !== 'feed') {
-        $_SESSION['error'] = 'Layer, Broiler and Ruminant Feed usage must use an Inventory Category whose Financial Type is Feed.';
-        header('Location: ' . BASE_URL . '/inventory.php');
+    $financialClassification =
+        (string)(
+            $selectedCategory['financial_type']
+            ?? 'other_stock'
+        );
+
+    $categoryItemErrors =
+        inventory_category_item_contract_errors(
+            (string)(
+                $selectedCategory['farm_type']
+                ?? ''
+            ),
+            $financialClassification,
+            $farmType,
+            $feedCategory
+        );
+
+    if ($categoryItemErrors) {
+        $_SESSION['error'] =
+            $categoryItemErrors[0];
+
+        header(
+            'Location: '
+            . BASE_URL
+            . '/inventory.php'
+        );
+
         exit();
     }
 

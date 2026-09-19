@@ -7,6 +7,7 @@ $root = dirname(__DIR__);
 $files = [
     'financial' => $root . '/lib/inventory_financial.php',
     'inventory' => $root . '/inventory.php',
+    'bridge' => $root . '/includes/inventory_permission_hardening.php',
     'js' => $root . '/assets/js/inventory.js',
 ];
 
@@ -51,6 +52,11 @@ $financial =
 $inventory =
     is_file($files['inventory'])
         ? (string)file_get_contents($files['inventory'])
+        : '';
+
+$bridge =
+    is_file($files['bridge'])
+        ? (string)file_get_contents($files['bridge'])
         : '';
 
 $js =
@@ -186,6 +192,31 @@ check_contract(
         "/SELECT\\s+id,\\s*farm_type,\\s*financial_type\\s+FROM\\s+inventory_categories/s",
         $inventory
     ) === 1
+);
+
+
+check_contract(
+    'DELEGATED_ADD_ITEM_LOADS_CATEGORY_FARM_AND_FINANCIAL',
+    preg_match(
+        "/SELECT\\s+id,\\s*farm_type,\\s*financial_type\\s+FROM\\s+inventory_categories/s",
+        $bridge
+    ) === 1
+);
+
+check_contract(
+    'DELEGATED_ADD_ITEM_USES_SHARED_CATEGORY_ITEM_CONTRACT',
+    strpos(
+        $bridge,
+        'inventory_category_item_contract_errors('
+    ) !== false
+);
+
+check_contract(
+    'DELEGATED_ADD_ITEM_HAS_NO_ONE_WAY_FEED_VALIDATION',
+    strpos(
+        $bridge,
+        "\$feedCategory !== 'general' && \$financialClassification !== 'feed'"
+    ) === false
 );
 
 check_contract(

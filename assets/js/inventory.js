@@ -229,6 +229,41 @@ $(document).ready(function() {
         form.submit();
     }
     
+    function openRequestedCategoryWorkspace() {
+        const params =
+            new URLSearchParams(
+                window.location.search
+            );
+
+        if (
+            params.get('manage_categories')
+            !== '1'
+        ) {
+            return;
+        }
+
+        const modalElement =
+            document.getElementById(
+                'addCategoryModal'
+            );
+
+        if (
+            !modalElement
+            ||
+            typeof bootstrap === 'undefined'
+            ||
+            !bootstrap.Modal
+        ) {
+            return;
+        }
+
+        bootstrap.Modal
+            .getOrCreateInstance(
+                modalElement
+            )
+            .show();
+    }
+
     function refreshCategoryFinancialTypeGuidance() {
         const select = document.getElementById('categoryFinancialTypeSelect');
         const help = document.getElementById('categoryFinancialTypeHelp');
@@ -283,6 +318,8 @@ $(document).ready(function() {
 
     document.addEventListener('DOMContentLoaded', function () {
         updateQuantityLabel();
+
+        openRequestedCategoryWorkspace();
 
         refreshCategoryFinancialTypeGuidance();
         document.getElementById('categoryFinancialTypeSelect')

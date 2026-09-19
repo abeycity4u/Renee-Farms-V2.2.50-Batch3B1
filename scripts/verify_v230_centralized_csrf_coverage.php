@@ -22,7 +22,10 @@ $permissionsSave = $read('admin/permissions_save.php');
 $poultryCycle = $read('management/poultry_cycle.php');
 $apiHelpers = $read('api/api_helpers.php');
 $inventoryAdd = $read('inventory/add_category.php');
+$inventoryList = $read('inventory/category_list.php');
 $inventoryDelete = $read('inventory/delete_category.php');
+$inventoryBridge = $read('includes/inventory_permission_hardening.php');
+$inventoryCategoryRedirect = $read('includes/inventory_category_legacy_redirect.php');
 $animalRegistry = $read('ruminant/animal_registry.php');
 $productionCycles = $read('management/production_cycles.php');
 $users = $read('management/users.php');
@@ -37,8 +40,54 @@ $add('Module Permissions form uses centralized CSRF field', $contains($permissio
 $add('Module Permissions save uses centralized POST guard', $contains($permissionsSave, 'require_valid_csrf_post();'));
 $add('Production-entry basis approval uses centralized POST guard', $contains($poultryCycle, 'require_valid_csrf_post();'));
 $add('API helper delegates token validation to shared CSRF helper', $contains($apiHelpers, 'csrf_request_is_valid()'));
-$add('Inventory Add Category uses centralized POST guard', $contains($inventoryAdd, 'require_valid_csrf_post();'));
-$add('Inventory Delete Category uses centralized POST guard', $contains($inventoryDelete, 'require_valid_csrf_post();'));
+$add(
+    'Canonical Inventory browser POSTs use centralized CSRF guard',
+    $contains(
+        $inventoryBridge,
+        'require_valid_csrf_post();'
+    )
+    && $contains(
+        $inventoryBridge,
+        'REQUEST_METHOD'
+    )
+);
+
+$add(
+    'Retired Inventory category routes are non-mutating compatibility redirects',
+    $contains(
+        $inventoryAdd,
+        'inventory_category_legacy_redirect.php'
+    )
+    && $contains(
+        $inventoryList,
+        'inventory_category_legacy_redirect.php'
+    )
+    && $contains(
+        $inventoryDelete,
+        'inventory_category_legacy_redirect.php'
+    )
+    && $contains(
+        $inventoryCategoryRedirect,
+        '/inventory.php?manage_categories=1'
+    )
+    && $contains(
+        $inventoryCategoryRedirect,
+        '303'
+    )
+    && !$contains(
+        $inventoryCategoryRedirect,
+        'INSERT INTO'
+    )
+    && !$contains(
+        $inventoryCategoryRedirect,
+        'UPDATE inventory_categories'
+    )
+    && !$contains(
+        $inventoryCategoryRedirect,
+        'DELETE FROM inventory_categories'
+    )
+);
+
 $add('Ruminant Animal Registry uses centralized POST guard', $contains($animalRegistry, 'require_valid_csrf_post();'));
 
 $productionCyclesLegacy = $contains($productionCycles, "verify_csrf_token(\$_POST['csrf_token'] ?? '')");

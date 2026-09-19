@@ -5,6 +5,7 @@ $checks = [
     'category add captures financial type' => [$root.'/inventory.php', 'name="category_financial_type"'],
     'category add-item loads farm and financial authority' => [$root.'/inventory.php', 'SELECT id, farm_type, financial_type'],
     'category add-item uses canonical category/item contract' => [$root.'/inventory.php', 'inventory_category_item_contract_errors('],
+    'delegated add-item uses canonical category/item contract' => [$root.'/includes/inventory_permission_hardening.php', 'inventory_category_item_contract_errors('],
     'feed/category consistency validation' => [$root.'/inventory.php', 'Financial Type is Feed'],
     'inventory financial controlled list' => [$root.'/lib/inventory_financial.php', "'medication_vaccine' => 'Medication / Vaccine'"],
     'single release notes' => [$root.'/RELEASE_NOTES.txt', 'CONSOLIDATED RELEASE NOTES'],
