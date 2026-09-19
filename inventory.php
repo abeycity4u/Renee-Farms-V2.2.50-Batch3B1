@@ -323,13 +323,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         $farmType = trim((string)($_POST['farm_type'] ?? ''));
-        $feedCategory = trim((string)($_POST['feed_category'] ?? 'general'));
+        $feedCategory = trim((string)($_POST['feed_category'] ?? ''));
         $financialClassification = 'other_stock';
-        if ($feedCategory === 'ruminant') {
-            $farmType = 'ruminant';
-        } elseif (in_array($feedCategory, ['layer', 'broiler'], true)) {
-            $farmType = 'poultry';
-        }
         $defaultProductionType = inventory_normalize_default_production_type(
             $farmType,
             $feedCategory,
@@ -1101,18 +1096,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                         <?php endforeach; ?>
                                     </select>
                                     <small id="addItemCategoryHelp" class="text-muted">
-                                        Choose Farm Type and Usage Classification to see compatible categories.
+                                        Select a category first. Its Financial Type determines which Usage Classification choices are valid.
                                     </small>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label>Farm Type</label>
-                                    <select name="farm_type" id="addItemFarmType" class="form-select" required>
-                                        <?php foreach (allowedFarmTypes() as $type): ?><option value="<?php echo $type; ?>"><?php echo ucfirst($type); ?></option><?php endforeach; ?>
+                                    <select name="farm_type" id="addItemFarmType" class="form-select" required disabled>
+                                        <option value="">Select Farm Type</option>
+                                        <?php foreach (allowedFarmTypes() as $type): ?>
+                                            <option value="<?php echo $type; ?>">
+                                                <?php echo ucfirst($type); ?>
+                                            </option>
+                                        <?php endforeach; ?>
                                     </select>
+                                    <small id="addItemFarmTypeHelp" class="text-muted">
+                                        Available Farm Types follow the selected Inventory Category.
+                                    </small>
                                 </div>
                                 <div class="col-md-12 mb-3">
                                     <label>Usage Classification</label>
-                                    <select name="feed_category" id="addItemUsageClassification" class="form-select">
+                                    <select name="feed_category" id="addItemUsageClassification" class="form-select" required disabled>
+                                        <option value="">Select Usage Classification</option>
                                         <?php
                                         $feedCategoryLabels = [
                                             'general' => 'General / Non-feed item',
@@ -1122,10 +1126,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                         ];
                                         foreach (allowedFeedCategories() as $category):
                                         ?>
-                                            <option value="<?php echo $category; ?>"><?php echo $feedCategoryLabels[$category]; ?></option>
+                                            <option value="<?php echo $category; ?>">
+                                                <?php echo $feedCategoryLabels[$category]; ?>
+                                            </option>
                                         <?php endforeach; ?>
                                     </select>
-                                    <small class="text-muted">Classifies how the item is used. Feed choices determine their operation automatically. Choose General / Non-feed item for medication, vaccines, supplements, consumables, equipment and other stocked items.</small>
+                                    <small id="addItemUsageHelp" class="text-muted">
+                                        Select Category and Farm Type first. Only financially and operationally valid Usage choices will be shown.
+                                    </small>
                                 </div>
                                 <div class="col-md-12 mb-3" id="defaultProductionTypeWrap">
                                     <label>Default Production Attribution</label>

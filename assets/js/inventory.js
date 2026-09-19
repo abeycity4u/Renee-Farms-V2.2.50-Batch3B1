@@ -274,11 +274,150 @@ $(document).ready(function() {
         help.textContent = option?.dataset?.help || '';
     }
 
-    function refreshAddItemCategoryOptions() {
+    function selectedAddItemCategory() {
         const categorySelect =
             document.getElementById(
                 'addItemCategory'
             );
+
+        if (!categorySelect) {
+            return null;
+        }
+
+        const option =
+            categorySelect
+                .selectedOptions?.[0];
+
+        return (
+            option
+            && option.value
+        )
+            ? option
+            : null;
+    }
+
+    function refreshAddItemCategoryGuidance() {
+        const help =
+            document.getElementById(
+                'addItemCategoryHelp'
+            );
+
+        if (!help) {
+            return;
+        }
+
+        const category =
+            selectedAddItemCategory();
+
+        if (!category) {
+            help.textContent =
+                'Select a category first. Its Financial Type determines which Usage Classification choices are valid.';
+            return;
+        }
+
+        const label =
+            category.dataset.financialLabel
+            || 'Unknown';
+
+        const financialHelp =
+            category.dataset.financialHelp
+            || '';
+
+        help.textContent =
+            `Financial Type: ${label}. ${financialHelp}`;
+    }
+
+    function refreshAddItemFarmTypeOptions() {
+        const category =
+            selectedAddItemCategory();
+
+        const farmSelect =
+            document.getElementById(
+                'addItemFarmType'
+            );
+
+        if (!farmSelect) {
+            return;
+        }
+
+        if (!category) {
+            farmSelect.value = '';
+            farmSelect.disabled = true;
+
+            Array.from(
+                farmSelect.options
+            ).forEach(
+                option => {
+                    option.hidden = false;
+                    option.disabled = false;
+                }
+            );
+
+            return;
+        }
+
+        const categoryFarmType =
+            category.dataset.farmType
+            || '';
+
+        const financialType =
+            category.dataset.financialType
+            || '';
+
+        farmSelect.disabled = false;
+
+        Array.from(
+            farmSelect.options
+        ).forEach(
+            option => {
+                if (!option.value) {
+                    option.hidden = false;
+                    option.disabled = false;
+                    return;
+                }
+
+                let compatible =
+                    categoryFarmType === 'both'
+                        ? true
+                        : option.value === categoryFarmType;
+
+                /*
+                 * A Feed item must resolve to an operational module before its
+                 * usage can be Layer/Broiler/Ruminant. Therefore a category
+                 * scoped Both may feed Poultry or Ruminant, but an individual
+                 * Feed item cannot remain Farm Type Both.
+                 */
+                if (
+                    financialType === 'feed'
+                    && option.value === 'both'
+                ) {
+                    compatible = false;
+                }
+
+                option.hidden =
+                    !compatible;
+
+                option.disabled =
+                    !compatible;
+            }
+        );
+
+        const selected =
+            farmSelect
+                .selectedOptions?.[0];
+
+        if (
+            selected
+            && selected.value
+            && selected.disabled
+        ) {
+            farmSelect.value = '';
+        }
+    }
+
+    function refreshAddItemUsageOptions() {
+        const category =
+            selectedAddItemCategory();
 
         const farmSelect =
             document.getElementById(
@@ -292,101 +431,95 @@ $(document).ready(function() {
 
         const help =
             document.getElementById(
-                'addItemCategoryHelp'
+                'addItemUsageHelp'
             );
 
         if (
-            !categorySelect
-            || !farmSelect
+            !farmSelect
             || !usageSelect
         ) {
             return;
         }
 
-        const usage =
-            usageSelect.value
-            || 'general';
-
-        let itemFarmType =
+        const farmType =
             farmSelect.value;
 
         if (
-            usage === 'layer'
-            || usage === 'broiler'
+            !category
+            || !farmType
         ) {
-            itemFarmType = 'poultry';
+            usageSelect.value = '';
+            usageSelect.disabled = true;
 
-            if (
-                farmSelect.value
-                !== 'poultry'
-            ) {
-                farmSelect.value =
-                    'poultry';
-            }
-        } else if (
-            usage === 'ruminant'
-        ) {
-            itemFarmType = 'ruminant';
+            Array.from(
+                usageSelect.options
+            ).forEach(
+                option => {
+                    option.hidden = false;
+                    option.disabled = false;
+                }
+            );
 
-            if (
-                farmSelect.value
-                !== 'ruminant'
-            ) {
-                farmSelect.value =
-                    'ruminant';
+            if (help) {
+                help.textContent =
+                    'Select Category and Farm Type first. Only financially and operationally valid Usage choices will be shown.';
             }
+
+            return;
         }
 
-        let visibleCount = 0;
+        const financialType =
+            category.dataset.financialType
+            || '';
+
+        let allowedUsage = [];
+
+        if (financialType === 'feed') {
+            if (farmType === 'poultry') {
+                allowedUsage = [
+                    'layer',
+                    'broiler',
+                ];
+            } else if (
+                farmType === 'ruminant'
+            ) {
+                allowedUsage = [
+                    'ruminant',
+                ];
+            }
+        } else {
+            allowedUsage = [
+                'general',
+            ];
+        }
+
+        usageSelect.disabled = false;
 
         Array.from(
-            categorySelect.options
+            usageSelect.options
         ).forEach(
             option => {
-                if (
-                    !option.value
-                ) {
+                if (!option.value) {
                     option.hidden = false;
                     option.disabled = false;
                     return;
                 }
 
-                const categoryFarmType =
-                    option.dataset.farmType
-                    || '';
-
-                const financialType =
-                    option.dataset.financialType
-                    || '';
-
-                const farmCompatible =
-                    categoryFarmType === itemFarmType
-                    ||
-                    categoryFarmType === 'both';
-
-                const financialCompatible =
-                    usage === 'general'
-                        ? financialType !== 'feed'
-                        : financialType === 'feed';
-
                 const compatible =
-                    farmCompatible
-                    && financialCompatible;
+                    allowedUsage.includes(
+                        option.value
+                    );
 
                 option.hidden =
                     !compatible;
 
                 option.disabled =
                     !compatible;
-
-                if (compatible) {
-                    visibleCount++;
-                }
             }
         );
 
         const selected =
-            categorySelect
+            usageSelect
                 .selectedOptions?.[0];
 
         if (
@@ -394,76 +527,151 @@ $(document).ready(function() {
             && selected.value
             && selected.disabled
         ) {
-            categorySelect.value = '';
+            usageSelect.value = '';
         }
 
-        const current =
-            categorySelect
-                .selectedOptions?.[0];
-
-        if (
-            help
-            && current
-            && current.value
-        ) {
-            const label =
-                current.dataset.financialLabel
-                || 'Unknown';
-
-            const financialHelp =
-                current.dataset.financialHelp
-                || '';
-
-            help.textContent =
-                `Financial Type: ${label}. ${financialHelp}`;
-        } else if (help) {
-            help.textContent =
-                visibleCount > 0
-                    ? 'Choose a compatible category. The category Financial Type controls how this item is treated financially.'
-                    : 'No compatible category is available. Create or correct an Inventory Category first.';
+        if (help) {
+            if (
+                financialType === 'feed'
+                && farmType === 'poultry'
+            ) {
+                help.textContent =
+                    'Feed + Poultry: choose Layer Feed or Broiler Feed.';
+            } else if (
+                financialType === 'feed'
+                && farmType === 'ruminant'
+            ) {
+                help.textContent =
+                    'Feed + Ruminant: Ruminant Feed is the valid Usage Classification.';
+            } else {
+                help.textContent =
+                    'This category is non-feed financially, so Usage Classification is General / Non-feed item.';
+            }
         }
-    }
-
-    function refreshAddItemFormContract() {
-        refreshAddItemCategoryOptions();
-        refreshDefaultProductionAttribution();
     }
 
     function refreshDefaultProductionAttribution() {
-        const farmSelect = document.getElementById('addItemFarmType');
-        const usageSelect = document.getElementById('addItemUsageClassification');
-        const wrap = document.getElementById('defaultProductionTypeWrap');
-        const select = document.getElementById('defaultProductionType');
-        if (!farmSelect || !usageSelect || !wrap || !select) return;
-
-        const usage = usageSelect.value;
-        let farmType = farmSelect.value;
-        if (usage === 'layer' || usage === 'broiler') farmType = 'poultry';
-        if (usage === 'ruminant') farmType = 'ruminant';
-
-        // Feed ownership is already explicit in Usage Classification; only
-        // General / Non-feed stock needs an owner chosen by the farmer.
-        if (usage !== 'general') {
-            wrap.classList.add('d-none');
-            select.replaceChildren(
-                new Option(
-                    'Automatic',
-                    usage === 'layer' ? 'layer' : (usage === 'broiler' ? 'broiler' : 'shared')
-                )
+        const farmSelect =
+            document.getElementById(
+                'addItemFarmType'
             );
+
+        const usageSelect =
+            document.getElementById(
+                'addItemUsageClassification'
+            );
+
+        const wrap =
+            document.getElementById(
+                'defaultProductionTypeWrap'
+            );
+
+        const select =
+            document.getElementById(
+                'defaultProductionType'
+            );
+
+        if (
+            !farmSelect
+            || !usageSelect
+            || !wrap
+            || !select
+        ) {
             return;
         }
 
-        wrap.classList.remove('d-none');
-        const options = farmType === 'poultry'
-            ? [['shared','Shared Poultry'],['layer','Layer'],['broiler','Broiler']]
-            : farmType === 'ruminant'
-                ? [['shared','Shared Ruminant'],['cattle','Cattle'],['goat','Goat'],['sheep','Sheep'],['other','Other']]
-                : [['shared','Shared / Farm-wide']];
-        const previous = select.value;
+        const farmType =
+            farmSelect.value;
+
+        const usage =
+            usageSelect.value;
+
+        if (
+            !farmType
+            || !usage
+        ) {
+            wrap.classList.add(
+                'd-none'
+            );
+
+            select.replaceChildren();
+
+            return;
+        }
+
+        if (usage !== 'general') {
+            wrap.classList.add(
+                'd-none'
+            );
+
+            select.replaceChildren(
+                new Option(
+                    'Automatic',
+                    usage === 'layer'
+                        ? 'layer'
+                        : (
+                            usage === 'broiler'
+                                ? 'broiler'
+                                : 'shared'
+                        )
+                )
+            );
+
+            return;
+        }
+
+        wrap.classList.remove(
+            'd-none'
+        );
+
+        const options =
+            farmType === 'poultry'
+                ? [
+                    ['shared', 'Shared Poultry'],
+                    ['layer', 'Layer'],
+                    ['broiler', 'Broiler'],
+                ]
+                : farmType === 'ruminant'
+                    ? [
+                        ['shared', 'Shared Ruminant'],
+                        ['cattle', 'Cattle'],
+                        ['goat', 'Goat'],
+                        ['sheep', 'Sheep'],
+                        ['other', 'Other'],
+                    ]
+                    : [
+                        ['shared', 'Shared / Farm-wide'],
+                    ];
+
+        const previous =
+            select.value;
+
         select.replaceChildren();
-        options.forEach(([value,label]) => select.add(new Option(label, value)));
-        select.value = options.some(([value]) => value === previous) ? previous : options[0][0];
+
+        options.forEach(
+            ([value, label]) =>
+                select.add(
+                    new Option(
+                        label,
+                        value
+                    )
+                )
+        );
+
+        select.value =
+            options.some(
+                ([value]) =>
+                    value === previous
+            )
+                ? previous
+                : options[0][0];
+    }
+
+    function refreshAddItemFormContract() {
+        refreshAddItemCategoryGuidance();
+        refreshAddItemFarmTypeOptions();
+        refreshAddItemUsageOptions();
+        refreshDefaultProductionAttribution();
     }
 
     // Shared app-behaviors.js invokes these Inventory actions through window.
@@ -485,6 +693,12 @@ $(document).ready(function() {
 
         refreshAddItemFormContract();
 
+        document.getElementById('addItemCategory')
+            ?.addEventListener(
+                'change',
+                refreshAddItemFormContract
+            );
+
         document.getElementById('addItemFarmType')
             ?.addEventListener(
                 'change',
@@ -495,11 +709,5 @@ $(document).ready(function() {
             ?.addEventListener(
                 'change',
                 refreshAddItemFormContract
-            );
-
-        document.getElementById('addItemCategory')
-            ?.addEventListener(
-                'change',
-                refreshAddItemCategoryOptions
             );
     });

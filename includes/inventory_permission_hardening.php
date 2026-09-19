@@ -90,13 +90,7 @@ function inventory_permission_handle_delegated_add_item(PDO $pdo): void
 
     $farmId = requireCurrentFarmId();
     $farmType = trim((string)($_POST['farm_type'] ?? ''));
-    $feedCategory = trim((string)($_POST['feed_category'] ?? 'general'));
-
-    if ($feedCategory === 'ruminant') {
-        $farmType = 'ruminant';
-    } elseif (in_array($feedCategory, ['layer', 'broiler'], true)) {
-        $farmType = 'poultry';
-    }
+    $feedCategory = trim((string)($_POST['feed_category'] ?? ''));
 
     if (!inventory_permission_user_can_access_farm_type($farmType)) {
         $_SESSION['error'] = 'You do not have permission to add inventory items for that farm area.';

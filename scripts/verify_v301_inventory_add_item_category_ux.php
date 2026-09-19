@@ -20,7 +20,7 @@ $bridge =
         . '/includes/inventory_permission_hardening.php'
     );
 
-$checks = [];
+$checks = 0;
 $failed = 0;
 
 function ux_check(
@@ -29,14 +29,7 @@ function ux_check(
 ): void {
     global $checks, $failed;
 
-    $checks[] = [
-        $name,
-        $condition,
-    ];
-
-    if (!$condition) {
-        $failed++;
-    }
+    $checks++;
 
     echo
         $name
@@ -47,182 +40,248 @@ function ux_check(
                 : 'FAIL'
         )
         . PHP_EOL;
+
+    if (!$condition) {
+        $failed++;
+    }
 }
 
 
-ux_check(
-    'CATEGORY_SELECT_HAS_STABLE_ID',
+$itemNamePos =
+    strpos(
+        $inventory,
+        'name="item_name"'
+    );
+
+$categoryPos =
     strpos(
         $inventory,
         'id="addItemCategory"'
-    ) !== false
-);
+    );
 
-ux_check(
-    'CATEGORY_OPTIONS_EMIT_FARM_TYPE',
+$farmTypePos =
     strpos(
         $inventory,
-        'data-farm-type='
-    ) !== false
-);
+        'id="addItemFarmType"'
+    );
+
+$usagePos =
+    strpos(
+        $inventory,
+        'id="addItemUsageClassification"'
+    );
+
 
 ux_check(
-    'CATEGORY_OPTIONS_EMIT_FINANCIAL_TYPE',
+    'FORM_ORDER_ITEM_CATEGORY_FARM_USAGE',
+    $itemNamePos !== false
+    && $categoryPos !== false
+    && $farmTypePos !== false
+    && $usagePos !== false
+    && $itemNamePos < $categoryPos
+    && $categoryPos < $farmTypePos
+    && $farmTypePos < $usagePos
+);
+
+
+ux_check(
+    'CATEGORY_OPTIONS_REMAIN_VISIBLE_FIRST',
+    strpos(
+        $js,
+        'categorySelect.options'
+    ) === false
+    &&
+    strpos(
+        $js,
+        'refreshAddItemCategoryOptions'
+    ) === false
+);
+
+
+ux_check(
+    'CATEGORY_EMITS_FINANCIAL_TYPE',
     strpos(
         $inventory,
         'data-financial-type='
     ) !== false
 );
 
+
 ux_check(
-    'CATEGORY_OPTIONS_EMIT_CENTRAL_FINANCIAL_LABEL',
+    'CATEGORY_EMITS_FARM_TYPE',
     strpos(
         $inventory,
-        'inventory_financial_classification_label('
+        'data-farm-type='
     ) !== false
 );
 
+
 ux_check(
-    'CATEGORY_OPTIONS_EMIT_CENTRAL_FINANCIAL_GUIDANCE',
+    'CATEGORY_SHOWS_CENTRAL_FINANCIAL_GUIDANCE',
     strpos(
         $inventory,
         'inventory_financial_classification_guidance_text('
     ) !== false
-);
-
-ux_check(
-    'CATEGORY_HELP_TARGET_EXISTS',
-    strpos(
-        $inventory,
-        'id="addItemCategoryHelp"'
-    ) !== false
-);
-
-ux_check(
-    'JS_CATEGORY_FILTER_EXISTS',
-    strpos(
-        $js,
-        'function refreshAddItemCategoryOptions()'
-    ) !== false
-);
-
-ux_check(
-    'LAYER_AND_BROILER_FORCE_POULTRY_UI',
-    strpos(
-        $js,
-        "usage === 'layer'"
-    ) !== false
     &&
-    strpos(
-        $js,
-        "usage === 'broiler'"
-    ) !== false
-    &&
-    strpos(
-        $js,
-        "farmSelect.value =\n                    'poultry';"
-    ) !== false
-);
-
-ux_check(
-    'RUMINANT_FEED_FORCES_RUMINANT_UI',
-    strpos(
-        $js,
-        "usage === 'ruminant'"
-    ) !== false
-    &&
-    strpos(
-        $js,
-        "farmSelect.value = 'ruminant'"
-    ) !== false
-        ||
-    strpos(
-        $js,
-        "farmSelect.value =\n                    'ruminant';"
-    ) !== false
-);
-
-ux_check(
-    'GENERAL_USAGE_EXCLUDES_FEED_FINANCIAL_TYPE',
-    strpos(
-        $js,
-        "usage === 'general'"
-    ) !== false
-    &&
-    strpos(
-        $js,
-        "financialType !== 'feed'"
-    ) !== false
-);
-
-ux_check(
-    'SPECIALIZED_FEED_REQUIRES_FEED_FINANCIAL_TYPE',
-    strpos(
-        $js,
-        "financialType === 'feed'"
-    ) !== false
-);
-
-ux_check(
-    'CATEGORY_FARM_COMPATIBILITY_FILTER_EXISTS',
-    strpos(
-        $js,
-        "categoryFarmType === itemFarmType"
-    ) !== false
-    &&
-    strpos(
-        $js,
-        "categoryFarmType === 'both'"
-    ) !== false
-);
-
-ux_check(
-    'INCOMPATIBLE_CATEGORY_OPTIONS_HIDDEN',
-    strpos(
-        $js,
-        'option.hidden ='
-    ) !== false
-);
-
-ux_check(
-    'INCOMPATIBLE_CATEGORY_OPTIONS_DISABLED',
-    strpos(
-        $js,
-        'option.disabled ='
-    ) !== false
-);
-
-ux_check(
-    'STALE_CATEGORY_SELECTION_IS_CLEARED',
-    strpos(
-        $js,
-        "categorySelect.value = '';"
-    ) !== false
-);
-
-ux_check(
-    'CATEGORY_HELP_DISPLAYS_FINANCIAL_TYPE',
     strpos(
         $js,
         'Financial Type: ${label}.'
     ) !== false
 );
 
+
 ux_check(
-    'FORM_EVENTS_USE_SINGLE_REFRESH_COORDINATOR',
+    'FARM_TYPE_STARTS_EXPLICIT',
     strpos(
-        $js,
-        'function refreshAddItemFormContract()'
+        $inventory,
+        '<option value="">Select Farm Type</option>'
     ) !== false
 );
 
+
 ux_check(
-    'OWNER_ADMIN_BACKEND_USES_SHARED_CONTRACT',
+    'USAGE_STARTS_EXPLICIT',
+    strpos(
+        $inventory,
+        '<option value="">Select Usage Classification</option>'
+    ) !== false
+);
+
+
+ux_check(
+    'CATEGORY_CONTROLS_FARM_TYPE_AVAILABILITY',
+    strpos(
+        $js,
+        "categoryFarmType === 'both'"
+    ) !== false
+    &&
+    strpos(
+        $js,
+        'option.value === categoryFarmType'
+    ) !== false
+);
+
+
+ux_check(
+    'FEED_ITEM_CANNOT_REMAIN_FARM_TYPE_BOTH',
+    strpos(
+        $js,
+        "financialType === 'feed'"
+    ) !== false
+    &&
+    strpos(
+        $js,
+        "option.value === 'both'"
+    ) !== false
+);
+
+
+ux_check(
+    'POULTRY_FEED_USAGE_IS_LAYER_OR_BROILER',
+    strpos(
+        $js,
+        "farmType === 'poultry'"
+    ) !== false
+    &&
+    strpos(
+        $js,
+        "'layer'"
+    ) !== false
+    &&
+    strpos(
+        $js,
+        "'broiler'"
+    ) !== false
+);
+
+
+ux_check(
+    'RUMINANT_FEED_USAGE_IS_RUMINANT_ONLY',
+    strpos(
+        $js,
+        "farmType === 'ruminant'"
+    ) !== false
+    &&
+    strpos(
+        $js,
+        "'ruminant'"
+    ) !== false
+);
+
+
+ux_check(
+    'NONFEED_USAGE_IS_GENERAL_ONLY',
+    strpos(
+        $js,
+        "allowedUsage = [\n                'general',"
+    ) !== false
+);
+
+
+ux_check(
+    'USAGE_FILTER_DEPENDS_ON_CATEGORY_FINANCIAL_TYPE',
+    strpos(
+        $js,
+        "const financialType ="
+    ) !== false
+    &&
+    strpos(
+        $js,
+        "if (financialType === 'feed')"
+    ) !== false
+);
+
+
+ux_check(
+    'FARM_TYPE_DOES_NOT_DEPEND_ON_USAGE',
+    strpos(
+        $js,
+        "farmSelect.value =\n                    'poultry';"
+    ) === false
+    &&
+    strpos(
+        $js,
+        "farmSelect.value =\n                    'ruminant';"
+    ) === false
+);
+
+
+ux_check(
+    'OWNER_BACKEND_DOES_NOT_REWRITE_FARM_FROM_USAGE',
+    strpos(
+        $inventory,
+        "if (\$feedCategory === 'ruminant')"
+    ) === false
+    &&
+    strpos(
+        $inventory,
+        "in_array(\$feedCategory, ['layer', 'broiler'], true)"
+    ) === false
+);
+
+
+ux_check(
+    'DELEGATED_BACKEND_DOES_NOT_REWRITE_FARM_FROM_USAGE',
+    strpos(
+        $bridge,
+        "if (\$feedCategory === 'ruminant')"
+    ) === false
+    &&
+    strpos(
+        $bridge,
+        "in_array(\$feedCategory, ['layer', 'broiler'], true)"
+    ) === false
+);
+
+
+ux_check(
+    'OWNER_BACKEND_USES_SHARED_CONTRACT',
     strpos(
         $inventory,
         'inventory_category_item_contract_errors('
     ) !== false
 );
+
 
 ux_check(
     'DELEGATED_BACKEND_USES_SHARED_CONTRACT',
@@ -232,24 +291,69 @@ ux_check(
     ) !== false
 );
 
+
 ux_check(
-    'CATEGORY_MODAL_STILL_HAS_NO_CYCLE_FIELD',
-    preg_match(
-        '/id="addCategoryModal"[\s\S]*?<\/div>\s*<\/div>\s*<\/div>\s*<\?php endif; \?>/',
+    'OWNER_REQUIRES_EXPLICIT_USAGE',
+    strpos(
         $inventory,
-        $match
-    ) === 1
+        "\$_POST['feed_category'] ?? ''"
+    ) !== false
+);
+
+
+ux_check(
+    'DELEGATED_REQUIRES_EXPLICIT_USAGE',
+    strpos(
+        $bridge,
+        "\$_POST['feed_category'] ?? ''"
+    ) !== false
+);
+
+
+ux_check(
+    'DEFAULT_ATTRIBUTION_WAITS_FOR_FARM_AND_USAGE',
+    strpos(
+        $js,
+        '!farmType'
+    ) !== false
     &&
-    stripos(
-        $match[0],
-        'cycle'
+    strpos(
+        $js,
+        '!usage'
+    ) !== false
+);
+
+
+ux_check(
+    'GENERAL_BOTH_REMAINS_SHARED_FARM_WIDE',
+    strpos(
+        $js,
+        "['shared', 'Shared / Farm-wide']"
+    ) !== false
+);
+
+
+ux_check(
+    'MANAGE_CATEGORY_CYCLE_NOT_ADDED',
+    strpos(
+        $inventory,
+        'name="category_cycle'
     ) === false
+);
+
+
+ux_check(
+    'BOTH_LABEL_CONTRACT_UNCHANGED',
+    strpos(
+        $inventory,
+        'allowedFarmTypes()'
+    ) !== false
 );
 
 
 echo
     'CHECK_COUNT='
-    . count($checks)
+    . $checks
     . PHP_EOL;
 
 echo
