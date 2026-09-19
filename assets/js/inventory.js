@@ -274,6 +274,161 @@ $(document).ready(function() {
         help.textContent = option?.dataset?.help || '';
     }
 
+    function refreshAddItemCategoryOptions() {
+        const categorySelect =
+            document.getElementById(
+                'addItemCategory'
+            );
+
+        const farmSelect =
+            document.getElementById(
+                'addItemFarmType'
+            );
+
+        const usageSelect =
+            document.getElementById(
+                'addItemUsageClassification'
+            );
+
+        const help =
+            document.getElementById(
+                'addItemCategoryHelp'
+            );
+
+        if (
+            !categorySelect
+            || !farmSelect
+            || !usageSelect
+        ) {
+            return;
+        }
+
+        const usage =
+            usageSelect.value
+            || 'general';
+
+        let itemFarmType =
+            farmSelect.value;
+
+        if (
+            usage === 'layer'
+            || usage === 'broiler'
+        ) {
+            itemFarmType = 'poultry';
+
+            if (
+                farmSelect.value
+                !== 'poultry'
+            ) {
+                farmSelect.value =
+                    'poultry';
+            }
+        } else if (
+            usage === 'ruminant'
+        ) {
+            itemFarmType = 'ruminant';
+
+            if (
+                farmSelect.value
+                !== 'ruminant'
+            ) {
+                farmSelect.value =
+                    'ruminant';
+            }
+        }
+
+        let visibleCount = 0;
+
+        Array.from(
+            categorySelect.options
+        ).forEach(
+            option => {
+                if (
+                    !option.value
+                ) {
+                    option.hidden = false;
+                    option.disabled = false;
+                    return;
+                }
+
+                const categoryFarmType =
+                    option.dataset.farmType
+                    || '';
+
+                const financialType =
+                    option.dataset.financialType
+                    || '';
+
+                const farmCompatible =
+                    categoryFarmType === itemFarmType
+                    ||
+                    categoryFarmType === 'both';
+
+                const financialCompatible =
+                    usage === 'general'
+                        ? financialType !== 'feed'
+                        : financialType === 'feed';
+
+                const compatible =
+                    farmCompatible
+                    && financialCompatible;
+
+                option.hidden =
+                    !compatible;
+
+                option.disabled =
+                    !compatible;
+
+                if (compatible) {
+                    visibleCount++;
+                }
+            }
+        );
+
+        const selected =
+            categorySelect
+                .selectedOptions?.[0];
+
+        if (
+            selected
+            && selected.value
+            && selected.disabled
+        ) {
+            categorySelect.value = '';
+        }
+
+        const current =
+            categorySelect
+                .selectedOptions?.[0];
+
+        if (
+            help
+            && current
+            && current.value
+        ) {
+            const label =
+                current.dataset.financialLabel
+                || 'Unknown';
+
+            const financialHelp =
+                current.dataset.financialHelp
+                || '';
+
+            help.textContent =
+                `Financial Type: ${label}. ${financialHelp}`;
+        } else if (help) {
+            help.textContent =
+                visibleCount > 0
+                    ? 'Choose a compatible category. The category Financial Type controls how this item is treated financially.'
+                    : 'No compatible category is available. Create or correct an Inventory Category first.';
+        }
+    }
+
+    function refreshAddItemFormContract() {
+        refreshAddItemCategoryOptions();
+        refreshDefaultProductionAttribution();
+    }
+
     function refreshDefaultProductionAttribution() {
         const farmSelect = document.getElementById('addItemFarmType');
         const usageSelect = document.getElementById('addItemUsageClassification');
@@ -328,7 +483,23 @@ $(document).ready(function() {
                 refreshCategoryFinancialTypeGuidance
             );
 
-        refreshDefaultProductionAttribution();
-        document.getElementById('addItemFarmType')?.addEventListener('change', refreshDefaultProductionAttribution);
-        document.getElementById('addItemUsageClassification')?.addEventListener('change', refreshDefaultProductionAttribution);
+        refreshAddItemFormContract();
+
+        document.getElementById('addItemFarmType')
+            ?.addEventListener(
+                'change',
+                refreshAddItemFormContract
+            );
+
+        document.getElementById('addItemUsageClassification')
+            ?.addEventListener(
+                'change',
+                refreshAddItemFormContract
+            );
+
+        document.getElementById('addItemCategory')
+            ?.addEventListener(
+                'change',
+                refreshAddItemCategoryOptions
+            );
     });

@@ -1079,14 +1079,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label>Category</label>
-                                    <select name="category_id" class="form-select" required>
+                                    <select name="category_id" id="addItemCategory" class="form-select" required>
                                         <option value="">Select Category</option>
                                         <?php foreach ($categories as $category): ?>
-                                        <option value="<?php echo $category['id']; ?>">
+                                        <?php
+                                            $categoryFinancialType =
+                                                (string)(
+                                                    $category['financial_type']
+                                                    ?? 'other_stock'
+                                                );
+                                        ?>
+                                        <option
+                                            value="<?php echo (int)$category['id']; ?>"
+                                            data-farm-type="<?php echo htmlspecialchars((string)($category['farm_type'] ?? 'both')); ?>"
+                                            data-financial-type="<?php echo htmlspecialchars($categoryFinancialType); ?>"
+                                            data-financial-label="<?php echo htmlspecialchars(inventory_financial_classification_label($categoryFinancialType), ENT_QUOTES); ?>"
+                                            data-financial-help="<?php echo htmlspecialchars(inventory_financial_classification_guidance_text($categoryFinancialType), ENT_QUOTES); ?>"
+                                        >
                                             <?php echo htmlspecialchars($category['category_name']); ?>
                                         </option>
                                         <?php endforeach; ?>
                                     </select>
+                                    <small id="addItemCategoryHelp" class="text-muted">
+                                        Choose Farm Type and Usage Classification to see compatible categories.
+                                    </small>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label>Farm Type</label>
