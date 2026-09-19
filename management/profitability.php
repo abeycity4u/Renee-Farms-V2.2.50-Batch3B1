@@ -398,6 +398,52 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
                                         <span class="badge bg-secondary">
                                             Cash-only balance
                                         </span>
+                                    <?php elseif (($sharedRow['status'] ?? '') === 'retained_shared'): ?>
+
+                                        <?php if ($allocationUrl !== ''): ?>
+                                            <a
+                                                class="badge bg-info text-dark text-decoration-none"
+                                                href="<?php echo htmlspecialchars(
+                                                    $allocationUrl,
+                                                    ENT_QUOTES | ENT_SUBSTITUTE,
+                                                    'UTF-8'
+                                                ); ?>"
+                                                title="Shared revenue intentionally retained without cycle attribution"
+                                            >
+                                                Retained as shared
+                                                <i class="bi bi-box-arrow-up-right ms-1"></i>
+                                            </a>
+                                        <?php else: ?>
+                                            <span class="badge bg-info text-dark">
+                                                Retained as shared
+                                            </span>
+                                        <?php endif; ?>
+
+                                    <?php elseif (($sharedRow['status'] ?? '') === 'partially_allocated'): ?>
+
+                                        <?php if ($allocationUrl !== ''): ?>
+                                            <a
+                                                class="badge bg-warning text-dark text-decoration-none"
+                                                href="<?php echo htmlspecialchars(
+                                                    $allocationUrl,
+                                                    ENT_QUOTES | ENT_SUBSTITUTE,
+                                                    'UTF-8'
+                                                ); ?>"
+                                                title="<?php echo htmlspecialchars(
+                                                    $allocationTitle,
+                                                    ENT_QUOTES | ENT_SUBSTITUTE,
+                                                    'UTF-8'
+                                                ); ?>"
+                                            >
+                                                Partially allocated
+                                                <i class="bi bi-box-arrow-up-right ms-1"></i>
+                                            </a>
+                                        <?php else: ?>
+                                            <span class="badge bg-warning text-dark">
+                                                Partially allocated
+                                            </span>
+                                        <?php endif; ?>
+
                                     <?php elseif ($allocationUrl !== ''): ?>
                                         <a
                                             class="badge bg-warning text-dark text-decoration-none"

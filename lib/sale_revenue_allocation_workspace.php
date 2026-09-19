@@ -504,6 +504,38 @@ function sale_revenue_allocation_workspace_snapshot(
         ];
     }
 
+    $latestRevisionAction =
+        $latestRevision
+            ? strtolower(
+                trim(
+                    (string)(
+                        $latestRevision['revision_action']
+                        ?? ''
+                    )
+                )
+            )
+            : '';
+
+    $retainedShared =
+        $latestRevisionAction === 'retain_shared'
+        &&
+        ($summary['rows'] ?? []) === [];
+
+    $resolutionStatus =
+        $retainedShared
+            ? 'retained_shared'
+            : (
+                (float)$summary['allocated_amount'] > 0
+                &&
+                (float)$summary['remaining_amount'] > 0
+                    ? 'partially_allocated'
+                    : (
+                        (float)$summary['remaining_amount'] <= 0
+                            ? 'allocated'
+                            : 'awaiting_allocation'
+                    )
+            );
+
     return [
         'parent' =>
             $parent,
@@ -542,6 +574,20 @@ function sale_revenue_allocation_workspace_snapshot(
             $latestRevision
                 ? (int)$latestRevision['revision_no']
                 : 0,
+
+        'resolution_status' =>
+            $resolutionStatus,
+
+        'retained_shared' =>
+            $retainedShared,
+
+        'retained_shared_reason' =>
+            $retainedShared
+                ? (
+                    $latestRevision['revision_reason']
+                    ?? null
+                )
+                : null,
 
         /*
          * Canonical persistence permits the initial create without a reason

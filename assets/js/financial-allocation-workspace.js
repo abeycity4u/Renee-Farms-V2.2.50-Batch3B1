@@ -420,6 +420,21 @@
         async function (event) {
             event.preventDefault();
 
+            const submitter =
+                event.submitter || null;
+
+            const decisionAction =
+                String(
+                    submitter
+                    && submitter.dataset
+                        ? (
+                            submitter.dataset.allocationDecision
+                            || 'allocate'
+                        )
+                        : 'allocate'
+                ).trim()
+                || 'allocate';
+
             if (mutationBlocked) {
                 notify(
                     'error',
@@ -431,6 +446,19 @@
 
             const allocated =
                 currentTotal();
+
+            if (
+                decisionAction === 'retain_shared'
+                &&
+                allocated > 0.005
+            ) {
+                notify(
+                    'error',
+                    'Clear cycle amounts before retaining this revenue as shared.'
+                );
+
+                return;
+            }
 
             if (allocated > gross + 0.005) {
                 notify(
@@ -449,13 +477,19 @@
                 ).trim();
 
             if (
-                reasonRequired
+                (
+                    reasonRequired
+                    ||
+                    decisionAction === 'retain_shared'
+                )
                 &&
                 reason === ''
             ) {
                 notify(
                     'error',
-                    'Enter a reason for changing this ' + entityLabel + ' allocation.'
+                    decisionAction === 'retain_shared'
+                        ? 'Enter a reason for keeping this revenue at shared-operation level.'
+                        : 'Enter a reason for changing this ' + entityLabel + ' allocation.'
                 );
 
                 if (reasonInput) {
@@ -521,6 +555,11 @@
             );
 
             body.set(
+                'decision_action',
+                decisionAction
+            );
+
+            body.set(
                 parentIdField,
                 parentId
             );
@@ -542,16 +581,19 @@
                 JSON.stringify(rows)
             );
 
+            const activeButton =
+                submitter || saveButton;
+
             const originalText =
-                saveButton
-                    ? saveButton.innerHTML
+                activeButton
+                    ? activeButton.innerHTML
                     : '';
 
-            if (saveButton) {
-                saveButton.disabled =
+            if (activeButton) {
+                activeButton.disabled =
                     true;
 
-                saveButton.innerHTML =
+                activeButton.innerHTML =
                     '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Saving...';
             }
 
@@ -623,13 +665,15 @@
                         : 'The ' + allocationLabel + ' could not be saved.'
                 );
 
-                if (saveButton) {
-                    saveButton.disabled =
+                if (activeButton) {
+                    activeButton.disabled =
                         false;
 
-                    saveButton.innerHTML =
+                    activeButton.innerHTML =
                         originalText;
                 }
+
+                refreshSummary();
             }
         }
     );

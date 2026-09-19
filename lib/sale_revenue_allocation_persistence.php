@@ -1162,6 +1162,226 @@ function sale_revenue_allocation_persistence_append_revision(
 }
 
 
+
+if (!function_exists(
+    'sale_revenue_allocation_persistence_retain_shared'
+)) {
+function sale_revenue_allocation_persistence_retain_shared(
+    PDO $pdo,
+    int $farmId,
+    int $saleId,
+    int $actorUserId,
+    ?string $revisionReason = null
+): array {
+    sale_revenue_allocation_persistence_require_transaction(
+        $pdo
+    );
+
+    if (
+        $farmId < 1
+        ||
+        $saleId < 1
+    ) {
+        throw new InvalidArgumentException(
+            'Shared revenue parent identity is invalid.'
+        );
+    }
+
+    $actorUserId =
+        sale_revenue_allocation_persistence_actor(
+            $actorUserId
+        );
+
+    /*
+     * This is an explicit business decision, not an allocation.
+     *
+     * The source sale remains unchanged.
+     * The cycle-allocation projection remains empty.
+     * The immutable revision ledger records that the revenue was reviewed
+     * and deliberately retained at shared-operation level.
+     */
+    $sale =
+        sale_revenue_allocation_persistence_parent(
+            $pdo,
+            $farmId,
+            $saleId,
+            true
+        );
+
+    sale_revenue_allocation_service_parent_contract(
+        $sale
+    );
+
+    $currentRows =
+        sale_revenue_allocation_persistence_current_rows(
+            $pdo,
+            $farmId,
+            $saleId,
+            true
+        );
+
+    sale_revenue_allocation_persistence_assert_manual_projection(
+        $currentRows
+    );
+
+    if ($currentRows !== []) {
+        throw new RuntimeException(
+            'Only fully unallocated shared revenue can be retained entirely as shared.'
+        );
+    }
+
+    $animalCount =
+        sale_revenue_allocation_persistence_animal_count(
+            $pdo,
+            $farmId,
+            $saleId,
+            true
+        );
+
+    if ($animalCount > 0) {
+        throw new RuntimeException(
+            'Revenue allocated to individual animals cannot also be retained as shared revenue.'
+        );
+    }
+
+    $validated =
+        sale_revenue_allocation_service_validate_desired_rows(
+            $sale,
+            [],
+            [],
+            0
+        );
+
+    $latest =
+        sale_revenue_allocation_persistence_latest_revision(
+            $pdo,
+            $farmId,
+            $saleId,
+            true
+        );
+
+    sale_revenue_allocation_persistence_assert_revision_consistency(
+        $pdo,
+        $sale,
+        [],
+        $latest,
+        true
+    );
+
+    if (
+        $latest !== null
+        &&
+        strtolower(
+            trim(
+                (string)(
+                    $latest['revision_action']
+                    ?? ''
+                )
+            )
+        ) === 'retain_shared'
+    ) {
+        return [
+            'changed' =>
+                false,
+
+            'action' =>
+                'retain_shared',
+
+            'sale_id' =>
+                $saleId,
+
+            'rows' =>
+                [],
+
+            'allocated_amount' =>
+                $validated['allocated_amount'],
+
+            'remaining_amount' =>
+                $validated['remaining_amount'],
+
+            'revision_no' =>
+                (int)$latest['revision_no'],
+        ];
+    }
+
+    $reason =
+        sale_revenue_allocation_persistence_reason(
+            'retain_shared',
+            $revisionReason
+        );
+
+    $revision =
+        sale_revenue_allocation_persistence_append_revision(
+            $pdo,
+            $farmId,
+            $saleId,
+            $sale,
+            [],
+            $latest,
+            'retain_shared',
+            $reason,
+            $actorUserId
+        );
+
+    $latestWritten =
+        sale_revenue_allocation_persistence_latest_revision(
+            $pdo,
+            $farmId,
+            $saleId,
+            true
+        );
+
+    sale_revenue_allocation_persistence_assert_revision_consistency(
+        $pdo,
+        $sale,
+        [],
+        $latestWritten,
+        true
+    );
+
+    if (
+        $latestWritten === null
+        ||
+        strtolower(
+            trim(
+                (string)(
+                    $latestWritten['revision_action']
+                    ?? ''
+                )
+            )
+        ) !== 'retain_shared'
+    ) {
+        throw new RuntimeException(
+            'Shared revenue retention decision was not persisted safely.'
+        );
+    }
+
+    return [
+        'changed' =>
+            true,
+
+        'action' =>
+            'retain_shared',
+
+        'sale_id' =>
+            $saleId,
+
+        'rows' =>
+            [],
+
+        'allocated_amount' =>
+            $validated['allocated_amount'],
+
+        'remaining_amount' =>
+            $validated['remaining_amount'],
+
+        'revision_no' =>
+            (int)$revision['revision_no'],
+    ];
+}
+}
+
+
 if (!function_exists(
     'sale_revenue_allocation_persistence_apply'
 )) {

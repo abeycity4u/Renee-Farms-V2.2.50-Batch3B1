@@ -285,6 +285,37 @@ function profitability_unallocated_shared_summary(
         ] += $unallocatedCents;
 
         if ($unallocatedCents > 0) {
+            $latestRevenueRevision =
+                sale_revenue_allocation_persistence_latest_revision(
+                    $pdo,
+                    $farmId,
+                    $saleId,
+                    false
+                );
+
+            $latestRevenueAction =
+                $latestRevenueRevision
+                    ? strtolower(
+                        trim(
+                            (string)(
+                                $latestRevenueRevision[
+                                    'revision_action'
+                                ]
+                                ?? ''
+                            )
+                        )
+                    )
+                    : '';
+
+            $revenueStatus =
+                $allocatedCents > 0
+                    ? 'partially_allocated'
+                    : (
+                        $latestRevenueAction === 'retain_shared'
+                            ? 'retained_shared'
+                            : 'awaiting_allocation'
+                    );
+
             $rows[] = [
                 'source_type' =>
                     'Shared revenue',
@@ -323,7 +354,17 @@ function profitability_unallocated_shared_summary(
                     $unallocatedCents / 100,
 
                 'status' =>
-                    'awaiting_allocation',
+                    $revenueStatus,
+
+                'resolution_reason' =>
+                    $revenueStatus === 'retained_shared'
+                        ? (
+                            $latestRevenueRevision[
+                                'revision_reason'
+                            ]
+                            ?? null
+                        )
+                        : null,
 
                 /*
                  * Keep ineligible / unauthorized revenue visibly

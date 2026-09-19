@@ -182,6 +182,13 @@ $money =
                     'reason_required'
                 ]
             );
+
+        $retainedShared =
+            !empty(
+                $workspace[
+                    'retained_shared'
+                ]
+            );
         ?>
 
         <div class="alert alert-info">
@@ -192,6 +199,34 @@ $money =
             Otherwise enter the actual business allocation manually.
             Any balance left over remains visibly unallocated.
         </div>
+
+        <?php if ($retainedShared): ?>
+
+            <div class="alert alert-success">
+                <strong>Retained as shared revenue.</strong>
+                This sale was deliberately reviewed and left without
+                production-cycle attribution.
+
+                <?php if (!empty(
+                    $workspace['retained_shared_reason']
+                )): ?>
+                    <div class="mt-1">
+                        Decision reason:
+                        <?php echo $escape(
+                            $workspace[
+                                'retained_shared_reason'
+                            ]
+                        ); ?>
+                    </div>
+                <?php endif; ?>
+
+                <div class="small mt-1">
+                    The revenue remains included at shared poultry/farm level
+                    and is not assigned to an individual production cycle.
+                </div>
+            </div>
+
+        <?php endif; ?>
 
         <div class="card mb-3">
             <div class="card-body">
@@ -348,7 +383,7 @@ $money =
                 The revenue remains unallocated.
             </div>
 
-        <?php else: ?>
+        <?php endif; ?>
 
             <form
                 id="financialAllocationWorkspaceForm"
@@ -391,7 +426,11 @@ $money =
                                     class="form-check-input"
                                     type="checkbox"
                                     id="financialAllocationEqualSplit"
-                                    <?php echo $mutationBlocked
+                                    <?php echo (
+                                        $mutationBlocked
+                                        ||
+                                        !$workspace['cycles']
+                                    )
                                         ? 'disabled'
                                         : ''; ?>
                                 >
@@ -408,7 +447,11 @@ $money =
                                 type="button"
                                 class="btn btn-sm btn-outline-secondary"
                                 id="financialAllocationClearAmounts"
-                                <?php echo $mutationBlocked
+                                <?php echo (
+                                    $mutationBlocked
+                                    ||
+                                    !$workspace['cycles']
+                                )
                                     ? 'disabled'
                                     : ''; ?>
                             >
@@ -555,7 +598,7 @@ $money =
                                 for="financialAllocationRevisionReason"
                                 class="form-label"
                             >
-                                Reason for allocation change
+                                Reason for allocation / shared-retention decision
                                 <?php if (!$reasonRequired): ?>
                                     <span class="text-muted">
                                         (optional on first allocation)
@@ -580,10 +623,11 @@ $money =
                             ></textarea>
 
                             <div class="form-text">
-                                After the first revision, a change reason is
-                                required by the canonical revenue audit contract.
-                                Clearing all amounts preserves immutable revision
-                                history.
+                                A reason is required when deliberately retaining
+                                revenue as shared. After the first revision, a
+                                change reason is also required by the canonical
+                                revenue audit contract. Clearing all amounts
+                                preserves immutable revision history.
                             </div>
                         </div>
 
@@ -594,11 +638,43 @@ $money =
                                 visible unallocated remainder.
                             </div>
 
+                            <?php if (
+                                (float)$workspace[
+                                    'allocated_amount'
+                                ] <= 0.00001
+                            ): ?>
+
+                                <button
+                                    type="submit"
+                                    class="btn btn-outline-info"
+                                    id="financialAllocationRetainSharedButton"
+                                    data-allocation-decision="retain_shared"
+                                    <?php echo (
+                                        $mutationBlocked
+                                        ||
+                                        $retainedShared
+                                    )
+                                        ? 'disabled'
+                                        : ''; ?>
+                                >
+                                    <i class="bi bi-check-circle"></i>
+                                    <?php echo $retainedShared
+                                        ? 'Retained as Shared'
+                                        : 'Keep as Shared Revenue'; ?>
+                                </button>
+
+                            <?php endif; ?>
+
                             <button
                                 type="submit"
                                 class="btn btn-primary"
                                 id="financialAllocationSaveButton"
-                                <?php echo $mutationBlocked
+                                data-allocation-decision="allocate"
+                                <?php echo (
+                                    $mutationBlocked
+                                    ||
+                                    !$workspace['cycles']
+                                )
                                     ? 'disabled'
                                     : ''; ?>
                             >
@@ -609,8 +685,6 @@ $money =
                     </div>
                 </div>
             </form>
-
-        <?php endif; ?>
 
 
         <?php if (!empty(
