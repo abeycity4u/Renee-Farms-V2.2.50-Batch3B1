@@ -6,6 +6,402 @@
  * reporting ownership: they never duplicate or rewrite the source revenue.
  */
 require_once __DIR__ . '/layer_egg_inventory.php';
+require_once __DIR__ . '/sale_revenue_allocation_provenance.php';
+
+
+if (!class_exists(
+    'SaleRevenueAllocationLifecycleException'
+)) {
+    class SaleRevenueAllocationLifecycleException
+        extends RuntimeException
+    {
+    }
+}
+
+
+function sales_manual_revenue_allocation_require_transaction(
+    PDO $pdo
+): void {
+    if (!$pdo->inTransaction()) {
+        throw new SaleRevenueAllocationLifecycleException(
+            'Manual shared revenue lifecycle protection requires an active transaction.'
+        );
+    }
+}
+
+
+function sales_lock_sale_for_manual_revenue_lifecycle(
+    PDO $pdo,
+    int $farmId,
+    int $saleId
+): array {
+    sales_manual_revenue_allocation_require_transaction(
+        $pdo
+    );
+
+    $stmt =
+        $pdo->prepare(
+            "SELECT *
+             FROM sales_records
+             WHERE farm_id=?
+               AND id=?
+             LIMIT 1
+             FOR UPDATE"
+        );
+
+    $stmt->execute([
+        $farmId,
+        $saleId,
+    ]);
+
+    $sale =
+        $stmt->fetch(
+            PDO::FETCH_ASSOC
+        );
+
+    if (!$sale) {
+        throw new SaleRevenueAllocationLifecycleException(
+            'Sale record was not found for revenue-allocation lifecycle protection.'
+        );
+    }
+
+    return $sale;
+}
+
+
+function sales_manual_revenue_allocation_state(
+    PDO $pdo,
+    int $farmId,
+    int $saleId,
+    bool $forUpdate = false
+): array {
+    if (
+        $farmId < 1
+        ||
+        $saleId < 1
+    ) {
+        throw new InvalidArgumentException(
+            'Sale revenue lifecycle identity is invalid.'
+        );
+    }
+
+    if ($forUpdate) {
+        sales_manual_revenue_allocation_require_transaction(
+            $pdo
+        );
+    }
+
+    $projectionSql =
+        "SELECT
+             id,
+             allocation_basis
+         FROM sales_allocations
+         WHERE farm_id=?
+           AND sale_id=?
+         ORDER BY id";
+
+    if ($forUpdate) {
+        $projectionSql .=
+            " FOR UPDATE";
+    }
+
+    $projectionStmt =
+        $pdo->prepare(
+            $projectionSql
+        );
+
+    $projectionStmt->execute([
+        $farmId,
+        $saleId,
+    ]);
+
+    $projectionRows =
+        $projectionStmt->fetchAll(
+            PDO::FETCH_ASSOC
+        ) ?: [];
+
+    $manualRows = 0;
+    $otherRows = 0;
+
+    foreach ($projectionRows as $row) {
+        $basis =
+            strtolower(
+                trim(
+                    (string)(
+                        $row['allocation_basis']
+                        ?? ''
+                    )
+                )
+            );
+
+        if ($basis === 'manual_shared_revenue') {
+            $manualRows++;
+        } else {
+            $otherRows++;
+        }
+    }
+
+    /*
+     * Individual-animal revenue allocation is a separate mutually-exclusive
+     * authority. Lock it before revision rows, matching the canonical writer's
+     * parent -> projection -> animal -> revision lock order.
+     */
+    $animalSql =
+        "SELECT id
+         FROM ruminant_sale_animal_allocations
+         WHERE farm_id=?
+           AND sale_id=?
+         ORDER BY id";
+
+    if ($forUpdate) {
+        $animalSql .=
+            " FOR UPDATE";
+    }
+
+    $animalStmt =
+        $pdo->prepare(
+            $animalSql
+        );
+
+    $animalStmt->execute([
+        $farmId,
+        $saleId,
+    ]);
+
+    $animalRows =
+        $animalStmt->fetchAll(
+            PDO::FETCH_COLUMN
+        ) ?: [];
+
+    $revisionSql =
+        "SELECT
+             id,
+             revision_no,
+             revision_action
+         FROM sales_allocation_revisions
+         WHERE farm_id=?
+           AND sale_id=?
+         ORDER BY id";
+
+    if ($forUpdate) {
+        $revisionSql .=
+            " FOR UPDATE";
+    }
+
+    $revisionStmt =
+        $pdo->prepare(
+            $revisionSql
+        );
+
+    $revisionStmt->execute([
+        $farmId,
+        $saleId,
+    ]);
+
+    $revisionRows =
+        $revisionStmt->fetchAll(
+            PDO::FETCH_ASSOC
+        ) ?: [];
+
+    $revisionCount =
+        count(
+            $revisionRows
+        );
+
+    return [
+        'manual_row_count' =>
+            $manualRows,
+
+        'other_row_count' =>
+            $otherRows,
+
+        'animal_row_count' =>
+            count(
+                $animalRows
+            ),
+
+        'revision_count' =>
+            $revisionCount,
+
+        'protected' =>
+            $manualRows > 0
+            ||
+            $revisionCount > 0,
+
+        'unprovenanced_manual_projection' =>
+            $manualRows > 0
+            &&
+            $revisionCount === 0,
+    ];
+}
+
+
+function sales_manual_revenue_allocation_assert_consistent(
+    array $state
+): void {
+    if (
+        !empty(
+            $state['unprovenanced_manual_projection']
+        )
+    ) {
+        throw new SaleRevenueAllocationLifecycleException(
+            'Manual shared revenue allocation exists without immutable revision provenance.'
+        );
+    }
+
+    if (
+        !empty(
+            $state['protected']
+        )
+        &&
+        (int)(
+            $state['other_row_count']
+            ?? 0
+        ) > 0
+    ) {
+        throw new SaleRevenueAllocationLifecycleException(
+            'This sale has conflicting revenue allocation ownership.'
+        );
+    }
+
+    if (
+        !empty(
+            $state['protected']
+        )
+        &&
+        (int)(
+            $state['animal_row_count']
+            ?? 0
+        ) > 0
+    ) {
+        throw new SaleRevenueAllocationLifecycleException(
+            'Manual cycle revenue allocation cannot overlap individual-animal revenue allocation.'
+        );
+    }
+}
+
+
+function sales_assert_manual_revenue_edit_allowed(
+    PDO $pdo,
+    int $farmId,
+    int $saleId,
+    array $proposedSale,
+    int $proposedAnimalAllocationCount = 0
+): array {
+    $current =
+        sales_lock_sale_for_manual_revenue_lifecycle(
+            $pdo,
+            $farmId,
+            $saleId
+        );
+
+    $state =
+        sales_manual_revenue_allocation_state(
+            $pdo,
+            $farmId,
+            $saleId,
+            true
+        );
+
+    sales_manual_revenue_allocation_assert_consistent(
+        $state
+    );
+
+    if (empty($state['protected'])) {
+        return $current;
+    }
+
+    if ($proposedAnimalAllocationCount > 0) {
+        throw new SaleRevenueAllocationLifecycleException(
+            'A sale with manual shared revenue allocation history cannot be changed to individual-animal revenue allocation.'
+        );
+    }
+
+    $currentManifest =
+        sale_revenue_allocation_provenance_parent(
+            $current
+        );
+
+    $proposedManifest =
+        sale_revenue_allocation_provenance_parent(
+            array_merge(
+                $current,
+                $proposedSale
+            )
+        );
+
+    $criticalFields = [
+        'sale_date',
+        'farm_type',
+        'production_type',
+        'attribution_scope',
+        'cycle_id',
+        'product_type',
+        'quantity',
+        'unit_of_measure',
+        'unit_price',
+        'total_amount',
+    ];
+
+    $changed = [];
+
+    foreach ($criticalFields as $field) {
+        if (
+            (
+                $currentManifest[$field]
+                ?? null
+            )
+            !==
+            (
+                $proposedManifest[$field]
+                ?? null
+            )
+        ) {
+            $changed[] =
+                $field;
+        }
+    }
+
+    if ($changed) {
+        throw new SaleRevenueAllocationLifecycleException(
+            'This sale has manual shared revenue allocation history. Allocation-critical sale fields cannot be edited from Sales Records.'
+        );
+    }
+
+    return $current;
+}
+
+
+function sales_assert_manual_revenue_delete_allowed(
+    PDO $pdo,
+    int $farmId,
+    int $saleId
+): void {
+    sales_lock_sale_for_manual_revenue_lifecycle(
+        $pdo,
+        $farmId,
+        $saleId
+    );
+
+    $state =
+        sales_manual_revenue_allocation_state(
+            $pdo,
+            $farmId,
+            $saleId,
+            true
+        );
+
+    sales_manual_revenue_allocation_assert_consistent(
+        $state
+    );
+
+    if (!empty($state['protected'])) {
+        throw new SaleRevenueAllocationLifecycleException(
+            'Sales with manual shared revenue allocation history cannot be deleted.'
+        );
+    }
+}
+
 
 function sales_allocation_status(PDO $pdo, int $farmId, int $saleId, float $saleTotal): array
 {
@@ -21,6 +417,24 @@ function sales_allocation_status(PDO $pdo, int $farmId, int $saleId, float $sale
 
 function sales_clear_allocations(PDO $pdo, int $farmId, int $saleId): void
 {
+    $state =
+        sales_manual_revenue_allocation_state(
+            $pdo,
+            $farmId,
+            $saleId,
+            $pdo->inTransaction()
+        );
+
+    sales_manual_revenue_allocation_assert_consistent(
+        $state
+    );
+
+    if (!empty($state['protected'])) {
+        throw new SaleRevenueAllocationLifecycleException(
+            'Manual shared revenue allocation history protects this sale from automatic allocation clearing.'
+        );
+    }
+
     $stmt = $pdo->prepare("DELETE FROM sales_allocations WHERE farm_id=? AND sale_id=?");
     $stmt->execute([$farmId,$saleId]);
 }
@@ -81,19 +495,112 @@ function sales_auto_allocate_layer_egg(PDO $pdo, int $farmId, int $saleId, strin
 
 function sales_refresh_automatic_allocation(PDO $pdo, int $farmId, int $saleId, ?int $userId=null): array
 {
-    $stmt=$pdo->prepare("SELECT id,sale_date,farm_type,production_type,cycle_id,product_type,total_amount FROM sales_records WHERE id=? AND farm_id=? LIMIT 1");
+    $sql = "SELECT id,sale_date,farm_type,production_type,cycle_id,product_type,total_amount FROM sales_records WHERE id=? AND farm_id=? LIMIT 1";
+
+    if ($pdo->inTransaction()) {
+        $sql .= " FOR UPDATE";
+    }
+
+    $stmt=$pdo->prepare($sql);
     $stmt->execute([$saleId,$farmId]);
     $sale=$stmt->fetch(PDO::FETCH_ASSOC);
-    if(!$sale) throw new RuntimeException('Sale was not found for allocation.');
-    if(!empty($sale['cycle_id'])) {
+
+    if(!$sale) {
+        throw new RuntimeException(
+            'Sale was not found for allocation.'
+        );
+    }
+
+    $state =
+        sales_manual_revenue_allocation_state(
+            $pdo,
+            $farmId,
+            $saleId,
+            $pdo->inTransaction()
+        );
+
+    sales_manual_revenue_allocation_assert_consistent(
+        $state
+    );
+
+    $isDirect =
+        !empty(
+            $sale['cycle_id']
+        );
+
+    $isAutomaticLayerEgg =
+        $sale['farm_type'] === 'poultry'
+        &&
+        strtolower(
+            (string)$sale['production_type']
+        ) === 'layer'
+        &&
+        layer_egg_is_sale_product(
+            $sale['product_type']
+            ?? null
+        );
+
+    if (!empty($state['protected'])) {
+        if (
+            $isDirect
+            ||
+            $isAutomaticLayerEgg
+        ) {
+            throw new SaleRevenueAllocationLifecycleException(
+                'Manual shared revenue allocation history prevents changing this sale to direct or automatic allocation authority.'
+            );
+        }
+
+        $status =
+            sales_allocation_status(
+                $pdo,
+                $farmId,
+                $saleId,
+                (float)$sale['total_amount']
+            );
+
+        $status['cycles'] =
+            (int)$state['manual_row_count'];
+
+        $status['allocation_basis'] =
+            'manual_shared_revenue';
+
+        $status['reason'] =
+            'Manual shared revenue allocation was preserved; automatic refresh was skipped.';
+
+        return $status;
+    }
+
+    if($isDirect) {
         sales_clear_allocations($pdo,$farmId,$saleId);
-        return ['status'=>'direct','allocated_amount'=>(float)$sale['total_amount'],'cycles'=>1,'reason'=>'Sale is directly assigned to a cycle.'];
+
+        return [
+            'status'=>'direct',
+            'allocated_amount'=>(float)$sale['total_amount'],
+            'cycles'=>1,
+            'reason'=>'Sale is directly assigned to a cycle.'
+        ];
     }
-    if($sale['farm_type']==='poultry' && strtolower((string)$sale['production_type'])==='layer' && layer_egg_is_sale_product($sale['product_type']??null)) {
-        return sales_auto_allocate_layer_egg($pdo,$farmId,$saleId,(string)$sale['sale_date'],(float)$sale['total_amount'],$userId);
+
+    if($isAutomaticLayerEgg) {
+        return sales_auto_allocate_layer_egg(
+            $pdo,
+            $farmId,
+            $saleId,
+            (string)$sale['sale_date'],
+            (float)$sale['total_amount'],
+            $userId
+        );
     }
+
     sales_clear_allocations($pdo,$farmId,$saleId);
-    return ['status'=>'unallocated','allocated_amount'=>0.0,'cycles'=>0,'reason'=>'This shared sale has no automatic allocation basis.'];
+
+    return [
+        'status'=>'unallocated',
+        'allocated_amount'=>0.0,
+        'cycles'=>0,
+        'reason'=>'This shared sale has no automatic allocation basis.'
+    ];
 }
 
 /**

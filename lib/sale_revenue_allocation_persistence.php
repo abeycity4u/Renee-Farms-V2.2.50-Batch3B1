@@ -407,8 +407,7 @@ function sale_revenue_allocation_persistence_target_cycles(
              production_type,
              cycle_code,
              status,
-             start_date,
-             end_date
+             start_date
          FROM production_cycles
          WHERE farm_id=?
            AND id IN ({$placeholders})

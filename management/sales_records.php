@@ -657,12 +657,57 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             exit();
         }
 
-        $beforeSaleStmt = $pdo->prepare("SELECT sale_date,farm_type,production_type,product_type FROM sales_records WHERE id=? AND farm_id=? LIMIT 1");
-        $beforeSaleStmt->execute([(int)$_POST['sale_id'],$tenantFarmId]);
-        $beforeSale = $beforeSaleStmt->fetch(PDO::FETCH_ASSOC) ?: [];
-
         $pdo->beginTransaction();
         try {
+        $beforeSale =
+            sales_assert_manual_revenue_edit_allowed(
+                $pdo,
+                $tenantFarmId,
+                (int)$_POST['sale_id'],
+                [
+                    'sale_date' =>
+                        (string)$_POST['sale_date'],
+
+                    'farm_type' =>
+                        $saleFarmType,
+
+                    'production_type' =>
+                        $productionType,
+
+                    'attribution_scope' =>
+                        $scope,
+
+                    'cycle_id' =>
+                        $cycleId > 0
+                            ? $cycleId
+                            : null,
+
+                    'product_type' =>
+                        (string)$_POST['product_type'],
+
+                    'quantity' =>
+                        (string)$_POST['quantity'],
+
+                    'unit_of_measure' =>
+                        $unitOfMeasure,
+
+                    'unit_price' =>
+                        (string)$_POST['unit_price'],
+
+                    'total_amount' =>
+                        number_format(
+                            $newTotal,
+                            2,
+                            '.',
+                            ''
+                        ),
+                ],
+                count(
+                    $animalRevenueAllocation['rows']
+                    ?? []
+                )
+            );
+
         $postedUpfront = isset($_POST['edit_payment_received']) ? (float)$_POST['edit_payment_received'] : null;
         receivable_sync_sale_edit($pdo,$tenantFarmId,(int)$_POST['sale_id'],$newTotal,trim((string)$_POST['customer_name']),(string)$_POST['sale_date'],(string)$_POST['product_type'],(float)$_POST['quantity'],(int)$_SESSION['user_id'],$postedUpfront);
 
@@ -700,7 +745,31 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         $pdo->commit();
-        } catch (Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); $_SESSION['error']=safeUserExceptionMessage($e,'The sale could not be updated.'); header("Location: sales_records.php?report_mode={$reportMode}&month={$month}&year={$year}&farm_type={$farmType}"); exit(); }
+        } catch (SaleRevenueAllocationLifecycleException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            $_SESSION['error'] =
+                $e->getMessage();
+
+            header("Location: sales_records.php?report_mode={$reportMode}&month={$month}&year={$year}&farm_type={$farmType}");
+            exit();
+
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            $_SESSION['error'] =
+                safeUserExceptionMessage(
+                    $e,
+                    'The sale could not be updated.'
+                );
+
+            header("Location: sales_records.php?report_mode={$reportMode}&month={$month}&year={$year}&farm_type={$farmType}");
+            exit();
+        }
 
         $_SESSION['success'] = "Sale updated successfully!";
         if ($saleFarmType === 'poultry' && $productionType === 'layer' && $cycleId <= 0 && layer_egg_is_sale_product($_POST['product_type'] ?? null)) {

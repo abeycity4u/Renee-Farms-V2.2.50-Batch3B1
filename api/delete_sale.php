@@ -17,6 +17,7 @@ try {
  $find=$pdo->prepare('SELECT * FROM sales_records WHERE id=? AND farm_id=? FOR UPDATE');
  $find->execute([(int)$id,$farmId]); $row=$find->fetch(PDO::FETCH_ASSOC);
  if(!$row) { $pdo->rollBack(); send_json(['success'=>false,'error'=>'Record not found.'],404); }
+ sales_assert_manual_revenue_delete_allowed($pdo,$farmId,(int)$id);
  receivable_assert_sale_deletable($pdo,$farmId,(int)$id);
  sale_population_effect_assert_deletable($pdo,$farmId,(int)$id);
  if (($row['farm_type'] ?? '') === 'ruminant') { ruminant_sale_reverse_exit_events($pdo,$farmId,(int)$id); }
@@ -27,6 +28,9 @@ try {
      sales_rebuild_layer_egg_allocations($pdo,$farmId,(string)$row['sale_date'],(int)($_SESSION['user_id'] ?? 0));
  }
  $pdo->commit(); $_SESSION['success'] = 'Sale record deleted successfully.'; send_json(['success'=>true,'message'=>'Sale record deleted successfully.']);
+} catch(SaleRevenueAllocationLifecycleException $e) {
+ if($pdo->inTransaction()) $pdo->rollBack();
+ send_json(['success'=>false,'error'=>$e->getMessage()],409);
 } catch(SalePopulationEffectException $e) {
  if($pdo->inTransaction()) $pdo->rollBack();
  send_json(['success'=>false,'error'=>$e->getMessage()],409);

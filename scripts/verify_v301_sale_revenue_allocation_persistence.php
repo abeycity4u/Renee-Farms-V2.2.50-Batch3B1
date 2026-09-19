@@ -611,6 +611,20 @@ $check(
 );
 
 
+$check(
+    'TARGET_CYCLE_QUERY_USES_LIVE_SCHEMA',
+    strpos(
+        $persistence,
+        "status,\n             start_date\n         FROM production_cycles"
+    ) !== false
+    &&
+    strpos(
+        $persistence,
+        "\n             end_date\n         FROM production_cycles"
+    ) === false
+);
+
+
 /* =========================================================
  * FOUNDATIONAL SERVICE STILL SEPARATES AUTO LAYER EGGS
  * ========================================================= */
