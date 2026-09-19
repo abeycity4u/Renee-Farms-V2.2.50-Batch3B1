@@ -176,6 +176,7 @@ $check(
 $poultryShared = [
     'id' => 33,
     'farm_id' => 4,
+    'sale_date' => '2026-09-18',
     'farm_type' => 'poultry',
     'production_type' => 'shared',
     'attribution_scope' => 'farm',
@@ -187,6 +188,7 @@ $poultryShared = [
 $poultryLayerSpecific = [
     'id' => 34,
     'farm_id' => 4,
+    'sale_date' => '2026-09-18',
     'farm_type' => 'poultry',
     'production_type' => 'layer',
     'attribution_scope' => 'production_type',
@@ -198,6 +200,7 @@ $poultryLayerSpecific = [
 $layerEgg = [
     'id' => 35,
     'farm_id' => 4,
+    'sale_date' => '2026-09-18',
     'farm_type' => 'poultry',
     'production_type' => 'layer',
     'attribution_scope' => 'production_type',
@@ -209,6 +212,7 @@ $layerEgg = [
 $directSale = [
     'id' => 36,
     'farm_id' => 4,
+    'sale_date' => '2026-09-18',
     'farm_type' => 'poultry',
     'production_type' => 'layer',
     'attribution_scope' => 'cycle',
@@ -249,6 +253,26 @@ $otherFarmLayer = [
     'status' => 'active',
 ];
 
+$futureLayer = [
+    'id' => 91,
+    'farm_id' => 4,
+    'farm_type' => 'poultry',
+    'production_type' => 'layer',
+    'status' => 'active',
+    'start_date' => '2026-09-19',
+    'end_date' => null,
+];
+
+$historicalClosedLayer = [
+    'id' => 92,
+    'farm_id' => 4,
+    'farm_type' => 'poultry',
+    'production_type' => 'layer',
+    'status' => 'closed',
+    'start_date' => '2026-08-01',
+    'end_date' => '2026-09-10',
+];
+
 
 $sharedContract =
     sale_revenue_allocation_service_parent_contract(
@@ -263,6 +287,32 @@ $check(
     &&
     ($sharedContract['allocation_basis'] ?? '')
         === 'manual_shared_revenue'
+);
+
+$check(
+    'PARENT_SALE_DATE_EXPOSED',
+    ($sharedContract['sale_date'] ?? '')
+        === '2026-09-18'
+);
+
+$invalidDateSale =
+    $poultryShared;
+
+$invalidDateSale['sale_date'] =
+    'not-a-date';
+
+$check(
+    'INVALID_SALE_DATE_REJECTED',
+    $throws(
+        static function () use (
+            $invalidDateSale
+        ): void {
+            sale_revenue_allocation_service_parent_contract(
+                $invalidDateSale
+            );
+        },
+        'sale date is invalid'
+    )
 );
 
 $check(
@@ -359,6 +409,42 @@ $check(
         },
         'does not belong to this farm'
     )
+);
+
+$check(
+    'FUTURE_CYCLE_START_REJECTED',
+    $throws(
+        static function () use (
+            $sharedContract,
+            $futureLayer
+        ): void {
+            sale_revenue_allocation_service_target_contract(
+                $sharedContract,
+                $futureLayer
+            );
+        },
+        'starts after the sale date'
+    )
+);
+
+$check(
+    'HISTORICAL_CLOSED_CYCLE_ACCEPTED',
+    (function () use (
+        $sharedContract,
+        $historicalClosedLayer
+    ): bool {
+        try {
+            sale_revenue_allocation_service_target_contract(
+                $sharedContract,
+                $historicalClosedLayer
+            );
+
+            return true;
+
+        } catch (Throwable $e) {
+            return false;
+        }
+    })()
 );
 
 $layerSpecificContract =

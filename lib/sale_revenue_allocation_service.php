@@ -238,6 +238,25 @@ function sale_revenue_allocation_service_parent_contract(
         );
     }
 
+    $saleDate =
+        trim(
+            (string)(
+                $sale['sale_date']
+                ?? ''
+            )
+        );
+
+    if (
+        preg_match(
+            '/^\\d{4}-\\d{2}-\\d{2}$/',
+            $saleDate
+        ) !== 1
+    ) {
+        throw new RuntimeException(
+            'Shared revenue sale date is invalid.'
+        );
+    }
+
     if (
         sale_revenue_allocation_service_is_automatic_layer_egg(
             $sale
@@ -276,6 +295,9 @@ function sale_revenue_allocation_service_parent_contract(
 
         'attribution_scope' =>
             $scope,
+
+        'sale_date' =>
+            $saleDate,
 
         'parent_cents' =>
             $parentCents,
@@ -383,6 +405,37 @@ function sale_revenue_allocation_service_target_contract(
         throw new RuntimeException(
             'Revenue allocation target cycle does not match the sale production type.'
         );
+    }
+
+    $cycleStartDate =
+        trim(
+            (string)(
+                $cycle['start_date']
+                ?? ''
+            )
+        );
+
+    if ($cycleStartDate !== '') {
+        if (
+            preg_match(
+                '/^\\d{4}-\\d{2}-\\d{2}$/',
+                $cycleStartDate
+            ) !== 1
+        ) {
+            throw new RuntimeException(
+                'Revenue allocation target cycle start date is invalid.'
+            );
+        }
+
+        if (
+            $cycleStartDate
+            >
+            (string)$parent['sale_date']
+        ) {
+            throw new RuntimeException(
+                'Revenue cannot be allocated to a production cycle that starts after the sale date.'
+            );
+        }
     }
 
     return [
