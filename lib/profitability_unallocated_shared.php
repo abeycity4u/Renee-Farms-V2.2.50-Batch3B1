@@ -17,6 +17,7 @@
  */
 
 require_once __DIR__ . '/shared_cost_contract.php';
+require_once __DIR__ . '/financial_allocation_workspace.php';
 require_once __DIR__ . '/stock_consumption_economics.php';
 require_once __DIR__ . '/stock_consumption_allocation_workspace.php';
 
@@ -406,6 +407,28 @@ function profitability_unallocated_shared_summary(
                 )
             ) === 'feeds';
 
+        $expenseAllocationUrl =
+            null;
+
+        if (
+            !$isFeedPurchase
+            &&
+            financial_allocation_workspace_parent_is_eligible(
+                $expense
+            )
+            &&
+            financial_allocation_workspace_can_access(
+                $expense,
+                'operational'
+            )
+        ) {
+            $expenseAllocationUrl =
+                financial_allocation_workspace_url(
+                    $expenseId,
+                    'operational'
+                );
+        }
+
         $prefix =
             $isFeedPurchase
                 ? 'cash_feed_purchase'
@@ -480,6 +503,14 @@ function profitability_unallocated_shared_summary(
                     $isFeedPurchase
                         ? 'cash_only_waiting_allocation'
                         : 'awaiting_allocation',
+
+                'allocation_kind' =>
+                    $isFeedPurchase
+                        ? null
+                        : 'expense',
+
+                'allocation_url' =>
+                    $expenseAllocationUrl,
             ];
         }
     }
@@ -748,6 +779,9 @@ function profitability_unallocated_shared_summary(
                  * Expose its workspace destination only; all mutation
                  * authority remains in the canonical workspace/API.
                  */
+                'allocation_kind' =>
+                    'stock',
+
                 'allocation_url' =>
                     stock_consumption_allocation_workspace_url(
                         $stockId

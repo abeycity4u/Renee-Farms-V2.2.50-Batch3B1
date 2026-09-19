@@ -209,6 +209,172 @@ $check(
     ) !== false
 );
 
+
+$revenueStart =
+    strpos(
+        $helper,
+        ' * SHARED / POOLED REVENUE'
+    );
+
+$expenseStart =
+    strpos(
+        $helper,
+        ' * MANUAL SHARED EXPENSES'
+    );
+
+$stockStart =
+    strpos(
+        $helper,
+        ' * CONSUMED STOCK'
+    );
+
+$presentationStart =
+    strpos(
+        $helper,
+        ' * PRESENTATION TOTALS'
+    );
+
+$revenueSection =
+    (
+        $revenueStart !== false
+        &&
+        $expenseStart !== false
+        &&
+        $expenseStart > $revenueStart
+    )
+        ? substr(
+            $helper,
+            $revenueStart,
+            $expenseStart - $revenueStart
+        )
+        : '';
+
+$expenseSection =
+    (
+        $expenseStart !== false
+        &&
+        $stockStart !== false
+        &&
+        $stockStart > $expenseStart
+    )
+        ? substr(
+            $helper,
+            $expenseStart,
+            $stockStart - $expenseStart
+        )
+        : '';
+
+$stockSection =
+    (
+        $stockStart !== false
+        &&
+        $presentationStart !== false
+        &&
+        $presentationStart > $stockStart
+    )
+        ? substr(
+            $helper,
+            $stockStart,
+            $presentationStart - $stockStart
+        )
+        : '';
+
+$check(
+    'USES_CANONICAL_FINANCIAL_ALLOCATION_WORKSPACE',
+    strpos(
+        $helper,
+        "require_once __DIR__ . '/financial_allocation_workspace.php';"
+    ) !== false
+);
+
+$check(
+    'MANUAL_EXPENSE_LINK_USES_CANONICAL_ELIGIBILITY_AND_PERMISSION',
+    $expenseSection !== ''
+    &&
+    strpos(
+        $expenseSection,
+        'financial_allocation_workspace_parent_is_eligible('
+    ) !== false
+    &&
+    strpos(
+        $expenseSection,
+        'financial_allocation_workspace_can_access('
+    ) !== false
+    &&
+    strpos(
+        $expenseSection,
+        'financial_allocation_workspace_url('
+    ) !== false
+);
+
+$check(
+    'CASH_FEED_PURCHASE_REMAINS_NON_ACTIONABLE',
+    $expenseSection !== ''
+    &&
+    strpos(
+        $expenseSection,
+        '!$isFeedPurchase'
+    ) !== false
+    &&
+    strpos(
+        $expenseSection,
+        "'cash_only_waiting_allocation'"
+    ) !== false
+);
+
+$check(
+    'SHARED_REVENUE_HAS_NO_FAKE_MANUAL_WORKSPACE',
+    $revenueSection !== ''
+    &&
+    strpos(
+        $revenueSection,
+        "'allocation_url'"
+    ) === false
+);
+
+$check(
+    'STOCK_ACTION_KIND_REMAINS_EXPLICIT',
+    $stockSection !== ''
+    &&
+    strpos(
+        $stockSection,
+        "'allocation_kind'"
+    ) !== false
+    &&
+    strpos(
+        $stockSection,
+        "'stock'"
+    ) !== false
+    &&
+    strpos(
+        $stockSection,
+        'stock_consumption_allocation_workspace_url('
+    ) !== false
+);
+
+$check(
+    'PAGE_SUPPORTS_STOCK_AND_EXPENSE_ACTIONS',
+    strpos(
+        $page,
+        '$allocationKind'
+    ) !== false
+    &&
+    strpos(
+        $page,
+        "'Open shared-expense allocation workspace'"
+    ) !== false
+    &&
+    strpos(
+        $page,
+        "'Open consumed-stock allocation workspace'"
+    ) !== false
+    &&
+    strpos(
+        $page,
+        "\$allocationKind === 'stock'"
+    ) !== false
+);
+
 $failed = [];
 
 foreach ($checks as $name => $ok) {

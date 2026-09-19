@@ -341,17 +341,41 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
 
                                 <td>
                                     <?php
-                                    $allocationUrl =
-                                        $canManageStockAllocation
-                                            ? trim(
+                                    $allocationKind =
+                                        strtolower(
+                                            trim(
                                                 (string)(
                                                     $sharedRow[
-                                                        'allocation_url'
+                                                        'allocation_kind'
                                                     ]
                                                     ?? ''
                                                 )
                                             )
-                                            : '';
+                                        );
+
+                                    $allocationUrl =
+                                        trim(
+                                            (string)(
+                                                $sharedRow[
+                                                    'allocation_url'
+                                                ]
+                                                ?? ''
+                                            )
+                                        );
+
+                                    if (
+                                        $allocationKind === 'stock'
+                                        &&
+                                        !$canManageStockAllocation
+                                    ) {
+                                        $allocationUrl =
+                                            '';
+                                    }
+
+                                    $allocationTitle =
+                                        $allocationKind === 'expense'
+                                            ? 'Open shared-expense allocation workspace'
+                                            : 'Open consumed-stock allocation workspace';
                                     ?>
 
                                     <?php if (($sharedRow['status'] ?? '') === 'attribution_exception'): ?>
@@ -370,7 +394,11 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
                                                 ENT_QUOTES | ENT_SUBSTITUTE,
                                                 'UTF-8'
                                             ); ?>"
-                                            title="Open consumed-stock allocation workspace"
+                                            title="<?php echo htmlspecialchars(
+                                                $allocationTitle,
+                                                ENT_QUOTES | ENT_SUBSTITUTE,
+                                                'UTF-8'
+                                            ); ?>"
                                         >
                                             Awaiting allocation
                                             <i class="bi bi-box-arrow-up-right ms-1"></i>
