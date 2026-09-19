@@ -11,6 +11,14 @@ $readerPath =
     $root
     . '/lib/stock_consumption_economics.php';
 
+$unallocatedPath =
+    $root
+    . '/lib/profitability_unallocated_shared.php';
+
+$profitabilityPagePath =
+    $root
+    . '/management/profitability.php';
+
 $financial =
     file_get_contents(
         $financialPath
@@ -21,10 +29,24 @@ $reader =
         $readerPath
     );
 
+$unallocated =
+    file_get_contents(
+        $unallocatedPath
+    );
+
+$profitabilityPage =
+    file_get_contents(
+        $profitabilityPagePath
+    );
+
 if (
     $financial === false
     ||
     $reader === false
+    ||
+    $unallocated === false
+    ||
+    $profitabilityPage === false
 ) {
     echo "RESULT=FAIL\n";
     echo "CHECK_COUNT=0\n";
@@ -238,6 +260,73 @@ verify_check(
         . '(?:stock_transactions|stock_consumption_allocations)\b/i',
         $profitSource
     ) !== 1
+);
+
+
+verify_check(
+    $checks,
+    'UNALLOCATED_STOCK_ROW_EXPOSES_CANONICAL_WORKSPACE_URL',
+    substr_count(
+        $unallocated,
+        'stock_consumption_allocation_workspace_url('
+    ) === 1
+    &&
+    strpos(
+        $unallocated,
+        "'allocation_url'"
+    ) !== false
+);
+
+verify_check(
+    $checks,
+    'PROFITABILITY_ACTION_IS_PERMISSION_GATED',
+    strpos(
+        $profitabilityPage,
+        'stock_consumption_allocation_workspace_can_manage()'
+    ) !== false
+    &&
+    strpos(
+        $profitabilityPage,
+        '$canManageStockAllocation'
+    ) !== false
+);
+
+verify_check(
+    $checks,
+    'PROFITABILITY_RENDERS_CANONICAL_ALLOCATION_LINK',
+    strpos(
+        $profitabilityPage,
+        "'allocation_url'"
+    ) !== false
+    &&
+    strpos(
+        $profitabilityPage,
+        '$allocationUrl'
+    ) !== false
+    &&
+    strpos(
+        $profitabilityPage,
+        'Open consumed-stock allocation workspace'
+    ) !== false
+);
+
+verify_check(
+    $checks,
+    'NON_ACTIONABLE_STATUS_BADGES_REMAIN_NON_LINKS',
+    strpos(
+        $profitabilityPage,
+        'Correct source attribution'
+    ) !== false
+    &&
+    strpos(
+        $profitabilityPage,
+        'Cash-only balance'
+    ) !== false
+    &&
+    strpos(
+        $profitabilityPage,
+        '<span class="badge bg-warning text-dark">'
+    ) !== false
 );
 
 $failed = [];

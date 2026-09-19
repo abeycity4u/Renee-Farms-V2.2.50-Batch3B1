@@ -741,6 +741,17 @@ function profitability_unallocated_shared_summary(
 
                 'status' =>
                     'awaiting_allocation',
+
+                /*
+                 * This movement already passed the canonical
+                 * consumed-stock allocation eligibility contract.
+                 * Expose its workspace destination only; all mutation
+                 * authority remains in the canonical workspace/API.
+                 */
+                'allocation_url' =>
+                    stock_consumption_allocation_workspace_url(
+                        $stockId
+                    ),
             ];
         }
     }

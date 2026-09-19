@@ -54,6 +54,9 @@ $unallocatedShared =
         $end
     );
 
+$canManageStockAllocation =
+    stock_consumption_allocation_workspace_can_manage();
+
 $profitabilityAttribution =
     $summary['attribution_composition']
     ?? [];
@@ -337,6 +340,20 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
                                 </td>
 
                                 <td>
+                                    <?php
+                                    $allocationUrl =
+                                        $canManageStockAllocation
+                                            ? trim(
+                                                (string)(
+                                                    $sharedRow[
+                                                        'allocation_url'
+                                                    ]
+                                                    ?? ''
+                                                )
+                                            )
+                                            : '';
+                                    ?>
+
                                     <?php if (($sharedRow['status'] ?? '') === 'attribution_exception'): ?>
                                         <span class="badge bg-danger">
                                             Correct source attribution
@@ -345,6 +362,19 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
                                         <span class="badge bg-secondary">
                                             Cash-only balance
                                         </span>
+                                    <?php elseif ($allocationUrl !== ''): ?>
+                                        <a
+                                            class="badge bg-warning text-dark text-decoration-none"
+                                            href="<?php echo htmlspecialchars(
+                                                $allocationUrl,
+                                                ENT_QUOTES | ENT_SUBSTITUTE,
+                                                'UTF-8'
+                                            ); ?>"
+                                            title="Open consumed-stock allocation workspace"
+                                        >
+                                            Awaiting allocation
+                                            <i class="bi bi-box-arrow-up-right ms-1"></i>
+                                        </a>
                                     <?php else: ?>
                                         <span class="badge bg-warning text-dark">
                                             Awaiting allocation
