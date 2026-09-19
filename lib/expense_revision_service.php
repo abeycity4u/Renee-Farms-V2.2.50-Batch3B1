@@ -63,6 +63,7 @@ function expense_revision_service_reason_for_action(
             [
                 'update',
                 'delete',
+                'retain_shared',
             ],
             true
         )
@@ -71,7 +72,11 @@ function expense_revision_service_reason_for_action(
         throw new InvalidArgumentException(
             $action === 'delete'
                 ? 'Enter a reason for deleting this expense.'
-                : 'Enter a reason for changing this expense.'
+                : (
+                    $action === 'retain_shared'
+                        ? 'Enter a reason for retaining this expense as shared.'
+                        : 'Enter a reason for changing this expense.'
+                )
         );
     }
 
@@ -365,6 +370,7 @@ function expense_revision_service_insert_revision(
         'legacy_baseline',
         'update',
         'delete',
+        'retain_shared',
     ];
 
     if (
@@ -391,6 +397,7 @@ function expense_revision_service_insert_revision(
             [
                 'update',
                 'delete',
+                'retain_shared',
             ],
             true
         )
@@ -894,6 +901,144 @@ function expense_revision_service_prepare_existing_mutation(
                 'state_fingerprint'
             ],
     ];
+}
+}
+
+
+
+if (!function_exists(
+    'expense_revision_service_record_retained_shared'
+)) {
+function expense_revision_service_record_retained_shared(
+    PDO $pdo,
+    int $farmId,
+    int $expenseId,
+    ?int $changedByUserId,
+    ?string $revisionReason
+): array {
+    expense_revision_service_require_transaction(
+        $pdo
+    );
+
+    if (
+        $changedByUserId === null
+        || $changedByUserId < 1
+    ) {
+        throw new RuntimeException(
+            'Expense retained-shared decision actor is required.'
+        );
+    }
+
+    $state =
+        expense_revision_service_state(
+            $pdo,
+            $farmId,
+            $expenseId,
+            true
+        );
+
+    $latest =
+        expense_revision_service_latest(
+            $pdo,
+            $farmId,
+            $expenseId,
+            true
+        );
+
+    if ($latest === null) {
+        throw new RuntimeException(
+            'Expense retained-shared decision requires established revision history.'
+        );
+    }
+
+    expense_revision_service_assert_current_consistency(
+        $state,
+        $latest
+    );
+
+    if (
+        strtolower(
+            trim(
+                (string)(
+                    $latest['revision_action']
+                    ?? ''
+                )
+            )
+        ) === 'retain_shared'
+    ) {
+        return [
+            'id' =>
+                (int)$latest['id'],
+
+            'revision_no' =>
+                (int)$latest[
+                    'revision_no'
+                ],
+
+            'revision_action' =>
+                'retain_shared',
+
+            'revision_reason' =>
+                $latest[
+                    'revision_reason'
+                ]
+                ?? null,
+
+            'causal_fingerprint' =>
+                (string)$latest[
+                    'causal_fingerprint'
+                ],
+
+            'state_fingerprint' =>
+                (string)$latest[
+                    'state_fingerprint'
+                ],
+
+            'changed' =>
+                false,
+        ];
+    }
+
+    $revisionReason =
+        expense_revision_service_reason_for_action(
+            'retain_shared',
+            $revisionReason
+        );
+
+    $nextRevisionNo =
+        (int)$latest[
+            'revision_no'
+        ] + 1;
+
+    $revision =
+        expense_revision_service_insert_revision(
+            $pdo,
+            $state,
+            'retain_shared',
+            $nextRevisionNo,
+            (int)$latest['id'],
+            $changedByUserId,
+            $revisionReason
+        );
+
+    /*
+     * Retaining an expense as shared does not change any economic field or
+     * allocation projection. Only the immutable decision revision advances.
+     */
+    expense_revision_service_sync_projection(
+        $pdo,
+        $farmId,
+        $expenseId,
+        $nextRevisionNo,
+        $revision[
+            'causal_fingerprint'
+        ]
+    );
+
+    $revision['changed'] =
+        true;
+
+    return $revision;
 }
 }
 

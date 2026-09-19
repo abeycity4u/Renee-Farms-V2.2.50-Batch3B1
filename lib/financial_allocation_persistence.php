@@ -354,6 +354,288 @@ function financial_allocation_persistence_write_projection(
 }
 }
 
+
+if (!function_exists(
+    'financial_allocation_persistence_retain_shared'
+)) {
+function financial_allocation_persistence_retain_shared(
+    PDO $pdo,
+    int $farmId,
+    int $expenseId,
+    int $actorUserId,
+    ?string $revisionReason
+): array {
+    financial_allocation_persistence_require_transaction(
+        $pdo
+    );
+
+    if (
+        $farmId < 1
+        || $expenseId < 1
+    ) {
+        throw new InvalidArgumentException(
+            'Shared cost parent identity is invalid.'
+        );
+    }
+
+    $actorUserId =
+        financial_allocation_persistence_actor(
+            $actorUserId
+        );
+
+    /*
+     * This is a reviewed business decision, not an allocation.
+     *
+     * The parent expense remains unchanged.
+     * financial_allocations remains empty.
+     * The immutable expense revision ledger records that the cost was
+     * deliberately retained at shared-operation level.
+     */
+    $parent =
+        financial_allocation_service_parent(
+            $pdo,
+            $farmId,
+            $expenseId,
+            true
+        );
+
+    $currentRows =
+        financial_allocation_service_current_rows(
+            $pdo,
+            $farmId,
+            $expenseId,
+            true
+        );
+
+    $animalCount =
+        financial_allocation_service_animal_count(
+            $pdo,
+            $farmId,
+            $expenseId,
+            true
+        );
+
+    if ($currentRows !== []) {
+        throw new RuntimeException(
+            'Only fully unallocated shared costs can be retained entirely as shared.'
+        );
+    }
+
+    if ($animalCount > 0) {
+        throw new RuntimeException(
+            'A cost allocated to individual animals cannot also be retained as shared.'
+        );
+    }
+
+    $validated =
+        financial_allocation_service_validate_desired_rows(
+            $parent,
+            [],
+            [],
+            0
+        );
+
+    /*
+     * Establish legacy provenance when necessary, or verify canonical
+     * projection/history consistency before recording the decision.
+     */
+    expense_revision_service_prepare_existing_mutation(
+        $pdo,
+        $farmId,
+        $expenseId,
+        $actorUserId
+    );
+
+    /*
+     * Re-read while locks remain held and fail closed if allocation state
+     * changed while revision provenance was being established.
+     */
+    $lockedParent =
+        financial_allocation_service_parent(
+            $pdo,
+            $farmId,
+            $expenseId,
+            true
+        );
+
+    $lockedRows =
+        financial_allocation_service_current_rows(
+            $pdo,
+            $farmId,
+            $expenseId,
+            true
+        );
+
+    $lockedAnimalCount =
+        financial_allocation_service_animal_count(
+            $pdo,
+            $farmId,
+            $expenseId,
+            true
+        );
+
+    if ($lockedRows !== []) {
+        throw new RuntimeException(
+            'Shared cost allocation changed while recording the retained-shared decision.'
+        );
+    }
+
+    if ($lockedAnimalCount > 0) {
+        throw new RuntimeException(
+            'Shared cost animal allocation changed while recording the retained-shared decision.'
+        );
+    }
+
+    $lockedValidated =
+        financial_allocation_service_validate_desired_rows(
+            $lockedParent,
+            [],
+            [],
+            0
+        );
+
+    if (
+        $lockedValidated[
+            'allocated_amount'
+        ] !== $validated[
+            'allocated_amount'
+        ]
+        ||
+        $lockedValidated[
+            'remaining_amount'
+        ] !== $validated[
+            'remaining_amount'
+        ]
+    ) {
+        throw new RuntimeException(
+            'Shared cost parent value changed while recording the retained-shared decision.'
+        );
+    }
+
+    $latest =
+        expense_revision_service_latest(
+            $pdo,
+            $farmId,
+            $expenseId,
+            true
+        );
+
+    if (
+        $latest !== null
+        &&
+        strtolower(
+            trim(
+                (string)(
+                    $latest[
+                        'revision_action'
+                    ]
+                    ?? ''
+                )
+            )
+        ) === 'retain_shared'
+    ) {
+        return [
+            'changed' =>
+                false,
+
+            'action' =>
+                'retain_shared',
+
+            'expense_id' =>
+                $expenseId,
+
+            'rows' =>
+                [],
+
+            'allocated_amount' =>
+                $lockedValidated[
+                    'allocated_amount'
+                ],
+
+            'remaining_amount' =>
+                $lockedValidated[
+                    'remaining_amount'
+                ],
+
+            'revision_no' =>
+                (int)$latest[
+                    'revision_no'
+                ],
+        ];
+    }
+
+    $revision =
+        expense_revision_service_record_retained_shared(
+            $pdo,
+            $farmId,
+            $expenseId,
+            $actorUserId,
+            $revisionReason
+        );
+
+    $latestWritten =
+        expense_revision_service_latest(
+            $pdo,
+            $farmId,
+            $expenseId,
+            true
+        );
+
+    if (
+        $latestWritten === null
+        ||
+        strtolower(
+            trim(
+                (string)(
+                    $latestWritten[
+                        'revision_action'
+                    ]
+                    ?? ''
+                )
+            )
+        ) !== 'retain_shared'
+    ) {
+        throw new RuntimeException(
+            'Shared cost retention decision was not persisted safely.'
+        );
+    }
+
+    return [
+        'changed' =>
+            !empty(
+                $revision[
+                    'changed'
+                ]
+            ),
+
+        'action' =>
+            'retain_shared',
+
+        'expense_id' =>
+            $expenseId,
+
+        'rows' =>
+            [],
+
+        'allocated_amount' =>
+            $lockedValidated[
+                'allocated_amount'
+            ],
+
+        'remaining_amount' =>
+            $lockedValidated[
+                'remaining_amount'
+            ],
+
+        'revision_no' =>
+            (int)$latestWritten[
+                'revision_no'
+            ],
+    ];
+}
+}
+
+
 if (!function_exists(
     'financial_allocation_persistence_apply'
 )) {

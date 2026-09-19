@@ -61,6 +61,16 @@ $desiredRows =
         true
     );
 
+$decisionAction =
+    strtolower(
+        trim(
+            (string)(
+                $_POST['decision_action']
+                ?? 'allocate'
+            )
+        )
+    );
+
 if ($expenseId < 1) {
     send_json([
         'success' => false,
@@ -75,6 +85,34 @@ if (!is_array($desiredRows)) {
         'error' =>
             'Financial allocation rows are invalid.',
     ], 400);
+}
+
+if (
+    !in_array(
+        $decisionAction,
+        [
+            'allocate',
+            'retain_shared',
+        ],
+        true
+    )
+) {
+    send_json([
+        'success' => false,
+        'error' =>
+            'Shared cost decision is invalid.',
+    ], 400);
+}
+
+if (
+    $decisionAction === 'retain_shared'
+    && $desiredRows !== []
+) {
+    send_json([
+        'success' => false,
+        'error' =>
+            'Clear cycle amounts before retaining this cost as shared.',
+    ], 422);
 }
 
 $farmId =
@@ -126,23 +164,40 @@ try {
     }
 
     $result =
-        financial_allocation_persistence_apply(
-            $pdo,
-            $farmId,
-            $expenseId,
-            $desiredRows,
-            $actorUserId,
-            $revisionReason !== ''
-                ? $revisionReason
-                : null
-        );
+        $decisionAction === 'retain_shared'
+            ? financial_allocation_persistence_retain_shared(
+                $pdo,
+                $farmId,
+                $expenseId,
+                $actorUserId,
+                $revisionReason !== ''
+                    ? $revisionReason
+                    : null
+            )
+            : financial_allocation_persistence_apply(
+                $pdo,
+                $farmId,
+                $expenseId,
+                $desiredRows,
+                $actorUserId,
+                $revisionReason !== ''
+                    ? $revisionReason
+                    : null
+            );
 
     $pdo->commit();
 
-    $message =
-        !empty($result['changed'])
-            ? 'Shared cost allocation saved successfully.'
-            : 'No allocation changes were needed.';
+    if ($decisionAction === 'retain_shared') {
+        $message =
+            !empty($result['changed'])
+                ? 'Cost retained as shared successfully.'
+                : 'This cost is already retained as shared.';
+    } else {
+        $message =
+            !empty($result['changed'])
+                ? 'Shared cost allocation saved successfully.'
+                : 'No allocation changes were needed.';
+    }
 
     $_SESSION['success'] =
         $message;
