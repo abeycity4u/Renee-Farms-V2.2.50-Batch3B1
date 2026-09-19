@@ -254,7 +254,7 @@ function farm_intelligence_explainable_signals(
     // Profitability completeness: USED operating stock without a historical cost
     // snapshot must never be silently treated as zero cost.
     $effectiveStockSql = stock_effective_sql_predicate();
-    $feedItemSql = stock_feed_item_sql_predicate('s','c');
+    $feedItemSql = stock_feed_transaction_sql_predicate('t');
     $operatingClasses = array_keys(inventory_operating_consumption_classifications());
     $opPlaceholders = $operatingClasses ? implode(',', array_fill(0, count($operatingClasses), '?')) : "''";
     $uncostedSql = "SELECT COUNT(*) tx_count, COALESCE(SUM(t.quantity),0) quantity_total

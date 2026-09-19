@@ -710,9 +710,8 @@ function stock_consumption_economics_source_rows(
         );
 
     $feedPredicate =
-        stock_feed_item_sql_predicate(
-            's',
-            'c'
+        stock_feed_transaction_sql_predicate(
+            't'
         );
 
     $operatingClasses =

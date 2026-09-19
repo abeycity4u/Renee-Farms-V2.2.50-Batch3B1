@@ -132,13 +132,11 @@ function poultry_production_entry_stock_use_provenance_source(
     ];
 
     /*
-     * Feed eligibility itself depends on mutable joined item/category
-     * metadata. Preserve those policy inputs in Feed provenance so an
-     * eligibility-changing edit cannot leave the provenance fingerprint
-     * unchanged.
-     *
-     * category_name follows the same LOWER(COALESCE(...)) semantics as
-     * stock_feed_item_sql_predicate(), so case-only edits remain invariant.
+     * Feed eligibility now comes from the immutable stock-movement Financial
+     * Type snapshot. Keep the historical item/category metadata in this
+     * provenance digest recipe for compatibility with previously approved
+     * Production-Entry fingerprints. These fields no longer confer Feed
+     * accounting status.
      */
     if ($role === 'feed_use') {
         $revisionFacts['feed_category'] =
@@ -353,9 +351,10 @@ function poultry_production_entry_stock_allocation_provenance_source(
     ];
 
     /*
-     * Feed eligibility depends on mutable joined item/category metadata.
-     * Preserve exactly the same semantic inputs used by direct Feed
-     * provenance so eligibility changes cannot leave provenance unchanged.
+     * Feed accounting status comes from the immutable parent movement
+     * Financial Type snapshot. Retain the historical metadata inputs below
+     * solely so allocated Feed provenance remains digest-compatible with the
+     * existing Production-Entry provenance recipe.
      */
     if ($role === 'feed_use') {
         $revisionFacts['feed_category'] =
@@ -1190,9 +1189,8 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
         stock_effective_sql_predicate('t');
 
     $feedPredicate =
-        stock_feed_item_sql_predicate(
-            's',
-            'c'
+        stock_feed_transaction_sql_predicate(
+            't'
         );
 
     /*

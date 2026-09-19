@@ -9,12 +9,42 @@ require_once __DIR__ . '/stock_reporting.php';
  * (non-reversed) ledger rows so back-dated corrections do not accidentally use
  * today's replacement cost.
  */
+/**
+ * Operational Feed specialization for current inventory items.
+ *
+ * This helper must not be used to classify posted stock-ledger economics.
+ * Category names are descriptive only and never carry accounting authority.
+ */
 if (!function_exists('stock_feed_item_sql_predicate')) {
-    function stock_feed_item_sql_predicate(string $itemAlias = 's', string $categoryAlias = 'c'): string
-    {
+    function stock_feed_item_sql_predicate(
+        string $itemAlias = 's',
+        string $categoryAlias = 'c'
+    ): string {
         $item = rtrim($itemAlias, '.');
-        $category = rtrim($categoryAlias, '.');
-        return "({$item}.feed_category IN ('layer','broiler','ruminant') OR LOWER(COALESCE({$category}.category_name,'')) IN ('feed','feeds'))";
+
+        return "{$item}.feed_category IN ('layer','broiler','ruminant')";
+    }
+}
+
+/**
+ * Canonical Feed accounting predicate for posted stock movements.
+ *
+ * stock_transactions.financial_classification is an immutable financial
+ * snapshot captured when the movement is posted. Later item/category changes
+ * must not reinterpret historical Feed versus non-Feed economics.
+ */
+if (!function_exists('stock_feed_transaction_sql_predicate')) {
+    function stock_feed_transaction_sql_predicate(
+        string $transactionAlias = 't'
+    ): string {
+        $transaction =
+            rtrim(
+                $transactionAlias,
+                '.'
+            );
+
+        return
+            "LOWER(TRIM(COALESCE({$transaction}.financial_classification,'')))='feed'";
     }
 }
 

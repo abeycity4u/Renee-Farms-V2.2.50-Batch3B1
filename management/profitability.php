@@ -120,7 +120,7 @@ $summary['mortality_value'] = !empty($poultryEconomics['available'])
 // Use the same effective-transaction predicate as feed movement summaries and feed-cost reporting.
 // Compatibility contract: transaction_type='used' AND is_reversed = 0 AND reversal_of_id IS NULL
 $effectiveStockSql = stock_effective_sql_predicate();
-$feedItemSql = stock_feed_item_sql_predicate('s', 'c');
+$feedItemSql = stock_feed_transaction_sql_predicate('t');
 $uncostedSql = "SELECT COUNT(*)
                 FROM stock_transactions t
                 JOIN stock_items s ON s.id=t.stock_item_id AND s.farm_id=t.farm_id
