@@ -18,6 +18,7 @@
 
 require_once __DIR__ . '/shared_cost_contract.php';
 require_once __DIR__ . '/financial_allocation_workspace.php';
+require_once __DIR__ . '/sale_revenue_allocation_workspace.php';
 require_once __DIR__ . '/stock_consumption_economics.php';
 require_once __DIR__ . '/stock_consumption_allocation_workspace.php';
 
@@ -177,9 +178,12 @@ function profitability_unallocated_shared_summary(
         $pdo->prepare(
             "SELECT
                  id,
+                 farm_id,
+                 sale_date,
                  farm_type,
                  production_type,
                  attribution_scope,
+                 cycle_id,
                  product_type,
                  total_amount
              FROM sales_records
@@ -245,6 +249,29 @@ function profitability_unallocated_shared_summary(
             $parentCents
             - $allocatedCents;
 
+        /*
+         * Profitability exposes only the destination.
+         * Eligibility, authorization and all mutation authority remain
+         * inside the canonical shared-revenue workspace/service stack.
+         */
+        $revenueAllocationUrl =
+            null;
+
+        if (
+            sale_revenue_allocation_workspace_parent_is_eligible(
+                $sale
+            )
+            &&
+            sale_revenue_allocation_workspace_can_access(
+                $sale
+            )
+        ) {
+            $revenueAllocationUrl =
+                sale_revenue_allocation_workspace_url(
+                    $saleId
+                );
+        }
+
         $totals[
             'revenue_parent_cents'
         ] += $parentCents;
@@ -297,6 +324,18 @@ function profitability_unallocated_shared_summary(
 
                 'status' =>
                     'awaiting_allocation',
+
+                /*
+                 * Keep ineligible / unauthorized revenue visibly
+                 * unallocated without exposing a mutation action.
+                 */
+                'allocation_kind' =>
+                    $revenueAllocationUrl !== null
+                        ? 'revenue'
+                        : null,
+
+                'allocation_url' =>
+                    $revenueAllocationUrl,
             ];
         }
     }

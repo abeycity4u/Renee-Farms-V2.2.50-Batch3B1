@@ -63,6 +63,47 @@
     const mutationBlocked =
         form.dataset.mutationBlocked === '1';
 
+    /*
+     * Shared workspace interaction adapter.
+     *
+     * Expense allocation remains the backwards-compatible default.
+     * Revenue and future compatible allocation workspaces provide their
+     * identity/wording through form data attributes instead of duplicating
+     * this interaction policy in another JavaScript file.
+     */
+    const parentIdField =
+        String(
+            form.dataset.parentIdField
+            || 'expense_id'
+        );
+
+    const parentId =
+        String(
+            form.dataset.parentId
+            || form.dataset.expenseId
+            || ''
+        );
+
+    const entityLabel =
+        String(
+            form.dataset.entityLabel
+            || 'expense'
+        );
+
+    const allocationLabel =
+        String(
+            form.dataset.allocationLabel
+            || 'shared cost allocation'
+        );
+
+    /*
+     * Existing expense UI requires a reason on every save.
+     * Other canonical writers may allow the initial create without one.
+     * Their server-side persistence remains the final authority.
+     */
+    const reasonRequired =
+        form.dataset.reasonRequired !== '0';
+
     const amountInputs =
         Array.from(
             form.querySelectorAll(
@@ -382,7 +423,7 @@
             if (mutationBlocked) {
                 notify(
                     'error',
-                    'This expense has individual-animal allocations and cannot also be allocated to production cycles.'
+                    'This ' + entityLabel + ' has individual-animal allocations and cannot also be allocated to production cycles.'
                 );
 
                 return;
@@ -394,7 +435,7 @@
             if (allocated > gross + 0.005) {
                 notify(
                     'error',
-                    'Total allocations cannot exceed the parent expense total.'
+                    'Total allocations cannot exceed the parent ' + entityLabel + ' total.'
                 );
 
                 return;
@@ -407,10 +448,14 @@
                         : ''
                 ).trim();
 
-            if (reason === '') {
+            if (
+                reasonRequired
+                &&
+                reason === ''
+            ) {
                 notify(
                     'error',
-                    'Enter a reason for changing this expense allocation.'
+                    'Enter a reason for changing this ' + entityLabel + ' allocation.'
                 );
 
                 if (reasonInput) {
@@ -476,15 +521,16 @@
             );
 
             body.set(
-                'expense_id',
-                form.dataset.expenseId || ''
+                parentIdField,
+                parentId
             );
 
-            body.set(
-                'permission_scope',
-                form.dataset.permissionScope
-                    || 'operational'
-            );
+            if (form.dataset.permissionScope) {
+                body.set(
+                    'permission_scope',
+                    form.dataset.permissionScope
+                );
+            }
 
             body.set(
                 'revision_reason',
@@ -547,14 +593,18 @@
                         result
                         && result.error
                             ? result.error
-                            : 'The shared cost allocation could not be saved.'
+                            : 'The ' + allocationLabel + ' could not be saved.'
                     );
                 }
 
                 notify(
                     'success',
                     result.message
-                        || 'Shared cost allocation saved successfully.'
+                        || (
+                            allocationLabel.charAt(0).toUpperCase()
+                            + allocationLabel.slice(1)
+                            + ' saved successfully.'
+                        )
                 );
 
                 setTimeout(
@@ -570,7 +620,7 @@
                     error
                     && error.message
                         ? error.message
-                        : 'The shared cost allocation could not be saved.'
+                        : 'The ' + allocationLabel + ' could not be saved.'
                 );
 
                 if (saveButton) {

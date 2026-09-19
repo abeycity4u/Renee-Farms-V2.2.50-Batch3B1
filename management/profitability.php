@@ -372,10 +372,22 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
                                             '';
                                     }
 
+                                    $allocationTitles = [
+                                        'expense' =>
+                                            'Open shared-expense allocation workspace',
+
+                                        'stock' =>
+                                            'Open consumed-stock allocation workspace',
+
+                                        'revenue' =>
+                                            'Open shared-revenue allocation workspace',
+                                    ];
+
                                     $allocationTitle =
-                                        $allocationKind === 'expense'
-                                            ? 'Open shared-expense allocation workspace'
-                                            : 'Open consumed-stock allocation workspace';
+                                        $allocationTitles[
+                                            $allocationKind
+                                        ]
+                                        ?? 'Open allocation workspace';
                                     ?>
 
                                     <?php if (($sharedRow['status'] ?? '') === 'attribution_exception'): ?>
