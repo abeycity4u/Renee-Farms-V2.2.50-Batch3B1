@@ -363,6 +363,20 @@ $check(
 );
 
 
+
+$check(
+    'JS_NORMAL_SAVE_STAYS_DISABLED_WITH_ZERO_TARGETS',
+    $has(
+        $src['js'],
+        'const hasAllocationTargets ='
+    )
+    &&
+    $has(
+        $src['js'],
+        '!hasAllocationTargets'
+    )
+);
+
 /* Profitability state clarity. */
 $check(
     'PROFITABILITY_DERIVES_RETAINED_FROM_REVISION',

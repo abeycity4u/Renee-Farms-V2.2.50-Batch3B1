@@ -111,6 +111,9 @@
             )
         );
 
+    const hasAllocationTargets =
+        amountInputs.length > 0;
+
     const noteInputs =
         Array.from(
             form.querySelectorAll(
@@ -355,6 +358,8 @@
         if (saveButton) {
             saveButton.disabled =
                 mutationBlocked
+                ||
+                !hasAllocationTargets
                 ||
                 remainder < -0.005;
         }
