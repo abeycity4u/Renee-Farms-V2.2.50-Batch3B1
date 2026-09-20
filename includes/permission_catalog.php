@@ -178,3 +178,80 @@ function permission_catalog_expense_action_code(array $expense, string $action):
     return null;
 }
 }
+/*
+ * Poultry expense authority requirements.
+ *
+ * Layer and Broiler keep their existing granular permissions.
+ * A Poultry Shared expense belongs to both production areas, so every
+ * operational action requires the corresponding Layer AND Broiler
+ * permissions. No new broad/shared bypass permission is introduced.
+ */
+if (!function_exists(
+    'permission_catalog_poultry_expense_required_permissions'
+)) {
+function permission_catalog_poultry_expense_required_permissions(
+    string $productionType,
+    string $action
+): array {
+    $productionType =
+        strtolower(
+            trim(
+                $productionType
+            )
+        );
+
+    $action =
+        strtolower(
+            trim(
+                $action
+            )
+        );
+
+    $suffixMap = [
+        'view' =>
+            '',
+
+        'add' =>
+            '_add',
+
+        'edit' =>
+            '_edit',
+
+        'delete' =>
+            '_delete',
+    ];
+
+    if (!isset($suffixMap[$action])) {
+        return [];
+    }
+
+    $suffix =
+        $suffixMap[$action];
+
+    if ($productionType === 'layer') {
+        return [
+            'poultry_layer_expenses'
+            . $suffix,
+        ];
+    }
+
+    if ($productionType === 'broiler') {
+        return [
+            'poultry_broiler_expenses'
+            . $suffix,
+        ];
+    }
+
+    if ($productionType === 'shared') {
+        return [
+            'poultry_layer_expenses'
+            . $suffix,
+
+            'poultry_broiler_expenses'
+            . $suffix,
+        ];
+    }
+
+    return [];
+}
+}
