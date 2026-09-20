@@ -213,6 +213,19 @@ nav, .navbar, #appNavbar, .no-print, .report-controls, button, .btn, .modal, .of
   background: #fff !important; color: #1f2937 !important; box-shadow: none !important; border-color: #d1d5db !important;
 }
 .card { border: 1px solid #d1d5db !important; margin-bottom: 8px !important; }
+
+/*
+ * Bootstrap's h-100 is useful for equal-height browser cards, but Dompdf
+ * interprets height:100% as page-height content. That produces large blank
+ * continuation pages for dashboard/report cards. PDF output must size cards
+ * from their actual content instead.
+ */
+.h-100,
+.card.h-100 {
+  height: auto !important;
+  min-height: 0 !important;
+}
+
 .card-header { border-bottom: 1px solid #d1d5db !important; padding: 7px 9px !important; }
 .card-body { padding: 8px 9px !important; }
 h1, h2, h3, h4, h5, h6 {
