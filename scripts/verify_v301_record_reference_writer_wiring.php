@@ -25,6 +25,10 @@ $paths = [
         $root
         . '/poultry/broiler_expenses.php',
 
+    'poultry_entry' =>
+        $root
+        . '/lib/poultry_expense_entry.php',
+
     'ruminant' =>
         $root
         . '/ruminant/ruminant_expenses.php',
@@ -122,71 +126,152 @@ $check(
 foreach (
     [
         'layer' =>
-            'Layer expense',
+            'Layer expense adapter',
 
         'broiler' =>
-            'Broiler expense',
-
-        'ruminant' =>
-            'Ruminant expense',
+            'Broiler expense adapter',
     ]
     as $key => $label
 ) {
     $check(
         strpos(
             $source[$key],
-            "record_reference_persistence.php"
+            'poultry_expense_entry.php'
         ) !== false,
         $label
-            . ' writer loads canonical persistence'
+            . ' loads canonical Poultry expense entry service'
     );
 
     $check(
         substr_count(
             $source[$key],
-            'record_reference_persistence_assign_existing('
-        ) === 1
-        &&
-        preg_match(
-            '/record_reference_persistence_assign_existing\s*\(\s*\$pdo\s*,\s*\'expense\'\s*,\s*\$tenantFarmId\s*,\s*\$expenseId\s*\)/',
-            $source[$key]
+            'poultry_expense_entry_create('
         ) === 1,
         $label
-            . ' assigns exactly one expense reference'
+            . ' delegates exactly one creation request'
     );
 
-    $lastInsert =
+    $check(
+        strpos(
+            $source[$key],
+            'record_reference_persistence_assign_existing('
+        ) === false
+        &&
         strpos(
             $source[$key],
             '$pdo->lastInsertId()'
-        );
-
-    $assignment =
-        strpos(
-            $source[$key],
-            'record_reference_persistence_assign_existing('
-        );
-
-    $commit =
-        strpos(
-            $source[$key],
-            '$pdo->commit()'
-        );
-
-    $check(
-        $lastInsert !== false
-        &&
-        $assignment !== false
-        &&
-        $commit !== false
-        &&
-        $lastInsert < $assignment
-        &&
-        $assignment < $commit,
+        ) === false,
         $label
-            . ' reference assignment is inside creation transaction'
+            . ' owns no direct reference persistence'
     );
 }
+
+
+$check(
+    strpos(
+        $source['poultry_entry'],
+        'record_reference_persistence.php'
+    ) !== false,
+    'Canonical Poultry expense writer loads reference persistence'
+);
+
+$check(
+    substr_count(
+        $source['poultry_entry'],
+        'record_reference_persistence_assign_existing('
+    ) === 1
+    &&
+    preg_match(
+        '/record_reference_persistence_assign_existing\s*\(\s*\$pdo\s*,\s*\'expense\'\s*,\s*\$farmId\s*,\s*\$expenseId\s*\)/',
+        $source['poultry_entry']
+    ) === 1,
+    'Canonical Poultry expense writer assigns exactly one reference'
+);
+
+$poultryInsert =
+    strpos(
+        $source['poultry_entry'],
+        'INSERT INTO farm_expenses'
+    );
+
+$poultryLastInsert =
+    strpos(
+        $source['poultry_entry'],
+        '$pdo->lastInsertId()'
+    );
+
+$poultryAssignment =
+    strpos(
+        $source['poultry_entry'],
+        'record_reference_persistence_assign_existing('
+    );
+
+$check(
+    $poultryInsert !== false
+    &&
+    $poultryLastInsert !== false
+    &&
+    $poultryAssignment !== false
+    &&
+    $poultryInsert < $poultryLastInsert
+    &&
+    $poultryLastInsert < $poultryAssignment,
+    'Canonical Poultry expense reference follows the insert inside caller transaction'
+);
+
+
+$check(
+    strpos(
+        $source['ruminant'],
+        'record_reference_persistence.php'
+    ) !== false,
+    'Ruminant expense writer loads canonical persistence'
+);
+
+$check(
+    substr_count(
+        $source['ruminant'],
+        'record_reference_persistence_assign_existing('
+    ) === 1
+    &&
+    preg_match(
+        '/record_reference_persistence_assign_existing\s*\(\s*\$pdo\s*,\s*\'expense\'\s*,\s*\$tenantFarmId\s*,\s*\$expenseId\s*\)/',
+        $source['ruminant']
+    ) === 1,
+    'Ruminant expense assigns exactly one expense reference'
+);
+
+$ruminantLastInsert =
+    strpos(
+        $source['ruminant'],
+        '$pdo->lastInsertId()'
+    );
+
+$ruminantAssignment =
+    strpos(
+        $source['ruminant'],
+        'record_reference_persistence_assign_existing('
+    );
+
+$ruminantCommit =
+    strpos(
+        $source['ruminant'],
+        '$pdo->commit()'
+    );
+
+$check(
+    $ruminantLastInsert !== false
+    &&
+    $ruminantAssignment !== false
+    &&
+    $ruminantCommit !== false
+    &&
+    $ruminantLastInsert < $ruminantAssignment
+    &&
+    $ruminantAssignment < $ruminantCommit,
+    'Ruminant expense reference assignment is inside creation transaction'
+);
+
 
 $check(
     strpos(
@@ -258,8 +343,7 @@ $expenseInsertCount = 0;
 
 foreach (
     [
-        'layer',
-        'broiler',
+        'poultry_entry',
         'ruminant',
     ]
     as $key
@@ -272,8 +356,8 @@ foreach (
 }
 
 $check(
-    $expenseInsertCount === 3,
-    'Expense direct writer count remains exactly three'
+    $expenseInsertCount === 2,
+    'Expense direct writer count is centralized to Poultry and Ruminant authorities'
 );
 
 $check(
@@ -288,8 +372,8 @@ $check(
     substr_count(
         $allWriters,
         'record_reference_persistence_assign_existing('
-    ) === 6,
-    'Exactly six business insert paths receive reference assignment'
+    ) === 5,
+    'Exactly five source-level business insert authorities receive reference assignment'
 );
 
 $check(

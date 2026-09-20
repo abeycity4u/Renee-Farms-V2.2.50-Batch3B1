@@ -378,13 +378,35 @@ function poultry_expense_entry_create(
         &&
         $cycleId > 0
     ) {
-        attribution_validate_cycle(
-            $pdo,
-            $farmId,
-            $cycleId,
-            'poultry',
-            $productionType
-        );
+        try {
+            attribution_validate_cycle(
+                $pdo,
+                $farmId,
+                $cycleId,
+                'poultry',
+                $productionType
+            );
+
+        } catch (PDOException $e) {
+            /*
+             * Database failures remain internal. Do not convert database
+             * exception details into user-visible validation text.
+             */
+            throw $e;
+
+        } catch (RuntimeException $e) {
+            /*
+             * attribution_validate_cycle() uses RuntimeException for its
+             * expected farm/type/cycle validation outcomes. Promote only
+             * those domain validation messages to the caller's safe
+             * validation branch.
+             */
+            throw new InvalidArgumentException(
+                $e->getMessage(),
+                0,
+                $e
+            );
+        }
     }
 
     $storedCycleId =

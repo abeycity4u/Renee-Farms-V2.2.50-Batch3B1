@@ -6,8 +6,7 @@ require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/../lib/attribution.php');
 require_once(__DIR__ . '/../lib/transaction_actor_display.php');
 require_once(__DIR__ . '/../lib/inventory_financial.php');
-require_once(__DIR__ . '/../lib/expense_revision_service.php');
-require_once(__DIR__ . '/../lib/record_reference_persistence.php');
+require_once(__DIR__ . '/../lib/poultry_expense_entry.php');
 require_once(__DIR__ . '/../lib/financial_allocation_workspace.php');
 requireLogin();
 $pdfRequested = pdf_report_is_requested();
@@ -20,6 +19,7 @@ if (!checkAccess('poultry') && !hasPermission($_SESSION['user_type'], 'poultry_e
 }
 
 $canManageExpenses = isPlatformOwner() || hasRole('farm_admin') || hasPermission($_SESSION['user_type'], 'poultry_expenses');
+$canAddExpenses = poultry_expense_entry_can('broiler', 'add');
 $tenantFarmId = requireCurrentFarmId();
 $expenseCycleStmt = $pdo->prepare("SELECT id,cycle_code,status FROM production_cycles WHERE farm_id=? AND farm_type='poultry' AND production_type='broiler' ORDER BY start_date DESC,id DESC");
 $expenseCycleStmt->execute([$tenantFarmId]);
@@ -66,93 +66,121 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_expense'])) {
         http_response_code(419);
         exit('Invalid request token.');
     }
-    $expenseDate = trim((string)($_POST['expense_date'] ?? ''));
-    $dateObject = DateTime::createFromFormat('Y-m-d', $expenseDate);
-    $amount = (float)($_POST['amount'] ?? 0);
-    $unit = (float)($_POST['unit'] ?? 1);
-    $expenseCategory = trim((string)($_POST['category'] ?? ''));
-    $allowedCategories = ['salary', 'logistic', 'fuel', 'misc'];
-    if (!$dateObject || $dateObject->format('Y-m-d') !== $expenseDate || $amount <= 0 || $unit <= 0 || !in_array($expenseCategory, $allowedCategories, true)) {
-        $_SESSION['error'] = 'Please provide a valid date, category, amount and quantity greater than zero.';
-        header("Location: broiler_expenses.php?month=" . date('Y-m', strtotime($expenseDate ?: 'now')));
-        exit();
-    }
 
-    $cycleId = (int)($_POST['cycle_id'] ?? 0);
-    if ($cycleId > 0) {
-        try { attribution_validate_cycle($pdo, $tenantFarmId, $cycleId, 'poultry', 'broiler'); }
-        catch (RuntimeException $e) {
-            $_SESSION['error']=$e->getMessage();
-            header("Location: broiler_expenses.php?month=" . date('Y-m', strtotime($expenseDate)));
-            exit();
-        }
-    }
-    $scope = attribution_scope($cycleId > 0 ? $cycleId : null, 'poultry', 'broiler');
+    $expenseDate =
+        trim(
+            (string)(
+                $_POST['expense_date']
+                ?? ''
+            )
+        );
+
+    $redirectMonth =
+        preg_match(
+            '/^\\d{4}-\\d{2}-\\d{2}$/',
+            $expenseDate
+        )
+            ? substr(
+                $expenseDate,
+                0,
+                7
+            )
+            : date('Y-m');
 
     try {
         $pdo->beginTransaction();
 
-        $stmt = $pdo->prepare("INSERT INTO farm_expenses
-            (farm_id, expense_date, farm_type, production_type, attribution_scope, cycle_id, poultry_category, category, amount, unit, description, user_id)
-            VALUES (?, ?, 'poultry', 'broiler', ?, ?, 'broiler', ?, ?, ?, ?, ?)");
-
-        $stmt->execute([
-            $tenantFarmId,
-            $expenseDate,
-            $scope,
-            $cycleId > 0 ? $cycleId : null,
-            $expenseCategory,
-            $amount,
-            $unit,
-            trim((string)($_POST['description'] ?? '')),
-            $_SESSION['user_id']
-        ]);
-
-        $expenseId =
-            (int)$pdo->lastInsertId();
-
-        record_reference_persistence_assign_existing(
-            $pdo,
-            'expense',
-            $tenantFarmId,
-            $expenseId
-        );
-
-        expense_revision_service_record_created(
+        poultry_expense_entry_create(
             $pdo,
             $tenantFarmId,
-            $expenseId,
-            (int)($_SESSION['user_id'] ?? 0)
+            (int)(
+                $_SESSION['user_id']
+                ?? 0
+            ),
+            [
+                'production_type' =>
+                    'broiler',
+
+                'expense_date' =>
+                    $expenseDate,
+
+                'cycle_id' =>
+                    $_POST['cycle_id']
+                    ?? 0,
+
+                'category' =>
+                    $_POST['category']
+                    ?? '',
+
+                'amount' =>
+                    $_POST['amount']
+                    ?? null,
+
+                'unit' =>
+                    $_POST['unit']
+                    ?? 1,
+
+                'description' =>
+                    $_POST['description']
+                    ?? '',
+            ]
         );
 
         $pdo->commit();
+
+    } catch (InvalidArgumentException $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+
+        $_SESSION['error'] =
+            $e->getMessage();
+
+        header(
+            'Location: broiler_expenses.php?month='
+            . $redirectMonth
+        );
+
+        exit();
 
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
 
+        log_app_error(
+            'broiler_expense_create_failed',
+            [
+                'error' =>
+                    safe_api_exception_message(
+                        $e,
+                        'The broiler expense could not be recorded.'
+                    ),
+            ]
+        );
+
         $_SESSION['error'] =
             'The broiler expense could not be recorded.';
 
         header(
-            "Location: broiler_expenses.php?month="
-            . date(
-                'Y-m',
-                strtotime(
-                    $expenseDate ?: 'now'
-                )
-            )
+            'Location: broiler_expenses.php?month='
+            . $redirectMonth
         );
 
         exit();
     }
 
-    $_SESSION['success'] = "Broiler expense recorded successfully!";
-    $redirectMonth = date('Y-m', strtotime($expenseDate));
-    header("Location: broiler_expenses.php?month=" . $redirectMonth);
+    $_SESSION['success'] =
+        'Broiler expense recorded successfully!';
+
+    header(
+        'Location: broiler_expenses.php?month='
+        . $redirectMonth
+    );
+
     exit();
 }
+
 $pdfReportUrl = pdf_report_current_url();
 ?>
 <!DOCTYPE html>
@@ -180,9 +208,11 @@ $pdfReportUrl = pdf_report_current_url();
                             <input type="date" class="form-control js-calendar-input app-month-selector" id="monthSelector"
                                    value="<?php echo $monthSelectorDate; ?>">
                             <a class="btn btn-light" href="<?php echo htmlspecialchars($pdfReportUrl); ?>" target="_blank"><i class="bi bi-file-earmark-pdf"></i> PDF Report</a>
+                            <?php if ($canAddExpenses): ?>
                             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addExpenseModal">
                                 <i class="bi bi-plus-circle"></i> Add Expense
                             </button>
+                            <?php endif; ?>
                         </div>
                     </div>
 
@@ -423,6 +453,7 @@ $pdfReportUrl = pdf_report_current_url();
     </div>
     <?php endif; ?>
 
+    <?php if ($canAddExpenses): ?>
     <!-- Add Expense Modal -->
     <div class="modal fade" id="addExpenseModal" tabindex="-1">
         <div class="modal-dialog">
@@ -488,6 +519,8 @@ $pdfReportUrl = pdf_report_current_url();
             </div>
         </div>
     </div>
+
+    <?php endif; ?>
 
      <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/jquery/jquery.min.js'); ?>"></script>
     <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/bootstrap5/js/bootstrap.bundle.min.js'); ?>"></script>

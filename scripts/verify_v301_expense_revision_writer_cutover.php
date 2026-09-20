@@ -12,6 +12,10 @@ $paths = [
         $root
         . '/poultry/broiler_expenses.php',
 
+    'poultry_entry' =>
+        $root
+        . '/lib/poultry_expense_entry.php',
+
     'ruminant' =>
         $root
         . '/ruminant/ruminant_expenses.php',
@@ -81,10 +85,18 @@ $checks = [];
  */
 $allRequire = true;
 
-foreach ($files as $text) {
+foreach (
+    [
+        'poultry_entry',
+        'ruminant',
+        'update',
+        'delete',
+    ]
+    as $writerKey
+) {
     if (
         strpos(
-            $text,
+            $files[$writerKey],
             'expense_revision_service.php'
         ) === false
     ) {
@@ -101,14 +113,28 @@ $checks['ALL_WRITERS_USE_SHARED_SERVICE'] =
  * Poultry create transactions:
  * transaction -> insert -> ID -> revision -> commit.
  */
+$canonicalPoultryCreate =
+    expense_cutover_ordered(
+        $files['poultry_entry'],
+        [
+            'INSERT INTO farm_expenses',
+            '$pdo->lastInsertId()',
+            'expense_revision_service_record_created(',
+        ]
+    )
+    &&
+    strpos(
+        $files['poultry_entry'],
+        'record_reference_persistence_assign_existing('
+    ) !== false;
+
+
 $checks['LAYER_CREATE_ATOMIC_REVISION'] =
     expense_cutover_ordered(
         $files['layer'],
         [
             '$pdo->beginTransaction();',
-            'INSERT INTO farm_expenses',
-            '$pdo->lastInsertId()',
-            'expense_revision_service_record_created(',
+            'poultry_expense_entry_create(',
             '$pdo->commit();',
         ]
     )
@@ -116,7 +142,9 @@ $checks['LAYER_CREATE_ATOMIC_REVISION'] =
     strpos(
         $files['layer'],
         '$pdo->rollBack();'
-    ) !== false;
+    ) !== false
+    &&
+    $canonicalPoultryCreate;
 
 
 $checks['BROILER_CREATE_ATOMIC_REVISION'] =
@@ -124,9 +152,7 @@ $checks['BROILER_CREATE_ATOMIC_REVISION'] =
         $files['broiler'],
         [
             '$pdo->beginTransaction();',
-            'INSERT INTO farm_expenses',
-            '$pdo->lastInsertId()',
-            'expense_revision_service_record_created(',
+            'poultry_expense_entry_create(',
             '$pdo->commit();',
         ]
     )
@@ -134,7 +160,9 @@ $checks['BROILER_CREATE_ATOMIC_REVISION'] =
     strpos(
         $files['broiler'],
         '$pdo->rollBack();'
-    ) !== false;
+    ) !== false
+    &&
+    $canonicalPoultryCreate;
 
 
 /*
