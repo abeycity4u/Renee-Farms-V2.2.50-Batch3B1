@@ -8,6 +8,9 @@ require_once __DIR__
     . '/../config.php';
 
 require_once __DIR__
+    . '/../includes/pdf/PdfReportService.php';
+
+require_once __DIR__
     . '/../includes/functions.php';
 
 require_once __DIR__
@@ -572,6 +575,38 @@ $productionLabels = [
         'Poultry Shared',
 ];
 
+
+$pdfRequested =
+    pdf_report_is_requested();
+
+
+$pdfReportUrl =
+    pdf_report_current_url();
+
+
+$pdfViewLabel =
+    $activeTab === 'all'
+        ? 'Poultry'
+        : (
+            $workspaceTabs[
+                $activeTab
+            ]
+            ?? 'Poultry'
+        );
+
+
+$pdfReportTitle =
+    $pdfViewLabel
+    . ' Expenses - '
+    . $monthObject->format(
+        'F Y'
+    );
+
+
+if ($pdfRequested) {
+    pdf_report_begin();
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -612,6 +647,16 @@ $productionLabels = [
                     aria-label="Expense month"
                 >
 
+                <a
+                    class="btn btn-light"
+                    href="<?php echo app_attr($pdfReportUrl); ?>"
+                    target="_blank"
+                    rel="noopener"
+                >
+                    <i class="bi bi-file-earmark-pdf"></i>
+                    PDF Report
+                </a>
+
                 <?php if ($canAddAny): ?>
                 <button
                     type="button"
@@ -642,7 +687,7 @@ $productionLabels = [
             </div>
 
 
-            <ul class="nav nav-tabs mb-4">
+            <ul class="nav nav-tabs mb-4 no-print">
 
                 <?php foreach ($workspaceTabs as $tabKey => $tabLabel): ?>
 
@@ -2227,3 +2272,17 @@ $productionLabels = [
 
 </body>
 </html>
+
+<?php
+if ($pdfRequested) {
+    pdf_report_finish(
+        'poultry-expenses-'
+        . $activeTab
+        . '-'
+        . $yearMonth
+        . '.pdf',
+        'landscape',
+        $pdfReportTitle
+    );
+}
+?>
