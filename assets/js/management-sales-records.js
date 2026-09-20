@@ -639,23 +639,4 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
         }
     });
 
-    function deleteSale(saleId) {
-        AppConfirm.ask('Are you sure you want to delete this sale record?', {title:'Delete sale record?', confirmText:'Delete'}).then(function(confirmed){ if (confirmed) {
-            const params = new URLSearchParams({ id: saleId, csrf_token: salesRecordsConfig.csrfToken });
-            fetch(salesRecordsConfig.deleteSaleUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: params.toString()
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        location.reload();
-                    } else {
-                        AppNotify.error(data.error || data.message || 'Unable to delete sale');
-                    }
-                });
-        }
-        });
-    }
 })();

@@ -527,11 +527,25 @@ async function deleteRecord(recordId, recordType) {
  * Delete sale
  */
 async function deleteSale(saleId) {
+    const salesConfigElement =
+        document.getElementById('managementSalesRecordsConfig');
+    const deleteSaleUrl = salesConfigElement
+        ? String(salesConfigElement.dataset.deleteSaleUrl || '').trim()
+        : '';
+
+    if (!deleteSaleUrl) {
+        showAlert(
+            'danger',
+            'Sale delete endpoint is not configured for this page.'
+        );
+        return;
+    }
+
     if (!await confirmAction('Are you sure you want to delete this sale record?', {title:'Delete sale record?', confirmText:'Delete'})) return;
     
     try {
         const params = new URLSearchParams({ id: saleId });
-        const result = await apiFetch('api/delete_sale.php', {
+        const result = await apiFetch(deleteSaleUrl, {
             method: 'POST',
             data: params,
             headers: {
