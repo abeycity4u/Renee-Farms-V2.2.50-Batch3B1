@@ -12,6 +12,10 @@ $paths = [
         $root
         . '/poultry/broiler_expenses.php',
 
+    'poultry_hub' =>
+        $root
+        . '/poultry/expenses.php',
+
     'poultry_entry' =>
         $root
         . '/lib/poultry_expense_entry.php',
@@ -129,9 +133,9 @@ $canonicalPoultryCreate =
     ) !== false;
 
 
-$checks['LAYER_CREATE_ATOMIC_REVISION'] =
+$checks['POULTRY_HUB_CREATE_ATOMIC_REVISION'] =
     expense_cutover_ordered(
-        $files['layer'],
+        $files['poultry_hub'],
         [
             '$pdo->beginTransaction();',
             'poultry_expense_entry_create(',
@@ -140,29 +144,35 @@ $checks['LAYER_CREATE_ATOMIC_REVISION'] =
     )
     &&
     strpos(
-        $files['layer'],
+        $files['poultry_hub'],
         '$pdo->rollBack();'
     ) !== false
     &&
     $canonicalPoultryCreate;
 
 
-$checks['BROILER_CREATE_ATOMIC_REVISION'] =
-    expense_cutover_ordered(
+$checks['LAYER_CREATE_AUTHORITY_RETIRED'] =
+    strpos(
+        $files['layer'],
+        'poultry_expense_entry_create('
+    ) === false
+    &&
+    strpos(
+        $files['layer'],
+        "isset(\$_POST['add_expense'])"
+    ) === false;
+
+
+$checks['BROILER_CREATE_AUTHORITY_RETIRED'] =
+    strpos(
         $files['broiler'],
-        [
-            '$pdo->beginTransaction();',
-            'poultry_expense_entry_create(',
-            '$pdo->commit();',
-        ]
-    )
+        'poultry_expense_entry_create('
+    ) === false
     &&
     strpos(
         $files['broiler'],
-        '$pdo->rollBack();'
-    ) !== false
-    &&
-    $canonicalPoultryCreate;
+        "isset(\$_POST['add_expense'])"
+    ) === false;
 
 
 /*
@@ -308,12 +318,7 @@ $checks['CURRENT_PROJECTION_PRESERVED'] =
  */
 $checks['ROLLBACK_PATHS_RETAINED'] =
     strpos(
-        $files['layer'],
-        '$pdo->rollBack();'
-    ) !== false
-    &&
-    strpos(
-        $files['broiler'],
+        $files['poultry_hub'],
         '$pdo->rollBack();'
     ) !== false
     &&

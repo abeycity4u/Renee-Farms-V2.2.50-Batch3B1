@@ -16,6 +16,14 @@ $paths = [
         $root
         . '/poultry/broiler_expenses.php',
 
+    'hub' =>
+        $root
+        . '/poultry/expenses.php',
+
+    'hub_js' =>
+        $root
+        . '/assets/js/poultry-expenses.js',
+
     'service' =>
         $root
         . '/lib/poultry_expense_entry.php',
@@ -26,7 +34,9 @@ $src = [];
 foreach ($paths as $key => $path) {
     $src[$key] =
         is_file($path)
-            ? (string)file_get_contents($path)
+            ? (string)file_get_contents(
+                $path
+            )
             : '';
 }
 
@@ -71,21 +81,48 @@ foreach (
 
     poultry_expense_cutover_check(
         $upper
-        . '_LOADS_CANONICAL_SERVICE',
+        . '_LOADS_CANONICAL_SERVICE_FOR_ADD_CAPABILITY',
         strpos(
             $src[$key],
             'poultry_expense_entry.php'
         ) !== false
+        &&
+        strpos(
+            $src[$key],
+            '$canAddExpenses = poultry_expense_entry_can('
+        ) !== false
     );
+
 
     poultry_expense_cutover_check(
         $upper
-        . '_DELEGATES_CREATE_ONCE',
-        substr_count(
+        . '_OWNS_NO_CREATE_WRITER_CALL',
+        strpos(
             $src[$key],
             'poultry_expense_entry_create('
-        ) === 1
+        ) === false
     );
+
+
+    poultry_expense_cutover_check(
+        $upper
+        . '_OWNS_NO_LOCAL_ADD_POST_HANDLER',
+        strpos(
+            $src[$key],
+            "isset(\$_POST['add_expense'])"
+        ) === false
+    );
+
+
+    poultry_expense_cutover_check(
+        $upper
+        . '_OWNS_NO_LOCAL_ADD_MODAL',
+        strpos(
+            $src[$key],
+            'id="addExpenseModal"'
+        ) === false
+    );
+
 
     poultry_expense_cutover_check(
         $upper
@@ -95,6 +132,7 @@ foreach (
             'INSERT INTO farm_expenses'
         ) === false
     );
+
 
     poultry_expense_cutover_check(
         $upper
@@ -115,76 +153,129 @@ foreach (
         ) === false
     );
 
-    poultry_expense_cutover_check(
-        $upper
-        . '_RETAINS_OUTER_TRANSACTION',
-        strpos(
-            $src[$key],
-            '$pdo->beginTransaction();'
-        ) !== false
-        &&
-        strpos(
-            $src[$key],
-            '$pdo->commit();'
-        ) !== false
-        &&
-        strpos(
-            $src[$key],
-            '$pdo->rollBack();'
-        ) !== false
-    );
 
     poultry_expense_cutover_check(
         $upper
-        . '_USES_CANONICAL_ADD_PERMISSION',
+        . '_ADD_SHORTCUTS_TO_HUB',
         strpos(
             $src[$key],
-            '$canAddExpenses = poultry_expense_entry_can('
+            "/poultry/expenses.php?"
         ) !== false
         &&
-        substr_count(
+        strpos(
             $src[$key],
-            'if ($canAddExpenses)'
-        ) >= 2
+            "'add' =>"
+        ) !== false
+        &&
+        strpos(
+            $src[$key],
+            "'production_type' =>"
+        ) !== false
+    );
+
+
+    poultry_expense_cutover_check(
+        $upper
+        . '_FILTERED_READ_VIEW_PRESERVED',
+        strpos(
+            $src[$key],
+            "AND e.poultry_category = '"
+            . $key
+            . "'"
+        ) !== false
+    );
+
+
+    poultry_expense_cutover_check(
+        $upper
+        . '_PDF_REPORT_PRESERVED',
+        strpos(
+            $src[$key],
+            'PDF Report'
+        ) !== false
+        &&
+        strpos(
+            $src[$key],
+            'pdf_report_finish('
+        ) !== false
+    );
+
+
+    poultry_expense_cutover_check(
+        $upper
+        . '_EDIT_SURFACE_PRESERVED',
+        strpos(
+            $src[$key],
+            'id="editExpenseModal"'
+        ) !== false
+        &&
+        strpos(
+            $src[$key],
+            '../api/update_expense.php'
+        ) === false
     );
 }
 
 
 poultry_expense_cutover_check(
-    'LAYER_ROUTE_FIXES_PRODUCTION_TYPE',
+    'LAYER_SHORTCUT_FIXES_LAYER_TARGET',
     strpos(
         $src['layer'],
-        "'production_type' =>\n                    'layer'"
+        "'tab' =>\n                                                'layer'"
     ) !== false
-);
-
-
-poultry_expense_cutover_check(
-    'BROILER_ROUTE_FIXES_PRODUCTION_TYPE',
-    strpos(
-        $src['broiler'],
-        "'production_type' =>\n                    'broiler'"
-    ) !== false
-);
-
-
-poultry_expense_cutover_check(
-    'LAYER_EXISTING_READ_FILTER_PRESERVED',
+    &&
     strpos(
         $src['layer'],
-        "AND e.poultry_category = 'layer'"
+        "'production_type' =>\n                                                'layer'"
     ) !== false
 );
 
 
 poultry_expense_cutover_check(
-    'BROILER_EXISTING_READ_FILTER_PRESERVED',
+    'BROILER_SHORTCUT_FIXES_BROILER_TARGET',
     strpos(
         $src['broiler'],
-        "AND e.poultry_category = 'broiler'"
+        "'tab' =>\n                                                'broiler'"
+    ) !== false
+    &&
+    strpos(
+        $src['broiler'],
+        "'production_type' =>\n                                                'broiler'"
     ) !== false
 );
 
+
+poultry_expense_cutover_check(
+    'HUB_IS_SINGLE_UI_CREATE_DELEGATE',
+    substr_count(
+        $src['hub'],
+        'poultry_expense_entry_create('
+    ) === 1
+    &&
+    strpos(
+        $src['layer'],
+        'poultry_expense_entry_create('
+    ) === false
+    &&
+    strpos(
+        $src['broiler'],
+        'poultry_expense_entry_create('
+    ) === false
+);
+
+
+poultry_expense_cutover_check(
+    'HUB_SUPPORTS_DEEP_LINK_PRODUCTION_SELECTION',
+    strpos(
+        $src['hub_js'],
+        "params.get(\n                    'production_type'"
+    ) !== false
+    &&
+    strpos(
+        $src['hub_js'],
+        "params.get(\n            'add'"
+    ) !== false
+);
 
 
 poultry_expense_cutover_check(
@@ -197,7 +288,7 @@ poultry_expense_cutover_check(
 
 
 poultry_expense_cutover_check(
-    'CANONICAL_SERVICE_IS_SINGLE_POULTRY_WRITER',
+    'CANONICAL_SERVICE_REMAINS_SINGLE_EXPENSE_INSERT_AUTHORITY',
     substr_count(
         $src['service'],
         'INSERT INTO farm_expenses'
@@ -216,15 +307,15 @@ poultry_expense_cutover_check(
 
 
 poultry_expense_cutover_check(
-    'OLD_PAGES_KEEP_NO_SHARED_ENTRY_YET',
+    'OLD_FILTERED_PAGES_KEEP_NO_SHARED_ENTRY',
     strpos(
         $src['layer'],
-        "value=\"shared\""
+        'value="shared"'
     ) === false
     &&
     strpos(
         $src['broiler'],
-        "value=\"shared\""
+        'value="shared"'
     ) === false
 );
 

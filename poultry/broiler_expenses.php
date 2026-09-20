@@ -60,126 +60,8 @@ $inventoryCategoryTotals = inventory_financial_receipt_category_totals($inventor
 $spendingCategoryTotals = inventory_financial_combined_spending_totals($categoryTotals, $inventoryCategoryTotals);
 $totalSpending = round($manualExpenseTotal + $inventoryPurchaseTotal, 2);
 
-// Handle form submission
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_expense'])) {
-    if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
-        http_response_code(419);
-        exit('Invalid request token.');
-    }
-
-    $expenseDate =
-        trim(
-            (string)(
-                $_POST['expense_date']
-                ?? ''
-            )
-        );
-
-    $redirectMonth =
-        preg_match(
-            '/^\\d{4}-\\d{2}-\\d{2}$/',
-            $expenseDate
-        )
-            ? substr(
-                $expenseDate,
-                0,
-                7
-            )
-            : date('Y-m');
-
-    try {
-        $pdo->beginTransaction();
-
-        poultry_expense_entry_create(
-            $pdo,
-            $tenantFarmId,
-            (int)(
-                $_SESSION['user_id']
-                ?? 0
-            ),
-            [
-                'production_type' =>
-                    'broiler',
-
-                'expense_date' =>
-                    $expenseDate,
-
-                'cycle_id' =>
-                    $_POST['cycle_id']
-                    ?? 0,
-
-                'category' =>
-                    $_POST['category']
-                    ?? '',
-
-                'amount' =>
-                    $_POST['amount']
-                    ?? null,
-
-                'unit' =>
-                    $_POST['unit']
-                    ?? 1,
-
-                'description' =>
-                    $_POST['description']
-                    ?? '',
-            ]
-        );
-
-        $pdo->commit();
-
-    } catch (InvalidArgumentException $e) {
-        if ($pdo->inTransaction()) {
-            $pdo->rollBack();
-        }
-
-        $_SESSION['error'] =
-            $e->getMessage();
-
-        header(
-            'Location: broiler_expenses.php?month='
-            . $redirectMonth
-        );
-
-        exit();
-
-    } catch (Throwable $e) {
-        if ($pdo->inTransaction()) {
-            $pdo->rollBack();
-        }
-
-        log_app_error(
-            'broiler_expense_create_failed',
-            [
-                'error' =>
-                    safe_api_exception_message(
-                        $e,
-                        'The broiler expense could not be recorded.'
-                    ),
-            ]
-        );
-
-        $_SESSION['error'] =
-            'The broiler expense could not be recorded.';
-
-        header(
-            'Location: broiler_expenses.php?month='
-            . $redirectMonth
-        );
-
-        exit();
-    }
-
-    $_SESSION['success'] =
-        'Broiler expense recorded successfully!';
-
-    header(
-        'Location: broiler_expenses.php?month='
-        . $redirectMonth
-    );
-
-    exit();
-}
+// Add Expense creation is centralized in poultry/expenses.php.
+// This production-specific page remains a filtered view/action surface.
 
 $pdfReportUrl = pdf_report_current_url();
 ?>
@@ -209,9 +91,30 @@ $pdfReportUrl = pdf_report_current_url();
                                    value="<?php echo $monthSelectorDate; ?>">
                             <a class="btn btn-light" href="<?php echo htmlspecialchars($pdfReportUrl); ?>" target="_blank"><i class="bi bi-file-earmark-pdf"></i> PDF Report</a>
                             <?php if ($canAddExpenses): ?>
-                            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addExpenseModal">
+                            <a
+                                class="btn btn-primary"
+                                href="<?php
+                                    echo app_attr(
+                                        rtrim(BASE_URL, '/')
+                                        . '/poultry/expenses.php?'
+                                        . http_build_query([
+                                            'month' =>
+                                                $yearMonth,
+
+                                            'tab' =>
+                                                'broiler',
+
+                                            'add' =>
+                                                '1',
+
+                                            'production_type' =>
+                                                'broiler',
+                                        ])
+                                    );
+                                ?>"
+                            >
                                 <i class="bi bi-plus-circle"></i> Add Expense
-                            </button>
+                            </a>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -453,74 +356,7 @@ $pdfReportUrl = pdf_report_current_url();
     </div>
     <?php endif; ?>
 
-    <?php if ($canAddExpenses): ?>
-    <!-- Add Expense Modal -->
-    <div class="modal fade" id="addExpenseModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <form method="POST">
-                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Record Broiler Expense</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="alert alert-info py-2 small"><strong>Non-stock costs only:</strong> physical items purchased into store should be received through Inventory. Their purchase activity appears automatically on this page.</div>
-                        <div class="mb-3">
-                            <label>Date</label>
-                            <input type="date" name="expense_date" class="form-control"
-                                   value="<?php echo date('Y-m-d'); ?>" required>
-                        </div>
-                        <div class="mb-3">
-                            <label>Production Type</label>
-                            <select class="form-select" disabled aria-label="Production Type">
-                                <option selected>Broiler</option>
-                            </select>
-                            <input type="hidden" name="production_type" value="broiler">
-                            <small class="text-muted">This expense page is scoped to Broiler.</small>
-                        </div>
-                        <div class="mb-3">
-                            <label>Production Cycle (optional)</label>
-                            <select name="cycle_id" class="form-select">
-                                <option value="0">Shared between Broiler cycles</option>
-                                <?php foreach($expenseCycles as $cycle): ?><option value="<?php echo (int)$cycle['id']; ?>"><?php echo htmlspecialchars($cycle['cycle_code'].' — '.$cycle['status']); ?></option><?php endforeach; ?>
-                            </select>
-                            <small class="text-muted">Choose a cycle only when this expense belongs directly to it.</small>
-                        </div>
-                        <div class="mb-3">
-                            <label>Category</label>
-                            <select name="category" class="form-select" required>
-                                <option value="salary">Salary</option>
-                                <option value="logistic">Logistic</option>
-                                <option value="fuel">Fuel</option>
-                                <option value="misc">Miscellaneous</option>
-                            </select>
-                            <small class="text-muted">Stock purchases such as feed, medication and vaccines are recorded through Inventory. Use this form for non-stock operating costs and services.</small>
-                        </div>
-                        <div class="mb-3">
-                            <label>Unit</label>
-                            <input type="number" name="unit" class="form-control" step="0.01" min="0.01" value="1" required>
-                        </div>
-                        <div class="mb-3">
-                            <label>Amount (₦)</label>
-                            <input type="number" name="amount" class="form-control"
-                                   step="0.01" min="0.01" required>
-                        </div>
-                        <div class="mb-3">
-                            <label>Description</label>
-                            <textarea name="description" class="form-control" rows="3"></textarea>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" name="add_expense" class="btn btn-primary">Save Expense</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <?php endif; ?>
+    <!-- Add Expense entry is centralized in the Poultry Expenses hub. -->
 
      <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/jquery/jquery.min.js'); ?>"></script>
     <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/bootstrap5/js/bootstrap.bundle.min.js'); ?>"></script>
