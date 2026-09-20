@@ -72,9 +72,80 @@ try {
     if (!in_array($category, $allowedManualCategories, true) && !$isLegacyFeedEdit && !$isLegacyMedicationEdit) {
         send_json(['success' => false, 'error' => 'Stock purchases such as feed and medication are recorded through Inventory. Choose a non-stock expense category.'], 422);
     }
-    $requestedProduction=$_POST['production_type'] ?? ($existing['production_type'] ?? null);
-    if ($farmType==='poultry' && in_array((string)$poultryCategory,['layer','broiler'],true)) $requestedProduction=$poultryCategory;
-    $productionType=attribution_normalize_production_type($farmType,$requestedProduction);
+    $requestedProduction =
+        $_POST['production_type']
+        ?? ($existing['production_type'] ?? null);
+
+    if ($farmType === 'poultry') {
+        $requestedProduction =
+            strtolower(
+                trim(
+                    (string)$requestedProduction
+                )
+            );
+
+        $legacyPoultryCategory =
+            strtolower(
+                trim(
+                    (string)$poultryCategory
+                )
+            );
+
+        /*
+         * production_type is the canonical Poultry ownership field.
+         *
+         * poultry_category is retained only as a compatibility fallback for
+         * historical Layer/Broiler callers that do not provide a usable
+         * production_type. It must never override an explicit Shared target.
+         */
+        if (
+            !in_array(
+                $requestedProduction,
+                [
+                    'layer',
+                    'broiler',
+                    'shared',
+                ],
+                true
+            )
+            &&
+            in_array(
+                $legacyPoultryCategory,
+                [
+                    'layer',
+                    'broiler',
+                ],
+                true
+            )
+        ) {
+            $requestedProduction =
+                $legacyPoultryCategory;
+        }
+    }
+
+    $productionType =
+        attribution_normalize_production_type(
+            $farmType,
+            $requestedProduction
+        );
+
+    if ($farmType === 'poultry') {
+        /*
+         * Keep the legacy poultry_category column synchronized with canonical
+         * production ownership. Shared has no Layer/Broiler category.
+         */
+        $poultryCategory =
+            in_array(
+                $productionType,
+                [
+                    'layer',
+                    'broiler',
+                ],
+                true
+            )
+                ? $productionType
+                : null;
+    }
     $targetExpenseScope = [
         'farm_type' =>
             $farmType,
@@ -100,9 +171,43 @@ try {
             send_json(['success' => false, 'error' => 'You do not have permission to move or edit an expense in the requested area.'], 403);
         }
     }
-    $cycleId=(int)($_POST['cycle_id'] ?? ($existing['cycle_id'] ?? 0));
-    if ($cycleId>0) attribution_validate_cycle($pdo,$farmId,$cycleId,$farmType,$productionType);
-    $scope=attribution_scope($cycleId>0?$cycleId:null,$farmType,$productionType);
+    $cycleId =
+        (int)(
+            $_POST['cycle_id']
+            ?? ($existing['cycle_id'] ?? 0)
+        );
+
+    /*
+     * Poultry Shared is a Poultry-wide parent. It cannot carry a specific
+     * Layer or Broiler cycle, even if a stale client submits one.
+     */
+    if (
+        $farmType === 'poultry'
+        &&
+        $productionType === 'shared'
+    ) {
+        $cycleId =
+            0;
+    }
+
+    if ($cycleId > 0) {
+        attribution_validate_cycle(
+            $pdo,
+            $farmId,
+            $cycleId,
+            $farmType,
+            $productionType
+        );
+    }
+
+    $scope =
+        attribution_scope(
+            $cycleId > 0
+                ? $cycleId
+                : null,
+            $farmType,
+            $productionType
+        );
     $animalAllocation = null;
     if ($farmType === 'ruminant') {
         $animalAllocation = ruminant_expense_build_animal_allocations($pdo, $farmId, $productionType, round(((float)$amount) * ((float)$unit), 2), $_POST);
