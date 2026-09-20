@@ -516,45 +516,227 @@ function poultry_expense_workspace_manual_category_totals(
 
 
 if (!function_exists(
-    'poultry_expense_workspace_production_spending_view'
+    'poultry_expense_workspace_inventory_purchase_production_type'
 )) {
-function poultry_expense_workspace_production_spending_view(
-    PDO $pdo,
-    int $farmId,
-    string $startDate,
-    string $endDate,
-    string $productionType,
-    array $workspaceRows
-): array {
+function poultry_expense_workspace_inventory_purchase_production_type(
+    array $row
+): string {
     $productionType =
         strtolower(
             trim(
-                $productionType
+                (string)(
+                    $row[
+                        'production_type'
+                    ]
+                    ?? ''
+                )
+            )
+        );
+
+    return
+        in_array(
+            $productionType,
+            [
+                'layer',
+                'broiler',
+                'shared',
+            ],
+            true
+        )
+            ? $productionType
+            : '';
+}
+}
+
+
+if (!function_exists(
+    'poultry_expense_workspace_filter_inventory_purchases'
+)) {
+function poultry_expense_workspace_filter_inventory_purchases(
+    array $rows,
+    string $tab,
+    array $visibleProductionTypes
+): array {
+    $tab =
+        strtolower(
+            trim(
+                $tab
             )
         );
 
     if (
         !in_array(
-            $productionType,
+            $tab,
             [
+                'all',
                 'layer',
                 'broiler',
+                'shared',
             ],
             true
         )
     ) {
         throw new InvalidArgumentException(
-            'Poultry production spending view supports Layer or Broiler.'
+            'Unsupported Poultry spending tab.'
+        );
+    }
+
+    $visibleProductionTypes =
+        array_values(
+            array_unique(
+                array_values(
+                    array_filter(
+                        array_map(
+                            static function (
+                                $value
+                            ): string {
+                                $value =
+                                    strtolower(
+                                        trim(
+                                            (string)$value
+                                        )
+                                    );
+
+                                return
+                                    in_array(
+                                        $value,
+                                        [
+                                            'layer',
+                                            'broiler',
+                                            'shared',
+                                        ],
+                                        true
+                                    )
+                                        ? $value
+                                        : '';
+                            },
+                            $visibleProductionTypes
+                        ),
+                        static fn (
+                            string $value
+                        ): bool =>
+                            $value !== ''
+                    )
+                )
+            )
+        );
+
+    return
+        array_values(
+            array_filter(
+                $rows,
+                static function (
+                    array $row
+                ) use (
+                    $tab,
+                    $visibleProductionTypes
+                ): bool {
+                    $productionType =
+                        poultry_expense_workspace_inventory_purchase_production_type(
+                            $row
+                        );
+
+                    if (
+                        $productionType === ''
+                        ||
+                        !in_array(
+                            $productionType,
+                            $visibleProductionTypes,
+                            true
+                        )
+                    ) {
+                        return false;
+                    }
+
+                    return
+                        $tab === 'all'
+                        ||
+                        $productionType === $tab;
+                }
+            )
+        );
+}
+}
+
+
+if (!function_exists(
+    'poultry_expense_workspace_spending_view'
+)) {
+function poultry_expense_workspace_spending_view(
+    PDO $pdo,
+    int $farmId,
+    string $startDate,
+    string $endDate,
+    string $tab,
+    array $workspaceRows
+): array {
+    $tab =
+        strtolower(
+            trim(
+                $tab
+            )
+        );
+
+    if (
+        !in_array(
+            $tab,
+            [
+                'all',
+                'layer',
+                'broiler',
+                'shared',
+            ],
+            true
+        )
+    ) {
+        throw new InvalidArgumentException(
+            'Unsupported Poultry spending tab.'
         );
     }
 
     /*
-     * This read model must never widen visibility beyond the production
-     * authority already used by the consolidated workspace.
+     * Resolve production visibility once from the same canonical operational
+     * View authority that owns the workspace tabs and manual expense rows.
+     *
+     * Shared therefore remains Layer View AND Broiler View.
      */
+    $visibleProductionTypes = [];
+
+    foreach (
+        [
+            'layer',
+            'broiler',
+            'shared',
+        ]
+        as $productionType
+    ) {
+        if (
+            poultry_expense_workspace_can_view_production(
+                $productionType
+            )
+        ) {
+            $visibleProductionTypes[] =
+                $productionType;
+        }
+    }
+
     if (
-        !poultry_expense_workspace_can_view_production(
-            $productionType
+        $tab === 'all'
+        &&
+        $visibleProductionTypes === []
+    ) {
+        throw new RuntimeException(
+            'You do not have permission to view this Poultry expense area.'
+        );
+    }
+
+    if (
+        $tab !== 'all'
+        &&
+        !in_array(
+            $tab,
+            $visibleProductionTypes,
+            true
         )
     ) {
         throw new RuntimeException(
@@ -562,10 +744,16 @@ function poultry_expense_workspace_production_spending_view(
         );
     }
 
+    /*
+     * Manual rows have already passed row-level View authority in
+     * poultry_expense_workspace_rows(). The All filter therefore counts each
+     * visible parent exactly once; exact tabs select only their recorded
+     * production owner.
+     */
     $manualExpenses =
         poultry_expense_workspace_filter_rows(
             $workspaceRows,
-            $productionType
+            $tab
         );
 
     $manualCategoryTotals =
@@ -582,9 +770,19 @@ function poultry_expense_workspace_production_spending_view(
         );
 
     /*
-     * Purchase/cash spending remains the canonical Inventory ledger read.
-     * Do not create a second stock query or farm_expenses representation.
+     * Inventory remains the sole purchase/cash source.
+     *
+     * All performs one Poultry receipt read and then filters every returned
+     * row through recorded production ownership + current visibility.
+     *
+     * Shared passes the literal "shared" filter, so Layer/Broiler purchases
+     * are never inferred or copied into the Shared tab.
      */
+    $inventoryProductionType =
+        $tab === 'all'
+            ? null
+            : $tab;
+
     $inventoryPurchases =
         inventory_financial_receipts(
             $pdo,
@@ -592,7 +790,14 @@ function poultry_expense_workspace_production_spending_view(
             $startDate,
             $endDate,
             'poultry',
-            $productionType
+            $inventoryProductionType
+        );
+
+    $inventoryPurchases =
+        poultry_expense_workspace_filter_inventory_purchases(
+            $inventoryPurchases,
+            $tab,
+            $visibleProductionTypes
         );
 
     $inventoryPurchaseTotal =
@@ -620,8 +825,11 @@ function poultry_expense_workspace_production_spending_view(
         );
 
     return [
-        'production_type' =>
-            $productionType,
+        'tab' =>
+            $tab,
+
+        'visible_production_types' =>
+            $visibleProductionTypes,
 
         'manual_expenses' =>
             $manualExpenses,

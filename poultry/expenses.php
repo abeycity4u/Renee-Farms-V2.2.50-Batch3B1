@@ -480,48 +480,21 @@ $workspaceRows =
     );
 
 
-$workspaceTotals =
-    poultry_expense_workspace_totals(
+$spendingView =
+    poultry_expense_workspace_spending_view(
+        $pdo,
+        $tenantFarmId,
+        $startDate,
+        $endDate,
+        $activeTab,
         $workspaceRows
     );
 
 
-$productionSpendingView =
-    null;
-
-
-if (
-    in_array(
-        $activeTab,
-        [
-            'layer',
-            'broiler',
-        ],
-        true
-    )
-) {
-    $productionSpendingView =
-        poultry_expense_workspace_production_spending_view(
-            $pdo,
-            $tenantFarmId,
-            $startDate,
-            $endDate,
-            $activeTab,
-            $workspaceRows
-        );
-
-    $expenses =
-        $productionSpendingView[
-            'manual_expenses'
-        ];
-
-} else {
-    $expenses =
-        poultry_expense_workspace_filter_rows(
-            $workspaceRows,
-            $activeTab
-        );
-}
+$expenses =
+    $spendingView[
+        'manual_expenses'
+    ];
 
 
 $expenseCycles =
@@ -565,6 +538,9 @@ $visibleTotal =
 
 
 $productionLabels = [
+    'all' =>
+        'Poultry',
+
     'layer' =>
         'Layer',
 
@@ -718,7 +694,7 @@ if ($pdfRequested) {
             </ul>
 
 
-            <?php if ($productionSpendingView !== null): ?>
+
 
             <?php
                 $productionLabel =
@@ -730,27 +706,27 @@ if ($pdfRequested) {
                     );
 
                 $manualExpenseTotal =
-                    (float)$productionSpendingView[
+                    (float)$spendingView[
                         'manual_expense_total'
                     ];
 
                 $inventoryPurchaseTotal =
-                    (float)$productionSpendingView[
+                    (float)$spendingView[
                         'inventory_purchase_total'
                     ];
 
                 $totalSpending =
-                    (float)$productionSpendingView[
+                    (float)$spendingView[
                         'total_spending'
                     ];
 
                 $spendingCategoryTotals =
-                    (array)$productionSpendingView[
+                    (array)$spendingView[
                         'spending_category_totals'
                     ];
 
                 $inventoryPurchases =
-                    (array)$productionSpendingView[
+                    (array)$spendingView[
                         'inventory_purchases'
                     ];
             ?>
@@ -766,7 +742,13 @@ if ($pdfRequested) {
                     </div>
 
                     <div class="small">
+                        <?php if ($activeTab === 'shared'): ?>
+                        Poultry-wide shared spending. Not duplicated into Layer or Broiler totals.
+                        <?php elseif ($activeTab === 'all'): ?>
+                        One view of all Poultry spending you are permitted to see. Each recorded parent or Inventory receipt is counted once.
+                        <?php else: ?>
                         One view of non-stock expenses and Inventory purchase spending for this production area.
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -966,30 +948,9 @@ if ($pdfRequested) {
 
                             <?php
                                 $purchaseProductionType =
-                                    strtolower(
-                                        trim(
-                                            (string)(
-                                                $purchase[
-                                                    'production_type'
-                                                ]
-                                                ?? $activeTab
-                                            )
-                                        )
+                                    poultry_expense_workspace_inventory_purchase_production_type(
+                                        $purchase
                                     );
-
-                                if (
-                                    !in_array(
-                                        $purchaseProductionType,
-                                        [
-                                            'layer',
-                                            'broiler',
-                                        ],
-                                        true
-                                    )
-                                ) {
-                                    $purchaseProductionType =
-                                        $activeTab;
-                                }
                             ?>
 
                             <tr>
@@ -1130,118 +1091,20 @@ if ($pdfRequested) {
             </div>
 
 
-            <?php else: ?>
 
-
-            <div class="row g-3 mb-4">
-
-                <div class="col-12 col-md-3">
-                    <div class="card h-100">
-                        <div class="card-body">
-                            <div class="small text-muted">
-                                Visible Poultry Expenses
-                            </div>
-
-                            <div class="fs-4 fw-bold">
-                                ₦<?php echo number_format($workspaceTotals['all'], 2); ?>
-                            </div>
-
-                            <div class="small text-muted">
-                                Each expense parent counted once.
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-
-                <?php if ($canViewLayer): ?>
-
-                <div class="col-12 col-md-3">
-                    <div class="card h-100">
-                        <div class="card-body">
-                            <div class="small text-muted">
-                                Layer
-                            </div>
-
-                            <div class="fs-4 fw-bold">
-                                ₦<?php echo number_format($workspaceTotals['layer'], 2); ?>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <?php endif; ?>
-
-
-                <?php if ($canViewBroiler): ?>
-
-                <div class="col-12 col-md-3">
-                    <div class="card h-100">
-                        <div class="card-body">
-                            <div class="small text-muted">
-                                Broiler
-                            </div>
-
-                            <div class="fs-4 fw-bold">
-                                ₦<?php echo number_format($workspaceTotals['broiler'], 2); ?>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <?php endif; ?>
-
-
-                <?php if ($canViewShared): ?>
-
-                <div class="col-12 col-md-3">
-                    <div class="card h-100 border-warning-subtle">
-                        <div class="card-body">
-                            <div class="small text-muted">
-                                Poultry Shared
-                            </div>
-
-                            <div class="fs-4 fw-bold">
-                                ₦<?php echo number_format($workspaceTotals['shared'], 2); ?>
-                            </div>
-
-                            <div class="small text-muted">
-                                Not duplicated into Layer or Broiler totals.
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <?php endif; ?>
-
-            </div>
-
-
-            <?php endif; ?>
 
 
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
 
                 <h5 class="mb-0">
-                    <?php if ($productionSpendingView !== null): ?>
                     Detailed Expenses —
                     <?php echo htmlspecialchars($productionLabel); ?>
                     —
-                    <?php else: ?>
-                    <?php echo htmlspecialchars($workspaceTabs[$activeTab] ?? 'Poultry'); ?>
-                    Expenses —
-                    <?php endif; ?>
-
                     <?php echo htmlspecialchars($monthObject->format('F Y')); ?>
                 </h5>
 
                 <span class="badge text-bg-secondary">
-                    <?php if ($productionSpendingView !== null): ?>
                     Non-stock
-                    <?php else: ?>
-                    Total
-                    <?php endif; ?>
-
                     ₦<?php echo number_format($visibleTotal, 2); ?>
                 </span>
 
