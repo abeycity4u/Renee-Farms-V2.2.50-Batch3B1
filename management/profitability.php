@@ -388,6 +388,11 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
                                             $allocationKind
                                         ]
                                         ?? 'Open allocation workspace';
+
+                                    $retainedTitle =
+                                        $allocationKind === 'revenue'
+                                            ? 'Shared revenue intentionally retained without cycle attribution'
+                                            : 'Shared cost intentionally retained without cycle attribution';
                                     ?>
 
                                     <?php if (($sharedRow['status'] ?? '') === 'attribution_exception'): ?>
@@ -408,7 +413,11 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
                                                     ENT_QUOTES | ENT_SUBSTITUTE,
                                                     'UTF-8'
                                                 ); ?>"
-                                                title="Shared revenue intentionally retained without cycle attribution"
+                                                title="<?php echo htmlspecialchars(
+                                                    $retainedTitle,
+                                                    ENT_QUOTES | ENT_SUBSTITUTE,
+                                                    'UTF-8'
+                                                ); ?>"
                                             >
                                                 Retained as shared
                                                 <i class="bi bi-box-arrow-up-right ms-1"></i>

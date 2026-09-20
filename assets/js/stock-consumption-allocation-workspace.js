@@ -96,6 +96,9 @@
             )
         );
 
+    const hasAllocationTargets =
+        amountInputs.length > 0;
+
     const noteInputs =
         Array.from(
             form.querySelectorAll(
@@ -158,6 +161,11 @@
     const saveButton =
         document.getElementById(
             'stockConsumptionAllocationSaveButton'
+        );
+
+    const retainSharedButton =
+        document.getElementById(
+            'stockConsumptionAllocationRetainSharedButton'
         );
 
     const reasonInput =
@@ -311,7 +319,18 @@
 
         if (saveButton) {
             saveButton.disabled =
+                !hasAllocationTargets
+                ||
                 remainderCents < 0;
+        }
+
+        if (
+            retainSharedButton
+            &&
+            form.dataset.retainedShared !== '1'
+        ) {
+            retainSharedButton.disabled =
+                allocatedCents > 0;
         }
 
         refreshPercentages();
@@ -453,8 +472,37 @@
         async function (event) {
             event.preventDefault();
 
+            const submitter =
+                event.submitter || null;
+
+            const decisionAction =
+                String(
+                    submitter
+                    &&
+                    submitter.dataset
+                        ? (
+                            submitter.dataset.allocationDecision
+                            || 'allocate'
+                        )
+                        : 'allocate'
+                ).trim()
+                || 'allocate';
+
             const allocatedCents =
                 currentTotalCents();
+
+            if (
+                decisionAction === 'retain_shared'
+                &&
+                allocatedCents > 0
+            ) {
+                notify(
+                    'error',
+                    'Clear cycle amounts before retaining this consumed stock cost as shared.'
+                );
+
+                return;
+            }
 
             if (
                 allocatedCents
@@ -476,13 +524,19 @@
                 ).trim();
 
             if (
-                hasRevision
+                (
+                    hasRevision
+                    ||
+                    decisionAction === 'retain_shared'
+                )
                 &&
                 reason === ''
             ) {
                 notify(
                     'error',
-                    'Enter a reason for changing this stock allocation.'
+                    decisionAction === 'retain_shared'
+                        ? 'Enter a reason for keeping this consumed stock cost at shared-operation level.'
+                        : 'Enter a reason for changing this stock allocation.'
                 );
 
                 if (reasonInput) {
@@ -560,6 +614,11 @@
             );
 
             body.set(
+                'decision_action',
+                decisionAction
+            );
+
+            body.set(
                 'revision_reason',
                 reason
             );
@@ -571,16 +630,19 @@
                 )
             );
 
+            const activeButton =
+                submitter || saveButton;
+
             const originalText =
-                saveButton
-                    ? saveButton.innerHTML
+                activeButton
+                    ? activeButton.innerHTML
                     : '';
 
-            if (saveButton) {
-                saveButton.disabled =
+            if (activeButton) {
+                activeButton.disabled =
                     true;
 
-                saveButton.innerHTML =
+                activeButton.innerHTML =
                     '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Saving...';
             }
 
@@ -653,13 +715,15 @@
                         : 'The consumed stock cost allocation could not be saved.'
                 );
 
-                if (saveButton) {
-                    saveButton.disabled =
+                if (activeButton) {
+                    activeButton.disabled =
                         false;
 
-                    saveButton.innerHTML =
+                    activeButton.innerHTML =
                         originalText;
                 }
+
+                refreshSummary();
             }
         }
     );

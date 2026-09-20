@@ -96,6 +96,18 @@
             || 'shared cost allocation'
         );
 
+    const retainClearMessage =
+        String(
+            form.dataset.retainClearMessage
+            || 'Clear cycle amounts before retaining this revenue as shared.'
+        );
+
+    const retainReasonMessage =
+        String(
+            form.dataset.retainReasonMessage
+            || 'Enter a reason for keeping this revenue at shared-operation level.'
+        );
+
     /*
      * Existing expense UI requires a reason on every save.
      * Other canonical writers may allow the initial create without one.
@@ -459,7 +471,7 @@
             ) {
                 notify(
                     'error',
-                    'Clear cycle amounts before retaining this revenue as shared.'
+                    retainClearMessage
                 );
 
                 return;
@@ -493,7 +505,7 @@
                 notify(
                     'error',
                     decisionAction === 'retain_shared'
-                        ? 'Enter a reason for keeping this revenue at shared-operation level.'
+                        ? retainReasonMessage
                         : 'Enter a reason for changing this ' + entityLabel + ' allocation.'
                 );
 

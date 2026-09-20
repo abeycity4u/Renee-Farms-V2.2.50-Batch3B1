@@ -174,6 +174,13 @@ $money =
             (int)$workspace[
                 'animal_allocation_count'
             ];
+
+        $retainedShared =
+            !empty(
+                $workspace[
+                    'retained_shared'
+                ]
+            );
         ?>
 
         <div class="alert alert-info">
@@ -184,6 +191,35 @@ $money =
             expense equally. Otherwise leave it unchecked and enter the amounts
             manually. Any balance left over remains visibly unallocated.
         </div>
+
+        <?php if ($retainedShared): ?>
+
+            <div class="alert alert-success">
+                <strong>Retained as shared cost.</strong>
+                This expense was deliberately reviewed and left without
+                production-cycle attribution.
+
+                <?php if (!empty(
+                    $workspace['retained_shared_reason']
+                )): ?>
+                    <div class="mt-1">
+                        Decision reason:
+                        <?php echo $escape(
+                            $workspace[
+                                'retained_shared_reason'
+                            ]
+                        ); ?>
+                    </div>
+                <?php endif; ?>
+
+                <div class="small mt-1">
+                    The expense remains included at its shared operation level.
+                    It has not been removed from cost or assigned to an
+                    individual production cycle.
+                </div>
+            </div>
+
+        <?php endif; ?>
 
         <div class="card mb-3">
             <div class="card-body">
@@ -327,9 +363,10 @@ $money =
         <?php if (!$workspace['cycles']): ?>
             <div class="alert alert-warning">
                 No compatible production cycles are available for this expense.
-                The expense remains unallocated.
+                The expense remains unallocated unless you explicitly confirm
+                that it should be retained as shared cost.
             </div>
-        <?php else: ?>
+        <?php endif; ?>
 
             <form
                 id="financialAllocationWorkspaceForm"
@@ -340,6 +377,10 @@ $money =
                 data-permission-scope="<?php echo $escape(
                     $permissionScope
                 ); ?>"
+                data-entity-label="expense"
+                data-allocation-label="shared cost allocation"
+                data-retain-clear-message="Clear cycle amounts before retaining this expense as shared."
+                data-retain-reason-message="Enter a reason for keeping this expense at shared-operation level."
                 data-csrf-token="<?php echo $escape(
                     csrf_token()
                 ); ?>"
@@ -367,7 +408,11 @@ $money =
                                     class="form-check-input"
                                     type="checkbox"
                                     id="financialAllocationEqualSplit"
-                                    <?php echo $animalAllocationCount > 0
+                                    <?php echo (
+                                        $animalAllocationCount > 0
+                                        ||
+                                        !$workspace['cycles']
+                                    )
                                         ? 'disabled'
                                         : ''; ?>
                                 >
@@ -383,7 +428,11 @@ $money =
                                 type="button"
                                 class="btn btn-sm btn-outline-secondary"
                                 id="financialAllocationClearAmounts"
-                                <?php echo $animalAllocationCount > 0
+                                <?php echo (
+                                    $animalAllocationCount > 0
+                                    ||
+                                    !$workspace['cycles']
+                                )
                                     ? 'disabled'
                                     : ''; ?>
                             >
@@ -511,7 +560,7 @@ $money =
                                 for="financialAllocationRevisionReason"
                                 class="form-label"
                             >
-                                Reason for allocation change
+                                Reason for allocation / shared-retention decision
                             </label>
 
                             <textarea
@@ -528,8 +577,10 @@ $money =
 
                             <div class="form-text">
                                 Required for the expense revision audit trail.
-                                Clearing every amount explicitly clears the
-                                cycle allocation while preserving revision history.
+                                A retained-shared decision must explain why no
+                                reliable production-cycle basis exists. Clearing
+                                every amount explicitly clears cycle allocation
+                                while preserving immutable revision history.
                             </div>
                         </div>
 
@@ -540,22 +591,55 @@ $money =
                                 visible unallocated remainder.
                             </div>
 
-                            <button
-                                type="submit"
-                                class="btn btn-primary"
-                                id="financialAllocationSaveButton"
-                                <?php echo $animalAllocationCount > 0
-                                    ? 'disabled'
-                                    : ''; ?>
-                            >
-                                <i class="bi bi-check2-circle"></i>
-                                Save Allocation
-                            </button>
+                            <div class="d-flex flex-wrap gap-2">
+                                <?php if (
+                                    (float)$workspace[
+                                        'allocated_amount'
+                                    ] <= 0.00001
+                                ): ?>
+
+                                    <button
+                                        type="submit"
+                                        class="btn btn-outline-info"
+                                        id="financialAllocationRetainSharedButton"
+                                        data-allocation-decision="retain_shared"
+                                        <?php echo (
+                                            $animalAllocationCount > 0
+                                            ||
+                                            $retainedShared
+                                        )
+                                            ? 'disabled'
+                                            : ''; ?>
+                                    >
+                                        <i class="bi bi-check-circle"></i>
+                                        <?php echo $retainedShared
+                                            ? 'Retained as Shared'
+                                            : 'Keep as Shared Cost'; ?>
+                                    </button>
+
+                                <?php endif; ?>
+
+                                <button
+                                    type="submit"
+                                    class="btn btn-primary"
+                                    id="financialAllocationSaveButton"
+                                    data-allocation-decision="allocate"
+                                    <?php echo (
+                                        $animalAllocationCount > 0
+                                        ||
+                                        !$workspace['cycles']
+                                    )
+                                        ? 'disabled'
+                                        : ''; ?>
+                                >
+                                    <i class="bi bi-check2-circle"></i>
+                                    Save Allocation
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             </form>
-        <?php endif; ?>
 
         <?php if (!empty(
             $workspace['incompatible_cycles']

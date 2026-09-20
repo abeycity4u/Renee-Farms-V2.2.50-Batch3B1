@@ -240,6 +240,13 @@ $scopeLabel =
         $hasRevision =
             $latestRevision !== null;
 
+        $retainedShared =
+            !empty(
+                $workspace[
+                    'retained_shared'
+                ]
+            );
+
         $sourceState =
             $workspace['source_state']
             ?? [];
@@ -253,6 +260,34 @@ $scopeLabel =
             unallocated. Use equal split only when every compatible cycle
             shown should share the full consumed cost equally.
         </div>
+
+        <?php if ($retainedShared): ?>
+
+            <div class="alert alert-success">
+                <strong>Retained as shared cost.</strong>
+                This consumed-stock cost was deliberately reviewed and left
+                without production-cycle attribution.
+
+                <?php if (!empty(
+                    $workspace['retained_shared_reason']
+                )): ?>
+                    <div class="mt-1">
+                        Decision reason:
+                        <?php echo $escape(
+                            $workspace[
+                                'retained_shared_reason'
+                            ]
+                        ); ?>
+                    </div>
+                <?php endif; ?>
+
+                <div class="small mt-1">
+                    The consumed cost remains included at its shared operation
+                    level and has not been removed from production economics.
+                </div>
+            </div>
+
+        <?php endif; ?>
 
         <div class="alert alert-light border">
             <strong>
@@ -481,10 +516,11 @@ $scopeLabel =
 
             <div class="alert alert-warning">
                 No compatible production cycles are available.
-                This consumed cost remains unallocated.
+                This consumed cost remains unallocated unless you explicitly
+                confirm that it should be retained as shared cost.
             </div>
 
-        <?php else: ?>
+        <?php endif; ?>
 
             <form
                 id="stockConsumptionAllocationWorkspaceForm"
@@ -500,6 +536,9 @@ $scopeLabel =
                     . '/api/update_stock_consumption_allocation.php'
                 ); ?>"
                 data-has-revision="<?php echo $hasRevision
+                    ? '1'
+                    : '0'; ?>"
+                data-retained-shared="<?php echo $retainedShared
                     ? '1'
                     : '0'; ?>"
             >
@@ -526,6 +565,9 @@ $scopeLabel =
                                     class="form-check-input"
                                     type="checkbox"
                                     id="stockConsumptionAllocationEqualSplit"
+                                    <?php echo !$workspace['cycles']
+                                        ? 'disabled'
+                                        : ''; ?>
                                 >
 
                                 <label
@@ -540,6 +582,9 @@ $scopeLabel =
                                 type="button"
                                 class="btn btn-sm btn-outline-secondary"
                                 id="stockConsumptionAllocationClearAmounts"
+                                <?php echo !$workspace['cycles']
+                                    ? 'disabled'
+                                    : ''; ?>
                             >
                                 Clear amounts
                             </button>
@@ -694,42 +739,42 @@ $scopeLabel =
 
                     <div class="card-body border-top">
 
-                        <?php if ($hasRevision): ?>
+                        <div class="mb-3">
+                            <label
+                                for="stockConsumptionAllocationRevisionReason"
+                                class="form-label fw-semibold"
+                            >
+                                Reason for allocation / shared-retention decision
+                                <?php if (!$hasRevision): ?>
+                                    <span class="text-muted">
+                                        (optional on first allocation)
+                                    </span>
+                                <?php endif; ?>
+                            </label>
 
-                            <div class="mb-3">
-                                <label
-                                    for="stockConsumptionAllocationRevisionReason"
-                                    class="form-label fw-semibold"
-                                >
-                                    Reason for this change
-                                </label>
+                            <textarea
+                                class="form-control"
+                                id="stockConsumptionAllocationRevisionReason"
+                                maxlength="500"
+                                rows="2"
+                                <?php echo $hasRevision
+                                    ? 'required'
+                                    : ''; ?>
+                                placeholder="<?php echo $hasRevision
+                                    ? 'Explain why this consumed-stock allocation is being changed.'
+                                    : 'Optional for first allocation; required to retain this cost as shared.'; ?>"
+                            ></textarea>
 
-                                <textarea
-                                    class="form-control"
-                                    id="stockConsumptionAllocationRevisionReason"
-                                    maxlength="500"
-                                    rows="2"
-                                    placeholder="Explain why this allocation is being updated or cleared."
-                                ></textarea>
-
-                                <div class="form-text">
-                                    Required because this stock movement already
-                                    has allocation revision history.
-                                </div>
+                            <div class="form-text">
+                                A reason is always required when deliberately
+                                retaining consumed cost as shared. After the
+                                first revision, a change reason is also required
+                                by the canonical stock-allocation audit contract.
                             </div>
-
-                        <?php else: ?>
-
-                            <div class="alert alert-light border mb-3">
-                                This is the first allocation revision for this
-                                stock movement. A change reason becomes mandatory
-                                on later updates or when clearing the allocation.
-                            </div>
-
-                        <?php endif; ?>
+                        </div>
 
                         <div
-                            class="d-flex flex-wrap justify-content-end gap-2"
+                            class="d-flex flex-wrap justify-content-between align-items-center gap-2"
                         >
                             <a
                                 class="btn btn-outline-secondary"
@@ -738,22 +783,49 @@ $scopeLabel =
                                 Cancel
                             </a>
 
-                            <button
-                                type="submit"
-                                class="btn btn-primary"
-                                id="stockConsumptionAllocationSaveButton"
-                            >
-                                <i class="bi bi-save me-1"></i>
-                                Save Allocation
-                            </button>
+                            <div class="d-flex flex-wrap gap-2">
+                                <?php if (
+                                    (float)$workspace[
+                                        'allocated_amount'
+                                    ] <= 0.00001
+                                ): ?>
+
+                                    <button
+                                        type="submit"
+                                        class="btn btn-outline-info"
+                                        id="stockConsumptionAllocationRetainSharedButton"
+                                        data-allocation-decision="retain_shared"
+                                        <?php echo $retainedShared
+                                            ? 'disabled'
+                                            : ''; ?>
+                                    >
+                                        <i class="bi bi-check-circle me-1"></i>
+                                        <?php echo $retainedShared
+                                            ? 'Retained as Shared'
+                                            : 'Keep as Shared Cost'; ?>
+                                    </button>
+
+                                <?php endif; ?>
+
+                                <button
+                                    type="submit"
+                                    class="btn btn-primary"
+                                    id="stockConsumptionAllocationSaveButton"
+                                    data-allocation-decision="allocate"
+                                    <?php echo !$workspace['cycles']
+                                        ? 'disabled'
+                                        : ''; ?>
+                                >
+                                    <i class="bi bi-save me-1"></i>
+                                    Save Allocation
+                                </button>
+                            </div>
                         </div>
 
                     </div>
                 </div>
 
             </form>
-
-        <?php endif; ?>
 
         <?php if (!empty(
             $workspace['incompatible_cycles']
