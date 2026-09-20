@@ -230,6 +230,46 @@ $canAddAny =
     $addProductionTypes !== [];
 
 
+/*
+ * The combined editor exposes only production targets the current user can
+ * operationally edit. The API independently re-authorizes both the existing
+ * row and requested target.
+ */
+$editableProductionTypes = [];
+
+foreach (
+    [
+        'layer' =>
+            'Layer',
+
+        'broiler' =>
+            'Broiler',
+
+        'shared' =>
+            'Shared',
+    ]
+    as $type => $label
+) {
+    if (
+        permission_catalog_expense_operational_can(
+            poultry_expense_workspace_production_row(
+                $type
+            ),
+            'edit'
+        )
+    ) {
+        $editableProductionTypes[
+            $type
+        ] =
+            $label;
+    }
+}
+
+
+$canEditAny =
+    $editableProductionTypes !== [];
+
+
 if (
     $_SERVER[
         'REQUEST_METHOD'
@@ -756,6 +796,25 @@ $productionLabels = [
                                     $expense,
                                     'operational'
                                 );
+
+                            $canEditExpense =
+                                permission_catalog_expense_operational_can(
+                                    $expense,
+                                    'edit'
+                                );
+
+                            $canDeleteExpense =
+                                permission_catalog_expense_operational_can(
+                                    $expense,
+                                    'delete'
+                                );
+
+                            $hasRowAction =
+                                $canAllocate
+                                ||
+                                $canEditExpense
+                                ||
+                                $canDeleteExpense;
                         ?>
 
                         <tr>
@@ -962,7 +1021,49 @@ $productionLabels = [
                                     <i class="bi bi-diagram-3"></i>
                                 </a>
 
-                                <?php else: ?>
+                                <?php endif; ?>
+
+
+                                <?php if ($canEditExpense): ?>
+
+                                <button
+                                    type="button"
+                                    class="btn btn-sm btn-outline-primary poultry-expense-edit-btn"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#editPoultryExpenseModal"
+                                    data-expense-id="<?php echo (int)$expense['id']; ?>"
+                                    data-expense-date="<?php echo app_attr((string)$expense['expense_date']); ?>"
+                                    data-production-type="<?php echo app_attr($productionType); ?>"
+                                    data-cycle-id="<?php echo (int)($expense['cycle_id'] ?? 0); ?>"
+                                    data-category="<?php echo app_attr((string)($expense['category'] ?? 'misc')); ?>"
+                                    data-unit="<?php echo app_attr((string)($expense['unit'] ?? 1)); ?>"
+                                    data-amount="<?php echo app_attr((string)($expense['amount'] ?? 0)); ?>"
+                                    data-description="<?php echo app_attr((string)($expense['description'] ?? '')); ?>"
+                                    title="Edit expense"
+                                    aria-label="Edit expense"
+                                >
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+
+                                <?php endif; ?>
+
+
+                                <?php if ($canDeleteExpense): ?>
+
+                                <button
+                                    type="button"
+                                    class="btn btn-sm btn-outline-danger poultry-expense-delete-btn"
+                                    data-expense-id="<?php echo (int)$expense['id']; ?>"
+                                    title="Delete expense"
+                                    aria-label="Delete expense"
+                                >
+                                    <i class="bi bi-trash"></i>
+                                </button>
+
+                                <?php endif; ?>
+
+
+                                <?php if (!$hasRowAction): ?>
 
                                 <span class="text-muted">—</span>
 
@@ -999,6 +1100,327 @@ $productionLabels = [
     </div>
 
 </div>
+
+
+<?php if ($canEditAny): ?>
+
+<div
+    class="modal fade"
+    id="editPoultryExpenseModal"
+    tabindex="-1"
+    aria-labelledby="editPoultryExpenseTitle"
+    aria-hidden="true"
+>
+    <div class="modal-dialog">
+
+        <div class="modal-content">
+
+            <form id="editPoultryExpenseForm">
+
+                <input
+                    type="hidden"
+                    name="expense_id"
+                    id="editPoultryExpenseId"
+                >
+
+                <input
+                    type="hidden"
+                    name="farm_type"
+                    value="poultry"
+                >
+
+                <div class="modal-header">
+
+                    <h5
+                        class="modal-title"
+                        id="editPoultryExpenseTitle"
+                    >
+                        Edit Poultry Expense
+                    </h5>
+
+                    <button
+                        type="button"
+                        class="btn-close"
+                        data-bs-dismiss="modal"
+                        aria-label="Close"
+                    ></button>
+
+                </div>
+
+
+                <div class="modal-body">
+
+                    <div class="mb-3">
+
+                        <label
+                            for="editPoultryExpenseDate"
+                            class="form-label"
+                        >
+                            Date
+                        </label>
+
+                        <input
+                            type="date"
+                            name="expense_date"
+                            id="editPoultryExpenseDate"
+                            class="form-control"
+                            required
+                        >
+
+                    </div>
+
+
+                    <div class="mb-3">
+
+                        <label
+                            for="editPoultryProductionType"
+                            class="form-label"
+                        >
+                            Production Type
+                        </label>
+
+                        <select
+                            name="production_type"
+                            id="editPoultryProductionType"
+                            class="form-select"
+                            required
+                        >
+
+                            <?php foreach ($editableProductionTypes as $type => $label): ?>
+
+                            <option value="<?php echo app_attr($type); ?>">
+                                <?php echo htmlspecialchars($label); ?>
+                            </option>
+
+                            <?php endforeach; ?>
+
+                        </select>
+
+                        <div class="form-text">
+                            Moving an expense to another Poultry area requires permission for both the existing row and the requested target.
+                        </div>
+
+                    </div>
+
+
+                    <div class="mb-3">
+
+                        <label
+                            for="editPoultryExpenseCycle"
+                            class="form-label"
+                        >
+                            Production Cycle
+                        </label>
+
+                        <select
+                            name="cycle_id"
+                            id="editPoultryExpenseCycle"
+                            class="form-select"
+                        >
+
+                            <?php if (isset($editableProductionTypes['layer'])): ?>
+
+                            <option
+                                value="0"
+                                data-production-type="layer"
+                            >
+                                Shared between Layer cycles
+                            </option>
+
+                            <?php foreach ($expenseCycles['layer'] as $cycle): ?>
+
+                            <option
+                                value="<?php echo (int)$cycle['id']; ?>"
+                                data-production-type="layer"
+                            >
+                                <?php
+                                    echo htmlspecialchars(
+                                        (string)$cycle['cycle_code']
+                                        . ' — '
+                                        . (string)$cycle['status']
+                                    );
+                                ?>
+                            </option>
+
+                            <?php endforeach; ?>
+
+                            <?php endif; ?>
+
+
+                            <?php if (isset($editableProductionTypes['broiler'])): ?>
+
+                            <option
+                                value="0"
+                                data-production-type="broiler"
+                            >
+                                Shared between Broiler cycles
+                            </option>
+
+                            <?php foreach ($expenseCycles['broiler'] as $cycle): ?>
+
+                            <option
+                                value="<?php echo (int)$cycle['id']; ?>"
+                                data-production-type="broiler"
+                            >
+                                <?php
+                                    echo htmlspecialchars(
+                                        (string)$cycle['cycle_code']
+                                        . ' — '
+                                        . (string)$cycle['status']
+                                    );
+                                ?>
+                            </option>
+
+                            <?php endforeach; ?>
+
+                            <?php endif; ?>
+
+
+                            <?php if (isset($editableProductionTypes['shared'])): ?>
+
+                            <option
+                                value="0"
+                                data-production-type="shared"
+                            >
+                                Poultry-wide shared — no specific production cycle
+                            </option>
+
+                            <?php endif; ?>
+
+                        </select>
+
+                        <div
+                            class="form-text"
+                            id="editPoultryExpenseCycleHelp"
+                        >
+                            Choose a cycle only when the expense belongs directly to it.
+                        </div>
+
+                    </div>
+
+
+                    <div class="mb-3">
+
+                        <label
+                            for="editPoultryExpenseCategory"
+                            class="form-label"
+                        >
+                            Category
+                        </label>
+
+                        <select
+                            name="category"
+                            id="editPoultryExpenseCategory"
+                            class="form-select"
+                            required
+                        >
+                            <option value="feeds">Feeds (legacy historical record)</option>
+                            <option value="medication">Medication (legacy historical record)</option>
+                            <option value="salary">Salary</option>
+                            <option value="logistic">Logistic</option>
+                            <option value="fuel">Fuel</option>
+                            <option value="misc">Miscellaneous</option>
+                        </select>
+
+                        <div class="form-text">
+                            New stock purchases remain Inventory records. Legacy Feed/Medication categories are shown only so historical records can remain unchanged while editing other fields.
+                        </div>
+
+                    </div>
+
+
+                    <div class="mb-3">
+
+                        <label
+                            for="editPoultryExpenseUnit"
+                            class="form-label"
+                        >
+                            Unit
+                        </label>
+
+                        <input
+                            type="number"
+                            name="unit"
+                            id="editPoultryExpenseUnit"
+                            class="form-control"
+                            step="0.01"
+                            min="0.01"
+                            required
+                        >
+
+                    </div>
+
+
+                    <div class="mb-3">
+
+                        <label
+                            for="editPoultryExpenseAmount"
+                            class="form-label"
+                        >
+                            Amount (₦)
+                        </label>
+
+                        <input
+                            type="number"
+                            name="amount"
+                            id="editPoultryExpenseAmount"
+                            class="form-control"
+                            step="0.01"
+                            min="0.01"
+                            required
+                        >
+
+                    </div>
+
+
+                    <div class="mb-3">
+
+                        <label
+                            for="editPoultryExpenseDescription"
+                            class="form-label"
+                        >
+                            Description
+                        </label>
+
+                        <textarea
+                            name="description"
+                            id="editPoultryExpenseDescription"
+                            class="form-control"
+                            rows="3"
+                        ></textarea>
+
+                    </div>
+
+                </div>
+
+
+                <div class="modal-footer">
+
+                    <button
+                        type="button"
+                        class="btn btn-secondary"
+                        data-bs-dismiss="modal"
+                    >
+                        Cancel
+                    </button>
+
+                    <button
+                        type="submit"
+                        class="btn btn-primary"
+                    >
+                        Save Changes
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+</div>
+
+<?php endif; ?>
 
 
 <?php if ($canAddAny): ?>
@@ -1302,6 +1724,7 @@ $productionLabels = [
     class="d-none"
     id="poultryExpensesHubConfig"
     data-active-tab="<?php echo app_attr($activeTab); ?>"
+    data-csrf-token="<?php echo app_attr(csrf_token()); ?>"
 ></div>
 
 
