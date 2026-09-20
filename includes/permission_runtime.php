@@ -146,8 +146,6 @@ $routeViews = [
     '/poultry/layer_feeds.php' => 'poultry_feeds',
     '/poultry/broiler_feeds.php' => 'poultry_feeds',
     '/poultry/health.php' => 'poultry_health',
-    '/poultry/layer_expenses.php' => 'poultry_layer_expenses',
-    '/poultry/broiler_expenses.php' => 'poultry_broiler_expenses',
     '/ruminant/ruminant_daily_record.php' => 'ruminant_daily',
     '/ruminant/animal_registry.php' => 'ruminant_animals',
     '/ruminant/animal_view.php' => 'ruminant_animals',
@@ -257,16 +255,6 @@ if (permission_runtime_ends_with($path, '/poultry/layers_daily_record.php')) {
             exit();
         }
     }
-} elseif (permission_runtime_ends_with($path, '/poultry/layer_expenses.php')) {
-    $extraCapability['expenseAdd'] = permission_runtime_has('poultry_layer_expenses_add');
-    $extraCapability['expenseEdit'] = permission_runtime_has('poultry_layer_expenses_edit');
-    $extraCapability['expenseDelete'] = permission_runtime_has('poultry_layer_expenses_delete');
-    if ($method === 'POST' && isset($_POST['add_expense']) && !$extraCapability['expenseAdd']) permission_runtime_deny('You do not have permission to add Layer expenses.');
-} elseif (permission_runtime_ends_with($path, '/poultry/broiler_expenses.php')) {
-    $extraCapability['expenseAdd'] = permission_runtime_has('poultry_broiler_expenses_add');
-    $extraCapability['expenseEdit'] = permission_runtime_has('poultry_broiler_expenses_edit');
-    $extraCapability['expenseDelete'] = permission_runtime_has('poultry_broiler_expenses_delete');
-    if ($method === 'POST' && isset($_POST['add_expense']) && !$extraCapability['expenseAdd']) permission_runtime_deny('You do not have permission to add Broiler expenses.');
 } elseif (permission_runtime_ends_with($path, '/ruminant/ruminant_expenses.php')) {
     $extraCapability['expenseAdd'] = permission_runtime_has('ruminant_expenses_add');
     $extraCapability['expenseEdit'] = permission_runtime_has('ruminant_expenses_edit');
@@ -296,8 +284,6 @@ if (permission_runtime_ends_with($path, '/poultry/layers_daily_record.php')) {
 
 $navCapability = [
     '/inventory.php' => permission_runtime_has('inventory'),
-    '/poultry/layer_expenses.php' => permission_runtime_has('poultry_layer_expenses'),
-    '/poultry/broiler_expenses.php' => permission_runtime_has('poultry_broiler_expenses'),
     '/ruminant/animal_registry.php' => permission_runtime_has('ruminant_animals'),
     '/management/sales_records.php' => permission_runtime_has('sales'),
     '/management/expenses.php' => permission_runtime_has('expenses'),

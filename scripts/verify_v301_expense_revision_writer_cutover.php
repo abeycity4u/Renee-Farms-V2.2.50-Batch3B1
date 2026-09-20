@@ -16,6 +16,10 @@ $paths = [
         $root
         . '/poultry/expenses.php',
 
+    'poultry_workspace' =>
+        $root
+        . '/lib/poultry_expense_workspace.php',
+
     'poultry_entry' =>
         $root
         . '/lib/poultry_expense_entry.php',
@@ -298,13 +302,13 @@ $checks['NO_DUPLICATED_REVISION_SQL_IN_WRITERS'] =
  */
 $checks['CURRENT_PROJECTION_PRESERVED'] =
     strpos(
-        $files['layer'],
+        $files['poultry_workspace'],
         'FROM farm_expenses e'
     ) !== false
     &&
     strpos(
-        $files['broiler'],
-        'FROM farm_expenses e'
+        $files['poultry_hub'],
+        'poultry_expense_workspace_rows('
     ) !== false
     &&
     strpos(

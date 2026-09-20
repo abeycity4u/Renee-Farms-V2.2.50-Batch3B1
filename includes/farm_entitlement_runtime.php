@@ -73,8 +73,6 @@ $routeModules = [
     '/poultry/layer_feeds.php' => 'poultry',
     '/poultry/broiler_feeds.php' => 'poultry',
     '/poultry/health.php' => 'poultry',
-    '/poultry/layer_expenses.php' => 'poultry',
-    '/poultry/broiler_expenses.php' => 'poultry',
     '/ruminant/ruminant_daily_record.php' => 'ruminant',
     '/ruminant/animal_registry.php' => 'ruminant',
     '/ruminant/animal_view.php' => 'ruminant',
@@ -84,8 +82,6 @@ $routeModules = [
 ];
 
 $delegatedExpenseRoutes = [
-    '/poultry/layer_expenses.php' => ['module' => 'poultry', 'permission' => 'poultry_layer_expenses'],
-    '/poultry/broiler_expenses.php' => ['module' => 'poultry', 'permission' => 'poultry_broiler_expenses'],
     '/ruminant/ruminant_expenses.php' => ['module' => 'ruminant', 'permission' => 'ruminant_expenses'],
 ];
 

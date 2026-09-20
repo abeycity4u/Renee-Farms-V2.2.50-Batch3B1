@@ -125,12 +125,6 @@ $showManagementMenu = $canViewSales || $canViewExpenseReport || $canViewReports 
             <?php if ($canViewPoultryExpenses): ?>
             <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/poultry/expenses.php"><i class="bi bi-cash-stack menu-icon me-2"></i> Poultry Expenses</a></li>
             <?php endif; ?>
-            <?php if ($canViewLayerExpenses): ?>
-            <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/poultry/layer_expenses.php"><i class="bi bi-cash menu-icon me-2"></i> Layer Expenses</a></li>
-            <?php endif; ?>
-            <?php if ($canViewBroilerExpenses): ?>
-            <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/poultry/broiler_expenses.php"><i class="bi bi-cash-stack menu-icon me-2"></i> Broiler Expenses</a></li>
-            <?php endif; ?>
           </ul>
         </li>
         <?php endif; ?>

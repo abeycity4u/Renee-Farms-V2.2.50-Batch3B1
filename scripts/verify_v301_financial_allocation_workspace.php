@@ -24,13 +24,9 @@ $files = [
         $root
         . '/management/expenses.php',
 
-    'layer' =>
+    'poultry_hub' =>
         $root
-        . '/poultry/layer_expenses.php',
-
-    'broiler' =>
-        $root
-        . '/poultry/broiler_expenses.php',
+        . '/poultry/expenses.php',
 
     'ruminant' =>
         $root
@@ -395,26 +391,20 @@ $checks['MANAGEMENT_LINKED'] =
         "financial_allocation_workspace_url((int)\$expense['id'], 'expense_report')"
     ) !== false;
 
-$checks['LAYER_LINKED'] =
+$checks['POULTRY_HUB_LINKED'] =
     strpos(
-        $content['layer'],
+        $content['poultry_hub'],
         'financial_allocation_workspace.php'
     ) !== false
     &&
     strpos(
-        $content['layer'],
-        "financial_allocation_workspace_url((int)\$expense['id'], 'operational')"
-    ) !== false;
-
-$checks['BROILER_LINKED'] =
-    strpos(
-        $content['broiler'],
-        'financial_allocation_workspace.php'
+        $content['poultry_hub'],
+        "financial_allocation_workspace_url("
     ) !== false
     &&
     strpos(
-        $content['broiler'],
-        "financial_allocation_workspace_url((int)\$expense['id'], 'operational')"
+        $content['poultry_hub'],
+        "'operational'"
     ) !== false;
 
 $checks['RUMINANT_LINKED'] =
@@ -434,13 +424,12 @@ $checks['ALL_LINKS_USE_CENTRAL_ELIGIBILITY'] =
             "\n",
             [
                 $content['management'],
-                $content['layer'],
-                $content['broiler'],
+                $content['poultry_hub'],
                 $content['ruminant'],
             ]
         ),
         'financial_allocation_workspace_parent_is_eligible('
-    ) >= 4;
+    ) >= 3;
 
 $checks['ALL_LINKS_USE_CENTRAL_PERMISSION'] =
     substr_count(
@@ -448,13 +437,12 @@ $checks['ALL_LINKS_USE_CENTRAL_PERMISSION'] =
             "\n",
             [
                 $content['management'],
-                $content['layer'],
-                $content['broiler'],
+                $content['poultry_hub'],
                 $content['ruminant'],
             ]
         ),
         'financial_allocation_workspace_can_access('
-    ) >= 4;
+    ) >= 3;
 
 $failed = [];
 

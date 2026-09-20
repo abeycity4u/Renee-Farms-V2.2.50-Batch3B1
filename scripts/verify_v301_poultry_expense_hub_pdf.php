@@ -201,20 +201,30 @@ hub_pdf_check(
 
 
 hub_pdf_check(
-    'LEGACY_LAYER_PDF_UNTOUCHED_IN_E4',
+    'LEGACY_LAYER_ROUTE_HAS_NO_PDF_AUTHORITY',
+    strpos(
+        $layer,
+        'poultry_expense_compatibility_redirect('
+    ) !== false
+    &&
     strpos(
         $layer,
         'pdf_report_finish('
-    ) !== false
+    ) === false
 );
 
 
 hub_pdf_check(
-    'LEGACY_BROILER_PDF_UNTOUCHED_IN_E4',
+    'LEGACY_BROILER_ROUTE_HAS_NO_PDF_AUTHORITY',
+    strpos(
+        $broiler,
+        'poultry_expense_compatibility_redirect('
+    ) !== false
+    &&
     strpos(
         $broiler,
         'pdf_report_finish('
-    ) !== false
+    ) === false
 );
 
 

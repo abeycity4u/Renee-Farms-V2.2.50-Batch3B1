@@ -243,20 +243,20 @@ poultry_expense_hub_check(
 
 
 poultry_expense_hub_check(
-    'LEGACY_LAYER_LINK_PRESERVED',
+    'LEGACY_LAYER_NAV_LINK_RETIRED',
     strpos(
         $content['navbar'],
         '/poultry/layer_expenses.php'
-    ) !== false
+    ) === false
 );
 
 
 poultry_expense_hub_check(
-    'LEGACY_BROILER_LINK_PRESERVED',
+    'LEGACY_BROILER_NAV_LINK_RETIRED',
     strpos(
         $content['navbar'],
         '/poultry/broiler_expenses.php'
-    ) !== false
+    ) === false
 );
 
 

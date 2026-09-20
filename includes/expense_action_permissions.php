@@ -2,10 +2,9 @@
 /**
  * Granular visibility bridge for legacy operational expense pages.
  *
- * Layer, Broiler and Ruminant expense pages still render Edit/Delete from a
- * broad legacy management flag. The expense APIs already enforce the exact
- * row-scoped permission. This bridge prevents restricted controls from being
- * painted while those large pages are migrated gradually.
+ * The Ruminant expense page still renders Edit/Delete from a broad legacy
+ * management flag. The expense APIs enforce exact row-scoped permission.
+ * Poultry expense actions now live only in the consolidated canonical hub.
  *
  * Expense Report is a separate management report permission. A Sales
  * Representative who is granted that report may use its normal farm filters;
@@ -24,12 +23,19 @@ if ($method !== 'GET') return;
 $privileged = isPlatformOwner() || hasRole('farm_admin');
 
 $permissionPair = null;
-if ($path === '/poultry/layer_expenses.php' || str_ends_with($path, '/poultry/layer_expenses.php')) {
-    $permissionPair = ['poultry_layer_expenses_edit', 'poultry_layer_expenses_delete'];
-} elseif ($path === '/poultry/broiler_expenses.php' || str_ends_with($path, '/poultry/broiler_expenses.php')) {
-    $permissionPair = ['poultry_broiler_expenses_edit', 'poultry_broiler_expenses_delete'];
-} elseif ($path === '/ruminant/ruminant_expenses.php' || str_ends_with($path, '/ruminant/ruminant_expenses.php')) {
-    $permissionPair = ['ruminant_expenses_edit', 'ruminant_expenses_delete'];
+
+if (
+    $path === '/ruminant/ruminant_expenses.php'
+    ||
+    str_ends_with(
+        $path,
+        '/ruminant/ruminant_expenses.php'
+    )
+) {
+    $permissionPair = [
+        'ruminant_expenses_edit',
+        'ruminant_expenses_delete',
+    ];
 }
 
 if ($permissionPair === null) return;

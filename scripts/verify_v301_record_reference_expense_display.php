@@ -4,40 +4,50 @@
  * Expense human-facing record-reference display verifier.
  *
  * Source-only verifier.
+ *
+ * Poultry Layer/Broiler/Shared display authority is consolidated in
+ * poultry/expenses.php. Poultry row reading belongs to the shared workspace.
  */
 
 $root =
     dirname(__DIR__);
 
 $paths = [
-    'layer' =>
-        $root . '/poultry/layer_expenses.php',
+    'poultry_hub' =>
+        $root
+        . '/poultry/expenses.php',
 
-    'broiler' =>
-        $root . '/poultry/broiler_expenses.php',
+    'poultry_workspace' =>
+        $root
+        . '/lib/poultry_expense_workspace.php',
 
     'ruminant' =>
-        $root . '/ruminant/ruminant_expenses.php',
+        $root
+        . '/ruminant/ruminant_expenses.php',
 
     'management' =>
-        $root . '/management/expenses.php',
+        $root
+        . '/management/expenses.php',
 
     'pdf' =>
-        $root . '/management/expense_report_pdf.php',
+        $root
+        . '/management/expense_report_pdf.php',
 
     'allocation' =>
-        $root . '/management/expense_allocation.php',
+        $root
+        . '/management/expense_allocation.php',
 
     'allocation_service' =>
-        $root . '/lib/financial_allocation_service.php',
+        $root
+        . '/lib/financial_allocation_service.php',
 ];
 
 $source = [];
 
-foreach ($paths as $key => $path) {
+foreach ($paths as $key => $sourcePath) {
     $source[$key] =
-        is_file($path)
-            ? (string)file_get_contents($path)
+        is_file($sourcePath)
+            ? (string)file_get_contents($sourcePath)
             : '';
 }
 
@@ -65,14 +75,77 @@ $check =
     };
 
 
+$check(
+    strpos(
+        $source['poultry_workspace'],
+        'SELECT'
+    ) !== false
+    &&
+    strpos(
+        $source['poultry_workspace'],
+        'e.*'
+    ) !== false
+    &&
+    strpos(
+        $source['poultry_workspace'],
+        'FROM farm_expenses e'
+    ) !== false,
+    'Poultry workspace query carries canonical expense row'
+);
+
+$check(
+    substr_count(
+        $source['poultry_hub'],
+        '<th>Reference</th>'
+    ) === 1,
+    'Poultry hub has exactly one Expense Reference column'
+);
+
+$check(
+    strpos(
+        $source['poultry_hub'],
+        "\$expense[\n                                                    'public_reference'"
+    ) !== false
+    ||
+    strpos(
+        $source['poultry_hub'],
+        "\$expense['public_reference']"
+    ) !== false,
+    'Poultry hub renders public reference'
+);
+
+$check(
+    strpos(
+        $source['poultry_hub'],
+        "data-expense-id"
+    ) !== false
+    &&
+    strpos(
+        $source['poultry_hub'],
+        "(int)\$expense["
+    ) !== false,
+    'Poultry hub preserves internal numeric expense IDs'
+);
+
+$check(
+    strpos(
+        $source['poultry_hub'],
+        'colspan="11"'
+    ) !== false,
+    'Poultry hub empty state matches unified expense columns'
+);
+
+$check(
+    strpos(
+        $source['poultry_hub'],
+        'pdf_report_finish('
+    ) !== false,
+    'Poultry hub PDF uses the same Reference-bearing expense table'
+);
+
+
 foreach (
     [
-        'layer' =>
-            'Layer Expenses',
-
-        'broiler' =>
-            'Broiler Expenses',
-
         'ruminant' =>
             'Ruminant Expenses',
 
@@ -126,22 +199,6 @@ foreach (
 
 $check(
     strpos(
-        $source['layer'],
-        '? 10 : 9;'
-    ) !== false,
-    'Layer empty state accounts for Reference column'
-);
-
-$check(
-    strpos(
-        $source['broiler'],
-        '? 10 : 9;'
-    ) !== false,
-    'Broiler empty state accounts for Reference column'
-);
-
-$check(
-    strpos(
         $source['ruminant'],
         '? 11 : 10;'
     ) !== false,
@@ -154,23 +211,6 @@ $check(
         "? '11' : '10';"
     ) !== false,
     'Management empty state accounts for Reference column'
-);
-
-
-$check(
-    strpos(
-        $source['layer'],
-        '<td colspan="5"><strong>TOTAL</strong></td>'
-    ) !== false,
-    'Layer total remains aligned after Reference column'
-);
-
-$check(
-    strpos(
-        $source['broiler'],
-        '<td colspan="5"><strong>TOTAL</strong></td>'
-    ) !== false,
-    'Broiler total remains aligned after Reference column'
 );
 
 $check(
@@ -187,7 +227,7 @@ $check(
         $source['pdf'],
         'SELECT e.*'
     ) !== false,
-    'Expense PDF query carries canonical expense row'
+    'Expense report PDF query carries canonical expense row'
 );
 
 $check(
@@ -195,7 +235,7 @@ $check(
         $source['pdf'],
         '<th>Reference</th>'
     ) !== false,
-    'Expense PDF has Reference column'
+    'Expense report PDF has Reference column'
 );
 
 $check(
@@ -203,7 +243,7 @@ $check(
         $source['pdf'],
         "\$expense['public_reference']"
     ) !== false,
-    'Expense PDF renders public reference'
+    'Expense report PDF renders public reference'
 );
 
 $check(
@@ -211,7 +251,7 @@ $check(
         $source['pdf'],
         'colspan="10"'
     ) !== false,
-    'Expense PDF empty state matches ten columns'
+    'Expense report PDF empty state matches ten columns'
 );
 
 
@@ -250,37 +290,28 @@ $check(
 );
 
 
-foreach (
-    [
-        'layer',
-        'broiler',
-        'ruminant',
-    ]
-    as $key
-) {
-    $check(
-        strpos(
-            $source[$key],
-            'pdf_report_finish('
-        ) !== false,
-        ucfirst($key)
-            . ' page-generated PDF uses the same Reference-bearing expense table'
-    );
-}
+$check(
+    strpos(
+        $source['ruminant'],
+        'pdf_report_finish('
+    ) !== false,
+    'Ruminant page-generated PDF preserves Reference-bearing expense table'
+);
 
 
 $displaySource =
     implode(
         "\n",
         [
-            $source['layer'],
-            $source['broiler'],
+            $source['poultry_hub'],
+            $source['poultry_workspace'],
             $source['ruminant'],
             $source['management'],
             $source['pdf'],
             $source['allocation'],
         ]
     );
+
 
 $check(
     strpos(
@@ -290,16 +321,17 @@ $check(
     'Expense display surfaces never generate references'
 );
 
+
 $check(
-    substr_count(
-        $source['layer'],
+    strpos(
+        $source['poultry_hub'],
         'record_reference_persistence_assign_existing('
-    ) === 1
+    ) === false
     &&
-    substr_count(
-        $source['broiler'],
+    strpos(
+        $source['poultry_workspace'],
         'record_reference_persistence_assign_existing('
-    ) === 1
+    ) === false
     &&
     substr_count(
         $source['ruminant'],
@@ -320,8 +352,9 @@ $check(
         $source['allocation'],
         'record_reference_persistence_assign_existing('
     ) === false,
-    'Expense display preserves only the three established canonical writer assignments'
+    'Only the still-combined Ruminant display/writer owns reference persistence'
 );
+
 
 $check(
     strpos(
@@ -330,6 +363,7 @@ $check(
     ) === false,
     'Expense display surfaces never update public_reference'
 );
+
 
 $check(
     preg_match(

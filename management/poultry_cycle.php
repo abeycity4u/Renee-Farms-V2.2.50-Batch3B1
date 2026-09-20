@@ -370,9 +370,11 @@ $feedsUrl =
         : '/poultry/broiler_feeds.php';
 
 $expensesUrl =
-    $type === 'layer'
-        ? '/poultry/layer_expenses.php'
-        : '/poultry/broiler_expenses.php';
+    '/poultry/expenses.php?'
+    . http_build_query([
+        'tab' =>
+            $type,
+    ]);
 
 $populationState = null;
 $populationReadError = '';

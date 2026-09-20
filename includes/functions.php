@@ -173,24 +173,6 @@ function hasPermission($role, $module) {
         return true;
     }
 
-    // Compatibility bridge for the legacy Layer/Broiler expense pages. Those pages
-    // still use `poultry_expenses` for their broad page/action-column check. Treat
-    // it as enabled when the current page has its exact View, Edit or Delete
-    // permission; Add remains independently enforced by permission_runtime.php.
-    if ($module === 'poultry_expenses') {
-        $path = '/' . ltrim(str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? '')), '/');
-        if ($path === '/poultry/layer_expenses.php' || str_ends_with($path, '/poultry/layer_expenses.php')) {
-            return hasPermission($role, 'poultry_layer_expenses')
-                || hasPermission($role, 'poultry_layer_expenses_edit')
-                || hasPermission($role, 'poultry_layer_expenses_delete');
-        }
-        if ($path === '/poultry/broiler_expenses.php' || str_ends_with($path, '/poultry/broiler_expenses.php')) {
-            return hasPermission($role, 'poultry_broiler_expenses')
-                || hasPermission($role, 'poultry_broiler_expenses_edit')
-                || hasPermission($role, 'poultry_broiler_expenses_delete');
-        }
-    }
-
     // Animal Profile still carries the old Ruminant Daily Records page check.
     // On this route only, resolve that stale check to the canonical parent
     // Ruminant Animal Registry — View permission already used by the route map.

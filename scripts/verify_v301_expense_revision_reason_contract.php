@@ -57,16 +57,10 @@ try {
         );
 
     $clients = [
-        'layer' =>
+        'poultry' =>
             $read(
                 $root
-                . '/assets/js/layer-expenses.js'
-            ),
-
-        'broiler' =>
-            $read(
-                $root
-                . '/assets/js/broiler-expenses.js'
+                . '/assets/js/poultry-expenses.js'
             ),
 
         'ruminant' =>

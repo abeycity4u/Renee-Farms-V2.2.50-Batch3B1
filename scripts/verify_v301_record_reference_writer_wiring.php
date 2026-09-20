@@ -17,11 +17,15 @@ $paths = [
         $root
         . '/lib/stock_service.php',
 
-    'layer' =>
+    'poultry_hub' =>
+        $root
+        . '/poultry/expenses.php',
+
+    'layer_compat' =>
         $root
         . '/poultry/layer_expenses.php',
 
-    'broiler' =>
+    'broiler_compat' =>
         $root
         . '/poultry/broiler_expenses.php',
 
@@ -123,35 +127,61 @@ $check(
     'Stock reversal receives its own human-facing reference'
 );
 
+$check(
+    strpos(
+        $source['poultry_hub'],
+        'poultry_expense_entry.php'
+    ) !== false,
+    'Poultry expense hub loads canonical Poultry expense entry service'
+);
+
+$check(
+    substr_count(
+        $source['poultry_hub'],
+        'poultry_expense_entry_create('
+    ) === 1,
+    'Poultry expense hub delegates exactly one creation request'
+);
+
+$check(
+    strpos(
+        $source['poultry_hub'],
+        'record_reference_persistence_assign_existing('
+    ) === false
+    &&
+    strpos(
+        $source['poultry_hub'],
+        '$pdo->lastInsertId()'
+    ) === false,
+    'Poultry expense hub owns no direct reference persistence'
+);
+
+
 foreach (
     [
-        'layer' =>
-            'Layer expense adapter',
+        'layer_compat' =>
+            'Layer compatibility route',
 
-        'broiler' =>
-            'Broiler expense adapter',
+        'broiler_compat' =>
+            'Broiler compatibility route',
     ]
     as $key => $label
 ) {
     $check(
         strpos(
             $source[$key],
-            'poultry_expense_entry.php'
+            'poultry_expense_compatibility_redirect('
         ) !== false,
         $label
-            . ' loads canonical Poultry expense entry service'
+            . ' delegates to canonical compatibility authority'
     );
 
     $check(
-        substr_count(
+        strpos(
             $source[$key],
             'poultry_expense_entry_create('
-        ) === 1,
-        $label
-            . ' delegates exactly one creation request'
-    );
-
-    $check(
+        ) === false
+        &&
         strpos(
             $source[$key],
             'record_reference_persistence_assign_existing('
@@ -162,7 +192,7 @@ foreach (
             '$pdo->lastInsertId()'
         ) === false,
         $label
-            . ' owns no direct reference persistence'
+            . ' owns no creation or reference persistence'
     );
 }
 

@@ -51,12 +51,6 @@ if ($path === '/management/expenses.php' || str_ends_with($path, '/management/ex
     if (!permission_prepaint_has('expenses_delete')) $tokens[] = 'expense-delete';
 }
 
-if ($path === '/poultry/layer_expenses.php' || str_ends_with($path, '/poultry/layer_expenses.php')) {
-    if (!permission_prepaint_has('poultry_layer_expenses_add')) $tokens[] = 'expense-add';
-}
-if ($path === '/poultry/broiler_expenses.php' || str_ends_with($path, '/poultry/broiler_expenses.php')) {
-    if (!permission_prepaint_has('poultry_broiler_expenses_add')) $tokens[] = 'expense-add';
-}
 if ($path === '/ruminant/ruminant_expenses.php' || str_ends_with($path, '/ruminant/ruminant_expenses.php')) {
     if (!permission_prepaint_has('ruminant_expenses_add')) $tokens[] = 'expense-add';
 }
@@ -117,8 +111,6 @@ if (!isPlatformOwner()) {
 // Hide unauthorized top-level/module links before first paint.
 $navLinks = [
     '/inventory.php' => 'inventory',
-    '/poultry/layer_expenses.php' => 'poultry_layer_expenses',
-    '/poultry/broiler_expenses.php' => 'poultry_broiler_expenses',
     '/ruminant/animal_registry.php' => 'ruminant_animals',
     '/ruminant/ruminant_expenses.php' => 'ruminant_expenses',
     '/management/sales_records.php' => 'sales',
