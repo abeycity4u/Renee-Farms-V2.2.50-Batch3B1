@@ -18,7 +18,6 @@ if (!checkAccess('poultry') && !hasPermission($_SESSION['user_type'], 'poultry_e
     exit();
 }
 
-$canManageExpenses = isPlatformOwner() || hasRole('farm_admin') || hasPermission($_SESSION['user_type'], 'poultry_expenses');
 $canAddExpenses = poultry_expense_entry_can('layer', 'add');
 $tenantFarmId = requireCurrentFarmId();
 $expenseCycleStmt = $pdo->prepare("SELECT id,cycle_code,status FROM production_cycles WHERE farm_id=? AND farm_type='poultry' AND production_type='layer' ORDER BY start_date DESC,id DESC");
@@ -43,6 +42,78 @@ $query = "SELECT e.*, u.full_name AS recorded_by_name, u.user_type AS recorded_b
 $stmt = $pdo->prepare($query);
 $stmt->execute([$tenantFarmId, $startDate, $endDate]);
 $expenses = $stmt->fetchAll();
+
+
+/*
+ * Legacy filtered pages remain familiar Layer/Broiler views, but action
+ * visibility must use the same canonical operational authority as the
+ * consolidated Poultry Expenses hub.
+ */
+$expenseActionCapabilities = [];
+$hasAnyExpenseActions = false;
+$hasAnyEditableExpenses = false;
+
+foreach ($expenses as $expense) {
+    $expenseId =
+        (int)(
+            $expense[
+                'id'
+            ]
+            ?? 0
+        );
+
+    $canAllocateExpense =
+        financial_allocation_workspace_parent_is_eligible(
+            $expense
+        )
+        &&
+        financial_allocation_workspace_can_access(
+            $expense,
+            'operational'
+        );
+
+    $canEditExpense =
+        permission_catalog_expense_operational_can(
+            $expense,
+            'edit'
+        );
+
+    $canDeleteExpense =
+        permission_catalog_expense_operational_can(
+            $expense,
+            'delete'
+        );
+
+    $expenseActionCapabilities[
+        $expenseId
+    ] = [
+        'allocate' =>
+            $canAllocateExpense,
+
+        'edit' =>
+            $canEditExpense,
+
+        'delete' =>
+            $canDeleteExpense,
+    ];
+
+    if ($canEditExpense) {
+        $hasAnyEditableExpenses =
+            true;
+    }
+
+    if (
+        $canAllocateExpense
+        ||
+        $canEditExpense
+        ||
+        $canDeleteExpense
+    ) {
+        $hasAnyExpenseActions =
+            true;
+    }
+}
+
 
 // Calculate manual non-stock expense totals. Historical feed expenses remain
 // visible for audit, but Feed is no longer accepted for new manual entries.
@@ -215,7 +286,7 @@ $pdfReportUrl = pdf_report_current_url();
                                         <th>Production / Cycle</th>
                                         <th>Description</th>
                                         <th>Recorded By</th>
-                                        <?php if ($canManageExpenses): ?>
+                                        <?php if ($hasAnyExpenseActions): ?>
                                         <th class="no-print">Actions</th>
                                         <?php endif; ?>
                                     </tr>
@@ -223,13 +294,49 @@ $pdfReportUrl = pdf_report_current_url();
                                 <tbody>
                                     <?php if (empty($expenses)): ?>
                                     <tr>
-                                        <td colspan="<?php echo $canManageExpenses ? 10 : 9; ?>" class="text-center text-muted py-4">
+                                        <td colspan="<?php echo $hasAnyExpenseActions ? 10 : 9; ?>" class="text-center text-muted py-4">
                                             <i class="bi bi-receipt display-4 d-block mb-2"></i>
                                             No expenses recorded for this month
                                         </td>
                                     </tr>
                                     <?php else: ?>
                                         <?php foreach ($expenses as $expense): ?>
+                                        <?php
+                                            $rowActions =
+                                                $expenseActionCapabilities[
+                                                    (int)(
+                                                        $expense[
+                                                            'id'
+                                                        ]
+                                                        ?? 0
+                                                    )
+                                                ]
+                                                ?? [
+                                                    'allocate' =>
+                                                        false,
+
+                                                    'edit' =>
+                                                        false,
+
+                                                    'delete' =>
+                                                        false,
+                                                ];
+
+                                            $canAllocateExpense =
+                                                (bool)$rowActions[
+                                                    'allocate'
+                                                ];
+
+                                            $canEditExpense =
+                                                (bool)$rowActions[
+                                                    'edit'
+                                                ];
+
+                                            $canDeleteExpense =
+                                                (bool)$rowActions[
+                                                    'delete'
+                                                ];
+                                        ?>
                                         <tr>
                                             <td><?php echo date('d/m/Y', strtotime($expense['expense_date'])); ?></td>
                                             <td class="text-nowrap"><code><?php echo htmlspecialchars((string)($expense['public_reference'] ?? '—')); ?></code></td>
@@ -268,13 +375,9 @@ $pdfReportUrl = pdf_report_current_url();
                                             <td>
                                                 <small><?php echo app_html(transaction_recorded_by_label_from_row($pdo, $tenantFarmId, $expense)); ?></small>
                                             </td>
-                                            <?php if ($canManageExpenses): ?>
+                                            <?php if ($hasAnyExpenseActions): ?>
                                             <td class="no-print">
-                                                <?php if (
-                                                    financial_allocation_workspace_parent_is_eligible($expense)
-                                                    &&
-                                                    financial_allocation_workspace_can_access($expense, 'operational')
-                                                ): ?>
+                                                <?php if ($canAllocateExpense): ?>
                                                 <a class="btn btn-sm btn-outline-secondary"
                                                    href="<?php echo htmlspecialchars(financial_allocation_workspace_url((int)$expense['id'], 'operational'), ENT_QUOTES); ?>"
                                                    title="Allocate shared cost"
@@ -282,6 +385,7 @@ $pdfReportUrl = pdf_report_current_url();
                                                     <i class="bi bi-diagram-3"></i>
                                                 </a>
                                                 <?php endif; ?>
+                                                <?php if ($canEditExpense): ?>
                                                 <button class="btn btn-sm btn-outline-primary edit-expense-btn"
                                                         data-id="<?php echo $expense['id']; ?>"
                                                         data-date="<?php echo $expense['expense_date']; ?>"
@@ -294,10 +398,24 @@ $pdfReportUrl = pdf_report_current_url();
                                                         data-poultry="<?php echo $expense['poultry_category'] ?? 'layer'; ?>">
                                                     <i class="bi bi-pencil"></i>
                                                 </button>
+                                                <?php endif; ?>
+
+                                                <?php if ($canDeleteExpense): ?>
                                                 <button class="btn btn-sm btn-outline-danger"
                                                         data-delete-expense-id="<?php echo (int)$expense['id']; ?>">
                                                     <i class="bi bi-trash"></i>
                                                 </button>
+                                                <?php endif; ?>
+
+                                                <?php if (
+                                                    !$canAllocateExpense
+                                                    &&
+                                                    !$canEditExpense
+                                                    &&
+                                                    !$canDeleteExpense
+                                                ): ?>
+                                                <span class="text-muted">—</span>
+                                                <?php endif; ?>
                                             </td>
                                             <?php endif; ?>
                                         </tr>
@@ -308,7 +426,7 @@ $pdfReportUrl = pdf_report_current_url();
                                     <tr>
                                         <td colspan="5"><strong>TOTAL</strong></td>
                                         <td class="text-danger fw-bold">₦<?php echo number_format($manualExpenseTotal, 2); ?></td>
-                                        <td colspan="<?php echo $canManageExpenses ? 4 : 3; ?>"></td>
+                                        <td colspan="<?php echo $hasAnyExpenseActions ? 4 : 3; ?>"></td>
                                     </tr>
                                 </tfoot>
                             </table>
@@ -319,7 +437,7 @@ $pdfReportUrl = pdf_report_current_url();
         </div>
     </div>
 
-    <?php if ($canManageExpenses): ?>
+    <?php if ($hasAnyEditableExpenses): ?>
     <!-- Edit Expense Modal -->
     <div class="modal fade" id="editExpenseModal" tabindex="-1">
         <div class="modal-dialog">
@@ -404,7 +522,6 @@ $pdfReportUrl = pdf_report_current_url();
     class="d-none"
     id="layerExpensesConfig"
     data-csrf-token="<?php echo app_attr(csrf_token()); ?>"
-    data-can-manage="<?php echo $canManageExpenses ? '1' : '0'; ?>"
 ></div>
 <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/layer-expenses.js'); ?>"></script>
 </body>

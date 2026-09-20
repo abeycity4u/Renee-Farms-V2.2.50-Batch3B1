@@ -1,157 +1,307 @@
 /**
- * Broiler Expenses page behavior.
- * Externalized for CSP compatibility.
+ * Broiler Expenses filtered-page behavior.
+ *
+ * Row action visibility is server-rendered from canonical operational
+ * permissions. These handlers do not make permission decisions.
  */
-window.BroilerExpensesConfig = window.BroilerExpensesConfig || {
-    csrfToken: '',
-    canManage: false
-};
+window.BroilerExpensesConfig =
+    window.BroilerExpensesConfig
+    || {
+        csrfToken:
+            ''
+    };
+
 
 (function () {
-    const config = document.getElementById('broilerExpensesConfig');
+    const config =
+        document.getElementById(
+            'broilerExpensesConfig'
+        );
 
     if (!config) {
         return;
     }
 
     window.BroilerExpensesConfig = {
-        csrfToken: config.dataset.csrfToken || '',
-        canManage: config.dataset.canManage === '1'
+        csrfToken:
+            config.dataset.csrfToken
+            || ''
     };
-})();
 
-document.getElementById('monthSelector').addEventListener('change', function() {
-        window.location.href = 'broiler_expenses.php?month=' + this.value.substring(0, 7);
-    });
 
-    
-async function parseJsonResponse(response) {
-    const contentType = response.headers.get('content-type') || '';
+    const monthSelector =
+        document.getElementById(
+            'monthSelector'
+        );
 
-    if (!contentType.includes('application/json')) {
-        const text = await response.text();
-        throw new Error(text || 'Unexpected non-JSON response');
+    if (monthSelector) {
+        monthSelector.addEventListener(
+            'change',
+            function () {
+                window.location.href =
+                    'broiler_expenses.php?month='
+                    + this.value.substring(
+                        0,
+                        7
+                    );
+            }
+        );
     }
 
-    return response.json();
-}
 
-async function deleteExpense(expenseId) {
-    if (!window.BroilerExpensesConfig.canManage) {
-        return;
-    }
+    async function parseJsonResponse(
+        response
+    ) {
+        const contentType =
+            response.headers.get(
+                'content-type'
+            )
+            || '';
 
-    const revisionReason = await AppConfirm.askReason(
-        'Why are you deleting this expense record?',
-        {
-            title: 'Delete expense record?',
-            confirmText: 'Delete',
-            tone: 'danger'
-        }
-    );
+        if (
+            !contentType.includes(
+                'application/json'
+            )
+        ) {
+            const text =
+                await response.text();
 
-    if (revisionReason === null) {
-        return;
-    }
-
-    try {
-        const params = new URLSearchParams({
-            id: expenseId,
-            csrf_token: window.BroilerExpensesConfig.csrfToken,
-            revision_reason: revisionReason
-        });
-
-        const response = await fetch('../api/delete_expense.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: params.toString()
-        });
-
-        const result = await parseJsonResponse(response);
-
-        if (result.success) {
-            location.reload();
-        } else {
-            AppNotify.error(
-                result.error ||
-                result.message ||
-                'Unable to delete expense'
+            throw new Error(
+                text
+                || 'Unexpected non-JSON response'
             );
         }
-    } catch (error) {
-        AppNotify.error('Network error: ' + error.message);
+
+        return response.json();
     }
-}
 
-window.deleteExpense = deleteExpense;
 
-if (window.BroilerExpensesConfig.canManage) {
-    attachEditModal({
-        buttonSelector: '.edit-expense-btn',
-        modalSelector: '#editExpenseModal',
-        fieldMap: {
-            id: '#editExpenseId',
-            date: '#editExpenseDate',
-            category: '#editCategory',
-            amount: '#editAmount',
-            unit: '#editUnit',
-            description: '#editDescription',
-            cycle: '#editExpenseCycle',
-            poultry: '#editPoultryCategory'
+    const editExpenseForm =
+        document.getElementById(
+            'editExpenseForm'
+        );
+
+    const editExpenseModal =
+        document.getElementById(
+            'editExpenseModal'
+        );
+
+
+    if (
+        editExpenseForm
+        &&
+        editExpenseModal
+    ) {
+        attachEditModal({
+            buttonSelector:
+                '.edit-expense-btn',
+
+            modalSelector:
+                '#editExpenseModal',
+
+            fieldMap: {
+                id:
+                    '#editExpenseId',
+
+                date:
+                    '#editExpenseDate',
+
+                category:
+                    '#editCategory',
+
+                amount:
+                    '#editAmount',
+
+                unit:
+                    '#editUnit',
+
+                description:
+                    '#editDescription',
+
+                cycle:
+                    '#editExpenseCycle',
+
+                poultry:
+                    '#editPoultryCategory'
+            }
+        });
+
+
+        editExpenseForm.addEventListener(
+            'submit',
+            async function (event) {
+                event.preventDefault();
+
+                const revisionReason =
+                    await AppConfirm.askReason(
+                        'Why are you changing this expense?',
+                        {
+                            title:
+                                'Reason for expense change',
+
+                            confirmText:
+                                'Save changes',
+
+                            tone:
+                                'primary'
+                        }
+                    );
+
+                if (revisionReason === null) {
+                    return;
+                }
+
+                const formData =
+                    new FormData(
+                        editExpenseForm
+                    );
+
+                formData.set(
+                    'csrf_token',
+                    window.BroilerExpensesConfig.csrfToken
+                );
+
+                formData.set(
+                    'permission_scope',
+                    'operational'
+                );
+
+                formData.set(
+                    'revision_reason',
+                    revisionReason
+                );
+
+                try {
+                    const response =
+                        await fetch(
+                            '../api/update_expense.php',
+                            {
+                                method:
+                                    'POST',
+
+                                body:
+                                    formData
+                            }
+                        );
+
+                    const result =
+                        await parseJsonResponse(
+                            response
+                        );
+
+                    if (result.success) {
+                        window.location.reload();
+                        return;
+                    }
+
+                    AppNotify.error(
+                        result.error
+                        ||
+                        result.message
+                        ||
+                        'Unable to update expense'
+                    );
+
+                } catch (error) {
+                    AppNotify.error(
+                        'Network error: '
+                        + error.message
+                    );
+                }
+            }
+        );
+    }
+
+
+    async function deleteExpense(
+        expenseId
+    ) {
+        if (!expenseId) {
+            return;
         }
-    });
 
-    const editExpenseForm = document.getElementById('editExpenseForm');
-
-    if (editExpenseForm) {
-        editExpenseForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-
-            const revisionReason = await AppConfirm.askReason(
-                'Why are you changing this expense?',
+        const revisionReason =
+            await AppConfirm.askReason(
+                'Why are you deleting this expense record?',
                 {
-                    title: 'Reason for expense change',
-                    confirmText: 'Save changes',
-                    tone: 'primary'
+                    title:
+                        'Delete expense record?',
+
+                    confirmText:
+                        'Delete',
+
+                    tone:
+                        'danger'
                 }
             );
 
-            if (revisionReason === null) {
+        if (revisionReason === null) {
+            return;
+        }
+
+        const params =
+            new URLSearchParams({
+                id:
+                    String(
+                        expenseId
+                    ),
+
+                csrf_token:
+                    window.BroilerExpensesConfig.csrfToken,
+
+                permission_scope:
+                    'operational',
+
+                revision_reason:
+                    revisionReason
+            });
+
+        try {
+            const response =
+                await fetch(
+                    '../api/delete_expense.php',
+                    {
+                        method:
+                            'POST',
+
+                        headers: {
+                            'Content-Type':
+                                'application/x-www-form-urlencoded'
+                        },
+
+                        body:
+                            params.toString()
+                    }
+                );
+
+            const result =
+                await parseJsonResponse(
+                    response
+                );
+
+            if (result.success) {
+                window.location.reload();
                 return;
             }
 
-            const formData = new FormData(this);
-            formData.append(
-                'csrf_token',
-                window.BroilerExpensesConfig.csrfToken
-            );
-            formData.append(
-                'revision_reason',
-                revisionReason
+            AppNotify.error(
+                result.error
+                ||
+                result.message
+                ||
+                'Unable to delete expense'
             );
 
-            try {
-                const response = await fetch('../api/update_expense.php', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const result = await parseJsonResponse(response);
-
-                if (result.success) {
-                    location.reload();
-                } else {
-                    AppNotify.error(
-                        result.error ||
-                        result.message ||
-                        'Unable to update expense'
-                    );
-                }
-            } catch (error) {
-                AppNotify.error('Network error: ' + error.message);
-            }
-        });
+        } catch (error) {
+            AppNotify.error(
+                'Network error: '
+                + error.message
+            );
+        }
     }
-}
+
+
+    window.deleteExpense =
+        deleteExpense;
+
+})();
