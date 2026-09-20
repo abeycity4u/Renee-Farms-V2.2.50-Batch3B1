@@ -195,10 +195,10 @@ verify_check(
 
 verify_check(
     $checks,
-    'CENTRAL_READER_OWNS_FEED_POLICY',
+    'CENTRAL_READER_OWNS_TRANSACTION_FEED_POLICY',
     strpos(
         $reader,
-        'stock_feed_item_sql_predicate'
+        'stock_feed_transaction_sql_predicate'
     ) !== false
 );
 

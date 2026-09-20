@@ -322,11 +322,16 @@ record_check(
 
 record_check(
     $checks,
-    'HISTORY_JS_ERROR_ROW_COLSPAN_12',
+    'HISTORY_JS_ERROR_ROW_COLSPAN_13',
+    strpos(
+        $sources['history_js'],
+        'colspan="13" class="text-danger text-center"'
+    ) !== false
+    &&
     strpos(
         $sources['history_js'],
         'colspan="12" class="text-danger text-center"'
-    ) !== false
+    ) === false
     &&
     strpos(
         $sources['history_js'],

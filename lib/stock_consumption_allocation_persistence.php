@@ -66,6 +66,7 @@ function stock_consumption_allocation_persistence_reason(
                 'update',
                 'clear',
                 'source_reversal',
+                'retain_shared',
             ],
             true
         )
@@ -73,7 +74,9 @@ function stock_consumption_allocation_persistence_reason(
         $reason === ''
     ) {
         throw new InvalidArgumentException(
-            'Enter a reason for changing this stock allocation.'
+            $action === 'retain_shared'
+                ? 'Enter a reason for retaining this consumed stock cost as shared.'
+                : 'Enter a reason for changing this stock allocation.'
         );
     }
 
@@ -1047,6 +1050,301 @@ function stock_consumption_allocation_persistence_insert_revision(
     ];
 }
 }
+
+
+if (!function_exists(
+    'stock_consumption_allocation_persistence_retain_shared'
+)) {
+function stock_consumption_allocation_persistence_retain_shared(
+    PDO $pdo,
+    int $farmId,
+    int $stockTransactionId,
+    int $actorUserId,
+    ?string $revisionReason = null
+): array {
+    stock_consumption_allocation_persistence_require_transaction(
+        $pdo
+    );
+
+    if (
+        $farmId < 1
+        || $stockTransactionId < 1
+    ) {
+        throw new InvalidArgumentException(
+            'Consumed-stock shared-cost identity is invalid.'
+        );
+    }
+
+    if ($actorUserId < 1) {
+        throw new RuntimeException(
+            'Stock retained-shared decision actor is required.'
+        );
+    }
+
+    /*
+     * This is a reviewed business decision, not an allocation.
+     *
+     * stock_transactions remains untouched.
+     * stock_consumption_allocations remains empty.
+     * The append-only allocation revision ledger records the deliberate
+     * retained-shared decision.
+     */
+    $locked =
+        stock_consumption_allocation_persistence_lock_parent(
+            $pdo,
+            $farmId,
+            $stockTransactionId
+        );
+
+    $current =
+        stock_consumption_allocation_persistence_current_rows(
+            $pdo,
+            $farmId,
+            $stockTransactionId
+        );
+
+    $latest =
+        stock_consumption_allocation_persistence_latest_revision(
+            $pdo,
+            $farmId,
+            $stockTransactionId
+        );
+
+    $currentCycleIds =
+        stock_consumption_allocation_persistence_cycle_ids(
+            $current
+        );
+
+    $currentCycles =
+        stock_consumption_allocation_persistence_target_cycles(
+            $pdo,
+            $farmId,
+            $currentCycleIds
+        );
+
+    $currentBuilt =
+        stock_consumption_allocation_persistence_assert_current_consistency(
+            $locked,
+            $current,
+            $latest,
+            $currentCycles
+        );
+
+    if ($current !== []) {
+        throw new RuntimeException(
+            'Only fully unallocated consumed-stock costs can be retained entirely as shared.'
+        );
+    }
+
+    /*
+     * Empty desired allocation is validated by the same canonical service
+     * used by normal allocation writes.
+     */
+    $desired =
+        stock_consumption_allocation_persistence_validate_rows(
+            $locked,
+            [],
+            []
+        );
+
+    if ($desired !== []) {
+        throw new RuntimeException(
+            'Retained-shared consumed stock unexpectedly produced allocation rows.'
+        );
+    }
+
+    $desiredBuilt =
+        stock_consumption_allocation_provenance_build(
+            $locked[
+                'movement'
+            ],
+            $desired
+        );
+
+    /*
+     * When revision history already exists, empty current projection must
+     * describe the exact same economic state before another decision event
+     * can be appended.
+     */
+    if (
+        $currentBuilt !== null
+        &&
+        !hash_equals(
+            (string)$currentBuilt[
+                'state_fingerprint'
+            ],
+            (string)$desiredBuilt[
+                'state_fingerprint'
+            ]
+        )
+    ) {
+        throw new RuntimeException(
+            'Consumed-stock shared-cost state changed before the retained-shared decision.'
+        );
+    }
+
+    /*
+     * Repeating the same reviewed decision is a semantic no-op.
+     * Do not manufacture duplicate retain_shared revisions.
+     */
+    if (
+        $latest !== null
+        &&
+        strtolower(
+            trim(
+                (string)(
+                    $latest[
+                        'revision_action'
+                    ]
+                    ?? ''
+                )
+            )
+        ) === 'retain_shared'
+    ) {
+        return [
+            'changed' =>
+                false,
+
+            'revision_action' =>
+                'retain_shared',
+
+            'stock_transaction_id' =>
+                $stockTransactionId,
+
+            'allocated_amount' =>
+                $desiredBuilt[
+                    'allocated_amount'
+                ],
+
+            'unallocated_amount' =>
+                $desiredBuilt[
+                    'unallocated_amount'
+                ],
+
+            'revision_no' =>
+                (int)$latest[
+                    'revision_no'
+                ],
+        ];
+    }
+
+    $reason =
+        stock_consumption_allocation_persistence_reason(
+            'retain_shared',
+            $revisionReason
+        );
+
+    $revisionNo =
+        $latest === null
+            ? 1
+            : (
+                (int)$latest[
+                    'revision_no'
+                ]
+                + 1
+            );
+
+    /*
+     * No stock_consumption_allocations write occurs here.
+     * Zero projection is the intended financial state.
+     */
+    $revision =
+        stock_consumption_allocation_persistence_insert_revision(
+            $pdo,
+            $farmId,
+            $stockTransactionId,
+            $revisionNo,
+            'retain_shared',
+            $reason,
+            $latest === null
+                ? null
+                : (int)$latest['id'],
+            $desiredBuilt,
+            [],
+            $actorUserId
+        );
+
+    $latestWritten =
+        stock_consumption_allocation_persistence_latest_revision(
+            $pdo,
+            $farmId,
+            $stockTransactionId
+        );
+
+    if (
+        $latestWritten === null
+        ||
+        strtolower(
+            trim(
+                (string)(
+                    $latestWritten[
+                        'revision_action'
+                    ]
+                    ?? ''
+                )
+            )
+        ) !== 'retain_shared'
+    ) {
+        throw new RuntimeException(
+            'Consumed-stock retained-shared decision was not persisted safely.'
+        );
+    }
+
+    /*
+     * Reuse canonical consistency authority against the newly appended
+     * zero-row revision before allowing the transaction to commit.
+     */
+    $writtenBuilt =
+        stock_consumption_allocation_persistence_assert_current_consistency(
+            $locked,
+            [],
+            $latestWritten,
+            []
+        );
+
+    if (
+        $writtenBuilt === null
+        ||
+        !hash_equals(
+            (string)$writtenBuilt[
+                'state_fingerprint'
+            ],
+            (string)$desiredBuilt[
+                'state_fingerprint'
+            ]
+        )
+    ) {
+        throw new RuntimeException(
+            'Consumed-stock retained-shared revision does not match current state.'
+        );
+    }
+
+    return array_merge(
+        $revision,
+        [
+            'changed' =>
+                true,
+
+            'revision_action' =>
+                'retain_shared',
+
+            'stock_transaction_id' =>
+                $stockTransactionId,
+
+            'allocated_amount' =>
+                $desiredBuilt[
+                    'allocated_amount'
+                ],
+
+            'unallocated_amount' =>
+                $desiredBuilt[
+                    'unallocated_amount'
+                ],
+        ]
+    );
+}
+}
+
 
 if (!function_exists('stock_consumption_allocation_persistence_apply')) {
 function stock_consumption_allocation_persistence_apply(

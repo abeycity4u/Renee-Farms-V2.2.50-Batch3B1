@@ -56,6 +56,16 @@ $desiredRows =
         true
     );
 
+$decisionAction =
+    strtolower(
+        trim(
+            (string)(
+                $_POST['decision_action']
+                ?? 'allocate'
+            )
+        )
+    );
+
 if ($stockTransactionId < 1) {
     send_json([
         'success' => false,
@@ -70,6 +80,34 @@ if (!is_array($desiredRows)) {
         'error' =>
             'Consumed-stock allocation rows are invalid.',
     ], 400);
+}
+
+if (
+    !in_array(
+        $decisionAction,
+        [
+            'allocate',
+            'retain_shared',
+        ],
+        true
+    )
+) {
+    send_json([
+        'success' => false,
+        'error' =>
+            'Consumed-stock shared-cost decision is invalid.',
+    ], 400);
+}
+
+if (
+    $decisionAction === 'retain_shared'
+    && $desiredRows !== []
+) {
+    send_json([
+        'success' => false,
+        'error' =>
+            'Clear cycle amounts before retaining this consumed stock cost as shared.',
+    ], 422);
 }
 
 if (
@@ -109,23 +147,40 @@ try {
     $pdo->beginTransaction();
 
     $result =
-        stock_consumption_allocation_persistence_apply(
-            $pdo,
-            $farmId,
-            $stockTransactionId,
-            $desiredRows,
-            $actorUserId,
-            $revisionReason !== ''
-                ? $revisionReason
-                : null
-        );
+        $decisionAction === 'retain_shared'
+            ? stock_consumption_allocation_persistence_retain_shared(
+                $pdo,
+                $farmId,
+                $stockTransactionId,
+                $actorUserId,
+                $revisionReason !== ''
+                    ? $revisionReason
+                    : null
+            )
+            : stock_consumption_allocation_persistence_apply(
+                $pdo,
+                $farmId,
+                $stockTransactionId,
+                $desiredRows,
+                $actorUserId,
+                $revisionReason !== ''
+                    ? $revisionReason
+                    : null
+            );
 
     $pdo->commit();
 
-    $message =
-        !empty($result['changed'])
-            ? 'Consumed stock cost allocation saved successfully.'
-            : 'No allocation changes were needed.';
+    if ($decisionAction === 'retain_shared') {
+        $message =
+            !empty($result['changed'])
+                ? 'Consumed stock cost retained as shared successfully.'
+                : 'This consumed stock cost is already retained as shared.';
+    } else {
+        $message =
+            !empty($result['changed'])
+                ? 'Consumed stock cost allocation saved successfully.'
+                : 'No allocation changes were needed.';
+    }
 
     $_SESSION['success'] =
         $message;
