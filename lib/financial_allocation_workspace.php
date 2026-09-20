@@ -225,6 +225,23 @@ function financial_allocation_workspace_return_url(
     if (
         $farmType === 'poultry'
         &&
+        $productionType === 'shared'
+    ) {
+        return
+            rtrim(BASE_URL, '/')
+            . '/poultry/expenses.php?'
+            . http_build_query([
+                'month' =>
+                    $month,
+
+                'tab' =>
+                    'shared',
+            ]);
+    }
+
+    if (
+        $farmType === 'poultry'
+        &&
         in_array(
             $productionType,
             [

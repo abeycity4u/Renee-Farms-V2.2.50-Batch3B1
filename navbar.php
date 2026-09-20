@@ -44,7 +44,8 @@ $canViewPoultryFeeds = $poultryEntitled && $navHas('poultry_feeds');
 $canViewPoultryHealth = $poultryEntitled && $navHas('poultry_health');
 $canViewLayerExpenses = $poultryExpenseEntitled && $navHas('poultry_layer_expenses');
 $canViewBroilerExpenses = $poultryExpenseEntitled && $navHas('poultry_broiler_expenses');
-$showPoultryMenu = $canViewLayerDaily || $canViewBroilerDaily || $canViewPoultryFeeds || $canViewPoultryHealth || $canViewLayerExpenses || $canViewBroilerExpenses;
+$canViewPoultryExpenses = $canViewLayerExpenses || $canViewBroilerExpenses;
+$showPoultryMenu = $canViewLayerDaily || $canViewBroilerDaily || $canViewPoultryFeeds || $canViewPoultryHealth || $canViewPoultryExpenses;
 
 $canViewRuminantDaily = $ruminantEntitled && $navHas('ruminant_daily');
 $canViewRuminantAnimals = $ruminantEntitled && $navHas('ruminant_animals');
@@ -120,6 +121,9 @@ $showManagementMenu = $canViewSales || $canViewExpenseReport || $canViewReports 
             <?php endif; ?>
             <?php if ($canViewPoultryHealth): ?>
             <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/poultry/health.php"><i class="bi bi-heart-pulse menu-icon me-2"></i> Health &amp; Treatment</a></li>
+            <?php endif; ?>
+            <?php if ($canViewPoultryExpenses): ?>
+            <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/poultry/expenses.php"><i class="bi bi-cash-stack menu-icon me-2"></i> Poultry Expenses</a></li>
             <?php endif; ?>
             <?php if ($canViewLayerExpenses): ?>
             <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/poultry/layer_expenses.php"><i class="bi bi-cash menu-icon me-2"></i> Layer Expenses</a></li>
