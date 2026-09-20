@@ -5,6 +5,9 @@ declare(strict_types=1);
 require_once __DIR__
     . '/../includes/permission_catalog.php';
 
+require_once __DIR__
+    . '/inventory_financial.php';
+
 
 /*
  * V3.0.1 Poultry Expense Workspace
@@ -434,6 +437,216 @@ function poultry_expense_workspace_totals(
     }
 
     return $totals;
+}
+}
+
+
+if (!function_exists(
+    'poultry_expense_workspace_manual_category_totals'
+)) {
+function poultry_expense_workspace_manual_category_totals(
+    array $rows
+): array {
+    $totals = [];
+
+    foreach ($rows as $row) {
+        $category =
+            trim(
+                (string)(
+                    $row[
+                        'category'
+                    ]
+                    ?? 'misc'
+                )
+            );
+
+        if ($category === '') {
+            $category =
+                'misc';
+        }
+
+        $lineTotal =
+            round(
+                (
+                    (float)(
+                        $row[
+                            'amount'
+                        ]
+                        ?? 0
+                    )
+                )
+                *
+                (
+                    (float)(
+                        $row[
+                            'unit'
+                        ]
+                        ?? 1
+                    )
+                ),
+                2
+            );
+
+        $totals[
+            $category
+        ] =
+            (
+                $totals[
+                    $category
+                ]
+                ?? 0.0
+            )
+            +
+            $lineTotal;
+    }
+
+    foreach ($totals as $category => $value) {
+        $totals[
+            $category
+        ] =
+            round(
+                (float)$value,
+                2
+            );
+    }
+
+    return $totals;
+}
+}
+
+
+if (!function_exists(
+    'poultry_expense_workspace_production_spending_view'
+)) {
+function poultry_expense_workspace_production_spending_view(
+    PDO $pdo,
+    int $farmId,
+    string $startDate,
+    string $endDate,
+    string $productionType,
+    array $workspaceRows
+): array {
+    $productionType =
+        strtolower(
+            trim(
+                $productionType
+            )
+        );
+
+    if (
+        !in_array(
+            $productionType,
+            [
+                'layer',
+                'broiler',
+            ],
+            true
+        )
+    ) {
+        throw new InvalidArgumentException(
+            'Poultry production spending view supports Layer or Broiler.'
+        );
+    }
+
+    /*
+     * This read model must never widen visibility beyond the production
+     * authority already used by the consolidated workspace.
+     */
+    if (
+        !poultry_expense_workspace_can_view_production(
+            $productionType
+        )
+    ) {
+        throw new RuntimeException(
+            'You do not have permission to view this Poultry expense area.'
+        );
+    }
+
+    $manualExpenses =
+        poultry_expense_workspace_filter_rows(
+            $workspaceRows,
+            $productionType
+        );
+
+    $manualCategoryTotals =
+        poultry_expense_workspace_manual_category_totals(
+            $manualExpenses
+        );
+
+    $manualExpenseTotal =
+        round(
+            array_sum(
+                $manualCategoryTotals
+            ),
+            2
+        );
+
+    /*
+     * Purchase/cash spending remains the canonical Inventory ledger read.
+     * Do not create a second stock query or farm_expenses representation.
+     */
+    $inventoryPurchases =
+        inventory_financial_receipts(
+            $pdo,
+            $farmId,
+            $startDate,
+            $endDate,
+            'poultry',
+            $productionType
+        );
+
+    $inventoryPurchaseTotal =
+        inventory_financial_receipt_total(
+            $inventoryPurchases
+        );
+
+    $inventoryCategoryTotals =
+        inventory_financial_receipt_category_totals(
+            $inventoryPurchases
+        );
+
+    $spendingCategoryTotals =
+        inventory_financial_combined_spending_totals(
+            $manualCategoryTotals,
+            $inventoryCategoryTotals
+        );
+
+    $totalSpending =
+        round(
+            $manualExpenseTotal
+            +
+            $inventoryPurchaseTotal,
+            2
+        );
+
+    return [
+        'production_type' =>
+            $productionType,
+
+        'manual_expenses' =>
+            $manualExpenses,
+
+        'manual_category_totals' =>
+            $manualCategoryTotals,
+
+        'manual_expense_total' =>
+            $manualExpenseTotal,
+
+        'inventory_purchases' =>
+            $inventoryPurchases,
+
+        'inventory_purchase_total' =>
+            $inventoryPurchaseTotal,
+
+        'inventory_category_totals' =>
+            $inventoryCategoryTotals,
+
+        'spending_category_totals' =>
+            $spendingCategoryTotals,
+
+        'total_spending' =>
+            $totalSpending,
+    ];
 }
 }
 
