@@ -198,15 +198,20 @@ $check(
 );
 
 $check(
-    'SALES_PDF_EMPTY_STATE_MATCHES_12_COLUMNS',
+    'SALES_PDF_EMPTY_STATE_MATCHES_13_COLUMNS',
     strpos(
         $source['sales_pdf'],
-        'colspan="12">No sales records for this period.'
+        '<th>Recorded By</th>'
     ) !== false
     &&
     strpos(
         $source['sales_pdf'],
-        'colspan="11">No sales records for this period.'
+        'colspan="13">No sales records for this period.'
+    ) !== false
+    &&
+    strpos(
+        $source['sales_pdf'],
+        'colspan="12">No sales records for this period.'
     ) === false
 );
 
