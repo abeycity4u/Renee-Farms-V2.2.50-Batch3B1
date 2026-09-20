@@ -271,18 +271,23 @@ $check(
 );
 
 $check(
-    str_contains($updateExpenseApi, '$existingViewPermission')
-    && str_contains($updateExpenseApi, '$existingPermission')
+    substr_count(
+        $updateExpenseApi,
+        'permission_catalog_expense_operational_can('
+    ) >= 2
     && str_contains(
         $updateExpenseApi,
         "\$permissionScope === 'expense_report'"
     )
     && str_contains($updateExpenseApi, "'expenses_edit'"),
-    'Expense update API separates Expense Report Edit from operational row Edit'
+    'Expense update API separates Expense Report Edit from canonical operational row Edit'
 );
 
 $check(
-    str_contains($deleteExpenseApi, 'permission_catalog_expense_action_code')
+    str_contains(
+        $deleteExpenseApi,
+        'permission_catalog_expense_operational_can('
+    )
     && str_contains(
         $deleteExpenseApi,
         "\$permissionScope==='expense_report'"
@@ -292,7 +297,7 @@ $check(
         $deleteExpenseApi,
         'permission to delete this expense record'
     ),
-    'Expense delete API separates Expense Report Delete from operational row Delete'
+    'Expense delete API separates Expense Report Delete from canonical operational row Delete'
 );
 
 echo PHP_EOL

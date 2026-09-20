@@ -21,8 +21,6 @@ try {
  $find=$pdo->prepare('SELECT * FROM farm_expenses WHERE id=? AND farm_id=? FOR UPDATE');
  $find->execute([(int)$id,$farmId]); $row=$find->fetch(PDO::FETCH_ASSOC);
  if(!$row) { $pdo->rollBack(); send_json(['success'=>false,'error'=>'Record not found.'],404); }
- $requiredPermission=permission_catalog_expense_action_code($row,'delete');
- $viewPermission=$requiredPermission ? preg_replace('/_delete$/','',$requiredPermission) : null;
  if(!$expensePrivileged) {
   if($permissionScope==='expense_report') {
    if(!hasPermission(getUserType(),'expenses')
@@ -30,10 +28,12 @@ try {
       || !permission_catalog_expense_report_row_accessible($row)) {
     $pdo->rollBack(); send_json(['success'=>false,'error'=>'You do not have permission to delete this Expense Report record.'],403);
    }
-  } elseif(!$requiredPermission
-      || !$viewPermission
-      || !hasPermission(getUserType(),$viewPermission)
-      || !hasPermission(getUserType(),$requiredPermission)) {
+  } elseif(
+      !permission_catalog_expense_operational_can(
+       $row,
+       'delete'
+      )
+  ) {
    $pdo->rollBack(); send_json(['success'=>false,'error'=>'You do not have permission to delete this expense record.'],403);
   }
  }

@@ -42,12 +42,6 @@ if (!in_array($permissionScope, ['operational', 'expense_report'], true)) {
 }
 $expensePrivileged = isPlatformOwner() || hasRole('farm_admin');
 
-$expenseViewPermission = static function (?string $actionPermission): ?string {
-    if (!$actionPermission) return null;
-    $viewPermission = preg_replace('/_(?:edit|delete)$/', '', $actionPermission);
-    return is_string($viewPermission) && $viewPermission !== $actionPermission ? $viewPermission : null;
-};
-
 try {
     $farmId=requireCurrentFarmId();
     $existingStmt=$pdo->prepare("SELECT farm_type,production_type,poultry_category,cycle_id,category FROM farm_expenses WHERE id=? AND farm_id=? LIMIT 1");
@@ -56,9 +50,6 @@ try {
     if (!$existing) {
         send_json(['success' => false, 'error' => 'Expense record not found.'], 404);
     }
-    $existingPermission = permission_catalog_expense_action_code($existing, 'edit');
-    $existingViewPermission = $expenseViewPermission($existingPermission);
-
     if (!$expensePrivileged) {
         if ($permissionScope === 'expense_report') {
             if (!hasPermission(getUserType(), 'expenses')
@@ -66,10 +57,12 @@ try {
                 || !permission_catalog_expense_report_row_accessible($existing)) {
                 send_json(['success' => false, 'error' => 'You do not have permission to edit this Expense Report record.'], 403);
             }
-        } elseif (!$existingPermission
-            || !$existingViewPermission
-            || !hasPermission(getUserType(), $existingViewPermission)
-            || !hasPermission(getUserType(), $existingPermission)) {
+        } elseif (
+            !permission_catalog_expense_operational_can(
+                $existing,
+                'edit'
+            )
+        ) {
             send_json(['success' => false, 'error' => 'You do not have permission to edit this expense record.'], 403);
         }
     }
@@ -82,27 +75,28 @@ try {
     $requestedProduction=$_POST['production_type'] ?? ($existing['production_type'] ?? null);
     if ($farmType==='poultry' && in_array((string)$poultryCategory,['layer','broiler'],true)) $requestedProduction=$poultryCategory;
     $productionType=attribution_normalize_production_type($farmType,$requestedProduction);
-    $targetPermission = permission_catalog_expense_action_code([
-        'farm_type' => $farmType,
-        'production_type' => $productionType,
-        'poultry_category' => $poultryCategory,
-    ], 'edit');
-    $targetViewPermission = $expenseViewPermission($targetPermission);
+    $targetExpenseScope = [
+        'farm_type' =>
+            $farmType,
+
+        'production_type' =>
+            $productionType,
+
+        'poultry_category' =>
+            $poultryCategory,
+    ];
+
     if (!$expensePrivileged) {
         if ($permissionScope === 'expense_report') {
-            $targetExpenseScope = [
-                'farm_type' => $farmType,
-                'production_type' => $productionType,
-                'poultry_category' => $poultryCategory,
-            ];
-
             if (!permission_catalog_expense_report_row_accessible($targetExpenseScope)) {
                 send_json(['success' => false, 'error' => 'You do not have permission to move this Expense Report record into the requested area.'], 403);
             }
-        } elseif (!$targetPermission
-            || !$targetViewPermission
-            || !hasPermission(getUserType(), $targetViewPermission)
-            || !hasPermission(getUserType(), $targetPermission)) {
+        } elseif (
+            !permission_catalog_expense_operational_can(
+                $targetExpenseScope,
+                'edit'
+            )
+        ) {
             send_json(['success' => false, 'error' => 'You do not have permission to move or edit an expense in the requested area.'], 403);
         }
     }

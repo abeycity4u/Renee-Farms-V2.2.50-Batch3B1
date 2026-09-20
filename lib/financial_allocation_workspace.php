@@ -129,34 +129,10 @@ function financial_allocation_workspace_can_access(
             );
     }
 
-    $editPermission =
-        permission_catalog_expense_action_code(
+    return
+        permission_catalog_expense_operational_can(
             $expense,
             'edit'
-        );
-
-    $viewPermission =
-        financial_allocation_workspace_view_permission(
-            $editPermission
-        );
-
-    if (
-        !$editPermission
-        ||
-        !$viewPermission
-    ) {
-        return false;
-    }
-
-    return
-        hasPermission(
-            getUserType(),
-            $viewPermission
-        )
-        &&
-        hasPermission(
-            getUserType(),
-            $editPermission
         );
 }
 }

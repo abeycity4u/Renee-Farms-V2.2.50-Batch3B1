@@ -255,3 +255,244 @@ function permission_catalog_poultry_expense_required_permissions(
     return [];
 }
 }
+/*
+ * Canonical operational permission requirements for an existing expense row.
+ *
+ * This is the row-level authority used by operational edit/delete/allocation
+ * surfaces. Poultry Shared deliberately resolves to multiple permissions:
+ * Layer AND Broiler. No synthetic "Shared" permission is introduced.
+ *
+ * Expense Report authority remains a separate permission scope.
+ */
+if (!function_exists(
+    'permission_catalog_expense_required_permissions'
+)) {
+function permission_catalog_expense_required_permissions(
+    array $expense,
+    string $action
+): array {
+    $action =
+        strtolower(
+            trim(
+                $action
+            )
+        );
+
+    if (
+        !in_array(
+            $action,
+            [
+                'view',
+                'edit',
+                'delete',
+            ],
+            true
+        )
+    ) {
+        return [];
+    }
+
+    $farmType =
+        strtolower(
+            trim(
+                (string)(
+                    $expense[
+                        'farm_type'
+                    ]
+                    ?? ''
+                )
+            )
+        );
+
+    $productionType =
+        strtolower(
+            trim(
+                (string)(
+                    $expense[
+                        'production_type'
+                    ]
+                    ?? ''
+                )
+            )
+        );
+
+    $poultryCategory =
+        strtolower(
+            trim(
+                (string)(
+                    $expense[
+                        'poultry_category'
+                    ]
+                    ?? ''
+                )
+            )
+        );
+
+    if ($farmType === 'poultry') {
+        /*
+         * Prefer the canonical production_type.
+         * poultry_category remains a compatibility fallback for historical
+         * Layer/Broiler rows only.
+         */
+        if (
+            !in_array(
+                $productionType,
+                [
+                    'layer',
+                    'broiler',
+                    'shared',
+                ],
+                true
+            )
+            &&
+            in_array(
+                $poultryCategory,
+                [
+                    'layer',
+                    'broiler',
+                ],
+                true
+            )
+        ) {
+            $productionType =
+                $poultryCategory;
+        }
+
+        return
+            permission_catalog_poultry_expense_required_permissions(
+                $productionType,
+                $action
+            );
+    }
+
+    $suffix =
+        $action === 'view'
+            ? ''
+            : '_'
+                . $action;
+
+    if ($farmType === 'ruminant') {
+        return [
+            'ruminant_expenses'
+            . $suffix,
+        ];
+    }
+
+    if (
+        $farmType === 'general'
+        ||
+        $farmType === 'both'
+    ) {
+        return [
+            'expenses'
+            . $suffix,
+        ];
+    }
+
+    return [];
+}
+}
+
+
+if (!function_exists(
+    'permission_catalog_expense_operational_can'
+)) {
+function permission_catalog_expense_operational_can(
+    array $expense,
+    string $action
+): bool {
+    $action =
+        strtolower(
+            trim(
+                $action
+            )
+        );
+
+    if (
+        isPlatformOwner()
+        ||
+        hasRole(
+            'farm_admin'
+        )
+    ) {
+        return true;
+    }
+
+    if (
+        !in_array(
+            $action,
+            [
+                'view',
+                'edit',
+                'delete',
+            ],
+            true
+        )
+    ) {
+        return false;
+    }
+
+    /*
+     * Edit/Delete always require visibility as well as the action permission.
+     * For Poultry Shared this becomes:
+     *
+     * View:
+     *   Layer View AND Broiler View
+     *
+     * Edit:
+     *   both View permissions
+     *   AND both Edit permissions
+     *
+     * Delete:
+     *   both View permissions
+     *   AND both Delete permissions
+     */
+    $required =
+        permission_catalog_expense_required_permissions(
+            $expense,
+            'view'
+        );
+
+    if ($required === []) {
+        return false;
+    }
+
+    if ($action !== 'view') {
+        $actionRequired =
+            permission_catalog_expense_required_permissions(
+                $expense,
+                $action
+            );
+
+        if ($actionRequired === []) {
+            return false;
+        }
+
+        $required =
+            array_merge(
+                $required,
+                $actionRequired
+            );
+    }
+
+    foreach (
+        array_values(
+            array_unique(
+                $required
+            )
+        )
+        as $permission
+    ) {
+        if (
+            !hasPermission(
+                getUserType(),
+                $permission
+            )
+        ) {
+            return false;
+        }
+    }
+
+    return true;
+}
+}
