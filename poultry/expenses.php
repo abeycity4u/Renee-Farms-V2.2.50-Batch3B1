@@ -483,11 +483,42 @@ $workspaceTotals =
     );
 
 
-$expenses =
-    poultry_expense_workspace_filter_rows(
-        $workspaceRows,
-        $activeTab
-    );
+$productionSpendingView =
+    null;
+
+
+if (
+    in_array(
+        $activeTab,
+        [
+            'layer',
+            'broiler',
+        ],
+        true
+    )
+) {
+    $productionSpendingView =
+        poultry_expense_workspace_production_spending_view(
+            $pdo,
+            $tenantFarmId,
+            $startDate,
+            $endDate,
+            $activeTab,
+            $workspaceRows
+        );
+
+    $expenses =
+        $productionSpendingView[
+            'manual_expenses'
+        ];
+
+} else {
+    $expenses =
+        poultry_expense_workspace_filter_rows(
+            $workspaceRows,
+            $activeTab
+        );
+}
 
 
 $expenseCycles =
@@ -642,15 +673,434 @@ $productionLabels = [
             </ul>
 
 
+            <?php if ($productionSpendingView !== null): ?>
+
+            <?php
+                $productionLabel =
+                    $productionLabels[
+                        $activeTab
+                    ]
+                    ?? ucfirst(
+                        $activeTab
+                    );
+
+                $manualExpenseTotal =
+                    (float)$productionSpendingView[
+                        'manual_expense_total'
+                    ];
+
+                $inventoryPurchaseTotal =
+                    (float)$productionSpendingView[
+                        'inventory_purchase_total'
+                    ];
+
+                $totalSpending =
+                    (float)$productionSpendingView[
+                        'total_spending'
+                    ];
+
+                $spendingCategoryTotals =
+                    (array)$productionSpendingView[
+                        'spending_category_totals'
+                    ];
+
+                $inventoryPurchases =
+                    (array)$productionSpendingView[
+                        'inventory_purchases'
+                    ];
+            ?>
+
+
+            <div class="smart-poultry-note p-3 mb-4 d-flex gap-3 align-items-start">
+                <i class="bi bi-stars fs-4"></i>
+
+                <div>
+                    <div class="fw-bold">
+                        <?php echo htmlspecialchars($productionLabel); ?>
+                        cost intelligence
+                    </div>
+
+                    <div class="small">
+                        One view of non-stock expenses and Inventory purchase spending for this production area.
+                    </div>
+                </div>
+            </div>
+
+
+            <div class="row g-3 mb-4">
+
+                <div class="col-12 col-md-4">
+                    <div class="card h-100 bg-danger text-white">
+                        <div class="card-body text-center">
+                            <div class="small text-uppercase">
+                                Total Spending
+                            </div>
+
+                            <div class="fs-3 fw-bold">
+                                ₦<?php echo number_format($totalSpending, 2); ?>
+                            </div>
+
+                            <div class="small">
+                                Inventory Purchases
+                                ₦<?php echo number_format($inventoryPurchaseTotal, 2); ?>
+                                +
+                                Detailed Expenses
+                                ₦<?php echo number_format($manualExpenseTotal, 2); ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <div class="col-12 col-md-4">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <div class="small text-muted">
+                                Inventory Purchases
+                            </div>
+
+                            <div class="fs-4 fw-bold">
+                                ₦<?php echo number_format($inventoryPurchaseTotal, 2); ?>
+                            </div>
+
+                            <div class="small text-muted">
+                                Purchase/cash activity from Inventory.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <div class="col-12 col-md-4">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <div class="small text-muted">
+                                Detailed Expenses
+                            </div>
+
+                            <div class="fs-4 fw-bold">
+                                ₦<?php echo number_format($manualExpenseTotal, 2); ?>
+                            </div>
+
+                            <div class="small text-muted">
+                                Non-stock operating expenses.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+
+            <?php if ($spendingCategoryTotals !== []): ?>
+
+            <h5>
+                Spending Breakdown
+            </h5>
+
+            <div class="row g-3 mb-4">
+
+                <?php foreach ($spendingCategoryTotals as $category => $total): ?>
+
+                <?php
+                    $categoryTotal =
+                        (float)$total;
+
+                    if ($categoryTotal <= 0) {
+                        continue;
+                    }
+
+                    $percentage =
+                        $totalSpending > 0
+                            ? (
+                                $categoryTotal
+                                /
+                                $totalSpending
+                                *
+                                100
+                            )
+                            : 0;
+                ?>
+
+                <div class="col-12 col-sm-6 col-lg-3 col-xl-2">
+
+                    <div class="card h-100">
+
+                        <div class="card-body text-center">
+
+                            <div class="small text-muted text-uppercase">
+                                <?php
+                                    echo htmlspecialchars(
+                                        inventory_financial_spending_label(
+                                            (string)$category
+                                        )
+                                    );
+                                ?>
+                            </div>
+
+                            <div class="fs-5 fw-bold text-danger">
+                                ₦<?php echo number_format($categoryTotal, 2); ?>
+                            </div>
+
+                            <div class="progress app-progress-h-5 mt-2">
+                                <div
+                                    class="progress-bar bg-danger <?php echo app_percent_class($percentage); ?>"
+                                ></div>
+                            </div>
+
+                            <div class="small text-muted mt-1">
+                                <?php echo number_format($percentage, 1); ?>%
+                                of total
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <?php endforeach; ?>
+
+            </div>
+
+            <?php endif; ?>
+
+
+            <div class="card border-primary-subtle mb-4">
+
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+
+                    <div>
+                        <strong>
+                            <i class="bi bi-box-arrow-in-down"></i>
+                            Inventory Purchases
+                        </strong>
+
+                        <div class="small text-muted">
+                            Received stock shown from the Inventory ledger.
+                            These are purchase/cash records, not duplicate operating-expense entries.
+                        </div>
+                    </div>
+
+                    <span class="badge text-bg-primary">
+                        Total ₦<?php echo number_format($inventoryPurchaseTotal, 2); ?>
+                    </span>
+
+                </div>
+
+
+                <div class="table-responsive">
+
+                    <table class="table table-sm table-hover mb-0 poultry-table align-middle">
+
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Item</th>
+                                <th>Qty</th>
+                                <th>Unit Cost</th>
+                                <th>Total</th>
+                                <th>Attribution</th>
+                                <th>Source</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                        <?php if ($inventoryPurchases === []): ?>
+
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-3">
+                                    No inventory purchases recorded for this month.
+                                </td>
+                            </tr>
+
+                        <?php else: ?>
+
+                            <?php foreach ($inventoryPurchases as $purchase): ?>
+
+                            <?php
+                                $purchaseProductionType =
+                                    strtolower(
+                                        trim(
+                                            (string)(
+                                                $purchase[
+                                                    'production_type'
+                                                ]
+                                                ?? $activeTab
+                                            )
+                                        )
+                                    );
+
+                                if (
+                                    !in_array(
+                                        $purchaseProductionType,
+                                        [
+                                            'layer',
+                                            'broiler',
+                                        ],
+                                        true
+                                    )
+                                ) {
+                                    $purchaseProductionType =
+                                        $activeTab;
+                                }
+                            ?>
+
+                            <tr>
+
+                                <td>
+                                    <?php
+                                        echo htmlspecialchars(
+                                            date(
+                                                'd/m/Y',
+                                                strtotime(
+                                                    (string)$purchase[
+                                                        'transaction_date'
+                                                    ]
+                                                )
+                                            )
+                                        );
+                                    ?>
+                                </td>
+
+                                <td>
+                                    <strong>
+                                        <?php
+                                            echo htmlspecialchars(
+                                                (string)$purchase[
+                                                    'item_name'
+                                                ]
+                                            );
+                                        ?>
+                                    </strong>
+
+                                    <?php if (!empty($purchase['category_name'])): ?>
+
+                                    <div class="small text-muted">
+                                        <?php
+                                            echo htmlspecialchars(
+                                                (string)$purchase[
+                                                    'category_name'
+                                                ]
+                                            );
+                                        ?>
+                                    </div>
+
+                                    <?php endif; ?>
+                                </td>
+
+                                <td>
+                                    <?php
+                                        echo number_format(
+                                            (float)$purchase[
+                                                'quantity'
+                                            ],
+                                            2
+                                        );
+                                    ?>
+
+                                    <?php
+                                        echo htmlspecialchars(
+                                            (string)$purchase[
+                                                'unit'
+                                            ]
+                                        );
+                                    ?>
+                                </td>
+
+                                <td>
+                                    ₦<?php
+                                        echo number_format(
+                                            (float)$purchase[
+                                                'unit_cost'
+                                            ],
+                                            2
+                                        );
+                                    ?>
+                                </td>
+
+                                <td class="fw-semibold">
+                                    ₦<?php
+                                        echo number_format(
+                                            (float)$purchase[
+                                                'total_cost'
+                                            ],
+                                            2
+                                        );
+                                    ?>
+                                </td>
+
+                                <td>
+                                    <div class="fw-semibold">
+                                        <?php
+                                            echo htmlspecialchars(
+                                                attribution_production_label(
+                                                    'poultry',
+                                                    $purchaseProductionType
+                                                )
+                                            );
+                                        ?>
+                                    </div>
+
+                                    <div class="small text-muted">
+                                        <?php
+                                            echo htmlspecialchars(
+                                                attribution_cycle_label(
+                                                    'poultry',
+                                                    $purchaseProductionType,
+                                                    $purchase[
+                                                        'cycle_code'
+                                                    ]
+                                                    ?? null
+                                                )
+                                            );
+                                        ?>
+                                    </div>
+                                </td>
+
+                                <td>
+                                    <span class="badge text-bg-light border">
+                                        Inventory
+                                    </span>
+                                </td>
+
+                            </tr>
+
+                            <?php endforeach; ?>
+
+                        <?php endif; ?>
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+
+                <div class="card-footer small text-muted">
+                    Inventory purchases are included in Total Spending, while profitability recognises stocked-item cost through the appropriate consumption logic.
+                </div>
+
+            </div>
+
+
+            <?php else: ?>
+
+
             <div class="row g-3 mb-4">
 
                 <div class="col-12 col-md-3">
                     <div class="card h-100">
                         <div class="card-body">
-                            <div class="small text-muted">Visible Poultry Expenses</div>
+                            <div class="small text-muted">
+                                Visible Poultry Expenses
+                            </div>
+
                             <div class="fs-4 fw-bold">
                                 ₦<?php echo number_format($workspaceTotals['all'], 2); ?>
                             </div>
+
                             <div class="small text-muted">
                                 Each expense parent counted once.
                             </div>
@@ -658,61 +1108,96 @@ $productionLabels = [
                     </div>
                 </div>
 
+
                 <?php if ($canViewLayer): ?>
+
                 <div class="col-12 col-md-3">
                     <div class="card h-100">
                         <div class="card-body">
-                            <div class="small text-muted">Layer</div>
+                            <div class="small text-muted">
+                                Layer
+                            </div>
+
                             <div class="fs-4 fw-bold">
                                 ₦<?php echo number_format($workspaceTotals['layer'], 2); ?>
                             </div>
                         </div>
                     </div>
                 </div>
+
                 <?php endif; ?>
 
+
                 <?php if ($canViewBroiler): ?>
+
                 <div class="col-12 col-md-3">
                     <div class="card h-100">
                         <div class="card-body">
-                            <div class="small text-muted">Broiler</div>
+                            <div class="small text-muted">
+                                Broiler
+                            </div>
+
                             <div class="fs-4 fw-bold">
                                 ₦<?php echo number_format($workspaceTotals['broiler'], 2); ?>
                             </div>
                         </div>
                     </div>
                 </div>
+
                 <?php endif; ?>
 
+
                 <?php if ($canViewShared): ?>
+
                 <div class="col-12 col-md-3">
                     <div class="card h-100 border-warning-subtle">
                         <div class="card-body">
-                            <div class="small text-muted">Poultry Shared</div>
+                            <div class="small text-muted">
+                                Poultry Shared
+                            </div>
+
                             <div class="fs-4 fw-bold">
                                 ₦<?php echo number_format($workspaceTotals['shared'], 2); ?>
                             </div>
+
                             <div class="small text-muted">
                                 Not duplicated into Layer or Broiler totals.
                             </div>
                         </div>
                     </div>
                 </div>
+
                 <?php endif; ?>
 
             </div>
 
 
+            <?php endif; ?>
+
+
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
 
                 <h5 class="mb-0">
+                    <?php if ($productionSpendingView !== null): ?>
+                    Detailed Expenses —
+                    <?php echo htmlspecialchars($productionLabel); ?>
+                    —
+                    <?php else: ?>
                     <?php echo htmlspecialchars($workspaceTabs[$activeTab] ?? 'Poultry'); ?>
                     Expenses —
+                    <?php endif; ?>
+
                     <?php echo htmlspecialchars($monthObject->format('F Y')); ?>
                 </h5>
 
                 <span class="badge text-bg-secondary">
-                    Total ₦<?php echo number_format($visibleTotal, 2); ?>
+                    <?php if ($productionSpendingView !== null): ?>
+                    Non-stock
+                    <?php else: ?>
+                    Total
+                    <?php endif; ?>
+
+                    ₦<?php echo number_format($visibleTotal, 2); ?>
                 </span>
 
             </div>
