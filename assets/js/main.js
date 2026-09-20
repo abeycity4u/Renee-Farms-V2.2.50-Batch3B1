@@ -560,7 +560,14 @@ async function deleteSale(saleId) {
             showAlert('danger', 'Error: ' + (result.error || result.message || 'Unable to delete sale record'));
         }
     } catch (error) {
-        showAlert('danger', 'Network error: ' + error.message);
+        const message = error instanceof TypeError
+            ? 'Network error: ' + error.message
+            : (
+                error && error.message
+                    ? error.message
+                    : 'Unable to delete sale record.'
+            );
+        showAlert('danger', message);
     }
 }
 

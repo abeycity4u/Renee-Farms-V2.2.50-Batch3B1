@@ -163,6 +163,62 @@ $check(
     ) !== false
 );
 
+$deleteSaleStart =
+    strpos(
+        $mainJs,
+        'async function deleteSale(saleId) {'
+    );
+
+$deleteExpenseStart =
+    strpos(
+        $mainJs,
+        "/**\n * Delete expense",
+        $deleteSaleStart === false
+            ? 0
+            : $deleteSaleStart
+    );
+
+$deleteSaleBlock =
+    (
+        $deleteSaleStart !== false
+        &&
+        $deleteExpenseStart !== false
+        &&
+        $deleteExpenseStart > $deleteSaleStart
+    )
+        ? substr(
+            $mainJs,
+            $deleteSaleStart,
+            $deleteExpenseStart - $deleteSaleStart
+        )
+        : '';
+
+$check(
+    'GLOBAL_DELETE_CLASSIFIES_TRANSPORT_ERRORS_ONLY',
+    strpos(
+        $deleteSaleBlock,
+        'error instanceof TypeError'
+    ) !== false
+    &&
+    strpos(
+        $deleteSaleBlock,
+        "'Network error: ' + error.message"
+    ) !== false
+    &&
+    strpos(
+        $deleteSaleBlock,
+        "showAlert('danger', message);"
+    ) !== false
+);
+
+$check(
+    'GLOBAL_DELETE_API_CONFLICT_NOT_UNCONDITIONALLY_NETWORK_LABELED',
+    strpos(
+        $deleteSaleBlock,
+        "showAlert('danger', 'Network error: ' + error.message);"
+    ) === false
+);
+
 $failed = [];
 
 foreach ($checks as $name => $passed) {
