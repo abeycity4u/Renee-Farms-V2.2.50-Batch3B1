@@ -722,6 +722,60 @@ function stock_consumption_allocation_workspace_snapshot(
             ?? null
         );
 
+    $latestRevisionAction =
+        $latestRevision
+            ? strtolower(
+                trim(
+                    (string)(
+                        $latestRevision[
+                            'revision_action'
+                        ]
+                        ?? ''
+                    )
+                )
+            )
+            : '';
+
+    $allocatedAmount =
+        (float)(
+            $summary[
+                'allocated_amount'
+            ]
+            ?? 0
+        );
+
+    $remainingAmount =
+        (float)(
+            $summary[
+                'remaining_amount'
+            ]
+            ?? 0
+        );
+
+    $retainedShared =
+        $latestRevisionAction === 'retain_shared'
+        &&
+        $currentRows === []
+        &&
+        $allocatedAmount <= 0.00001
+        &&
+        $remainingAmount > 0.00001;
+
+    $resolutionStatus =
+        $retainedShared
+            ? 'retained_shared'
+            : (
+                $allocatedAmount > 0.00001
+                &&
+                $remainingAmount > 0.00001
+                    ? 'partially_allocated'
+                    : (
+                        $remainingAmount <= 0.00001
+                            ? 'allocated'
+                            : 'awaiting_allocation'
+                    )
+            );
+
     $currentMap = [];
 
     foreach ($currentRows as $row) {
@@ -868,6 +922,22 @@ function stock_consumption_allocation_workspace_snapshot(
 
         'latest_revision' =>
             $latestRevision,
+
+        'resolution_status' =>
+            $resolutionStatus,
+
+        'retained_shared' =>
+            $retainedShared,
+
+        'retained_shared_reason' =>
+            $retainedShared
+                ? (
+                    $latestRevision[
+                        'revision_reason'
+                    ]
+                    ?? null
+                )
+                : null,
     ];
 }
 }

@@ -286,6 +286,63 @@ function financial_allocation_workspace_return_url(
 }
 }
 
+
+if (!function_exists(
+    'financial_allocation_workspace_latest_revision'
+)) {
+function financial_allocation_workspace_latest_revision(
+    PDO $pdo,
+    int $farmId,
+    int $expenseId
+): ?array {
+    if (
+        $farmId < 1
+        ||
+        $expenseId < 1
+    ) {
+        throw new InvalidArgumentException(
+            'Financial allocation revision identity is invalid.'
+        );
+    }
+
+    /*
+     * Read-only workspace projection.
+     *
+     * Mutation/revision authority remains expense_revision_service.php.
+     * This helper only exposes the latest immutable decision for display.
+     */
+    $stmt =
+        $pdo->prepare(
+            "SELECT
+                 id,
+                 revision_no,
+                 revision_action,
+                 revision_reason,
+                 created_at
+             FROM farm_expense_revisions
+             WHERE farm_id=?
+               AND expense_id=?
+             ORDER BY revision_no DESC
+             LIMIT 1"
+        );
+
+    $stmt->execute([
+        $farmId,
+        $expenseId,
+    ]);
+
+    $row =
+        $stmt->fetch(
+            PDO::FETCH_ASSOC
+        );
+
+    return
+        $row
+            ?: null;
+}
+}
+
+
 if (!function_exists(
     'financial_allocation_workspace_snapshot'
 )) {
@@ -435,6 +492,67 @@ function financial_allocation_workspace_snapshot(
             $animalAllocationCount
         );
 
+    $latestRevision =
+        financial_allocation_workspace_latest_revision(
+            $pdo,
+            $farmId,
+            $expenseId
+        );
+
+    $latestRevisionAction =
+        $latestRevision
+            ? strtolower(
+                trim(
+                    (string)(
+                        $latestRevision[
+                            'revision_action'
+                        ]
+                        ?? ''
+                    )
+                )
+            )
+            : '';
+
+    $allocatedAmount =
+        (float)(
+            $summary[
+                'allocated_amount'
+            ]
+            ?? 0
+        );
+
+    $remainingAmount =
+        (float)(
+            $summary[
+                'remaining_amount'
+            ]
+            ?? 0
+        );
+
+    $retainedShared =
+        $latestRevisionAction === 'retain_shared'
+        &&
+        $currentRows === []
+        &&
+        $allocatedAmount <= 0.00001
+        &&
+        $remainingAmount > 0.00001;
+
+    $resolutionStatus =
+        $retainedShared
+            ? 'retained_shared'
+            : (
+                $allocatedAmount > 0.00001
+                &&
+                $remainingAmount > 0.00001
+                    ? 'partially_allocated'
+                    : (
+                        $remainingAmount <= 0.00001
+                            ? 'allocated'
+                            : 'awaiting_allocation'
+                    )
+            );
+
     $currentMap = [];
 
     foreach ($currentRows as $row) {
@@ -562,6 +680,25 @@ function financial_allocation_workspace_snapshot(
             $summary[
                 'remaining_amount'
             ],
+
+        'latest_revision' =>
+            $latestRevision,
+
+        'resolution_status' =>
+            $resolutionStatus,
+
+        'retained_shared' =>
+            $retainedShared,
+
+        'retained_shared_reason' =>
+            $retainedShared
+                ? (
+                    $latestRevision[
+                        'revision_reason'
+                    ]
+                    ?? null
+                )
+                : null,
     ];
 }
 }

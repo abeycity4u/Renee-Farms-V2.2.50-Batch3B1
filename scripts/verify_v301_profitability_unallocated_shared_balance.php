@@ -323,13 +323,38 @@ $check(
 );
 
 $check(
-    'SHARED_REVENUE_HAS_NO_FAKE_MANUAL_WORKSPACE',
+    'SHARED_REVENUE_USES_CANONICAL_REVENUE_WORKSPACE',
     $revenueSection !== ''
     &&
     strpos(
         $revenueSection,
+        'sale_revenue_allocation_workspace_parent_is_eligible('
+    ) !== false
+    &&
+    strpos(
+        $revenueSection,
+        'sale_revenue_allocation_workspace_can_access('
+    ) !== false
+    &&
+    strpos(
+        $revenueSection,
+        'sale_revenue_allocation_workspace_url('
+    ) !== false
+    &&
+    strpos(
+        $revenueSection,
+        "'allocation_kind'"
+    ) !== false
+    &&
+    strpos(
+        $revenueSection,
+        "'revenue'"
+    ) !== false
+    &&
+    strpos(
+        $revenueSection,
         "'allocation_url'"
-    ) === false
+    ) !== false
 );
 
 $check(

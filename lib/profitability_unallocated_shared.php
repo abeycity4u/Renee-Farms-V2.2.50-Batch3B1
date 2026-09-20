@@ -43,6 +43,156 @@ function profitability_unallocated_shared_cents(
 }
 }
 
+
+if (!function_exists(
+    'profitability_unallocated_shared_latest_cost_revision_map'
+)) {
+function profitability_unallocated_shared_latest_cost_revision_map(
+    PDO $pdo,
+    int $farmId,
+    array $parentIds,
+    string $source
+): array {
+    if ($farmId < 1) {
+        throw new InvalidArgumentException(
+            'Shared-cost revision farm identity is invalid.'
+        );
+    }
+
+    $source =
+        strtolower(
+            trim(
+                $source
+            )
+        );
+
+    if ($source === 'expense') {
+        $table =
+            'farm_expense_revisions';
+
+        $parentColumn =
+            'expense_id';
+
+    } elseif ($source === 'stock') {
+        $table =
+            'stock_consumption_allocation_revisions';
+
+        $parentColumn =
+            'stock_transaction_id';
+
+    } else {
+        throw new InvalidArgumentException(
+            'Shared-cost revision source is invalid.'
+        );
+    }
+
+    $ids = [];
+
+    foreach ($parentIds as $parentId) {
+        $parentId =
+            (int)$parentId;
+
+        if ($parentId > 0) {
+            $ids[$parentId] =
+                $parentId;
+        }
+    }
+
+    if (!$ids) {
+        return [];
+    }
+
+    ksort(
+        $ids,
+        SORT_NUMERIC
+    );
+
+    $ids =
+        array_values(
+            $ids
+        );
+
+    $placeholders =
+        implode(
+            ',',
+            array_fill(
+                0,
+                count($ids),
+                '?'
+            )
+        );
+
+    /*
+     * One batched lookup per cost authority.
+     * Do not add a per-row latest-revision query to Profitability.
+     */
+    $sql =
+        "SELECT
+             r.{$parentColumn} AS parent_id,
+             r.revision_no,
+             r.revision_action,
+             r.revision_reason
+         FROM {$table} r
+         INNER JOIN (
+             SELECT
+                 {$parentColumn} AS parent_id,
+                 MAX(revision_no) AS revision_no
+             FROM {$table}
+             WHERE farm_id=?
+               AND {$parentColumn} IN ({$placeholders})
+             GROUP BY {$parentColumn}
+         ) latest
+           ON latest.parent_id=r.{$parentColumn}
+          AND latest.revision_no=r.revision_no
+         WHERE r.farm_id=?";
+
+    $params =
+        array_merge(
+            [
+                $farmId,
+            ],
+            $ids,
+            [
+                $farmId,
+            ]
+        );
+
+    $stmt =
+        $pdo->prepare(
+            $sql
+        );
+
+    $stmt->execute(
+        $params
+    );
+
+    $map = [];
+
+    foreach (
+        $stmt->fetchAll(
+            PDO::FETCH_ASSOC
+        )
+        as $row
+    ) {
+        $parentId =
+            (int)(
+                $row[
+                    'parent_id'
+                ]
+                ?? 0
+            );
+
+        if ($parentId > 0) {
+            $map[$parentId] =
+                $row;
+        }
+    }
+
+    return $map;
+}
+}
+
+
 if (!function_exists(
     'profitability_unallocated_shared_scope_label'
 )) {
@@ -422,12 +572,23 @@ function profitability_unallocated_shared_summary(
              ORDER BY cycle_id,id"
         );
 
-    foreach (
+    $expenses =
         $expenseStmt->fetchAll(
             PDO::FETCH_ASSOC
-        )
-        as $expense
-    ) {
+        ) ?: [];
+
+    $expenseRevisionMap =
+        profitability_unallocated_shared_latest_cost_revision_map(
+            $pdo,
+            $farmId,
+            array_column(
+                $expenses,
+                'id'
+            ),
+            'expense'
+        );
+
+    foreach ($expenses as $expense) {
         try {
             $parent =
                 shared_cost_contract_parent(
@@ -509,6 +670,39 @@ function profitability_unallocated_shared_summary(
                 );
         }
 
+        $latestExpenseRevision =
+            $expenseRevisionMap[
+                $expenseId
+            ]
+            ?? null;
+
+        $latestExpenseAction =
+            $latestExpenseRevision
+                ? strtolower(
+                    trim(
+                        (string)(
+                            $latestExpenseRevision[
+                                'revision_action'
+                            ]
+                            ?? ''
+                        )
+                    )
+                )
+                : '';
+
+        $expenseStatus =
+            $isFeedPurchase
+                ? 'cash_only_waiting_allocation'
+                : (
+                    $allocatedCents > 0
+                        ? 'partially_allocated'
+                        : (
+                            $latestExpenseAction === 'retain_shared'
+                                ? 'retained_shared'
+                                : 'awaiting_allocation'
+                        )
+                );
+
         $prefix =
             $isFeedPurchase
                 ? 'cash_feed_purchase'
@@ -580,9 +774,17 @@ function profitability_unallocated_shared_summary(
                     $unallocatedCents / 100,
 
                 'status' =>
-                    $isFeedPurchase
-                        ? 'cash_only_waiting_allocation'
-                        : 'awaiting_allocation',
+                    $expenseStatus,
+
+                'resolution_reason' =>
+                    $expenseStatus === 'retained_shared'
+                        ? (
+                            $latestExpenseRevision[
+                                'revision_reason'
+                            ]
+                            ?? null
+                        )
+                        : null,
 
                 'allocation_kind' =>
                     $isFeedPurchase
@@ -613,6 +815,17 @@ function profitability_unallocated_shared_summary(
             $pdo,
             $farmId,
             $stockParents
+        );
+
+    $stockRevisionMap =
+        profitability_unallocated_shared_latest_cost_revision_map(
+            $pdo,
+            $farmId,
+            array_column(
+                $stockParents,
+                'stock_transaction_id'
+            ),
+            'stock'
         );
 
     $stockAllocationMap = [];
@@ -782,6 +995,35 @@ function profitability_unallocated_shared_summary(
                 'unallocated_cents'
             ];
 
+        $latestStockRevision =
+            $stockRevisionMap[
+                $stockId
+            ]
+            ?? null;
+
+        $latestStockAction =
+            $latestStockRevision
+                ? strtolower(
+                    trim(
+                        (string)(
+                            $latestStockRevision[
+                                'revision_action'
+                            ]
+                            ?? ''
+                        )
+                    )
+                )
+                : '';
+
+        $stockStatus =
+            $allocatedCents > 0
+                ? 'partially_allocated'
+                : (
+                    $latestStockAction === 'retain_shared'
+                        ? 'retained_shared'
+                        : 'awaiting_allocation'
+                );
+
         $kind =
             (
                 (
@@ -851,7 +1093,17 @@ function profitability_unallocated_shared_summary(
                     $unallocatedCents / 100,
 
                 'status' =>
-                    'awaiting_allocation',
+                    $stockStatus,
+
+                'resolution_reason' =>
+                    $stockStatus === 'retained_shared'
+                        ? (
+                            $latestStockRevision[
+                                'revision_reason'
+                            ]
+                            ?? null
+                        )
+                        : null,
 
                 /*
                  * This movement already passed the canonical
