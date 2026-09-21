@@ -109,7 +109,7 @@ foreach (['layer', 'broiler', 'ruminant'] as $type) {
             . ' Current Stock subtitle uses shared scope label',
         str_contains(
             $source,
-            "$workspaceScope['current_stock_label']"
+            '$workspaceScope[\'current_stock_label\']'
         )
     );
 
@@ -118,7 +118,7 @@ foreach (['layer', 'broiler', 'ruminant'] as $type) {
             . ' all-record selector uses shared scope label',
         str_contains(
             $source,
-            "$workspaceScope['selector_all_label']"
+            '$workspaceScope[\'selector_all_label\']'
         )
         && !str_contains(
             $source,
@@ -131,7 +131,7 @@ foreach (['layer', 'broiler', 'ruminant'] as $type) {
             . ' activity cards expose displayed-month scope',
         str_contains(
             $source,
-            "$workspaceScope['activity_label']"
+            '$workspaceScope[\'activity_label\']'
         )
     );
 
