@@ -163,11 +163,11 @@ $check(
     'Mortality card uses combined mortality total',
     str_contains(
         $sources['page'],
-        "$summaryTotals['mortality'] ="
+        '$summaryTotals[\'mortality\'] ='
     )
     && str_contains(
         $sources['page'],
-        "$mortalitySummary['total_mortality']"
+        '$mortalitySummary[\'total_mortality\']'
     )
 );
 
@@ -175,11 +175,11 @@ $check(
     'Mortality card exposes tagged and group breakdown',
     str_contains(
         $sources['page'],
-        "$mortalitySummary['tagged_mortality']"
+        '$mortalitySummary[\'tagged_mortality\']'
     )
     && str_contains(
         $sources['page'],
-        "$mortalitySummary['daily_record_mortality']"
+        '$mortalitySummary[\'daily_record_mortality\']'
     )
 );
 
