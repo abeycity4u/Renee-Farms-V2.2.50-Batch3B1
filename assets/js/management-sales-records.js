@@ -210,11 +210,29 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
     }
 
     const salePopulationEffectExplanations = {
-        financial_only:
-            'This option updates only the financial sale record. Saving this sale will not reduce or change live population in any production cycle. Product type, quantity, and unit of measure are treated as financial/revenue data only.',
-        remove_live_population:
-            'This option records a physical population removal. Saving this sale will reduce live population only by the whole headcount you explicitly enter for the selected source production cycle(s). Product type, sales quantity, and unit of measure do not determine the population change.'
+        financial_only: {
+            default:
+                'This option creates no sale-owned live-population deduction. Product type, quantity, and unit of measure are treated as financial/revenue data only.',
+            ruminant:
+                'This sale creates no additional aggregate/group headcount deduction. Tagged ruminants explicitly marked Sold live or Culled/slaughtered are still removed from live population through the Animal Registry lifecycle. Product type, quantity, and unit of measure remain financial/revenue data only.'
+        },
+        remove_live_population: {
+            default:
+                'This option records a physical population removal. Saving this sale will reduce live population only by the whole headcount you explicitly enter for the selected source production cycle(s). Product type, sales quantity, and unit of measure do not determine the population change.',
+            ruminant:
+                'Use this for additional aggregate/group headcount physically removed by this sale. Enter only the whole headcount removed from the selected source production cycle(s). Do not include tagged animals already marked Sold live or Culled/slaughtered because their Animal Registry lifecycle already updates population.'
+        }
     };
+
+    function salePopulationEffectExplanation(mode, farm) {
+        const explanations =
+            salePopulationEffectExplanations[mode]
+            || salePopulationEffectExplanations.financial_only;
+
+        return farm === 'ruminant'
+            ? explanations.ruminant
+            : explanations.default;
+    }
 
     function eligibleSalePopulationCycles(prefix) {
         const ids = salePopulationSelectors(prefix);
@@ -373,9 +391,24 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
             modeElement.val() || 'financial_only'
         );
 
+        modeElement
+            .find('option[value="financial_only"]')
+            .text(
+                farm === 'ruminant'
+                    ? 'Financial only — no additional aggregate/group removal'
+                    : 'Financial only — no sale-owned population removal'
+            );
+
+        modeElement
+            .find('option[value="remove_live_population"]')
+            .text(
+                farm === 'ruminant'
+                    ? 'Remove live population — aggregate/group headcount'
+                    : 'Remove live population — explicit headcount by source cycle'
+            );
+
         $(ids.explanation).text(
-            salePopulationEffectExplanations[mode]
-                || salePopulationEffectExplanations.financial_only
+            salePopulationEffectExplanation(mode, farm)
         );
 
         const removeLive =

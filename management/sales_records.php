@@ -95,7 +95,7 @@ $renderSalePopulationEffectControls = static function (string $prefix): void {
                 class="form-select"
             >
                 <option value="financial_only" selected>
-                    Financial only — do not change live population
+                    Financial only — no sale-owned population removal
                 </option>
                 <option value="remove_live_population">
                     Remove live population — explicit headcount by source cycle
@@ -106,9 +106,10 @@ $renderSalePopulationEffectControls = static function (string $prefix): void {
                 id="<?php echo $idPrefix; ?>PopulationEffectExplanation"
                 class="small text-muted mt-1"
             >
-                This option updates only the financial sale record. Saving this sale will not
-                reduce or change live population in any production cycle. Product type, quantity,
-                and unit of measure are treated as financial/revenue data only.
+                This option creates no sale-owned live-population deduction. For tagged
+                ruminants, an explicit Sold live or Culled/slaughtered lifecycle outcome can
+                still change population independently. Product type, quantity, and unit of
+                measure remain financial/revenue data only.
             </div>
 
             <div

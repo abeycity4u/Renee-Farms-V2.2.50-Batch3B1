@@ -931,6 +931,42 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!"
                             </div>
                         </div>
 
+                        <div
+                            id="ruminantPopulationMovements"
+                            class="alert alert-light border d-none mb-3"
+                            role="status"
+                            aria-live="polite"
+                        >
+                            <div class="fw-semibold mb-1">
+                                Population movements for this date
+                            </div>
+                            <div
+                                id="ruminantTaggedMortalityRow"
+                                class="d-none"
+                            >
+                                Tagged Mortality (Animal Registry):
+                                <strong id="ruminantTaggedMortalityValue">0</strong>
+                            </div>
+                            <div
+                                id="ruminantSoldStockRow"
+                                class="d-none"
+                            >
+                                Sold Stock:
+                                <strong id="ruminantSoldStockValue">0</strong>
+                            </div>
+                            <div
+                                id="ruminantCulledStockRow"
+                                class="d-none"
+                            >
+                                Culled Stock:
+                                <strong id="ruminantCulledStockValue">0</strong>
+                            </div>
+                            <small class="text-muted d-block mt-1">
+                                Read-only canonical movements. Do not add tagged deaths
+                                again to Mortality (Unregistered / Group).
+                            </small>
+                        </div>
+
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label id="feedConsumptionLabel">Feed Consumption (kg)</label>
@@ -1027,6 +1063,7 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!"
     ); ?>"
     data-can-edit-opening="<?php echo (isPlatformOwner() || hasRole('farm_admin')) ? '1' : '0'; ?>"
 ></div>
+<script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/daily-population-movement-ui.js'); ?>"></script>
 <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/ruminant-daily-record.js'); ?>"></script>
 </body>
 </html>

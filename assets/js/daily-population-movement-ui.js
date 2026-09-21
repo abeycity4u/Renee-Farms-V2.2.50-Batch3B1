@@ -102,7 +102,137 @@
         });
     }
 
+    function ruminantMovementFacts(
+        payload = {},
+        dailyRecordMortality = 0
+    ) {
+        const totals = payload?.movement_totals || {};
+
+        function removalQuantity(type) {
+            const delta = Number(totals[type] ?? 0);
+
+            return Number.isFinite(delta) && delta < 0
+                ? Math.abs(delta)
+                : 0;
+        }
+
+        const groupMortality = Math.max(
+            0,
+            Number(dailyRecordMortality) || 0
+        );
+        const totalMortality = removalQuantity('mortality');
+
+        return Object.freeze({
+            soldStock: removalQuantity('sale'),
+            culledStock: removalQuantity('cull'),
+            taggedMortality: Math.max(
+                0,
+                totalMortality - groupMortality
+            )
+        });
+    }
+
+    function createRuminantMovementDisplay(options = {}) {
+        const container = document.getElementById(
+            String(
+                options.containerId
+                    || 'ruminantPopulationMovements'
+            )
+        );
+
+        const rows = {
+            soldStock: document.getElementById(
+                String(
+                    options.soldRowId
+                        || 'ruminantSoldStockRow'
+                )
+            ),
+            culledStock: document.getElementById(
+                String(
+                    options.culledRowId
+                        || 'ruminantCulledStockRow'
+                )
+            ),
+            taggedMortality: document.getElementById(
+                String(
+                    options.taggedMortalityRowId
+                        || 'ruminantTaggedMortalityRow'
+                )
+            )
+        };
+
+        const values = {
+            soldStock: document.getElementById(
+                String(
+                    options.soldValueId
+                        || 'ruminantSoldStockValue'
+                )
+            ),
+            culledStock: document.getElementById(
+                String(
+                    options.culledValueId
+                        || 'ruminantCulledStockValue'
+                )
+            ),
+            taggedMortality: document.getElementById(
+                String(
+                    options.taggedMortalityValueId
+                        || 'ruminantTaggedMortalityValue'
+                )
+            )
+        };
+
+        function clear() {
+            Object.values(rows).forEach(row => {
+                row?.classList.add('d-none');
+            });
+
+            Object.values(values).forEach(value => {
+                if (value) value.textContent = '0';
+            });
+
+            container?.classList.add('d-none');
+        }
+
+        function render(payload, dailyRecordMortality = 0) {
+            const facts = ruminantMovementFacts(
+                payload,
+                dailyRecordMortality
+            );
+            let visible = false;
+
+            Object.entries(facts).forEach(([key, quantity]) => {
+                const row = rows[key];
+                const value = values[key];
+
+                if (quantity > 0) {
+                    if (value) {
+                        value.textContent =
+                            quantity.toLocaleString();
+                    }
+                    row?.classList.remove('d-none');
+                    visible = true;
+                } else {
+                    row?.classList.add('d-none');
+                }
+            });
+
+            container?.classList.toggle('d-none', !visible);
+
+            return facts;
+        }
+
+        clear();
+
+        return Object.freeze({
+            clear,
+            render
+        });
+    }
+
     global.DailyPopulationMovementUI = Object.freeze({
-        createSoldStockDisplay
+        createSoldStockDisplay,
+        ruminantMovementFacts,
+        createRuminantMovementDisplay
     });
 })(window);

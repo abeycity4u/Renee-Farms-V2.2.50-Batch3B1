@@ -55,6 +55,14 @@ const feedItemSelector = document.getElementById('feedItemId');
     const selectedCycleAnimalType = ruminantDailyConfig.selectedCycleAnimalType;
     const validRuminantTypes = ['cattle', 'goat', 'sheep', 'other'];
 
+    const populationMovementDisplay =
+        window.DailyPopulationMovementUI
+            ?.createRuminantMovementDisplay();
+
+    function clearPopulationMovementDisplay() {
+        populationMovementDisplay?.clear();
+    }
+
     function getSelectedCycleAnimalType() {
         const animalType = String(selectedCycleAnimalType || '').toLowerCase();
         return selectedCycleId > 0 && validRuminantTypes.includes(animalType) ? animalType : null;
@@ -159,6 +167,12 @@ const feedItemSelector = document.getElementById('feedItemId');
                     document.getElementById('reproductionDetails').value = data.reproduction_details || '';
                     document.getElementById('otherDetails').value = data.other_details || '';
                     document.getElementById('remarks').value = data.remarks || '';
+                    fetchPopulationBoundary(
+                        date,
+                        animalType,
+                        Number(data.mortality || 0),
+                        false
+                    );
                 }
             })
             .catch(error => {
@@ -167,7 +181,17 @@ const feedItemSelector = document.getElementById('feedItemId');
     }
 
 
-    function fetchPreviousStock(date, animalType) {
+    function fetchPopulationBoundary(
+        date,
+        animalType,
+        dailyRecordMortality = 0,
+        applyOpeningStock = false
+    ) {
+        if (selectedCycleId <= 0 || !date || !animalType) {
+            clearPopulationMovementDisplay();
+            return Promise.resolve(null);
+        }
+
         const params = new URLSearchParams({
             type: 'ruminant',
             date: date,
@@ -175,15 +199,47 @@ const feedItemSelector = document.getElementById('feedItemId');
             cycle_id: selectedCycleId
         });
 
-        fetch(`../api/get_previous_stock.php?${params}`)
+        return fetch(`../api/get_previous_stock.php?${params}`)
             .then(response => response.json())
             .then(payload => {
-                if (payload && payload.closing_stock !== null && payload.closing_stock !== undefined) {
-                    document.getElementById('openingStock').value = payload.closing_stock > 0 ? payload.closing_stock : '';
+                if (payload && payload.error) {
+                    throw new Error(payload.error);
+                }
+
+                if (
+                    applyOpeningStock
+                    && payload
+                    && payload.closing_stock !== null
+                    && payload.closing_stock !== undefined
+                ) {
+                    document.getElementById('openingStock').value =
+                        payload.closing_stock > 0
+                            ? payload.closing_stock
+                            : '';
                     lockRetrievedOpeningStock();
                 }
+
+                populationMovementDisplay?.render(
+                    payload || {},
+                    dailyRecordMortality
+                );
+
+                return payload;
             })
-            .catch(error => console.error(error));
+            .catch(error => {
+                clearPopulationMovementDisplay();
+                console.error(error);
+                return null;
+            });
+    }
+
+    function fetchPreviousStock(date, animalType) {
+        return fetchPopulationBoundary(
+            date,
+            animalType,
+            0,
+            true
+        );
     }
 
     // Check existing record
@@ -239,6 +295,7 @@ const feedItemSelector = document.getElementById('feedItemId');
     // Reset form
     function resetForm() {
         unlockOpeningStock();
+        clearPopulationMovementDisplay();
         document.getElementById('recordForm').reset();
         document.getElementById('mortality').value = 0;
         document.getElementById('recordDate').value = document.getElementById('selectedDate').value;
@@ -276,6 +333,13 @@ const feedItemSelector = document.getElementById('feedItemId');
             modalElement.querySelector('#modalTitle').textContent = 'Edit Record';
             modalElement.querySelector('#animalType').disabled = true;
             modalElement.querySelector('#animalTypeHidden').value = data.animalType || '';
+
+            fetchPopulationBoundary(
+                data.recordDate || data.selectedDate || '',
+                data.animalType || '',
+                Number(parseNumericInput(data.mortality || 0) || 0),
+                false
+            );
         }
     });
 
