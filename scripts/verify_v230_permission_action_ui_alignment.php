@@ -29,6 +29,9 @@ $appBehaviors = $read('assets/js/app-behaviors.js');
 $deleteRecordApi = $read('api/delete_record.php');
 $updateExpenseApi = $read('api/update_expense.php');
 $deleteExpenseApi = $read('api/delete_expense.php');
+$poultryExpenseHub = $read('poultry/expenses.php');
+$layerExpenseCompatibility = $read('poultry/layer_expenses.php');
+$broilerExpenseCompatibility = $read('poultry/broiler_expenses.php');
 
 $check(
     str_contains($appBehaviors, '[data-open-record-modal]'),
@@ -102,12 +105,6 @@ $check(
 );
 
 foreach ([
-    'poultry_layer_expenses_add',
-    'poultry_layer_expenses_edit',
-    'poultry_layer_expenses_delete',
-    'poultry_broiler_expenses_add',
-    'poultry_broiler_expenses_edit',
-    'poultry_broiler_expenses_delete',
     'ruminant_expenses_add',
     'ruminant_expenses_edit',
     'ruminant_expenses_delete',
@@ -122,21 +119,68 @@ foreach ([
 }
 
 $check(
+    str_contains($catalog, "'poultry_layer_expenses_add' =>")
+    && str_contains($catalog, "'poultry_layer_expenses_edit' =>")
+    && str_contains($catalog, "'poultry_layer_expenses_delete' =>")
+    && str_contains($catalog, "'poultry_broiler_expenses_add' =>")
+    && str_contains($catalog, "'poultry_broiler_expenses_edit' =>")
+    && str_contains($catalog, "'poultry_broiler_expenses_delete' =>")
+    && str_contains(
+        $poultryExpenseHub,
+        'poultry_expense_entry_can('
+    )
+    && str_contains(
+        $poultryExpenseHub,
+        'permission_catalog_expense_operational_can('
+    )
+    && str_contains(
+        $updateExpenseApi,
+        'permission_catalog_expense_operational_can('
+    )
+    && str_contains(
+        $deleteExpenseApi,
+        'permission_catalog_expense_operational_can('
+    ),
+    'Consolidated Poultry expense authority preserves granular permissions centrally'
+);
+
+$check(
     str_contains($runtimeJs, 'x.expenseEdit === false')
     && str_contains($runtimeJs, 'x.expenseDelete === false'),
     'Expense runtime independently removes unauthorized Edit/Delete controls'
 );
 
-foreach ([
-    "'/poultry/layer_expenses.php' => [\n        'poultry_layer_expenses_edit',\n        'poultry_layer_expenses_delete',",
-    "'/poultry/broiler_expenses.php' => [\n        'poultry_broiler_expenses_edit',\n        'poultry_broiler_expenses_delete',",
-    "'/ruminant/ruminant_expenses.php' => [\n        'ruminant_expenses_edit',\n        'ruminant_expenses_delete',",
-] as $needle) {
-    $check(
-        str_contains($navbar, $needle),
-        'Legacy livestock expense Actions column uses exact Edit/Delete mapping'
-    );
-}
+$check(
+    str_contains(
+        $navbar,
+        "'/ruminant/ruminant_expenses.php' => [\n        'ruminant_expenses_edit',\n        'ruminant_expenses_delete',"
+    ),
+    'Legacy Ruminant expense Actions column uses exact Edit/Delete mapping'
+);
+
+$check(
+    str_contains(
+        $layerExpenseCompatibility,
+        'poultry_expense_compatibility_redirect('
+    )
+    && str_contains(
+        $broilerExpenseCompatibility,
+        'poultry_expense_compatibility_redirect('
+    ),
+    'Retired Layer/Broiler expense routes delegate to the consolidated Poultry hub'
+);
+
+$check(
+    !str_contains(
+        $navbar,
+        "'/poultry/layer_expenses.php' => ["
+    )
+    && !str_contains(
+        $navbar,
+        "'/poultry/broiler_expenses.php' => ["
+    ),
+    'Navbar no longer restores retired Poultry expense action ownership'
+);
 
 $check(
     str_contains(

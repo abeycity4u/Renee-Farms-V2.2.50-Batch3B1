@@ -141,8 +141,7 @@ $pdfCallers = [
     'management/reports.php',
     'management/sales_records.php',
     'management/sales_report_pdf.php',
-    'poultry/broiler_expenses.php',
-    'poultry/layer_expenses.php',
+    'poultry/expenses.php',
     'ruminant/ruminant_expenses.php',
 ];
 
@@ -163,6 +162,34 @@ foreach ($pdfCallers as $relative) {
     $check(
         $usesService,
         $relative . ' remains routed through centralized PDF branding'
+    );
+}
+
+foreach ([
+    'poultry/layer_expenses.php',
+    'poultry/broiler_expenses.php',
+] as $relative) {
+    $path = $root . '/' . $relative;
+
+    $content = is_file($path)
+        ? (string) file_get_contents($path)
+        : '';
+
+    $check(
+        str_contains(
+            $content,
+            'poultry_expense_compatibility_redirect('
+        )
+        && !str_contains(
+            $content,
+            'PdfReportService.php'
+        )
+        && !str_contains(
+            $content,
+            'pdf_report_finish('
+        ),
+        $relative
+        . ' remains a retired compatibility route without PDF ownership'
     );
 }
 
