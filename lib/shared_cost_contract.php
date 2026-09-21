@@ -382,6 +382,158 @@ function shared_cost_contract_target(
 }
 }
 
+
+if (!function_exists('shared_cost_contract_business_date')) {
+function shared_cost_contract_business_date(
+    $value,
+    string $label
+): string {
+    $value =
+        trim(
+            (string)$value
+        );
+
+    if (
+        preg_match(
+            '/^\d{4}-\d{2}-\d{2}$/',
+            $value
+        ) !== 1
+    ) {
+        throw new InvalidArgumentException(
+            $label . ' is invalid.'
+        );
+    }
+
+    [$year, $month, $day] =
+        array_map(
+            'intval',
+            explode(
+                '-',
+                $value
+            )
+        );
+
+    if (
+        !checkdate(
+            $month,
+            $day,
+            $year
+        )
+    ) {
+        throw new InvalidArgumentException(
+            $label . ' is invalid.'
+        );
+    }
+
+    return $value;
+}
+}
+
+if (!function_exists('shared_cost_contract_is_pre_cycle')) {
+function shared_cost_contract_is_pre_cycle(
+    $parentDate,
+    array $cycle
+): bool {
+    $parentDate =
+        shared_cost_contract_business_date(
+            $parentDate,
+            'Cost date'
+        );
+
+    $cycleStartDate =
+        shared_cost_contract_business_date(
+            $cycle['start_date']
+            ?? null,
+            'Production cycle start date'
+        );
+
+    return
+        $cycleStartDate
+        >
+        $parentDate;
+}
+}
+
+if (!function_exists('shared_cost_contract_assert_pre_cycle_reason')) {
+function shared_cost_contract_assert_pre_cycle_reason(
+    $parentDate,
+    array $cycles,
+    array $rows,
+    ?string $reason
+): void {
+    if ($rows === []) {
+        return;
+    }
+
+    $cycleMap = [];
+
+    foreach ($cycles as $cycle) {
+        if (!is_array($cycle)) {
+            throw new RuntimeException(
+                'Pre-cycle allocation target data is invalid.'
+            );
+        }
+
+        $cycleId =
+            (int)(
+                $cycle['id']
+                ?? $cycle['cycle_id']
+                ?? 0
+            );
+
+        if ($cycleId > 0) {
+            $cycleMap[$cycleId] =
+                $cycle;
+        }
+    }
+
+    foreach ($rows as $row) {
+        if (!is_array($row)) {
+            throw new RuntimeException(
+                'Pre-cycle allocation row is invalid.'
+            );
+        }
+
+        $cycleId =
+            (int)(
+                $row['cycle_id']
+                ?? $row['target_cycle_id']
+                ?? 0
+            );
+
+        if (
+            $cycleId < 1
+            ||
+            !isset(
+                $cycleMap[$cycleId]
+            )
+        ) {
+            throw new RuntimeException(
+                'Pre-cycle allocation target is unavailable.'
+            );
+        }
+
+        if (
+            shared_cost_contract_is_pre_cycle(
+                $parentDate,
+                $cycleMap[$cycleId]
+            )
+            &&
+            trim(
+                (string)(
+                    $reason
+                    ?? ''
+                )
+            ) === ''
+        ) {
+            throw new InvalidArgumentException(
+                'Enter a reason explaining how this cost prepared the selected future-start cycle.'
+            );
+        }
+    }
+}
+}
+
 if (!function_exists('shared_cost_contract_conservation')) {
 function shared_cost_contract_conservation(
     $parentAmount,

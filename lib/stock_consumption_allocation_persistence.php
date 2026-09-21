@@ -55,10 +55,11 @@ function stock_consumption_allocation_persistence_reason(
             )
         );
 
-    if ($action === 'create') {
-        return null;
-    }
-
+    /*
+     * A first/create allocation may legitimately carry an optional reason.
+     * This is required for audited pre-cycle preparation allocations.
+     * Blank create reasons remain valid for ordinary first allocations.
+     */
     if (
         in_array(
             $action,
@@ -381,7 +382,8 @@ function stock_consumption_allocation_persistence_target_cycles(
              farm_type,
              production_type,
              cycle_code,
-             status
+             status,
+             start_date
          FROM production_cycles
          WHERE farm_id=?
            AND id IN ({$placeholders})
@@ -1489,6 +1491,14 @@ function stock_consumption_allocation_persistence_apply(
                 ],
         ];
     }
+
+    shared_cost_contract_assert_pre_cycle_reason(
+        $locked['movement']['transaction_date']
+            ?? null,
+        $desiredCycles,
+        $desired,
+        $revisionReason
+    );
 
     if ($latest === null) {
         $action =

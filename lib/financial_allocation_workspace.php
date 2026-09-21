@@ -609,6 +609,13 @@ function financial_allocation_workspace_snapshot(
                 $cycle['start_date']
                 ?? null,
 
+            'is_pre_cycle' =>
+                shared_cost_contract_is_pre_cycle(
+                    $parent['expense_date']
+                    ?? null,
+                    $cycle
+                ),
+
             'allocated_amount' =>
                 $current
                     ? financial_allocation_service_money_string(

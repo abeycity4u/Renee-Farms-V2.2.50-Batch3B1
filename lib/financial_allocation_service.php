@@ -915,7 +915,8 @@ function financial_allocation_service_target_cycles(
              farm_id,
              farm_type,
              production_type,
-             status
+             status,
+             start_date
          FROM production_cycles
          WHERE farm_id=?
            AND id IN ({$placeholders})

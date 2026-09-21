@@ -644,6 +644,18 @@ $scopeLabel =
                                                 ); ?>
                                             </div>
                                         <?php endif; ?>
+
+                                        <?php if (!empty(
+                                            $cycle['is_pre_cycle']
+                                        )): ?>
+                                            <div class="mt-1">
+                                                <span
+                                                    class="badge text-bg-warning"
+                                                >
+                                                    Pre-cycle preparation
+                                                </span>
+                                            </div>
+                                        <?php endif; ?>
                                     </td>
 
                                     <td>
@@ -694,6 +706,11 @@ $scopeLabel =
                                             min="0"
                                             step="0.01"
                                             data-cycle-id="<?php echo (int)$cycle['id']; ?>"
+                                            data-pre-cycle="<?php echo !empty(
+                                                $cycle['is_pre_cycle']
+                                            )
+                                                ? '1'
+                                                : '0'; ?>"
                                             value="<?php echo $escape(
                                                 $cycle[
                                                     'allocated_amount'
@@ -747,7 +764,7 @@ $scopeLabel =
                                 Reason for allocation / shared-retention decision
                                 <?php if (!$hasRevision): ?>
                                     <span class="text-muted">
-                                        (optional on first allocation)
+                                        (optional on first allocation unless a pre-cycle target is used)
                                     </span>
                                 <?php endif; ?>
                             </label>
@@ -767,9 +784,13 @@ $scopeLabel =
 
                             <div class="form-text">
                                 A reason is always required when deliberately
-                                retaining consumed cost as shared. After the
-                                first revision, a change reason is also required
-                                by the canonical stock-allocation audit contract.
+                                retaining consumed cost as shared. A reason is
+                                also required when assigning any amount to a
+                                cycle that starts after this stock-use date,
+                                because that is a pre-cycle preparation cost.
+                                After the first revision, a change reason is
+                                also required by the canonical stock-allocation
+                                audit contract.
                             </div>
                         </div>
 

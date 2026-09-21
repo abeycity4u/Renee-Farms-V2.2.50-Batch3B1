@@ -844,6 +844,13 @@ function stock_consumption_allocation_workspace_snapshot(
                 $cycle['start_date']
                 ?? null,
 
+            'is_pre_cycle' =>
+                shared_cost_contract_is_pre_cycle(
+                    $movement['transaction_date']
+                    ?? null,
+                    $cycle
+                ),
+
             'allocated_amount' =>
                 $current
                     ? stock_consumption_allocation_service_money_string(

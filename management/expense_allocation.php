@@ -494,6 +494,29 @@ $money =
                                             );
                                             ?>
                                         </div>
+
+                                        <?php if (!empty(
+                                            $cycle['start_date']
+                                        )): ?>
+                                            <div class="small text-muted">
+                                                Starts
+                                                <?php echo $escape(
+                                                    $cycle['start_date']
+                                                ); ?>
+                                            </div>
+                                        <?php endif; ?>
+
+                                        <?php if (!empty(
+                                            $cycle['is_pre_cycle']
+                                        )): ?>
+                                            <div class="mt-1">
+                                                <span
+                                                    class="badge text-bg-warning"
+                                                >
+                                                    Pre-cycle preparation
+                                                </span>
+                                            </div>
+                                        <?php endif; ?>
                                     </td>
 
                                     <td>
@@ -577,10 +600,14 @@ $money =
 
                             <div class="form-text">
                                 Required for the expense revision audit trail.
-                                A retained-shared decision must explain why no
-                                reliable production-cycle basis exists. Clearing
-                                every amount explicitly clears cycle allocation
-                                while preserving immutable revision history.
+                                If a target cycle starts after the expense date,
+                                explain how the expense prepared that upcoming
+                                cycle; it is treated as a pre-cycle operating
+                                cost. A retained-shared decision must explain
+                                why no reliable production-cycle basis exists.
+                                Clearing every amount explicitly clears cycle
+                                allocation while preserving immutable revision
+                                history.
                             </div>
                         </div>
 

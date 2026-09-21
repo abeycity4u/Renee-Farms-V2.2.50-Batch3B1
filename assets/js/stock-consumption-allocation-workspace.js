@@ -523,6 +523,40 @@
                         : ''
                 ).trim();
 
+            const hasPreCycleAllocation =
+                decisionAction === 'allocate'
+                &&
+                amountInputs.some(
+                    (input) => {
+                        return (
+                            input.dataset.preCycle
+                                === '1'
+                            &&
+                            moneyStringToCents(
+                                input.value
+                                || '0'
+                            ) > 0
+                        );
+                    }
+                );
+
+            if (
+                hasPreCycleAllocation
+                &&
+                reason === ''
+            ) {
+                notify(
+                    'error',
+                    'Enter a reason explaining how this consumed stock cost prepared the selected future-start cycle.'
+                );
+
+                if (reasonInput) {
+                    reasonInput.focus();
+                }
+
+                return;
+            }
+
             if (
                 (
                     hasRevision

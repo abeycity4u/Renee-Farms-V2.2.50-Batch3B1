@@ -849,6 +849,15 @@ function financial_allocation_persistence_apply(
         ];
     }
 
+    shared_cost_contract_assert_pre_cycle_reason(
+        $parent['expense_date']
+            ?? null,
+        $cycles,
+        $desiredValidated['rows']
+            ?? [],
+        $revisionReason
+    );
+
     /*
      * A real allocation mutation becomes part of the SAME expense
      * revision transaction. For a legacy expense this establishes its
