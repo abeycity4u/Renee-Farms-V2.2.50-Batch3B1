@@ -1023,135 +1023,14 @@ $today = app_today();
 
 <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/bootstrap5/js/bootstrap.bundle.min.js'); ?>"></script>
 
-<?php if($canTransfer): ?>
-<script>
-(function () {
-    var modalElement =
-        document.getElementById(
-            'cycleTransferReverseModal'
-        );
+<div
+  id="ruminantAnimalViewConfig"
+  hidden
+  data-reopen-transfer-reverse="<?php echo ($reopenTransferReverseModal && $canTransfer) ? '1' : '0'; ?>"
+  data-reopen-transfer="<?php echo ($reopenTransferModal && $canTransfer && $animal['status']==='active') ? '1' : '0'; ?>"
+></div>
 
-    if (!modalElement) {
-        return;
-    }
-
-    modalElement.addEventListener(
-        'show.bs.modal',
-        function (event) {
-            var trigger =
-                event.relatedTarget;
-
-            if (!trigger) {
-                return;
-            }
-
-            var idInput =
-                document.getElementById(
-                    'cycle_transfer_reverse_id'
-                );
-
-            var fromInput =
-                document.getElementById(
-                    'cycle_transfer_reverse_from'
-                );
-
-            var toInput =
-                document.getElementById(
-                    'cycle_transfer_reverse_to'
-                );
-
-            var dateInput =
-                document.getElementById(
-                    'cycle_transfer_reverse_date'
-                );
-
-            var reasonInput =
-                modalElement.querySelector(
-                    '[name="transfer_reversal_reason"]'
-                );
-
-            if (idInput) {
-                idInput.value =
-                    trigger.getAttribute(
-                        'data-transfer-reverse-id'
-                    ) || '';
-            }
-
-            if (fromInput) {
-                fromInput.value =
-                    trigger.getAttribute(
-                        'data-transfer-from'
-                    ) || '—';
-            }
-
-            if (toInput) {
-                toInput.value =
-                    trigger.getAttribute(
-                        'data-transfer-to'
-                    ) || '—';
-            }
-
-            if (dateInput) {
-                dateInput.value =
-                    trigger.getAttribute(
-                        'data-transfer-date'
-                    ) || '—';
-            }
-
-            if (reasonInput) {
-                reasonInput.value = '';
-            }
-        }
-    );
-})();
-</script>
-<?php endif; ?>
-
-<?php if($reopenTransferReverseModal && $canTransfer): ?>
-<script>
-(function () {
-    var modalElement =
-        document.getElementById(
-            'cycleTransferReverseModal'
-        );
-
-    if (
-        modalElement
-        && window.bootstrap
-        && window.bootstrap.Modal
-    ) {
-        window.bootstrap.Modal
-            .getOrCreateInstance(
-                modalElement
-            )
-            .show();
-    }
-})();
-</script>
-<?php endif; ?>
-
-<?php if($reopenTransferModal && $canTransfer && $animal['status']==='active'): ?>
-<script>
-(function () {
-    var modalElement =
-        document.getElementById(
-            'cycleTransferModal'
-        );
-
-    if (
-        modalElement
-        && window.bootstrap
-        && window.bootstrap.Modal
-    ) {
-        window.bootstrap.Modal
-            .getOrCreateInstance(
-                modalElement
-            )
-            .show();
-    }
-})();
-</script>
-<?php endif; ?>
+<script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/ruminant-animal-view.js'); ?>"></script>
 
 </body>
 </html>
