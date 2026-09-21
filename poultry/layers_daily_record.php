@@ -828,6 +828,11 @@ $_SESSION['success'] = "Daily record saved successfully!"
                                        id="cratesCount" min="0" step="0.01" readonly required>
                                 <small class="text-muted">Auto-calculated as Egg Production ÷ 30</small>
                             </div>
+                            <div class="col-md-4 mb-3 ms-md-auto d-none" id="soldStockContainer">
+                                <label class="invisible" aria-hidden="true">Sold Stock</label>
+                                <div class="form-control fw-semibold" id="soldStockDisplay"
+                                     role="status" aria-live="polite"></div>
+                            </div>
                         </div>
 
                         <div class="row">
