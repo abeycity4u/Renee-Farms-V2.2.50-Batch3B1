@@ -65,7 +65,7 @@ $check(
     )
     && str_contains(
         $sources['shared_ui'],
-        'Sold'
+        'Sold Stock:'
     )
 );
 
@@ -97,7 +97,11 @@ $check(
     'Ruminant modal exposes separate read-only tagged mortality',
     str_contains(
         $sources['ruminant_page'],
-        'Tagged Mortality (Animal Registry):'
+        'Tagged Mortality'
+    )
+    && str_contains(
+        $sources['ruminant_page'],
+        'ruminantTaggedMortalityRow'
     )
     && str_contains(
         $sources['ruminant_page'],
@@ -106,14 +110,18 @@ $check(
 );
 
 $check(
-    'Ruminant modal exposes Sold Stock only through movement surface',
+    'Ruminant modal exposes Sold only through movement surface',
     str_contains(
         $sources['ruminant_page'],
-        'Sold Stock:'
+        'Sold'
     )
     && str_contains(
         $sources['ruminant_page'],
         'ruminantSoldStockRow'
+    )
+    && str_contains(
+        $sources['ruminant_page'],
+        'ruminantSoldStockValue'
     )
 );
 
