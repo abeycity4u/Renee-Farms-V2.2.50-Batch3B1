@@ -27,8 +27,6 @@ if (!function_exists('daily_population_continuity_types')) {
                 'population_label' => 'flock',
                 'animal_type_required' => false,
                 'farm_type' => 'poultry',
-                'production_type' => 'broiler',
-                'farm_type' => 'poultry',
                 'production_type' => 'layer',
             ],
             'broiler' => [
@@ -36,6 +34,8 @@ if (!function_exists('daily_population_continuity_types')) {
                 'source_type' => 'daily_broiler_record',
                 'population_label' => 'flock',
                 'animal_type_required' => false,
+                'farm_type' => 'poultry',
+                'production_type' => 'broiler',
             ],
             'ruminant' => [
                 'table' => 'ruminant_daily_records',
