@@ -4,6 +4,7 @@ require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/../lib/daily_feed_sync.php');
 require_once(__DIR__ . '/../lib/daily_population_sync.php');
 require_once(__DIR__ . '/../lib/daily_population_continuity.php');
+require_once(__DIR__ . '/../lib/daily_record_workspace_scope.php');
 requireLogin();
 
 // Check access
@@ -48,6 +49,11 @@ $dailyFeedItems = $dailyFeedItemsStmt->fetchAll(PDO::FETCH_ASSOC);
         }
     }
 }
+
+$workspaceScope = daily_record_workspace_scope(
+    $cycleEnabled,
+    $selectedCycleId
+);
 
 // Handle delete request (admin/owner only)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_record']) && $canDeleteRecords) {
@@ -207,18 +213,6 @@ foreach ($records as $record) {
 }
 
 $summaryTotals = $monthlyTotals;
-if ($cycleEnabled && $selectedCycleId === 0) {
-    $summaryStmt = $pdo->query("
-        SELECT
-            COALESCE(SUM(opening_stock), 0) AS opening_stock,
-            COALESCE(SUM(mortality), 0) AS mortality,
-            COALESCE(SUM(feed_consumption_kg), 0) AS feed_consumption,
-            COALESCE(SUM(water_consumption_liters), 0) AS water_consumption
-        FROM ruminant_daily_records
-        WHERE farm_id = $tenantFarmId
-    ");
-    $summaryTotals = array_merge($summaryTotals, $summaryStmt->fetch(PDO::FETCH_ASSOC) ?: []);
-}
 
 $normalizeAnimalType = static function ($value) {
     $normalized = strtolower(trim((string)$value));
@@ -505,7 +499,7 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!"
                                     <div class="card-body text-center">
                                         <h6>Current Stock</h6>
                                         <h3><?php echo is_numeric($latestClosingStock) ? number_format($latestClosingStock) : $latestClosingStock; ?></h3>
-                                        <small>Latest Closing</small>
+                                        <small><?php echo htmlspecialchars($workspaceScope['current_stock_label']); ?></small>
                                     </div>
                                 </div>
                             </div>
@@ -514,7 +508,7 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!"
                                     <div class="card-body text-center">
                                         <h6>Mortality</h6>
                                         <h3><?php echo number_format($summaryTotals['mortality']); ?></h3>
-                                        <small>Losses</small>
+                                        <small><?php echo htmlspecialchars($workspaceScope['activity_label']); ?> · Losses</small>
                                     </div>
                                 </div>
                             </div>
@@ -523,7 +517,7 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!"
                                     <div class="card-body text-center">
                                         <h6>Feed Used</h6>
                                         <h3><?php echo number_format($summaryTotals['feed_consumption'], 1); ?></h3>
-                                        <small>Kg</small>
+                                        <small><?php echo htmlspecialchars($workspaceScope['activity_label']); ?> · Kg</small>
                                     </div>
                                 </div>
                             </div>
@@ -532,7 +526,7 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!"
                                     <div class="card-body text-center">
                                         <h6>Water Used</h6>
                                         <h3><?php echo number_format($summaryTotals['water_consumption']); ?></h3>
-                                        <small>Liters</small>
+                                        <small><?php echo htmlspecialchars($workspaceScope['activity_label']); ?> · Liters</small>
                                     </div>
                                 </div>
                             </div>
@@ -543,7 +537,7 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!"
                             <div class="col-md-6">
                                 <label class="form-label fw-bold">Active Ruminant Cycle</label>
                                 <select class="form-select" id="activeCycleSelector">
-                                    <option value="0" <?php echo ($selectedCycleId === 0) ? 'selected' : ''; ?>>All / Legacy records</option>
+                                    <option value="0" <?php echo ($selectedCycleId === 0) ? 'selected' : ''; ?>><?php echo htmlspecialchars($workspaceScope['selector_all_label']); ?></option>
                                     <?php foreach ($activeCycles as $cycle): ?>
                                     <option value="<?php echo (int)$cycle['id']; ?>" <?php echo ((int)$selectedCycleId === (int)$cycle['id']) ? 'selected' : ''; ?>>
                                         <?php echo htmlspecialchars($cycle['cycle_code'] . ' (' . $cycle['production_type'] . ')'); ?>

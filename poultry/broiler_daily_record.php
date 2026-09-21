@@ -4,6 +4,7 @@ require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/../lib/daily_feed_sync.php');
 require_once(__DIR__ . '/../lib/daily_population_sync.php');
 require_once(__DIR__ . '/../lib/daily_population_continuity.php');
+require_once(__DIR__ . '/../lib/daily_record_workspace_scope.php');
 requireLogin();
 
 // Check access
@@ -33,6 +34,11 @@ $dailyFeedItemsStmt->execute([$tenantFarmId]);
 $dailyFeedItems = $dailyFeedItemsStmt->fetchAll(PDO::FETCH_ASSOC);
 
 }
+
+$workspaceScope = daily_record_workspace_scope(
+    $cycleEnabled,
+    $selectedCycleId
+);
 
 // Get records for the month
 $records = [];
@@ -131,17 +137,7 @@ foreach ($records as $record) {
 }
 
 $summaryTotals = $monthlyTotals;
-if ($cycleEnabled && $selectedCycleId === 0) {
-    $summaryStmt = $pdo->query("
-        SELECT
-            COALESCE(SUM(mortality), 0) AS mortality,
-            COALESCE(SUM(feed_consumption_bags), 0) AS feed_consumption,
-            COALESCE(SUM(water_consumption_liters), 0) AS water_consumption
-        FROM broiler_daily_records
-        WHERE farm_id = $tenantFarmId
-    ");
-    $summaryTotals = array_merge($summaryTotals, $summaryStmt->fetch(PDO::FETCH_ASSOC) ?: []);
-}
+$daysRecorded = daily_record_workspace_distinct_days($records);
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_record'])) {
@@ -381,7 +377,7 @@ $_SESSION['success'] = "Broiler daily record saved successfully!"
                                     <div class="card-body text-center">
                                         <h6>Current Stock</h6>
                                         <h3><?php echo $broilerClosingStock !== null ? number_format($broilerClosingStock) : '--'; ?></h3>
-                                        <small>Latest Closing</small>
+                                        <small><?php echo htmlspecialchars($workspaceScope['current_stock_label']); ?></small>
                                     </div>
                                 </div>
                             </div>
@@ -390,11 +386,7 @@ $_SESSION['success'] = "Broiler daily record saved successfully!"
                                     <div class="card-body text-center">
                                         <h6>Total Mortality</h6>
                                         <h3><?php echo number_format($summaryTotals['mortality']); ?></h3>
-                                        <?php if ($cycleEnabled && $selectedCycleId === 0): ?>
-                                            <small>Birds Lost</small>
-                                        <?php else: ?>
-                                            <small>This Month</small>
-                                        <?php endif; ?>
+                                        <small><?php echo htmlspecialchars($workspaceScope['activity_label']); ?> · Birds Lost</small>
                                     </div>
                                 </div>
                             </div>
@@ -403,7 +395,7 @@ $_SESSION['success'] = "Broiler daily record saved successfully!"
                                     <div class="card-body text-center">
                                         <h6>Feed Consumed</h6>
                                         <h3><?php echo number_format($summaryTotals['feed_consumption'], 2); ?></h3>
-                                        <small>Bags (25kg)</small>
+                                        <small><?php echo htmlspecialchars($workspaceScope['activity_label']); ?> · Bags (25kg)</small>
                                     </div>
                                 </div>
                             </div>
@@ -412,7 +404,7 @@ $_SESSION['success'] = "Broiler daily record saved successfully!"
                                     <div class="card-body text-center">
                                         <h6>Water Consumed</h6>
                                         <h3><?php echo number_format($summaryTotals['water_consumption']); ?></h3>
-                                        <small>Liters</small>
+                                        <small><?php echo htmlspecialchars($workspaceScope['activity_label']); ?> · Liters</small>
                                     </div>
                                 </div>
                             </div>
@@ -420,8 +412,8 @@ $_SESSION['success'] = "Broiler daily record saved successfully!"
                                 <div class="card text-white bg-info">
                                     <div class="card-body text-center">
                                         <h6>Days Recorded</h6>
-                                        <h3><?php echo count($records); ?></h3>
-                                        <small>Out of <?php echo date('t', strtotime($yearMonth)); ?> days</small>
+                                        <h3><?php echo $daysRecorded; ?></h3>
+                                        <small><?php echo htmlspecialchars($workspaceScope['activity_label']); ?> · Out of <?php echo date('t', strtotime($yearMonth)); ?> days</small>
                                     </div>
                                 </div>
                             </div>
@@ -432,7 +424,7 @@ $_SESSION['success'] = "Broiler daily record saved successfully!"
                             <div class="col-md-6 col-lg-4">
                                 <label class="form-label fw-bold">Active Broiler Cycle</label>
                                 <select class="form-select" id="activeCycleSelector">
-                                    <option value="0" <?php echo ($selectedCycleId === 0) ? 'selected' : ''; ?>>All / Legacy records</option>
+                                    <option value="0" <?php echo ($selectedCycleId === 0) ? 'selected' : ''; ?>><?php echo htmlspecialchars($workspaceScope['selector_all_label']); ?></option>
                                     <?php foreach ($activeCycles as $cycle): ?>
                                     <option value="<?php echo (int)$cycle['id']; ?>" <?php echo ((int)$selectedCycleId === (int)$cycle['id']) ? 'selected' : ''; ?>>
                                         <?php echo htmlspecialchars($cycle['cycle_code']); ?>

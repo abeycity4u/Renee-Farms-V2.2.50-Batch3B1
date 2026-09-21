@@ -4,6 +4,7 @@ require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/../lib/daily_feed_sync.php');
 require_once(__DIR__ . '/../lib/daily_population_sync.php');
 require_once(__DIR__ . '/../lib/daily_population_continuity.php');
+require_once(__DIR__ . '/../lib/daily_record_workspace_scope.php');
 require_once(__DIR__ . '/../lib/sales_allocation.php');
 requireLogin();
 
@@ -33,6 +34,11 @@ $dailyFeedItemsStmt->execute([$tenantFarmId]);
 $dailyFeedItems = $dailyFeedItemsStmt->fetchAll(PDO::FETCH_ASSOC);
 
 }
+
+$workspaceScope = daily_record_workspace_scope(
+    $cycleEnabled,
+    $selectedCycleId
+);
 
 // Get records for the month
 $records = [];
@@ -405,7 +411,7 @@ $_SESSION['success'] = "Daily record saved successfully!"
                                     <div class="card-body text-center">
                                         <h6>Current Stock</h6>
                                         <h3><?php echo $layerClosingStock !== null ? number_format($layerClosingStock) : '--'; ?></h3>
-                                        <small>Latest Closing</small>
+                                        <small><?php echo htmlspecialchars($workspaceScope['current_stock_label']); ?></small>
                                     </div>
                                 </div>
                             </div>
@@ -414,7 +420,7 @@ $_SESSION['success'] = "Daily record saved successfully!"
                                     <div class="card-body text-center">
                                         <h6>Total Eggs</h6>
                                         <h3><?php echo number_format($monthlyTotals['egg_production']); ?></h3>
-                                        <small>This Month</small>
+                                        <small><?php echo htmlspecialchars($workspaceScope['activity_label']); ?></small>
                                     </div>
                                 </div>
                             </div>
@@ -432,7 +438,7 @@ $_SESSION['success'] = "Daily record saved successfully!"
                                     <div class="card-body text-center">
                                         <h6>Total Mortality</h6>
                                         <h3><?php echo number_format($monthlyTotals['mortality']); ?></h3>
-                                        <small>Birds Lost</small>
+                                        <small><?php echo htmlspecialchars($workspaceScope['activity_label']); ?> · Birds Lost</small>
                                     </div>
                                 </div>
                             </div>
@@ -441,7 +447,7 @@ $_SESSION['success'] = "Daily record saved successfully!"
                                     <div class="card-body text-center">
                                         <h6>Feed Consumption</h6>
                                         <h3><?php echo number_format($monthlyTotals['feed_consumption'], 2); ?></h3>
-                                        <small>Bags (25kg each)</small>
+                                        <small><?php echo htmlspecialchars($workspaceScope['activity_label']); ?> · Bags (25kg each)</small>
                                     </div>
                                 </div>
                             </div>
@@ -450,7 +456,7 @@ $_SESSION['success'] = "Daily record saved successfully!"
                                     <div class="card-body text-center">
                                         <h6>Water Consumption</h6>
                                         <h3><?php echo number_format($monthlyTotals['water_consumption']); ?></h3>
-                                        <small>Liters</small>
+                                        <small><?php echo htmlspecialchars($workspaceScope['activity_label']); ?> · Liters</small>
                                     </div>
                                 </div>
                             </div>
@@ -461,7 +467,7 @@ $_SESSION['success'] = "Daily record saved successfully!"
                             <div class="col-md-6">
                                 <label class="form-label fw-bold">Active Layer Cycle</label>
                                 <select class="form-select" id="activeCycleSelector">
-                                    <option value="0" <?php echo ($selectedCycleId === 0) ? 'selected' : ''; ?>>All / Legacy records</option>
+                                    <option value="0" <?php echo ($selectedCycleId === 0) ? 'selected' : ''; ?>><?php echo htmlspecialchars($workspaceScope['selector_all_label']); ?></option>
                                     <?php foreach ($activeCycles as $cycle): ?>
                                     <option value="<?php echo (int)$cycle['id']; ?>" <?php echo ((int)$selectedCycleId === (int)$cycle['id']) ? 'selected' : ''; ?>>
                                         <?php echo htmlspecialchars($cycle['cycle_code']); ?>
