@@ -67,11 +67,11 @@ $check(
     'boundary snapshots expose cycle production identity',
     str_contains(
         $sources['boundary'],
-        "$snapshot['production_type']"
+        '$snapshot[\'production_type\']'
     )
     && str_contains(
         $sources['boundary'],
-        "$canonical['production_type']"
+        '$canonical[\'production_type\']'
     )
 );
 
@@ -103,7 +103,7 @@ $check(
     'movement summary does not disguise exits as mortality',
     str_contains(
         $sources['boundary'],
-        "$movementType === 'mortality'"
+        '$movementType === \'mortality\''
     )
     && str_contains(
         $sources['boundary'],
@@ -131,11 +131,11 @@ $check(
     ) === 1
     && str_contains(
         $sources['continuity'],
-        "$record['stored_opening_stock']"
+        '$record[\'stored_opening_stock\']'
     )
     && str_contains(
         $sources['continuity'],
-        "$record['population_closing_stock']"
+        '$record[\'population_closing_stock\']'
     )
 );
 
@@ -159,11 +159,11 @@ $check(
     'ruminant canonical opening is species/cycle safe',
     str_contains(
         $sources['continuity'],
-        "$config['key'] === 'ruminant'"
+        '$config[\'key\'] === \'ruminant\''
     )
     && str_contains(
         $sources['continuity'],
-        "$snapshot['production_type']"
+        '$snapshot[\'production_type\']'
     )
     && str_contains(
         $sources['continuity'],
