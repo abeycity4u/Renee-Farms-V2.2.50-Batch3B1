@@ -70,7 +70,7 @@ $check(
     )
     && str_contains(
         $source,
-        "$dates[] = (string)$row['record_date'];"
+        '$dates[] = (string)$row[\'record_date\'];'
     )
 );
 
@@ -82,15 +82,15 @@ $check(
     )
     && str_contains(
         $source,
-        "'source_type' => $config['source_type']"
+        '\'source_type\' => $config[\'source_type\']'
     )
     && str_contains(
         $source,
-        "'source_id' => $sourceId"
+        '\'source_id\' => $sourceId'
     )
     && str_contains(
         $source,
-        "'mortality' => $mortality"
+        '\'mortality\' => $mortality'
     )
 );
 
@@ -98,7 +98,7 @@ $check(
     'canonical opening is authoritative for target Daily Record',
     str_contains(
         $source,
-        "$canonicalOpening = (int)$target['opening_quantity'];"
+        '$canonicalOpening = (int)$target[\'opening_quantity\'];'
     )
     && str_contains(
         $source,
@@ -114,11 +114,11 @@ $check(
     'later openings and closings come from canonical boundaries',
     str_contains(
         $source,
-        "$expectedOpening = (int)$snapshot['opening_quantity'];"
+        '$expectedOpening = (int)$snapshot[\'opening_quantity\'];'
     )
     && str_contains(
         $source,
-        "$newClosing = (int)$snapshot['closing_quantity'];"
+        '$newClosing = (int)$snapshot[\'closing_quantity\'];'
     )
 );
 
@@ -126,7 +126,7 @@ $check(
     'canonical continuity preserves Layer derived-rate validation',
     str_contains(
         $source,
-        "$eggProduction > $expectedOpening"
+        '$eggProduction > $expectedOpening'
     )
     && str_contains(
         $source,
