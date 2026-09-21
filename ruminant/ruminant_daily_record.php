@@ -933,38 +933,39 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!"
 
                         <div
                             id="ruminantPopulationMovements"
-                            class="alert alert-light border d-none mb-3"
+                            class="border rounded px-3 py-2 mb-3 d-none"
                             role="status"
                             aria-live="polite"
                         >
-                            <div class="fw-semibold mb-1">
-                                Population movements for this date
+                            <div class="d-flex flex-wrap align-items-center gap-2 small">
+                                <span class="fw-semibold me-1">
+                                    Population movements:
+                                </span>
+                                <span
+                                    id="ruminantTaggedMortalityRow"
+                                    class="d-none"
+                                >
+                                    Tagged Mortality
+                                    <strong id="ruminantTaggedMortalityValue">0</strong>
+                                </span>
+                                <span
+                                    id="ruminantSoldStockRow"
+                                    class="d-none"
+                                >
+                                    Sold
+                                    <strong id="ruminantSoldStockValue">0</strong>
+                                </span>
+                                <span
+                                    id="ruminantCulledStockRow"
+                                    class="d-none"
+                                >
+                                    Culled
+                                    <strong id="ruminantCulledStockValue">0</strong>
+                                </span>
+                                <span class="text-muted">
+                                    · Read-only
+                                </span>
                             </div>
-                            <div
-                                id="ruminantTaggedMortalityRow"
-                                class="d-none"
-                            >
-                                Tagged Mortality (Animal Registry):
-                                <strong id="ruminantTaggedMortalityValue">0</strong>
-                            </div>
-                            <div
-                                id="ruminantSoldStockRow"
-                                class="d-none"
-                            >
-                                Sold Stock:
-                                <strong id="ruminantSoldStockValue">0</strong>
-                            </div>
-                            <div
-                                id="ruminantCulledStockRow"
-                                class="d-none"
-                            >
-                                Culled Stock:
-                                <strong id="ruminantCulledStockValue">0</strong>
-                            </div>
-                            <small class="text-muted d-block mt-1">
-                                Read-only canonical movements. Do not add tagged deaths
-                                again to Mortality (Unregistered / Group).
-                            </small>
                         </div>
 
                         <div class="row">

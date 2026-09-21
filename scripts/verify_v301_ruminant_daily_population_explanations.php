@@ -65,7 +65,7 @@ $check(
     )
     && str_contains(
         $sources['shared_ui'],
-        'Sold Stock:'
+        'Sold'
     )
 );
 
@@ -121,11 +121,23 @@ $check(
     'Ruminant modal exposes Culled Stock only through movement surface',
     str_contains(
         $sources['ruminant_page'],
-        'Culled Stock:'
+        'Culled'
     )
     && str_contains(
         $sources['ruminant_page'],
         'ruminantCulledStockRow'
+    )
+);
+
+$check(
+    'Ruminant movement surface stays compact',
+    str_contains(
+        $sources['ruminant_page'],
+        'd-flex flex-wrap align-items-center gap-2 small'
+    )
+    && !str_contains(
+        $sources['ruminant_page'],
+        'class="alert alert-light border d-none mb-3"'
     )
 );
 
