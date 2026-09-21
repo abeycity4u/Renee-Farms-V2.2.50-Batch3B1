@@ -830,7 +830,7 @@ $_SESSION['success'] = "Daily record saved successfully!"
                             </div>
                             <div class="col-md-4 mb-3 ms-md-auto d-none" id="soldStockContainer">
                                 <label class="invisible" aria-hidden="true">Sold Stock</label>
-                                <div class="form-control fw-semibold" id="soldStockDisplay"
+                                <div class="fw-semibold py-2 px-0" id="soldStockDisplay"
                                      role="status" aria-live="polite"></div>
                             </div>
                         </div>
