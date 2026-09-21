@@ -763,6 +763,11 @@ $_SESSION['success'] = "Broiler daily record saved successfully!"
                                 <input type="number" name="water_consumption" class="form-control"
                                        id="waterConsumption" step="0.1" min="0" required>
                             </div>
+                            <div class="col-md-6 mb-3 d-none" id="soldStockContainer">
+                                <label class="invisible" aria-hidden="true">Sold Stock</label>
+                                <div class="fw-semibold py-2 px-0" id="soldStockDisplay"
+                                     role="status" aria-live="polite"></div>
+                            </div>
                         </div>
 
                         <div class="mb-3">
@@ -811,6 +816,7 @@ $_SESSION['success'] = "Broiler daily record saved successfully!"
         'UTF-8'
     ); ?>"
 ></div>
+<script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/daily-population-movement-ui.js'); ?>"></script>
 <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/broiler-daily-record.js'); ?>"></script>
 </body>
 </html>

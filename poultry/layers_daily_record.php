@@ -898,6 +898,7 @@ $_SESSION['success'] = "Daily record saved successfully!"
         'UTF-8'
     ); ?>"
 ></div>
+<script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/daily-population-movement-ui.js'); ?>"></script>
 <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/layers-daily-record.js'); ?>"></script>
 </body>
 </html>

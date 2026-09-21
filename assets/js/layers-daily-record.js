@@ -75,6 +75,10 @@ const layerDailyConfig = {
 
     const selectedCycleId = layerDailyConfig.selectedCycleId;
     const canEditRetrievedOpeningStock = layerDailyConfig.canEditRetrievedOpeningStock;
+    const soldStockUI = DailyPopulationMovementUI.createSoldStockDisplay({
+        type: 'layer',
+        cycleId: selectedCycleId
+    });
     function lockRetrievedOpeningStock() {
         if (!canEditRetrievedOpeningStock) {
             document.getElementById('openingStock').readOnly = true;
@@ -129,63 +133,10 @@ const layerDailyConfig = {
             });
     }
 
-    function clearSoldStockDisplay() {
-        const container = document.getElementById('soldStockContainer');
-        const display = document.getElementById('soldStockDisplay');
-
-        if (!container || !display) {
-            return;
-        }
-
-        display.textContent = '';
-        container.classList.add('d-none');
-    }
-
-    function renderSoldStock(payload) {
-        const container = document.getElementById('soldStockContainer');
-        const display = document.getElementById('soldStockDisplay');
-
-        if (!container || !display) {
-            return;
-        }
-
-        const saleDelta = Number(payload?.movement_totals?.sale ?? 0);
-        const soldStock = Number.isFinite(saleDelta) && saleDelta < 0
-            ? Math.abs(saleDelta)
-            : 0;
-
-        if (soldStock <= 0) {
-            clearSoldStockDisplay();
-            return;
-        }
-
-        display.textContent = `Sold Stock: ${soldStock.toLocaleString()}`;
-        container.classList.remove('d-none');
-    }
-
-    function fetchSoldStock(selectedDate) {
-        if (selectedCycleId <= 0 || !selectedDate) {
-            clearSoldStockDisplay();
-            return;
-        }
-
-        fetch(`../api/get_previous_stock.php?type=layer&date=${selectedDate}&cycle_id=${selectedCycleId}`)
-            .then(response => response.json())
-            .then(payload => {
-                if (payload && payload.success === false) {
-                    throw new Error(payload.error || 'Failed to fetch population movements');
-                }
-                renderSoldStock(payload);
-            })
-            .catch(error => {
-                clearSoldStockDisplay();
-                console.error(error);
-            });
-    }
 
     // Fetch record data
     function fetchRecordData(date) {
-        fetchSoldStock(date);
+        soldStockUI.fetchForDate(date);
         fetch(`../api/get_record.php?type=layer&date=${date}&cycle_id=${selectedCycleId}`)
             .then(response => response.json())
             .then(payload => {
@@ -221,7 +172,7 @@ const layerDailyConfig = {
                 if (payload && payload.success === false) {
                     throw new Error(payload.error || 'Failed to fetch previous record');
                 }
-                renderSoldStock(payload);
+                soldStockUI.render(payload);
                 if (payload && payload.closing_stock !== null && payload.closing_stock !== undefined) {
                     document.getElementById('openingStock').value = payload.closing_stock > 0 ? payload.closing_stock : '';
                     lockRetrievedOpeningStock();
@@ -269,7 +220,7 @@ const layerDailyConfig = {
         document.getElementById('recordForm').reset();
         document.getElementById('mortality').value = 0;
         document.getElementById('cratesCount').value = '';
-        clearSoldStockDisplay();
+        soldStockUI.clear();
     }
 
 
@@ -304,7 +255,7 @@ const layerDailyConfig = {
         onShow: ({ modalElement }) => {
             modalElement.querySelector('#modalTitle').textContent = 'Edit Record';
             const recordDate = modalElement.querySelector('#recordDate')?.value || '';
-            fetchSoldStock(recordDate);
+            soldStockUI.fetchForDate(recordDate);
         }
     });
 

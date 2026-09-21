@@ -40,6 +40,10 @@ if (cycleSelector) {
 
     const selectedCycleId = broilerDailyConfig.selectedCycleId;
     const canEditRetrievedOpeningStock = broilerDailyConfig.canEditRetrievedOpeningStock;
+    const soldStockUI = DailyPopulationMovementUI.createSoldStockDisplay({
+        type: 'broiler',
+        cycleId: selectedCycleId
+    });
     function lockRetrievedOpeningStock() {
         if (!canEditRetrievedOpeningStock) {
             document.getElementById('openingStock').readOnly = true;
@@ -96,6 +100,7 @@ if (cycleSelector) {
 
     // Fetch record data
     function fetchRecordData(date) {
+        soldStockUI.fetchForDate(date);
         fetch(`../api/get_record.php?type=broiler&date=${date}&cycle_id=${selectedCycleId}`)
             .then(response => response.json())
             .then(payload => {
@@ -127,6 +132,7 @@ if (cycleSelector) {
                 if (payload && payload.success === false) {
                     throw new Error(payload.error || 'Failed to fetch previous record');
                 }
+                soldStockUI.render(payload);
                 if (payload && payload.closing_stock !== null && payload.closing_stock !== undefined) {
                     document.getElementById('openingStock').value = payload.closing_stock > 0 ? payload.closing_stock : '';
                     lockRetrievedOpeningStock();
@@ -171,6 +177,7 @@ if (cycleSelector) {
         unlockOpeningStock();
         document.getElementById('recordForm').reset();
         document.getElementById('mortality').value = 0;
+        soldStockUI.clear();
     }
 
     // Attach edit modals
@@ -191,6 +198,9 @@ if (cycleSelector) {
         },
         onShow: ({ modalElement }) => {
             modalElement.querySelector('#modalTitle').textContent = 'Edit Record';
+            const recordDate =
+                modalElement.querySelector('#recordDate')?.value || '';
+            soldStockUI.fetchForDate(recordDate);
         }
     });
 
