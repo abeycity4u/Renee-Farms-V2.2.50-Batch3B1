@@ -1,6 +1,7 @@
 <?php require_once(dirname(__DIR__) . '/init.php'); ?>
 <?php
 require_once(__DIR__ . '/../config.php');
+require_once(__DIR__ . '/../lib/daily_population_continuity.php');
 requireLogin();
 
 header('Content-Type: application/json');
@@ -34,8 +35,59 @@ if (!$isOwnerOrAdmin && !checkAccess($requiredModule)) {
     exit;
 }
 
+$farmId = requireCurrentFarmId();
+
+/*
+ * V3 population contract: the modal needs the authoritative population
+ * immediately before movements on the selected target date. Keep the
+ * historical response key "closing_stock" so existing Layer/Broiler/Ruminant
+ * JavaScript clients remain unchanged.
+ *
+ * Legacy/no-baseline cycles fall through to the previous Daily Record chain.
+ */
+if ($cycleId > 0) {
+    try {
+        $canonicalOpening =
+            daily_population_continuity_expected_opening(
+                $pdo,
+                $farmId,
+                $cycleId,
+                $type,
+                $date,
+                $tableMap[$type]['animal']
+                    ? $animalType
+                    : null
+            );
+
+        if ($canonicalOpening !== null) {
+            echo json_encode([
+                'closing_stock' =>
+                    (int)$canonicalOpening['opening_stock'],
+                'opening_stock' =>
+                    (int)$canonicalOpening['opening_stock'],
+                'tracking_status' => 'canonical',
+                'source' => 'v3_population_ledger',
+                'movement_totals' =>
+                    $canonicalOpening['movement_totals'] ?? [],
+            ]);
+            exit;
+        }
+    } catch (Throwable $error) {
+        http_response_code(400);
+        echo json_encode([
+            'closing_stock' => null,
+            'error' =>
+                $error instanceof InvalidArgumentException
+                || $error instanceof DailyPopulationContinuityException
+                    ? $error->getMessage()
+                    : 'Unable to resolve canonical opening stock.',
+        ]);
+        exit;
+    }
+}
+
 $sql = "SELECT * FROM {$tableMap[$type]['table']} WHERE record_date < ? AND farm_id = ?";
-$params = [$date, requireCurrentFarmId()];
+$params = [$date, $farmId];
 if ($cycleId > 0) {
     $sql .= " AND cycle_id = ?";
     $params[] = $cycleId;
