@@ -5,6 +5,7 @@ require_once(__DIR__ . '/../lib/daily_feed_sync.php');
 require_once(__DIR__ . '/../lib/daily_population_sync.php');
 require_once(__DIR__ . '/../lib/daily_population_continuity.php');
 require_once(__DIR__ . '/../lib/daily_record_workspace_scope.php');
+require_once(__DIR__ . '/../lib/ruminant_daily_record_mortality_summary.php');
 requireLogin();
 
 // Check access
@@ -213,6 +214,18 @@ foreach ($records as $record) {
 }
 
 $summaryTotals = $monthlyTotals;
+
+$mortalitySummary = ruminant_daily_record_mortality_summary(
+    $pdo,
+    $tenantFarmId,
+    $yearMonth,
+    $records,
+    ($cycleEnabled && $selectedCycleId > 0)
+        ? $selectedCycleId
+        : null
+);
+$summaryTotals['mortality'] =
+    $mortalitySummary['total_mortality'];
 
 $normalizeAnimalType = static function ($value) {
     $normalized = strtolower(trim((string)$value));
@@ -508,7 +521,11 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!"
                                     <div class="card-body text-center">
                                         <h6>Mortality</h6>
                                         <h3><?php echo number_format($summaryTotals['mortality']); ?></h3>
-                                        <small><?php echo htmlspecialchars($workspaceScope['activity_label']); ?> · Losses</small>
+                                        <small>
+                                            <?php echo htmlspecialchars($workspaceScope['activity_label']); ?>
+                                            · Tagged <?php echo number_format($mortalitySummary['tagged_mortality']); ?>
+                                            · Group <?php echo number_format($mortalitySummary['daily_record_mortality']); ?>
+                                        </small>
                                     </div>
                                 </div>
                             </div>
