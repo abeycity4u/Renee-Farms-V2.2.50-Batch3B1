@@ -308,6 +308,19 @@ $scopeLabel =
 
         <div class="card mb-3">
             <div class="card-body">
+
+                <div class="mb-3">
+                    <div class="small text-muted">
+                        Stock Reference
+                    </div>
+                    <div class="fw-semibold">
+                        <code><?php echo $escape(
+                            $movement['public_reference']
+                            ?? '—'
+                        ); ?></code>
+                    </div>
+                </div>
+
                 <div class="row g-3">
 
                     <div class="col-md-3">
