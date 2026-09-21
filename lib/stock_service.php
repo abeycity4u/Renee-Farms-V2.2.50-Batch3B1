@@ -146,39 +146,99 @@ function stock_apply_movement(
 
 
 
-    $insert = $pdo->prepare("INSERT INTO stock_transactions
-        (farm_id, cycle_id, stock_item_id, transaction_type, quantity, unit_cost, total_cost,
-         previous_stock, new_stock, transaction_date, remarks, user_id, farm_type, production_type, financial_classification,
-         attribution_scope, source_type, source_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $insert->execute([
-        $farmId,
-        $cycleId,
-        $itemId,
-        $type,
-        $quantity,
-        $snapshotUnitCost,
-        $totalCost,
-        $previous,
-        $newStock,
-        $transactionDate,
-        $remarks,
-        $userId,
-        $movementFarmType,
-        $productionType,
-        (string)($item['category_financial_type'] ?? $item['financial_classification'] ?? 'other_stock'),
-        $attributionScope,
-        $sourceType,
-        $sourceId,
-    ]);
-    $transactionId = (int)$pdo->lastInsertId();
+    $transactionId =
+        record_reference_persistence_insert_new(
+            $pdo,
+            'stock_movement',
+            static function (
+                string $publicReference,
+                string $createdAt
+            ) use (
+                $pdo,
+                $farmId,
+                $cycleId,
+                $itemId,
+                $type,
+                $quantity,
+                $snapshotUnitCost,
+                $totalCost,
+                $previous,
+                $newStock,
+                $transactionDate,
+                $remarks,
+                $userId,
+                $movementFarmType,
+                $productionType,
+                $item,
+                $attributionScope,
+                $sourceType,
+                $sourceId
+            ): int {
+                $insert =
+                    $pdo->prepare(
+                        "INSERT INTO stock_transactions
+                            (
+                                public_reference,
+                                farm_id,
+                                cycle_id,
+                                stock_item_id,
+                                transaction_type,
+                                quantity,
+                                unit_cost,
+                                total_cost,
+                                previous_stock,
+                                new_stock,
+                                transaction_date,
+                                remarks,
+                                user_id,
+                                farm_type,
+                                production_type,
+                                financial_classification,
+                                attribution_scope,
+                                source_type,
+                                source_id,
+                                created_at
+                            )
+                         VALUES
+                            (
+                                ?, ?, ?, ?, ?, ?,
+                                ?, ?, ?, ?, ?, ?,
+                                ?, ?, ?, ?, ?, ?,
+                                ?, ?
+                            )"
+                    );
 
-    record_reference_persistence_assign_existing(
-        $pdo,
-        'stock_movement',
-        $farmId,
-        $transactionId
-    );
+                $insert->execute([
+                    $publicReference,
+                    $farmId,
+                    $cycleId,
+                    $itemId,
+                    $type,
+                    $quantity,
+                    $snapshotUnitCost,
+                    $totalCost,
+                    $previous,
+                    $newStock,
+                    $transactionDate,
+                    $remarks,
+                    $userId,
+                    $movementFarmType,
+                    $productionType,
+                    (string)(
+                        $item['category_financial_type']
+                        ?? $item['financial_classification']
+                        ?? 'other_stock'
+                    ),
+                    $attributionScope,
+                    $sourceType,
+                    $sourceId,
+                    $createdAt,
+                ]);
+
+                return
+                    (int)$pdo->lastInsertId();
+            }
+        );
 
     // For manual movements the transaction id is the durable source id.
     if ($sourceType !== null && $sourceId === null) {
@@ -262,40 +322,119 @@ function stock_reverse_transaction(
     $remark = trim($reason) !== '' ? $reason : 'Stock transaction reversal';
     $reversalSourceType = $sourceType ?? (($tx['source_type'] ?: 'stock') . '_reversal');
     $reversalSourceId = $sourceId ?? (int)$tx['id'];
-    $insert = $pdo->prepare("INSERT INTO stock_transactions
-        (farm_id, cycle_id, stock_item_id, transaction_type, quantity, unit_cost, total_cost,
-         previous_stock, new_stock, transaction_date, remarks, user_id, farm_type, production_type, financial_classification,
-         attribution_scope, source_type, source_id, is_reversed, reversal_of_id, reversed_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, NULL)");
-    $insert->execute([
-        $farmId,
-        $tx['cycle_id'] ?? null,
-        (int)$item['id'],
-        $reverseType,
-        $quantity,
-        (float)($tx['unit_cost'] ?? 0),
-        round($quantity * (float)($tx['unit_cost'] ?? 0), 2),
-        $previous,
-        $newStock,
-        $tx['transaction_date'],
-        $remark,
-        $userId,
-        $tx['farm_type'] ?? $item['farm_type'],
-        $tx['production_type'] ?? 'shared',
-        $tx['financial_classification'] ?? ($item['financial_classification'] ?? 'other_stock'),
-        $tx['attribution_scope'] ?? (($tx['cycle_id'] ?? null) ? 'cycle' : 'farm'),
-        $reversalSourceType,
-        $reversalSourceId,
-        (int)$tx['id'],
-    ]);
-    $reversalId = (int)$pdo->lastInsertId();
+    $reversalId =
+        record_reference_persistence_insert_new(
+            $pdo,
+            'stock_movement',
+            static function (
+                string $publicReference,
+                string $createdAt
+            ) use (
+                $pdo,
+                $farmId,
+                $tx,
+                $item,
+                $reverseType,
+                $quantity,
+                $previous,
+                $newStock,
+                $remark,
+                $userId,
+                $reversalSourceType,
+                $reversalSourceId
+            ): int {
+                $insert =
+                    $pdo->prepare(
+                        "INSERT INTO stock_transactions
+                            (
+                                public_reference,
+                                farm_id,
+                                cycle_id,
+                                stock_item_id,
+                                transaction_type,
+                                quantity,
+                                unit_cost,
+                                total_cost,
+                                previous_stock,
+                                new_stock,
+                                transaction_date,
+                                remarks,
+                                user_id,
+                                farm_type,
+                                production_type,
+                                financial_classification,
+                                attribution_scope,
+                                source_type,
+                                source_id,
+                                is_reversed,
+                                reversal_of_id,
+                                reversed_at,
+                                created_at
+                            )
+                         VALUES
+                            (
+                                ?, ?, ?, ?, ?, ?,
+                                ?, ?, ?, ?, ?, ?,
+                                ?, ?, ?, ?, ?, ?,
+                                ?, 0, ?, NULL, ?
+                            )"
+                    );
 
-    record_reference_persistence_assign_existing(
-        $pdo,
-        'stock_movement',
-        $farmId,
-        $reversalId
-    );
+                $insert->execute([
+                    $publicReference,
+                    $farmId,
+                    $tx['cycle_id']
+                        ?? null,
+                    (int)$item['id'],
+                    $reverseType,
+                    $quantity,
+                    (float)(
+                        $tx['unit_cost']
+                        ?? 0
+                    ),
+                    round(
+                        $quantity
+                        * (float)(
+                            $tx['unit_cost']
+                            ?? 0
+                        ),
+                        2
+                    ),
+                    $previous,
+                    $newStock,
+                    $tx['transaction_date'],
+                    $remark,
+                    $userId,
+                    $tx['farm_type']
+                        ?? $item['farm_type'],
+                    $tx['production_type']
+                        ?? 'shared',
+                    $tx['financial_classification']
+                        ?? (
+                            $item[
+                                'financial_classification'
+                            ]
+                            ?? 'other_stock'
+                        ),
+                    $tx['attribution_scope']
+                        ?? (
+                            (
+                                $tx['cycle_id']
+                                ?? null
+                            )
+                                ? 'cycle'
+                                : 'farm'
+                        ),
+                    $reversalSourceType,
+                    $reversalSourceId,
+                    (int)$tx['id'],
+                    $createdAt,
+                ]);
+
+                return
+                    (int)$pdo->lastInsertId();
+            }
+        );
 
     $pdo->prepare("UPDATE stock_transactions
         SET is_reversed = 1, reversal_of_id = ?, reversed_at = NOW()

@@ -133,7 +133,7 @@ $canonicalPoultryCreate =
     &&
     strpos(
         $files['poultry_entry'],
-        'record_reference_persistence_assign_existing('
+        'record_reference_persistence_insert_new('
     ) !== false;
 
 

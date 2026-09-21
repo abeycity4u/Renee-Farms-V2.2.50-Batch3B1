@@ -446,60 +446,74 @@ function poultry_expense_entry_create(
         );
     }
 
-    $stmt =
-        $pdo->prepare(
-            "INSERT INTO farm_expenses
-                (
-                    farm_id,
-                    expense_date,
-                    farm_type,
-                    production_type,
-                    attribution_scope,
-                    cycle_id,
-                    poultry_category,
-                    category,
-                    amount,
-                    unit,
-                    description,
-                    user_id
-                )
-             VALUES
-                (
-                    ?,?,
-                    'poultry',
-                    ?,?,?,?,?,?,?,?,?
-                )"
-        );
-
-    $stmt->execute([
-        $farmId,
-        $expenseDate,
-        $productionType,
-        $attributionScope,
-        $storedCycleId,
-        $poultryCategory,
-        $category,
-        $amount,
-        $unit,
-        $description,
-        $actorUserId,
-    ]);
-
     $expenseId =
-        (int)$pdo->lastInsertId();
+        record_reference_persistence_insert_new(
+            $pdo,
+            'expense',
+            static function (
+                string $publicReference,
+                string $createdAt
+            ) use (
+                $pdo,
+                $farmId,
+                $expenseDate,
+                $productionType,
+                $attributionScope,
+                $storedCycleId,
+                $poultryCategory,
+                $category,
+                $amount,
+                $unit,
+                $description,
+                $actorUserId
+            ): int {
+                $stmt =
+                    $pdo->prepare(
+                        "INSERT INTO farm_expenses
+                            (
+                                public_reference,
+                                farm_id,
+                                expense_date,
+                                farm_type,
+                                production_type,
+                                attribution_scope,
+                                cycle_id,
+                                poultry_category,
+                                category,
+                                amount,
+                                unit,
+                                description,
+                                user_id,
+                                created_at
+                            )
+                         VALUES
+                            (
+                                ?, ?, ?,
+                                'poultry',
+                                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                            )"
+                    );
 
-    if ($expenseId < 1) {
-        throw new RuntimeException(
-            'Poultry expense creation did not return a valid record identity.'
+                $stmt->execute([
+                    $publicReference,
+                    $farmId,
+                    $expenseDate,
+                    $productionType,
+                    $attributionScope,
+                    $storedCycleId,
+                    $poultryCategory,
+                    $category,
+                    $amount,
+                    $unit,
+                    $description,
+                    $actorUserId,
+                    $createdAt,
+                ]);
+
+                return
+                    (int)$pdo->lastInsertId();
+            }
         );
-    }
-
-    record_reference_persistence_assign_existing(
-        $pdo,
-        'expense',
-        $farmId,
-        $expenseId
-    );
 
     expense_revision_service_record_created(
         $pdo,

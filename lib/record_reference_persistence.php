@@ -185,6 +185,134 @@ if (!function_exists('record_reference_persistence_require_transaction')) {
     }
 }
 
+if (!function_exists('record_reference_persistence_database_created_at')) {
+    function record_reference_persistence_database_created_at(
+        PDO $pdo
+    ): string {
+        /*
+         * New business references must derive their date token from the
+         * database posting timestamp, not an editable business/effective
+         * date and not a separately sampled PHP clock.
+         *
+         * The same timestamp is handed to the insert callback so the
+         * persisted created_at value and public-reference date token have
+         * one canonical clock source.
+         */
+        record_reference_persistence_require_transaction(
+            $pdo
+        );
+
+        $createdAt =
+            trim(
+                (string)$pdo
+                    ->query(
+                        'SELECT CURRENT_TIMESTAMP'
+                    )
+                    ->fetchColumn()
+            );
+
+        if ($createdAt === '') {
+            throw new RuntimeException(
+                'Unable to establish the record creation timestamp.'
+            );
+        }
+
+        try {
+            $date =
+                new DateTimeImmutable(
+                    $createdAt
+                );
+
+        } catch (Throwable $error) {
+            throw new RuntimeException(
+                'The database record creation timestamp is invalid.',
+                0,
+                $error
+            );
+        }
+
+        if (
+            $date->format(
+                'Y-m-d H:i:s'
+            ) !== $createdAt
+        ) {
+            throw new RuntimeException(
+                'The database record creation timestamp format is invalid.'
+            );
+        }
+
+        return $createdAt;
+    }
+}
+
+if (!function_exists('record_reference_persistence_insert_new')) {
+    function record_reference_persistence_insert_new(
+        PDO $pdo,
+        string $entity,
+        callable $operation
+    ): int {
+        /*
+         * This is the canonical path for creating a new business parent once
+         * public_reference becomes a database NOT NULL invariant.
+         *
+         * The caller still owns business SQL and the surrounding transaction.
+         * This helper owns:
+         * - active-transaction enforcement;
+         * - one database-sourced immutable created_at timestamp;
+         * - reference generation;
+         * - bounded unique-collision retry;
+         * - validation that the successful insert returned a row identity.
+         *
+         * The operation receives:
+         *   1. generated public reference;
+         *   2. canonical database created_at timestamp.
+         *
+         * The operation must persist both values in its INSERT and return the
+         * new integer primary key.
+         */
+        record_reference_persistence_require_transaction(
+            $pdo
+        );
+
+        record_reference_persistence_storage(
+            $entity
+        );
+
+        $createdAt =
+            record_reference_persistence_database_created_at(
+                $pdo
+            );
+
+        $recordId =
+            record_reference_persistence_with_retry(
+                $entity,
+                static function (
+                    string $reference
+                ) use (
+                    $operation,
+                    $createdAt
+                ): int {
+                    $insertedId =
+                        (int)$operation(
+                            $reference,
+                            $createdAt
+                        );
+
+                    if ($insertedId < 1) {
+                        throw new RuntimeException(
+                            'Record creation did not return a valid identity.'
+                        );
+                    }
+
+                    return $insertedId;
+                },
+                $createdAt
+            );
+
+        return (int)$recordId;
+    }
+}
+
 if (!function_exists('record_reference_persistence_assign_existing')) {
     function record_reference_persistence_assign_existing(
         PDO $pdo,

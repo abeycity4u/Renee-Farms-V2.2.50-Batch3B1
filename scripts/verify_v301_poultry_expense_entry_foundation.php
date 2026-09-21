@@ -214,7 +214,7 @@ poultry_expense_foundation_check(
     'SERVICE_ASSIGN_REFERENCE',
     strpos(
         $service,
-        'record_reference_persistence_assign_existing('
+        'record_reference_persistence_insert_new('
     ) !== false
 );
 

@@ -325,32 +325,32 @@ $check(
 $check(
     strpos(
         $source['poultry_hub'],
-        'record_reference_persistence_assign_existing('
+        'record_reference_persistence_insert_new('
     ) === false
     &&
     strpos(
         $source['poultry_workspace'],
-        'record_reference_persistence_assign_existing('
+        'record_reference_persistence_insert_new('
     ) === false
     &&
     substr_count(
         $source['ruminant'],
-        'record_reference_persistence_assign_existing('
+        'record_reference_persistence_insert_new('
     ) === 1
     &&
     strpos(
         $source['management'],
-        'record_reference_persistence_assign_existing('
+        'record_reference_persistence_insert_new('
     ) === false
     &&
     strpos(
         $source['pdf'],
-        'record_reference_persistence_assign_existing('
+        'record_reference_persistence_insert_new('
     ) === false
     &&
     strpos(
         $source['allocation'],
-        'record_reference_persistence_assign_existing('
+        'record_reference_persistence_insert_new('
     ) === false,
     'Only the still-combined Ruminant display/writer owns reference persistence'
 );

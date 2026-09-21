@@ -344,35 +344,117 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         $pdo->beginTransaction();
         try {
-        $stmt = $pdo->prepare("INSERT INTO sales_records
-            (farm_id, sale_date, farm_type, production_type, attribution_scope, cycle_id,
-             product_type, quantity, unit_of_measure, unit_price, payment_received, customer_name, remarks, user_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([
-            $tenantFarmId,
-            $_POST['sale_date'],
-            $saleFarmType,
-            $productionType,
-            $scope,
-            $cycleId > 0 ? $cycleId : null,
-            $_POST['product_type'],
-            $quantity,
-            $unitOfMeasure,
-            $unitPrice,
-            $paymentReceived,
-            $customerName !== '' ? $customerName : null,
-            $_POST['remarks'],
-            $_SESSION['user_id']
-        ]);
+        $saleDate =
+            (string)(
+                $_POST[
+                    'sale_date'
+                ]
+                ?? ''
+            );
 
-        $saleId = (int)$pdo->lastInsertId();
+        $saleProductType =
+            (string)(
+                $_POST[
+                    'product_type'
+                ]
+                ?? ''
+            );
 
-        record_reference_persistence_assign_existing(
-            $pdo,
-            'sale',
-            $tenantFarmId,
-            $saleId
-        );
+        $saleRemarks =
+            (string)(
+                $_POST[
+                    'remarks'
+                ]
+                ?? ''
+            );
+
+        $saleUserId =
+            (int)(
+                $_SESSION[
+                    'user_id'
+                ]
+                ?? 0
+            );
+
+        $saleId =
+            record_reference_persistence_insert_new(
+                $pdo,
+                'sale',
+                static function (
+                    string $publicReference,
+                    string $createdAt
+                ) use (
+                    $pdo,
+                    $tenantFarmId,
+                    $saleDate,
+                    $saleFarmType,
+                    $productionType,
+                    $scope,
+                    $cycleId,
+                    $saleProductType,
+                    $quantity,
+                    $unitOfMeasure,
+                    $unitPrice,
+                    $paymentReceived,
+                    $customerName,
+                    $saleRemarks,
+                    $saleUserId
+                ): int {
+                    $stmt =
+                        $pdo->prepare(
+                            "INSERT INTO sales_records
+                                (
+                                    public_reference,
+                                    farm_id,
+                                    sale_date,
+                                    farm_type,
+                                    production_type,
+                                    attribution_scope,
+                                    cycle_id,
+                                    product_type,
+                                    quantity,
+                                    unit_of_measure,
+                                    unit_price,
+                                    payment_received,
+                                    customer_name,
+                                    remarks,
+                                    user_id,
+                                    created_at
+                                )
+                             VALUES
+                                (
+                                    ?, ?, ?, ?, ?, ?, ?, ?,
+                                    ?, ?, ?, ?, ?, ?, ?, ?
+                                )"
+                        );
+
+                    $stmt->execute([
+                        $publicReference,
+                        $tenantFarmId,
+                        $saleDate,
+                        $saleFarmType,
+                        $productionType,
+                        $scope,
+                        $cycleId > 0
+                            ? $cycleId
+                            : null,
+                        $saleProductType,
+                        $quantity,
+                        $unitOfMeasure,
+                        $unitPrice,
+                        $paymentReceived,
+                        $customerName !== ''
+                            ? $customerName
+                            : null,
+                        $saleRemarks,
+                        $saleUserId,
+                        $createdAt,
+                    ]);
+
+                    return
+                        (int)$pdo->lastInsertId();
+                }
+            );
 
         ruminant_sale_save_animal_allocations($pdo, $tenantFarmId, $saleId, $animalRevenueAllocation, (int)$_SESSION['user_id']);
         if ($saleFarmType === 'ruminant') {

@@ -97,21 +97,91 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_expense'])) {
     try {
         $animalAllocation = ruminant_expense_build_animal_allocations($pdo, $tenantFarmId, $productionType, round($amount * $unit, 2), $_POST);
         $pdo->beginTransaction();
-        $stmt = $pdo->prepare("INSERT INTO farm_expenses
-            (farm_id, expense_date, farm_type, production_type, attribution_scope, cycle_id, category, amount, unit, description, user_id)
-            VALUES (?, ?, 'ruminant', ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([
-            $tenantFarmId, $expenseDate, $productionType, $scope, $cycleId > 0 ? $cycleId : null,
-            $expenseCategory, $amount, $unit, trim((string)($_POST['description'] ?? '')), $_SESSION['user_id']
-        ]);
-        $expenseId = (int)$pdo->lastInsertId();
+        $expenseDescription =
+            trim(
+                (string)(
+                    $_POST[
+                        'description'
+                    ]
+                    ?? ''
+                )
+            );
 
-        record_reference_persistence_assign_existing(
-            $pdo,
-            'expense',
-            $tenantFarmId,
-            $expenseId
-        );
+        $expenseUserId =
+            (int)(
+                $_SESSION[
+                    'user_id'
+                ]
+                ?? 0
+            );
+
+        $expenseId =
+            record_reference_persistence_insert_new(
+                $pdo,
+                'expense',
+                static function (
+                    string $publicReference,
+                    string $createdAt
+                ) use (
+                    $pdo,
+                    $tenantFarmId,
+                    $expenseDate,
+                    $productionType,
+                    $scope,
+                    $cycleId,
+                    $expenseCategory,
+                    $amount,
+                    $unit,
+                    $expenseDescription,
+                    $expenseUserId
+                ): int {
+                    $stmt =
+                        $pdo->prepare(
+                            "INSERT INTO farm_expenses
+                                (
+                                    public_reference,
+                                    farm_id,
+                                    expense_date,
+                                    farm_type,
+                                    production_type,
+                                    attribution_scope,
+                                    cycle_id,
+                                    category,
+                                    amount,
+                                    unit,
+                                    description,
+                                    user_id,
+                                    created_at
+                                )
+                             VALUES
+                                (
+                                    ?, ?, ?,
+                                    'ruminant',
+                                    ?, ?, ?, ?, ?, ?, ?, ?, ?
+                                )"
+                        );
+
+                    $stmt->execute([
+                        $publicReference,
+                        $tenantFarmId,
+                        $expenseDate,
+                        $productionType,
+                        $scope,
+                        $cycleId > 0
+                            ? $cycleId
+                            : null,
+                        $expenseCategory,
+                        $amount,
+                        $unit,
+                        $expenseDescription,
+                        $expenseUserId,
+                        $createdAt,
+                    ]);
+
+                    return
+                        (int)$pdo->lastInsertId();
+                }
+            );
 
         ruminant_expense_save_animal_allocations($pdo, $tenantFarmId, $expenseId, $animalAllocation, (int)$_SESSION['user_id']);
 

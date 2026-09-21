@@ -255,7 +255,7 @@ $check(
 
 
 $assignment =
-    'record_reference_persistence_assign_existing(';
+    'record_reference_persistence_insert_new(';
 
 $check(
     substr_count(
