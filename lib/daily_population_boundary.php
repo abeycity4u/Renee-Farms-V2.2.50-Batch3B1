@@ -85,6 +85,40 @@ if (!function_exists('daily_population_boundary_movement_label')) {
     }
 }
 
+if (!function_exists('daily_population_boundary_movement_summary')) {
+    /**
+     * Human-readable non-mortality movement summary for Daily Record rows.
+     * Mortality is already a first-class Daily Record column, so it is omitted
+     * by default rather than being duplicated or used as a generic exit label.
+     */
+    function daily_population_boundary_movement_summary(
+        array $movementTotals,
+        bool $includeMortality = false
+    ): string {
+        $parts = [];
+
+        foreach ($movementTotals as $movementType => $deltaRaw) {
+            $movementType = strtolower(trim((string)$movementType));
+            $delta = (int)$deltaRaw;
+
+            if ($delta === 0) {
+                continue;
+            }
+
+            if (!$includeMortality && $movementType === 'mortality') {
+                continue;
+            }
+
+            $parts[] =
+                daily_population_boundary_movement_label($movementType)
+                . ' '
+                . number_format(abs($delta));
+        }
+
+        return implode(' · ', $parts);
+    }
+}
+
 if (!function_exists('daily_population_boundary_build_snapshots')) {
     /**
      * Pure population-boundary calculator.
@@ -489,6 +523,10 @@ if (!function_exists('daily_population_boundary_snapshots')) {
             $snapshot['farm_id'] = $farmId;
             $snapshot['cycle_id'] = $cycleId;
             $snapshot['baseline_date'] = $baselineDate;
+            $snapshot['farm_type'] =
+                (string)$canonical['farm_type'];
+            $snapshot['production_type'] =
+                strtolower((string)$canonical['production_type']);
         }
         unset($snapshot);
 

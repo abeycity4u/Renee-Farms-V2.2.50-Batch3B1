@@ -26,6 +26,10 @@ if (!function_exists('daily_population_continuity_types')) {
                 'source_type' => 'daily_layer_record',
                 'population_label' => 'flock',
                 'animal_type_required' => false,
+                'farm_type' => 'poultry',
+                'production_type' => 'broiler',
+                'farm_type' => 'poultry',
+                'production_type' => 'layer',
             ],
             'broiler' => [
                 'table' => 'broiler_daily_records',
@@ -38,6 +42,8 @@ if (!function_exists('daily_population_continuity_types')) {
                 'source_type' => 'daily_ruminant_record',
                 'population_label' => 'herd',
                 'animal_type_required' => true,
+                'farm_type' => 'ruminant',
+                'production_type' => null,
             ],
         ];
     }
@@ -62,6 +68,12 @@ if (!function_exists('daily_population_continuity_type')) {
             'population_label' => $types[$recordType]['population_label'],
             'animal_type_required' =>
                 (bool)$types[$recordType]['animal_type_required'],
+            'farm_type' =>
+                (string)$types[$recordType]['farm_type'],
+            'production_type' =>
+                $types[$recordType]['production_type'] !== null
+                    ? (string)$types[$recordType]['production_type']
+                    : null,
         ];
     }
 }
@@ -216,6 +228,284 @@ if (!function_exists('daily_population_continuity_later_rows')) {
         $stmt->execute($params);
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+
+if (!function_exists('daily_population_continuity_expected_opening')) {
+    /**
+     * Read the authoritative opening population for one Daily Record date.
+     *
+     * NULL means the cycle/date is outside the V3 population contract and the
+     * route should retain its legacy previous-record continuity guard.
+     */
+    function daily_population_continuity_expected_opening(
+        PDO $pdo,
+        int $farmId,
+        int $cycleId,
+        string $recordType,
+        string $recordDate,
+        ?string $animalType = null
+    ): ?array {
+        $config = daily_population_continuity_type($recordType);
+        $animalType = daily_population_continuity_animal_type(
+            $config,
+            $animalType
+        );
+
+        $snapshot = daily_population_boundary_snapshot(
+            $pdo,
+            $farmId,
+            $cycleId,
+            $recordDate
+        );
+
+        if ($snapshot === null) {
+            return null;
+        }
+
+        if (
+            $config['key'] === 'ruminant'
+            && strtolower((string)$snapshot['production_type'])
+                !== $animalType
+        ) {
+            throw new DailyPopulationContinuityException(
+                'The selected ruminant cycle belongs to '
+                . ucfirst((string)$snapshot['production_type'])
+                . ', not '
+                . ucfirst((string)$animalType)
+                . '.'
+            );
+        }
+
+        return [
+            'opening_stock' => (int)$snapshot['opening_quantity'],
+            'closing_stock' => (int)$snapshot['closing_quantity'],
+            'tracking_status' => 'canonical',
+            'source' => 'v3_population_ledger',
+            'movement_totals' =>
+                $snapshot['movement_totals'] ?? [],
+        ];
+    }
+}
+
+if (!function_exists('daily_population_continuity_enrich_records')) {
+    /**
+     * Decorate Daily Record read models with canonical population boundaries.
+     *
+     * Stored opening_stock is retained as stored_opening_stock for audit/debug
+     * purposes. The public opening_stock value becomes canonical only where a
+     * V3 baseline covers that cycle/date. Legacy rows remain unchanged.
+     */
+    function daily_population_continuity_enrich_records(
+        PDO $pdo,
+        int $farmId,
+        string $recordType,
+        array $records
+    ): array {
+        $config = daily_population_continuity_type($recordType);
+        $groups = [];
+
+        foreach ($records as $index => &$record) {
+            $storedOpening = (int)($record['opening_stock'] ?? 0);
+            $mortality = (int)($record['mortality'] ?? 0);
+
+            $record['stored_opening_stock'] = $storedOpening;
+            $record['population_opening_stock'] = $storedOpening;
+            $record['population_closing_stock'] =
+                max(0, $storedOpening - $mortality);
+            $record['population_movement_totals'] = [];
+            $record['population_tracking_status'] = 'legacy';
+            $record['population_source'] = 'daily_record_chain';
+
+            $cycleId = (int)($record['cycle_id'] ?? 0);
+            $recordDate = (string)($record['record_date'] ?? '');
+
+            if (
+                $cycleId <= 0
+                || !daily_population_continuity_valid_date($recordDate)
+            ) {
+                continue;
+            }
+
+            if (!isset($groups[$cycleId])) {
+                $groups[$cycleId] = [
+                    'dates' => [],
+                    'indexes' => [],
+                ];
+            }
+
+            $groups[$cycleId]['dates'][] = $recordDate;
+            $groups[$cycleId]['indexes'][] = $index;
+        }
+        unset($record);
+
+        foreach ($groups as $cycleId => $group) {
+            $snapshots = daily_population_boundary_snapshots(
+                $pdo,
+                $farmId,
+                (int)$cycleId,
+                $group['dates']
+            );
+
+            if (!$snapshots) {
+                continue;
+            }
+
+            foreach ($group['indexes'] as $index) {
+                $recordDate =
+                    (string)$records[$index]['record_date'];
+                $snapshot = $snapshots[$recordDate] ?? null;
+
+                if ($snapshot === null) {
+                    continue;
+                }
+
+                if (
+                    $config['key'] === 'ruminant'
+                    && strtolower(
+                        (string)($records[$index]['animal_type'] ?? '')
+                    ) !== strtolower(
+                        (string)$snapshot['production_type']
+                    )
+                ) {
+                    continue;
+                }
+
+                $canonicalOpening =
+                    (int)$snapshot['opening_quantity'];
+
+                $records[$index]['opening_stock'] =
+                    $canonicalOpening;
+                $records[$index]['population_opening_stock'] =
+                    $canonicalOpening;
+                $records[$index]['population_closing_stock'] =
+                    (int)$snapshot['closing_quantity'];
+                $records[$index]['population_movement_totals'] =
+                    $snapshot['movement_totals'] ?? [];
+                $records[$index]['population_tracking_status'] =
+                    'canonical';
+                $records[$index]['population_source'] =
+                    'v3_population_ledger';
+
+                if (
+                    $config['key'] === 'layer'
+                    && $canonicalOpening > 0
+                ) {
+                    $eggProduction =
+                        (int)($records[$index]['egg_production'] ?? 0);
+
+                    if ($eggProduction <= $canonicalOpening) {
+                        $records[$index]['laying_rate'] =
+                            round(
+                                ($eggProduction / $canonicalOpening) * 100,
+                                2
+                            );
+                    }
+                }
+            }
+        }
+
+        return $records;
+    }
+}
+
+if (!function_exists('daily_population_continuity_current_stock')) {
+    /**
+     * Current live population for active cycles on one Daily Record workspace.
+     *
+     * Canonical V3 cycles read production_population_state(). Legacy cycles
+     * retain their most recent Daily Record closing as a compatibility fallback.
+     */
+    function daily_population_continuity_current_stock(
+        PDO $pdo,
+        int $farmId,
+        string $recordType,
+        ?int $selectedCycleId = null
+    ): ?int {
+        $config = daily_population_continuity_type($recordType);
+
+        $sql =
+            'SELECT id, production_type'
+            . ' FROM production_cycles'
+            . ' WHERE farm_id = ?'
+            . ' AND farm_type = ?'
+            . " AND status = 'active'";
+        $params = [
+            $farmId,
+            $config['farm_type'],
+        ];
+
+        if ($config['production_type'] !== null) {
+            $sql .= ' AND LOWER(production_type) = ?';
+            $params[] = $config['production_type'];
+        }
+
+        if ($selectedCycleId !== null && $selectedCycleId > 0) {
+            $sql .= ' AND id = ?';
+            $params[] = $selectedCycleId;
+        }
+
+        $sql .= ' ORDER BY start_date ASC, id ASC';
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $cycles = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (!$cycles) {
+            return null;
+        }
+
+        $total = 0;
+        $resolved = false;
+
+        foreach ($cycles as $cycle) {
+            $cycleId = (int)$cycle['id'];
+            $state = production_population_state(
+                $pdo,
+                $farmId,
+                $cycleId
+            );
+
+            if ($state !== null) {
+                $total += (int)$state['quantity'];
+                $resolved = true;
+                continue;
+            }
+
+            $legacySql =
+                'SELECT opening_stock, mortality'
+                . ' FROM ' . $config['table']
+                . ' WHERE farm_id = ?'
+                . ' AND cycle_id = ?';
+            $legacyParams = [
+                $farmId,
+                $cycleId,
+            ];
+
+            if ($config['key'] === 'ruminant') {
+                $legacySql .= ' AND LOWER(animal_type) = ?';
+                $legacyParams[] =
+                    strtolower((string)$cycle['production_type']);
+            }
+
+            $legacySql .=
+                ' ORDER BY record_date DESC, id DESC LIMIT 1';
+
+            $legacyStmt = $pdo->prepare($legacySql);
+            $legacyStmt->execute($legacyParams);
+            $legacy = $legacyStmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($legacy) {
+                $total += max(
+                    0,
+                    (int)$legacy['opening_stock']
+                    - (int)$legacy['mortality']
+                );
+                $resolved = true;
+            }
+        }
+
+        return $resolved ? $total : null;
     }
 }
 

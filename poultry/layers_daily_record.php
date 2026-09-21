@@ -46,6 +46,12 @@ $query .= " ORDER BY record_date";
 $stmt = $pdo->prepare($query);
 $stmt->execute($params);
 $records = $stmt->fetchAll();
+$records = daily_population_continuity_enrich_records(
+    $pdo,
+    $tenantFarmId,
+    'layer',
+    $records
+);
 
 // V2.2.49 Batch 4B refinement: resolve the feed item saved on each historical
 // daily record. This is deliberately independent of the current active-feed
@@ -94,6 +100,20 @@ if ($cycleEnabled && $selectedCycleId === 0) {
 }
 if ($latestLayerRecord) {
     $layerClosingStock = $latestLayerRecord['opening_stock'] - $latestLayerRecord['mortality'];
+}
+
+if ($cycleEnabled) {
+    $canonicalWorkspaceStock =
+        daily_population_continuity_current_stock(
+            $pdo,
+            $tenantFarmId,
+            'layer',
+            $selectedCycleId > 0 ? $selectedCycleId : null
+        );
+
+    if ($canonicalWorkspaceStock !== null) {
+        $layerClosingStock = $canonicalWorkspaceStock;
+    }
 }
 
 // Calculate monthly totals
@@ -194,20 +214,41 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $calculatedLayingRate = round(($eggProduction / $openingStock) * 100, 2);
         $calculatedCrates = round($eggProduction / 30, 2);
 
-        // Cycle continuity: the next day's opening flock must equal the previous day's closing flock.
+        // V3 cycles use canonical population. Legacy cycles retain the previous-record chain.
         if ($cycleIdForSave !== null) {
-            $previousStmt = $pdo->prepare("SELECT record_date, opening_stock, mortality FROM layer_daily_records WHERE farm_id = ? AND cycle_id = ? AND record_date < ? ORDER BY record_date DESC LIMIT 1");
-            $previousStmt->execute([$tenantFarmId, $cycleIdForSave, $recordDate]);
-            $previous = $previousStmt->fetch(PDO::FETCH_ASSOC);
-            if ($previous) {
-                $expectedOpening = max(0, (int)$previous['opening_stock'] - (int)$previous['mortality']);
+            $canonicalExpected =
+                daily_population_continuity_expected_opening(
+                    $pdo,
+                    $tenantFarmId,
+                    $cycleIdForSave,
+                    'layer',
+                    $recordDate
+                );
+
+            if ($canonicalExpected !== null) {
+                $expectedOpening =
+                    (int)$canonicalExpected['opening_stock'];
+
                 if ($openingStock !== $expectedOpening) {
-                    $_SESSION['error'] = "Opening stock must match the previous day's closing flock (expected {$expectedOpening}).";
+                    $_SESSION['error'] =
+                        "Opening stock must match canonical live population before today's movements (expected {$expectedOpening}).";
                     header('Location: layers_daily_record.php?month=' . urlencode($yearMonth) . '&cycle_id=' . (int)$selectedCycleId);
                     exit();
                 }
+            } else {
+                // Legacy compatibility: Opening stock must match the previous day's closing flock.
+                $previousStmt = $pdo->prepare("SELECT record_date, opening_stock, mortality FROM layer_daily_records WHERE farm_id = ? AND cycle_id = ? AND record_date < ? ORDER BY record_date DESC LIMIT 1");
+                $previousStmt->execute([$tenantFarmId, $cycleIdForSave, $recordDate]);
+                $previous = $previousStmt->fetch(PDO::FETCH_ASSOC);
+                if ($previous) {
+                    $expectedOpening = max(0, (int)$previous['opening_stock'] - (int)$previous['mortality']);
+                    if ($openingStock !== $expectedOpening) {
+                        $_SESSION['error'] = "Opening stock must match the previous day's closing flock (expected {$expectedOpening}).";
+                        header('Location: layers_daily_record.php?month=' . urlencode($yearMonth) . '&cycle_id=' . (int)$selectedCycleId);
+                        exit();
+                    }
+                }
             }
-
         }
 
         // Check if record exists
@@ -289,7 +330,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 'layer',
                 $recordDate,
                 $openingStock,
-                $mortality
+                $mortality,
+                null,
+                $dailyRecordId
             );
         }
 
@@ -589,7 +632,8 @@ $_SESSION['success'] = "Daily record saved successfully!"
                                             </tr>
                                             <?php else: ?>
                                                 <?php foreach ($records as $record):
-                                                    $closingStock = $record['opening_stock'] - $record['mortality'];
+                                                    $closingStock = $record['population_closing_stock']
+                                                        ?? ($record['opening_stock'] - $record['mortality']);
                                                 ?>
                                                 <tr class="record-card">
                                                     <td>
@@ -601,6 +645,17 @@ $_SESSION['success'] = "Daily record saved successfully!"
                                                         <small class="d-block fw-bold text-dark">
                                                             Closing: <?php echo $closingStock; ?>
                                                         </small>
+                                                        <?php
+                                                        $populationMovementSummary =
+                                                            daily_population_boundary_movement_summary(
+                                                                $record['population_movement_totals'] ?? []
+                                                            );
+                                                        ?>
+                                                        <?php if ($populationMovementSummary !== ''): ?>
+                                                            <small class="d-block text-primary">
+                                                                <?php echo htmlspecialchars($populationMovementSummary); ?>
+                                                            </small>
+                                                        <?php endif; ?>
                                                     </td>
                                                     <td><?php echo $record['feed_consumption_bags']; ?></td>
                                                     <td><?php $feedLabel = $dailyRecordFeedItemLabel($record); ?><span class="<?php echo $feedLabel === 'Not assigned' ? 'text-muted' : ''; ?>"><?php echo htmlspecialchars($feedLabel); ?></span></td>

@@ -113,6 +113,12 @@ $query .= " ORDER BY record_date, animal_type";
 $stmt = $pdo->prepare($query);
 $stmt->execute($params);
 $records = $stmt->fetchAll();
+$records = daily_population_continuity_enrich_records(
+    $pdo,
+    $tenantFarmId,
+    'ruminant',
+    $records
+);
 
 // V2.2.49 Batch 4B refinement: resolve the feed item saved on each historical
 // daily record. This is deliberately independent of the current active-feed
@@ -273,6 +279,20 @@ if ($cycleEnabled && $selectedCycleId === 0) {
     }
 }
 
+if ($cycleEnabled) {
+    $canonicalWorkspaceStock =
+        daily_population_continuity_current_stock(
+            $pdo,
+            $tenantFarmId,
+            'ruminant',
+            $selectedCycleId > 0 ? $selectedCycleId : null
+        );
+
+    if ($canonicalWorkspaceStock !== null) {
+        $latestClosingStock = $canonicalWorkspaceStock;
+    }
+}
+
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_record'])) {
     if (!verify_csrf_token($_POST['csrf_token'] ?? '')) { http_response_code(419); exit('Invalid request token.'); }
@@ -338,15 +358,38 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_record'])) {
         exit();
     }
     if ($cycleIdForSave !== null) {
-        $previousStmt = $pdo->prepare("SELECT opening_stock, mortality FROM ruminant_daily_records WHERE farm_id = ? AND cycle_id = ? AND LOWER(animal_type) = ? AND record_date < ? ORDER BY record_date DESC LIMIT 1");
-        $previousStmt->execute([$tenantFarmId, $cycleIdForSave, $animalType, $recordDate]);
-        $previous = $previousStmt->fetch(PDO::FETCH_ASSOC);
-        if ($previous) {
-            $expectedOpening = max(0, (int)$previous['opening_stock'] - (int)$previous['mortality']);
+        $canonicalExpected =
+            daily_population_continuity_expected_opening(
+                $pdo,
+                $tenantFarmId,
+                $cycleIdForSave,
+                'ruminant',
+                $recordDate,
+                $animalType
+            );
+
+        if ($canonicalExpected !== null) {
+            $expectedOpening =
+                (int)$canonicalExpected['opening_stock'];
+
             if ($openingStock !== $expectedOpening) {
-                $_SESSION['error'] = "Opening stock must match the previous day's closing herd (expected {$expectedOpening}).";
+                $_SESSION['error'] =
+                    "Opening stock must match canonical live population before today's movements (expected {$expectedOpening}).";
                 header('Location: ruminant_daily_record.php?month=' . urlencode($month) . '&cycle_id=' . (int)$selectedCycleId);
                 exit();
+            }
+        } else {
+            // Legacy compatibility: Opening stock must match the previous day's closing herd.
+            $previousStmt = $pdo->prepare("SELECT opening_stock, mortality FROM ruminant_daily_records WHERE farm_id = ? AND cycle_id = ? AND LOWER(animal_type) = ? AND record_date < ? ORDER BY record_date DESC LIMIT 1");
+            $previousStmt->execute([$tenantFarmId, $cycleIdForSave, $animalType, $recordDate]);
+            $previous = $previousStmt->fetch(PDO::FETCH_ASSOC);
+            if ($previous) {
+                $expectedOpening = max(0, (int)$previous['opening_stock'] - (int)$previous['mortality']);
+                if ($openingStock !== $expectedOpening) {
+                    $_SESSION['error'] = "Opening stock must match the previous day's closing herd (expected {$expectedOpening}).";
+                    header('Location: ruminant_daily_record.php?month=' . urlencode($month) . '&cycle_id=' . (int)$selectedCycleId);
+                    exit();
+                }
             }
         }
     }
@@ -393,7 +436,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_record'])) {
                 $recordDate,
                 $openingStock,
                 $mortality,
-                $animalType
+                $animalType,
+                $dailyRecordId
             );
         }
 
@@ -686,7 +730,8 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!"
                                 ];
 
                                 foreach ($typeRecords as $record) {
-                                    $closingStock = max(0, $record['opening_stock'] - $record['mortality']);
+                                    $closingStock = $record['population_closing_stock']
+                                        ?? max(0, $record['opening_stock'] - $record['mortality']);
                                     $typeTotals['closing_stock'] = $closingStock;
                                     $typeTotals['mortality'] += $record['mortality'];
                                     $typeTotals['feed_consumption'] += $record['feed_consumption_kg'];
@@ -717,7 +762,8 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!"
                                         </thead>
                                         <tbody>
                                             <?php foreach ($typeRecords as $record):
-                                                $closingStock = $record['opening_stock'] - $record['mortality'];
+                                                $closingStock = $record['population_closing_stock']
+                                                    ?? ($record['opening_stock'] - $record['mortality']);
                                             ?>
                                             <tr>
                                                 <td><?php echo date('d/m/Y', strtotime($record['record_date'])); ?></td>
@@ -727,6 +773,17 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!"
                                                     <small class="d-block text-muted">
                                                         Closing: <?php echo $closingStock; ?>
                                                     </small>
+                                                    <?php
+                                                    $populationMovementSummary =
+                                                        daily_population_boundary_movement_summary(
+                                                            $record['population_movement_totals'] ?? []
+                                                        );
+                                                    ?>
+                                                    <?php if ($populationMovementSummary !== ''): ?>
+                                                        <small class="d-block text-primary">
+                                                            <?php echo htmlspecialchars($populationMovementSummary); ?>
+                                                        </small>
+                                                    <?php endif; ?>
                                                 </td>
                                                 <td><?php echo $record['feed_consumption_kg']; ?></td>
                                                 <td><?php $feedLabel = $dailyRecordFeedItemLabel($record); ?><span class="<?php echo $feedLabel === 'Not assigned' ? 'text-muted' : ''; ?>"><?php echo htmlspecialchars($feedLabel); ?></span></td>
