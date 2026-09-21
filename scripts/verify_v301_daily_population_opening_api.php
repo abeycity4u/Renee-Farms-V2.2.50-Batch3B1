@@ -99,7 +99,7 @@ $check(
     'legacy previous-record fallback remains available',
     str_contains(
         $api,
-        "max(0, (float)$record['opening_stock'] - (float)$record['mortality'])"
+        'max(0, (float)$record[\'opening_stock\'] - (float)$record[\'mortality\'])'
     )
 );
 
@@ -107,7 +107,7 @@ $check(
     'ruminant request still carries animal type into shared guard',
     str_contains(
         $api,
-        "$tableMap[$type]['animal']"
+        '$tableMap[$type][\'animal\']'
     )
     && str_contains(
         $api,
