@@ -11,6 +11,8 @@
  * - Ruminant continuity is isolated by animal_type.
  */
 
+require_once __DIR__ . '/daily_population_boundary.php';
+
 if (!class_exists('DailyPopulationContinuityException')) {
     class DailyPopulationContinuityException extends RuntimeException {}
 }
@@ -162,7 +164,8 @@ if (!function_exists('daily_population_continuity_later_rows')) {
         string $recordType,
         string $recordDate,
         ?string $animalType = null,
-        bool $forUpdate = false
+        bool $forUpdate = false,
+        ?int $sourceId = null
     ): array {
         $config = daily_population_continuity_type($recordType);
         $animalType = daily_population_continuity_animal_type(
@@ -216,6 +219,188 @@ if (!function_exists('daily_population_continuity_later_rows')) {
     }
 }
 
+if (!function_exists('daily_population_continuity_canonical_preview')) {
+    /**
+     * Build a V3 continuity plan from the canonical population ledger.
+     *
+     * Daily Record mortality is overlaid in-memory because the durable source
+     * row is saved before its canonical projection is synchronized. This keeps
+     * the established source-row -> continuity -> feed -> population lock
+     * order intact while making Sales, Transfers, Registry exits and every
+     * other canonical physical movement part of Daily Record continuity.
+     */
+    function daily_population_continuity_canonical_preview(
+        PDO $pdo,
+        int $farmId,
+        int $cycleId,
+        array $config,
+        string $recordDate,
+        int $openingStock,
+        int $mortality,
+        array $rows,
+        ?string $animalType,
+        ?int $sourceId,
+        bool $forUpdate
+    ): ?array {
+        if ($sourceId === null || $sourceId <= 0) {
+            return null;
+        }
+
+        $dates = [$recordDate];
+
+        foreach ($rows as $row) {
+            $dates[] = (string)$row['record_date'];
+        }
+
+        $snapshots = daily_population_boundary_snapshots(
+            $pdo,
+            $farmId,
+            $cycleId,
+            $dates,
+            [
+                'source_type' => $config['source_type'],
+                'source_id' => $sourceId,
+                'record_date' => $recordDate,
+                'mortality' => $mortality,
+                'for_update' => $forUpdate,
+            ]
+        );
+
+        $target = $snapshots[$recordDate] ?? null;
+
+        /*
+         * No V3 baseline on this date means this is a legacy Daily Record
+         * continuity case. The caller will preserve the pre-V3 chain.
+         */
+        if ($target === null) {
+            return null;
+        }
+
+        $canonicalOpening = (int)$target['opening_quantity'];
+
+        if ($openingStock !== $canonicalOpening) {
+            throw new DailyPopulationContinuityException(
+                'Opening stock must match canonical live population before '
+                . 'movements on '
+                . $recordDate
+                . ' (expected '
+                . $canonicalOpening
+                . ').'
+            );
+        }
+
+        $changes = [];
+        $projectedFinalClosing = (int)$target['closing_quantity'];
+
+        foreach ($rows as $row) {
+            $rowDate = (string)$row['record_date'];
+            $snapshot = $snapshots[$rowDate] ?? null;
+
+            if ($snapshot === null) {
+                throw new DailyPopulationContinuityException(
+                    'Canonical population could not be resolved for the later '
+                    . 'Daily Record on '
+                    . $rowDate
+                    . '.'
+                );
+            }
+
+            $expectedOpening = (int)$snapshot['opening_quantity'];
+            $newClosing = (int)$snapshot['closing_quantity'];
+            $oldOpening = (int)$row['opening_stock'];
+            $rowMortality = (int)$row['mortality'];
+
+            if ($expectedOpening < 1) {
+                throw new DailyPopulationContinuityException(
+                    'Canonical population leaves no opening '
+                    . $config['population_label']
+                    . ' for the later Daily Record on '
+                    . $rowDate
+                    . '.'
+                );
+            }
+
+            if ($rowMortality > $expectedOpening) {
+                throw new DailyPopulationContinuityException(
+                    'The existing mortality on '
+                    . $rowDate
+                    . ' exceeds canonical opening '
+                    . $config['population_label']
+                    . '. Correct that later Daily Record before applying '
+                    . 'this historical population correction.'
+                );
+            }
+
+            $newLayingRate = null;
+            $oldLayingRate = null;
+            $eggProduction = null;
+
+            if ($config['key'] === 'layer') {
+                $eggProduction = (int)$row['egg_production'];
+
+                if ($eggProduction > $expectedOpening) {
+                    throw new DailyPopulationContinuityException(
+                        'The existing egg production on '
+                        . $rowDate
+                        . ' exceeds canonical opening flock. '
+                        . 'Correct that later Daily Record before applying '
+                        . 'this historical population correction.'
+                    );
+                }
+
+                $oldLayingRate = (float)$row['laying_rate'];
+                $newLayingRate = round(
+                    ($eggProduction / $expectedOpening) * 100,
+                    2
+                );
+            }
+
+            $oldClosing = max(
+                0,
+                $oldOpening - $rowMortality
+            );
+
+            if ($oldOpening !== $expectedOpening) {
+                $changes[] = [
+                    'id' => (int)$row['id'],
+                    'record_date' => $rowDate,
+                    'old_opening_stock' => $oldOpening,
+                    'new_opening_stock' => $expectedOpening,
+                    'mortality' => $rowMortality,
+                    'old_closing_stock' => $oldClosing,
+                    'new_closing_stock' => $newClosing,
+                    'egg_production' => $eggProduction,
+                    'old_laying_rate' => $oldLayingRate,
+                    'new_laying_rate' => $newLayingRate,
+                ];
+            }
+
+            $projectedFinalClosing = $newClosing;
+        }
+
+        return [
+            'record_type' => $config['key'],
+            'source_type' => $config['source_type'],
+            'farm_id' => $farmId,
+            'cycle_id' => $cycleId,
+            'record_date' => $recordDate,
+            'animal_type' => $animalType,
+            'target_opening_stock' => $canonicalOpening,
+            'target_mortality' => $mortality,
+            'target_closing_stock' =>
+                (int)$target['closing_quantity'],
+            'affected_count' => count($changes),
+            'changes' => $changes,
+            'projected_final_closing_stock' =>
+                $projectedFinalClosing,
+            'tracking_status' => 'canonical',
+            'source' => 'v3_population_ledger',
+            'target_movement_totals' =>
+                $target['movement_totals'] ?? [],
+        ];
+    }
+}
+
 if (!function_exists('daily_population_continuity_preview')) {
     /**
      * Build the deterministic downstream continuity plan.
@@ -257,6 +442,24 @@ if (!function_exists('daily_population_continuity_preview')) {
             $animalType,
             $forUpdate
         );
+
+        $canonicalPlan = daily_population_continuity_canonical_preview(
+            $pdo,
+            $farmId,
+            $cycleId,
+            $config,
+            $recordDate,
+            $openingStock,
+            $mortality,
+            $rows,
+            $animalType,
+            $sourceId,
+            $forUpdate
+        );
+
+        if ($canonicalPlan !== null) {
+            return $canonicalPlan;
+        }
 
         $expectedOpening = $openingStock - $mortality;
         $changes = [];
@@ -358,6 +561,9 @@ if (!function_exists('daily_population_continuity_preview')) {
             'changes' => $changes,
             'projected_final_closing_stock' =>
                 $expectedOpening,
+            'tracking_status' => 'legacy',
+            'source' => 'daily_record_chain',
+            'target_movement_totals' => [],
         ];
     }
 }
@@ -378,7 +584,8 @@ if (!function_exists('daily_population_continuity_apply')) {
         string $recordDate,
         int $openingStock,
         int $mortality,
-        ?string $animalType = null
+        ?string $animalType = null,
+        ?int $sourceId = null
     ): array {
         if (!$pdo->inTransaction()) {
             throw new DailyPopulationContinuityException(
@@ -400,7 +607,8 @@ if (!function_exists('daily_population_continuity_apply')) {
             $openingStock,
             $mortality,
             $animalType,
-            true
+            true,
+            $sourceId
         );
 
         $config = daily_population_continuity_type($recordType);
