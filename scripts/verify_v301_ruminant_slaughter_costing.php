@@ -217,7 +217,15 @@ $check(
     'Zero-cost sourced receipt participates in weighted-average costing',
     str_contains(
         $sources['stock'],
-        '$incomingUnitCost !== null && $incomingUnitCost >= 0'
+        'if ($incomingUnitCost !== null)'
+    )
+    && str_contains(
+        $sources['stock'],
+        '$incomingUnitCost < 0'
+    )
+    && !str_contains(
+        $sources['stock'],
+        '$incomingUnitCost <= 0'
     )
 );
 
