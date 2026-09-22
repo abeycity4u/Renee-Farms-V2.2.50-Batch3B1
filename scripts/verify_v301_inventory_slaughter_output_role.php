@@ -155,18 +155,34 @@ $check(
 );
 
 $check(
-    'Slaughter service requires explicit slaughter_output category role',
+    'Central helper owns the slaughter-output role key',
     str_contains(
-        $sources['service'],
-        "ic.inventory_role='slaughter_output'"
+        $sources['role'],
+        'function inventory_category_slaughter_output_role'
     )
 );
 
 $check(
-    'Slaughter page dropdown requires explicit slaughter_output category role',
+    'Slaughter service resolves output role through shared policy',
+    str_contains(
+        $sources['service'],
+        'inventory_category_slaughter_output_role()'
+    )
+    && str_contains(
+        $sources['service'],
+        'ic.inventory_role=?'
+    )
+);
+
+$check(
+    'Slaughter page dropdown resolves output role through shared policy',
     str_contains(
         $sources['page'],
-        "ic.inventory_role='slaughter_output'"
+        'inventory_category_slaughter_output_role()'
+    )
+    && str_contains(
+        $sources['page'],
+        'ic.inventory_role=?'
     )
 );
 

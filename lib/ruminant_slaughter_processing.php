@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/stock_service.php';
+require_once __DIR__ . '/inventory_category_role.php';
 
 /**
  * Ruminant slaughter processing.
@@ -318,13 +319,17 @@ function ruminant_slaughter_processing_add_output(
              INNER JOIN inventory_categories ic
                  ON ic.id=si.category_id
                 AND ic.farm_id=si.farm_id
-                AND ic.inventory_role='slaughter_output'
+                AND ic.inventory_role=?
              WHERE si.id=?
                AND si.farm_id=?
              LIMIT 1
              FOR UPDATE"
         );
-        $itemStmt->execute([$stockItemId, $farmId]);
+        $itemStmt->execute([
+            inventory_category_slaughter_output_role(),
+            $stockItemId,
+            $farmId,
+        ]);
         $item = $itemStmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$item) {

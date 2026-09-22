@@ -9,6 +9,11 @@
  * merely because they are "General / Non-feed" inventory.
  */
 
+function inventory_category_slaughter_output_role(): string
+{
+    return 'slaughter_output';
+}
+
 function inventory_category_roles(): array
 {
     return [

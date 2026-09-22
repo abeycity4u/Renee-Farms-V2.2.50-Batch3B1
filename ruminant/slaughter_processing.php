@@ -101,10 +101,13 @@ $itemStmt = $pdo->prepare(
        AND si.is_active=1
        AND si.farm_type='ruminant'
        AND si.feed_category='general'
-       AND ic.inventory_role='slaughter_output'
+       AND ic.inventory_role=?
      ORDER BY ic.category_name,si.item_name"
 );
-$itemStmt->execute([$farmId]);
+$itemStmt->execute([
+    $farmId,
+    inventory_category_slaughter_output_role(),
+]);
 $outputItems = $itemStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 ?>
 <!doctype html>
