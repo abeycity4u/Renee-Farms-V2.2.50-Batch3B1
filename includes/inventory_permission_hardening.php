@@ -87,6 +87,7 @@ function inventory_permission_handle_delegated_add_item(PDO $pdo): void
 {
     require_once dirname(__DIR__) . '/lib/stock_service.php';
     require_once dirname(__DIR__) . '/lib/inventory_financial.php';
+    require_once dirname(__DIR__) . '/lib/inventory_category_role.php';
 
     $farmId = requireCurrentFarmId();
     $farmType = trim((string)($_POST['farm_type'] ?? ''));
@@ -120,7 +121,7 @@ function inventory_permission_handle_delegated_add_item(PDO $pdo): void
 
     $categoryId = (int)($_POST['category_id'] ?? 0);
     $categoryStmt = $pdo->prepare(
-        'SELECT id, farm_type, financial_type
+        'SELECT id, farm_type, financial_type, inventory_role
          FROM inventory_categories
          WHERE id = ? AND farm_id = ?'
     );
@@ -155,6 +156,26 @@ function inventory_permission_handle_delegated_add_item(PDO $pdo): void
             $financialClassification,
             $farmType,
             $feedCategory
+        );
+
+    $categoryRoleErrors =
+        inventory_category_role_item_contract_errors(
+            (string)(
+                $selectedCategory['inventory_role']
+                ?? 'operational'
+            ),
+            $farmType,
+            $feedCategory
+        );
+
+    $categoryItemErrors =
+        array_values(
+            array_unique(
+                array_merge(
+                    $categoryItemErrors,
+                    $categoryRoleErrors
+                )
+            )
         );
 
     if ($categoryItemErrors) {
@@ -207,6 +228,28 @@ function inventory_permission_handle_delegated_add_item(PDO $pdo): void
     $initialStock = (float)$initialStockRaw;
     $minStock = (float)$minStockRaw;
     $unitCost = (float)$unitCostRaw;
+
+    $initialStockErrors =
+        inventory_category_role_initial_stock_errors(
+            (string)(
+                $selectedCategory['inventory_role']
+                ?? 'operational'
+            ),
+            $initialStock
+        );
+
+    if ($initialStockErrors) {
+        $_SESSION['error'] =
+            $initialStockErrors[0];
+
+        header(
+            'Location: '
+            . BASE_URL
+            . '/inventory.php'
+        );
+
+        exit();
+    }
 
     try {
         $pdo->beginTransaction();

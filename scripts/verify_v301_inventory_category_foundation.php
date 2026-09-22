@@ -196,9 +196,9 @@ check_contract(
 
 
 check_contract(
-    'DELEGATED_ADD_ITEM_LOADS_CATEGORY_FARM_AND_FINANCIAL',
+    'DELEGATED_ADD_ITEM_LOADS_CATEGORY_FARM_FINANCIAL_AND_ROLE',
     preg_match(
-        "/SELECT\\s+id,\\s*farm_type,\\s*financial_type\\s+FROM\\s+inventory_categories/s",
+        "/SELECT\\s+id,\\s*farm_type,\\s*financial_type,\\s*inventory_role\\s+FROM\\s+inventory_categories/s",
         $bridge
     ) === 1
 );

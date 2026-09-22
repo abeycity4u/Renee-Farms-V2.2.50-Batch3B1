@@ -19,6 +19,9 @@ $paths = [
     'inventory' =>
         $root . '/inventory.php',
 
+    'bridge' =>
+        $root . '/includes/inventory_permission_hardening.php',
+
     'stock' =>
         $root . '/lib/stock_service.php',
 
@@ -201,6 +204,26 @@ $check(
     && !preg_match(
         '/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+stock_transactions/i',
         $sources['service']
+    )
+);
+
+$check(
+    'Delegated Add Item loads and validates Inventory role',
+    str_contains(
+        $sources['bridge'],
+        'financial_type, inventory_role'
+    )
+    && str_contains(
+        $sources['bridge'],
+        'inventory_category_role_item_contract_errors('
+    )
+);
+
+$check(
+    'Delegated Slaughter Output Add Item must begin at zero',
+    str_contains(
+        $sources['bridge'],
+        'inventory_category_role_initial_stock_errors('
     )
 );
 
