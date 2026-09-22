@@ -296,10 +296,10 @@ check_result(
 
 check_result(
     $checks,
-    'USES_CANONICAL_FEED_POLICY',
+    'USES_CANONICAL_POSTED_FEED_POLICY',
     strpos(
         $source,
-        'stock_feed_item_sql_predicate'
+        'stock_feed_transaction_sql_predicate'
     ) !== false
 );
 

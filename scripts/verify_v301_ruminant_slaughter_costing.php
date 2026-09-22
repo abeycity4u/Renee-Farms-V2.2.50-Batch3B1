@@ -223,10 +223,10 @@ $check(
 
 $check(
     'Slaughter writer preserves exact allocated output total in stock receipt',
-    preg_match(
-        '/stock_apply_movement\\(.*?\\$unitCostSnapshot,\\s*\\(string\\)\\$batch\\[\\'production_type\\'\\],\\s*\\$allocatedCost\\s*\\)/s',
-        $sources['service']
-    ) === 1
+    str_contains(
+        $sources['service'],
+        "\$unitCostSnapshot,\n            (string)\$batch['production_type'],\n            \$allocatedCost"
+    )
 );
 
 $check(
