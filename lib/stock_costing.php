@@ -72,13 +72,24 @@ if (!function_exists('stock_weighted_cost_replay')) {
             $q = round((float)$row['quantity'], 4);
             if ($q <= 0) continue;
             if ($row['transaction_type'] === 'received') {
-                if ($row['unit_cost'] === null) {
-                    $uncosted++;
-                    $quantity += $q;
-                    continue;
-                }
                 $quantity += $q;
-                $value += $q * (float)$row['unit_cost'];
+
+                if ($row['total_cost'] !== null) {
+                    /*
+                     * The posted line total is the monetary authority for a
+                     * receipt. Unit cost is a rate snapshot and may be rounded
+                     * to four decimals, so quantity × unit rate can differ by
+                     * a cent from an exact supplier/source allocation.
+                     */
+                    $value +=
+                        (float)$row['total_cost'];
+                } elseif ($row['unit_cost'] !== null) {
+                    $value +=
+                        $q
+                        * (float)$row['unit_cost'];
+                } else {
+                    $uncosted++;
+                }
             } elseif ($row['transaction_type'] === 'used') {
                 $quantity -= $q;
                 if ($quantity < -0.00005) $invalidQuantity = true;

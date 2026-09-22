@@ -28,7 +28,8 @@ function stock_apply_movement(
     ?string $sourceType = null,
     ?int $sourceId = null,
     ?float $incomingUnitCost = null,
-    ?string $productionTypeOverride = null
+    ?string $productionTypeOverride = null,
+    ?float $incomingTotalCost = null
 ): int {
     /*
      * Stock mutations and their human-facing reference assignment must be
@@ -45,6 +46,55 @@ function stock_apply_movement(
     }
     if ($quantity <= 0 || !is_finite($quantity)) {
         throw new RuntimeException('Quantity must be greater than zero.');
+    }
+
+    if ($incomingUnitCost !== null) {
+        if (
+            !is_finite($incomingUnitCost)
+            || $incomingUnitCost < 0
+        ) {
+            throw new RuntimeException(
+                'Incoming unit cost must be zero or greater.'
+            );
+        }
+
+        $incomingUnitCost =
+            round(
+                $incomingUnitCost,
+                4
+            );
+    }
+
+    if ($incomingTotalCost !== null) {
+        if ($type !== 'received') {
+            throw new RuntimeException(
+                'An exact incoming total cost is valid only for received stock.'
+            );
+        }
+
+        if (
+            !is_finite($incomingTotalCost)
+            || $incomingTotalCost < 0
+        ) {
+            throw new RuntimeException(
+                'Incoming total cost must be zero or greater.'
+            );
+        }
+
+        $incomingTotalCost =
+            round(
+                $incomingTotalCost,
+                2
+            );
+
+        if ($incomingUnitCost === null) {
+            $incomingUnitCost =
+                round(
+                    $incomingTotalCost
+                    / $quantity,
+                    4
+                );
+        }
     }
 
     $itemSql = "SELECT si.*, COALESCE(ic.financial_type, si.financial_classification, 'other_stock') AS category_financial_type, COALESCE(NULLIF(ic.inventory_role,''),'operational') AS category_inventory_role FROM stock_items si JOIN inventory_categories ic ON ic.id=si.category_id AND ic.farm_id=si.farm_id WHERE si.id = ? AND si.farm_id = ?";
@@ -140,27 +190,78 @@ function stock_apply_movement(
         $newStock = round($previous - $quantity, 2);
     } else {
         $newStock = round($previous + $quantity, 2);
-        if ($incomingUnitCost !== null && $incomingUnitCost >= 0) {
-            $newUnitCost = $newStock > 0
-                ? (($previous * $unitCost) + ($quantity * $incomingUnitCost)) / $newStock
-                : $incomingUnitCost;
-            $newUnitCost = round($newUnitCost, 4);
+
+        if ($incomingUnitCost !== null) {
+            $incomingValue =
+                $incomingTotalCost !== null
+                    ? $incomingTotalCost
+                    : (
+                        $quantity
+                        * $incomingUnitCost
+                    );
+
+            $newUnitCost =
+                $newStock > 0
+                    ? (
+                        (
+                            $previous
+                            * $unitCost
+                        )
+                        + $incomingValue
+                    )
+                    / $newStock
+                    : $incomingUnitCost;
+
+            $newUnitCost =
+                round(
+                    $newUnitCost,
+                    4
+                );
         }
     }
 
     $pdo->prepare("UPDATE stock_items SET current_stock = ?, unit_cost = ? WHERE id = ? AND farm_id = ?")
         ->execute([$newStock, $newUnitCost, $itemId, $farmId]);
 
-    // Receipts preserve their actual purchase price. Usage preserves the
-    // weighted-average cost that existed on the business date, so editing an
-    // older Daily Record after a later price change does not rewrite history.
+    // Receipts preserve both their unit-rate snapshot and, where the
+    // source owns an exact line value, that exact monetary total. This avoids
+    // a cent-level drift when quantity multiplied by a four-decimal unit rate
+    // cannot represent the source total exactly. Usage preserves the weighted
+    // average that existed on the business date.
     if ($type === 'received') {
-        $snapshotUnitCost = $incomingUnitCost !== null ? (float)$incomingUnitCost : $unitCost;
+        $snapshotUnitCost =
+            $incomingUnitCost !== null
+                ? (float)$incomingUnitCost
+                : $unitCost;
     } else {
-        $snapshotUnitCost = stock_historical_unit_cost($pdo, $farmId, $itemId, $transactionDate, $unitCost);
+        $snapshotUnitCost =
+            stock_historical_unit_cost(
+                $pdo,
+                $farmId,
+                $itemId,
+                $transactionDate,
+                $unitCost
+            );
     }
-    $snapshotUnitCost = round(max(0.0, $snapshotUnitCost), 4);
-    $totalCost = round($quantity * $snapshotUnitCost, 2);
+
+    $snapshotUnitCost =
+        round(
+            max(
+                0.0,
+                $snapshotUnitCost
+            ),
+            4
+        );
+
+    $totalCost =
+        $type === 'received'
+        && $incomingTotalCost !== null
+            ? $incomingTotalCost
+            : round(
+                $quantity
+                * $snapshotUnitCost,
+                2
+            );
 
 
 

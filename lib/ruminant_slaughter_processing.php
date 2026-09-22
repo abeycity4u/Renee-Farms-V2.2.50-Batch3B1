@@ -584,7 +584,8 @@ function ruminant_slaughter_processing_add_output(
             'ruminant_slaughter_output',
             $outputId,
             $unitCostSnapshot,
-            (string)$batch['production_type']
+            (string)$batch['production_type'],
+            $allocatedCost
         );
 
         $pdo->prepare(

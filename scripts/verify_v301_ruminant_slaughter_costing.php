@@ -24,6 +24,9 @@ $paths = [
         $root . '/assets/js/inventory.js',
     'stock' =>
         $root . '/lib/stock_service.php',
+
+    'precision_migration' =>
+        $root . '/migrations/072_stock_receipt_cost_precision.sql',
 ];
 
 $sources = [];
@@ -215,6 +218,26 @@ $check(
     str_contains(
         $sources['stock'],
         '$incomingUnitCost !== null && $incomingUnitCost >= 0'
+    )
+);
+
+$check(
+    'Slaughter writer preserves exact allocated output total in stock receipt',
+    preg_match(
+        '/stock_apply_movement\\(.*?\\$unitCostSnapshot,\\s*\\(string\\)\\$batch\\[\\'production_type\\'\\],\\s*\\$allocatedCost\\s*\\)/s',
+        $sources['service']
+    ) === 1
+);
+
+$check(
+    'Current Inventory unit-cost cache has four-decimal schema precision',
+    str_contains(
+        $sources['precision_migration'],
+        'DECIMAL(14,4)'
+    )
+    && str_contains(
+        $sources['precision_migration'],
+        'MODIFY COLUMN unit_cost'
     )
 );
 
