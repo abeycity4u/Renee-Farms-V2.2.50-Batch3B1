@@ -222,9 +222,17 @@ check_contract(
 check_contract(
     'CATEGORY_UPDATE_LOCKS_CATEGORY',
     preg_match(
-        "/SELECT\\s+id,\\s*farm_type\\s+FROM\\s+inventory_categories.*FOR UPDATE/s",
+        "/SELECT\\s+id,\\s*farm_type,\\s*inventory_role\\s+FROM\\s+inventory_categories.*FOR UPDATE/s",
         $inventory
     ) === 1
+);
+
+check_contract(
+    'CATEGORY_UPDATE_LOCK_READS_INVENTORY_ROLE',
+    strpos(
+        $inventory,
+        "\$lockedCategory['inventory_role']"
+    ) !== false
 );
 
 check_contract(
