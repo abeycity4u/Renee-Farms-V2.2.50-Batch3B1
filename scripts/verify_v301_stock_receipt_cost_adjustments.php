@@ -155,15 +155,23 @@ $check(
     'Adjustment service accepts only active received stock movement',
     str_contains(
         $sources['service'],
-        "transaction_type'] !== 'received'"
+        "(string)\$transaction['transaction_type']"
     )
     && str_contains(
         $sources['service'],
-        "is_reversed']"
+        "!== 'received'"
     )
     && str_contains(
         $sources['service'],
-        "reversal_of_id']"
+        "\$transaction['is_reversed']"
+    )
+    && str_contains(
+        $sources['service'],
+        "\$transaction['reversal_of_id']"
+    )
+    && str_contains(
+        $sources['service'],
+        'Only an active original received-stock transaction can receive a cost adjustment.'
     )
 );
 
