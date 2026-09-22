@@ -51,6 +51,10 @@ foreach ($paths as $key => $path) {
             : '';
 }
 
+if ($sources['role'] !== '') {
+    require_once $paths['role'];
+}
+
 $checks = 0;
 $failures = 0;
 
@@ -262,15 +266,52 @@ $check(
 );
 
 $check(
-    'Shared role policy permits only sourced slaughter receipts',
-    str_contains(
-        $sources['role'],
-        "sourceType === 'ruminant_slaughter_output'"
+    'Shared role policy permits only sourced slaughter movements',
+    function_exists(
+        'inventory_category_role_stock_movement_errors'
     )
-    && str_contains(
-        $sources['role'],
-        "movementType === 'received'"
-    )
+    && inventory_category_role_stock_movement_errors(
+        inventory_category_slaughter_output_role(),
+        'received',
+        'ruminant_slaughter_output',
+        1
+    ) === []
+    && inventory_category_role_stock_movement_errors(
+        inventory_category_slaughter_output_role(),
+        'received',
+        'ruminant_slaughter_sale_reversal',
+        1
+    ) === []
+    && inventory_category_role_stock_movement_errors(
+        inventory_category_slaughter_output_role(),
+        'used',
+        'ruminant_slaughter_sale',
+        1
+    ) === []
+    && inventory_category_role_stock_movement_errors(
+        inventory_category_slaughter_output_role(),
+        'received',
+        'inventory_update',
+        1
+    ) !== []
+    && inventory_category_role_stock_movement_errors(
+        inventory_category_slaughter_output_role(),
+        'used',
+        'inventory_update',
+        1
+    ) !== []
+    && inventory_category_role_stock_movement_errors(
+        inventory_category_slaughter_output_role(),
+        'received',
+        'ruminant_slaughter_output',
+        null
+    ) !== []
+    && inventory_category_role_stock_movement_errors(
+        inventory_category_slaughter_output_role(),
+        'used',
+        'ruminant_slaughter_sale',
+        null
+    ) !== []
 );
 
 $check(

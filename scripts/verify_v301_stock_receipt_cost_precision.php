@@ -113,9 +113,17 @@ $check(
 );
 
 $check(
-    'Ledger total prefers exact source total for a receipt',
+    'Ledger total preserves exact sourced totals and snapshot-cost fallback',
     preg_match(
-        '/\$totalCost\s*=.*?\$type\s*===\s*[\'"]received[\'"].*?\$incomingTotalCost\s*!==\s*null/s',
+        '/if\\s*\\(\\s*\\$type\\s*===\\s*[\\'"]received[\\'"]\\s*&&\\s*\\$incomingTotalCost\\s*!==\\s*null\\s*\\)\\s*\\{\\s*\\$totalCost\\s*=\\s*\\$incomingTotalCost\\s*;/s',
+        $sources['service']
+    ) === 1
+    && preg_match(
+        '/elseif\\s*\\(\\s*\\$type\\s*===\\s*[\\'"]used[\\'"]\\s*&&\\s*\\$outgoingTotalCost\\s*!==\\s*null\\s*\\)\\s*\\{\\s*\\$totalCost\\s*=\\s*\\$outgoingTotalCost\\s*;/s',
+        $sources['service']
+    ) === 1
+    && preg_match(
+        '/else\\s*\\{\\s*\\$totalCost\\s*=\\s*round\\s*\\(\\s*\\$quantity\\s*\\*\\s*\\$snapshotUnitCost\\s*,\\s*2\\s*\\)\\s*;/s',
         $sources['service']
     ) === 1
 );
