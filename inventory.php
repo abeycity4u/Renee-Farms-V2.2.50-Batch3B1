@@ -4,6 +4,7 @@ require_once(__DIR__ . '/config.php');
 require_once(__DIR__ . '/includes/functions.php');
 require_once(__DIR__ . '/lib/stock_service.php');
 require_once(__DIR__ . '/lib/inventory_financial.php');
+require_once(__DIR__ . '/lib/inventory_category_role.php');
 requireLogin();
 
 // Check access. Inventory is permission-driven so Sales and other tenant
@@ -156,6 +157,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $farmType = $_POST['category_farm_type'] ?? 'both';
         $unit = trim($_POST['category_unit'] ?? '');
         $financialType = trim((string)($_POST['category_financial_type'] ?? 'other_stock'));
+        $inventoryRole = trim((string)($_POST['category_inventory_role'] ?? 'operational'));
 
         if ($name === '') {
             $_SESSION['error'] = "Category name is required.";
@@ -172,9 +174,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             exit();
         }
 
+        $roleErrors =
+            inventory_category_role_contract_errors(
+                $inventoryRole,
+                $farmType,
+                $financialType
+            );
+
+        if ($roleErrors) {
+            $_SESSION['error'] = $roleErrors[0];
+            header('Location: inventory.php');
+            exit();
+        }
+
         try {
-            $stmt = $pdo->prepare("INSERT INTO inventory_categories (farm_id, category_name, farm_type, unit, financial_type) VALUES (?, ?, ?, ?, ?)");
-            $stmt->execute([$currentFarmId, $name, $farmType, $unit, $financialType]);
+            $stmt = $pdo->prepare("INSERT INTO inventory_categories (farm_id, category_name, farm_type, unit, financial_type, inventory_role) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$currentFarmId, $name, $farmType, $unit, $financialType, $inventoryRole]);
             $_SESSION['success'] = "Category added successfully.";
         } catch (PDOException $e) {
             $_SESSION['error'] = "Could not add category. It may already exist.";
@@ -201,7 +216,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $pdo->beginTransaction();
 
             $categoryLockStmt = $pdo->prepare(
-                'SELECT id, farm_type FROM inventory_categories WHERE id=? AND farm_id=? FOR UPDATE'
+                'SELECT id, farm_type, inventory_role FROM inventory_categories WHERE id=? AND farm_id=? FOR UPDATE'
             );
             $categoryLockStmt->execute([
                 $categoryId,
@@ -212,6 +227,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
             if (!$lockedCategory) {
                 throw new RuntimeException('Inventory category not found.');
+            }
+
+            $roleErrors =
+                inventory_category_role_contract_errors(
+                    (string)(
+                        $lockedCategory['inventory_role']
+                        ?? 'operational'
+                    ),
+                    (string)$lockedCategory['farm_type'],
+                    $financialType
+                );
+
+            if ($roleErrors) {
+                throw new RuntimeException(
+                    $roleErrors[0]
+                );
             }
 
             $categoryItemStmt = $pdo->prepare(
@@ -315,6 +346,155 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         header('Location: inventory.php');
         exit();
     }
+    if (isset($_POST['update_category_inventory_role'])) {
+        if (!$canManageInventory) {
+            $_SESSION['error'] = "Only owners can update categories.";
+            header('Location: inventory.php');
+            exit();
+        }
+
+        $categoryId =
+            (int)($_POST['category_id'] ?? 0);
+
+        $inventoryRole =
+            trim(
+                (string)(
+                    $_POST['category_inventory_role']
+                    ?? ''
+                )
+            );
+
+        if (
+            $categoryId <= 0
+            || !inventory_category_role_is_valid(
+                $inventoryRole
+            )
+        ) {
+            $_SESSION['error'] =
+                'Choose a valid category and Inventory Role.';
+            header('Location: inventory.php');
+            exit();
+        }
+
+        try {
+            $pdo->beginTransaction();
+
+            $categoryLockStmt =
+                $pdo->prepare(
+                    'SELECT
+                         id,
+                         farm_type,
+                         financial_type
+                     FROM inventory_categories
+                     WHERE id=?
+                       AND farm_id=?
+                     FOR UPDATE'
+                );
+
+            $categoryLockStmt->execute([
+                $categoryId,
+                $currentFarmId,
+            ]);
+
+            $lockedCategory =
+                $categoryLockStmt->fetch(
+                    PDO::FETCH_ASSOC
+                );
+
+            if (!$lockedCategory) {
+                throw new RuntimeException(
+                    'Inventory category not found.'
+                );
+            }
+
+            $roleErrors =
+                inventory_category_role_contract_errors(
+                    $inventoryRole,
+                    (string)$lockedCategory['farm_type'],
+                    (string)(
+                        $lockedCategory['financial_type']
+                        ?? 'other_stock'
+                    )
+                );
+
+            if ($roleErrors) {
+                throw new RuntimeException(
+                    $roleErrors[0]
+                );
+            }
+
+            $categoryItemStmt =
+                $pdo->prepare(
+                    'SELECT
+                         id,
+                         item_name,
+                         farm_type,
+                         feed_category
+                     FROM stock_items
+                     WHERE category_id=?
+                       AND farm_id=?
+                     ORDER BY id'
+                );
+
+            $categoryItemStmt->execute([
+                $categoryId,
+                $currentFarmId,
+            ]);
+
+            foreach (
+                $categoryItemStmt->fetchAll(
+                    PDO::FETCH_ASSOC
+                )
+                as $categoryItem
+            ) {
+                $itemRoleErrors =
+                    inventory_category_role_item_contract_errors(
+                        $inventoryRole,
+                        (string)$categoryItem['farm_type'],
+                        (string)$categoryItem['feed_category']
+                    );
+
+                if ($itemRoleErrors) {
+                    throw new RuntimeException(
+                        'Cannot apply that Inventory Role while item "'
+                        . (string)$categoryItem['item_name']
+                        . '" remains in this category. '
+                        . $itemRoleErrors[0]
+                    );
+                }
+            }
+
+            $pdo->prepare(
+                'UPDATE inventory_categories
+                 SET inventory_role=?
+                 WHERE id=?
+                   AND farm_id=?'
+            )->execute([
+                $inventoryRole,
+                $categoryId,
+                $currentFarmId,
+            ]);
+
+            $pdo->commit();
+
+            $_SESSION['success'] =
+                'Inventory Role updated successfully.';
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            $_SESSION['error'] =
+                safeUserExceptionMessage(
+                    $e,
+                    'The Inventory Role could not be updated.'
+                );
+        }
+
+        header('Location: inventory.php');
+        exit();
+    }
+
     if (isset($_POST['add_item'])) {
         if (!$canManageInventory) {
             $_SESSION['error'] = "Only owners can add inventory items.";
@@ -338,7 +518,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         $categoryId = (int)($_POST['category_id'] ?? 0);
         $categoryStmt = $pdo->prepare(
-            'SELECT id, farm_type, financial_type
+            'SELECT id, farm_type, financial_type, inventory_role
              FROM inventory_categories
              WHERE id = ? AND farm_id = ?'
         );
@@ -370,6 +550,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $financialClassification,
                 $farmType,
                 $feedCategory
+            );
+
+        $categoryRoleErrors =
+            inventory_category_role_item_contract_errors(
+                (string)(
+                    $selectedCategory['inventory_role']
+                    ?? 'operational'
+                ),
+                $farmType,
+                $feedCategory
+            );
+
+        $categoryItemErrors =
+            array_values(
+                array_unique(
+                    array_merge(
+                        $categoryItemErrors,
+                        $categoryRoleErrors
+                    )
+                )
             );
 
         if ($categoryItemErrors) {
@@ -982,6 +1182,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                         </small>
                                     </div>
                                     <div class="mb-3">
+                                        <label>Inventory Role</label>
+                                        <select name="category_inventory_role" class="form-select" required>
+                                            <?php foreach (inventory_category_roles() as $roleKey => $roleLabel): ?>
+                                                <option value="<?php echo htmlspecialchars($roleKey); ?>" <?php echo $roleKey === 'operational' ? 'selected' : ''; ?>>
+                                                    <?php echo htmlspecialchars($roleLabel); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                        <small class="text-muted">
+                                            Operational Inventory is the normal default. Choose Slaughter Output only for physical products created from slaughtered tagged ruminants.
+                                        </small>
+                                    </div>
+
+                                    <div class="mb-3">
                                         <label>Unit (optional)</label>
                                         <input type="text" name="category_unit" class="form-control" placeholder="kg, bags, liters...">
                                     </div>
@@ -1001,6 +1215,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                                 <th>Farm</th>
                                                 <th>Unit</th>
                                                 <th>Financial Type</th>
+                                                <th>Inventory Role</th>
                                                 <th>Items</th>
                                                 <th></th>
                                             </tr>
@@ -1020,6 +1235,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                                             <?php endforeach; ?>
                                                         </select>
                                                         <button type="submit" name="update_category_financial_type" class="btn btn-sm btn-outline-primary" title="Save Financial Type"><i class="bi bi-check-lg"></i></button>
+                                                    </form>
+                                                </td>
+                                                <td>
+                                                    <form method="POST" class="d-flex gap-1 align-items-center">
+                                                        <input type="hidden" name="category_id" value="<?php echo (int)$category['id']; ?>">
+                                                        <select name="category_inventory_role" class="form-select form-select-sm app-min-width-170">
+                                                            <?php foreach (inventory_category_roles() as $roleKey => $roleLabel): ?>
+                                                                <option value="<?php echo htmlspecialchars($roleKey); ?>" <?php echo (($category['inventory_role'] ?? 'operational') === $roleKey) ? 'selected' : ''; ?>>
+                                                                    <?php echo htmlspecialchars($roleLabel); ?>
+                                                                </option>
+                                                            <?php endforeach; ?>
+                                                        </select>
+                                                        <button type="submit" name="update_category_inventory_role" class="btn btn-sm btn-outline-primary" title="Save Inventory Role"><i class="bi bi-check-lg"></i></button>
                                                     </form>
                                                 </td>
                                                 <td><?php echo (int) $category['item_count']; ?></td>
@@ -1088,6 +1316,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                             value="<?php echo (int)$category['id']; ?>"
                                             data-farm-type="<?php echo htmlspecialchars((string)($category['farm_type'] ?? 'both')); ?>"
                                             data-financial-type="<?php echo htmlspecialchars($categoryFinancialType); ?>"
+                                            data-inventory-role="<?php echo htmlspecialchars((string)($category['inventory_role'] ?? 'operational')); ?>"
                                             data-financial-label="<?php echo htmlspecialchars(inventory_financial_classification_label($categoryFinancialType), ENT_QUOTES); ?>"
                                             data-financial-help="<?php echo htmlspecialchars(inventory_financial_classification_guidance_text($categoryFinancialType), ENT_QUOTES); ?>"
                                         >

@@ -99,8 +99,9 @@ $itemStmt = $pdo->prepare(
         AND ic.farm_id=si.farm_id
      WHERE si.farm_id=?
        AND si.is_active=1
-       AND si.farm_type IN ('ruminant','both')
+       AND si.farm_type='ruminant'
        AND si.feed_category='general'
+       AND ic.inventory_role='slaughter_output'
      ORDER BY ic.category_name,si.item_name"
 );
 $itemStmt->execute([$farmId]);
@@ -426,9 +427,9 @@ $outputItems = $itemStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
                             </form>
                         <?php else: ?>
                             <div class="alert alert-warning mb-0">
-                                Create an active Ruminant/Shared non-feed
-                                Inventory item first, then return here to
-                                receive slaughter output.
+                                Create an active Ruminant Inventory item under
+                                an Inventory Category whose role is Slaughter Output,
+                                then return here to receive the processed product.
                             </div>
                         <?php endif; ?>
                     <?php endif; ?>

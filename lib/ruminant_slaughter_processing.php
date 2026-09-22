@@ -315,6 +315,10 @@ function ruminant_slaughter_processing_add_output(
                  si.feed_category,
                  si.is_active
              FROM stock_items si
+             INNER JOIN inventory_categories ic
+                 ON ic.id=si.category_id
+                AND ic.farm_id=si.farm_id
+                AND ic.inventory_role='slaughter_output'
              WHERE si.id=?
                AND si.farm_id=?
              LIMIT 1
