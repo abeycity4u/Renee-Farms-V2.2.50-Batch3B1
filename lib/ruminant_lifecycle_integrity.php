@@ -22,7 +22,11 @@ function ruminant_manual_exit(PDO $pdo,int $farmId,int $animalId,string $date,st
             'Use Move to another cycle from the Animal Profile for an internal production-cycle transfer. Transferred remains available only as historical lifecycle status.'
         );
     }
-    $map=['dead'=>'dead','culled'=>'culled'];
+    $map=[
+        'dead'=>'dead',
+        'culled'=>'culled',
+        'slaughtered'=>'slaughtered',
+    ];
     if(!isset($map[$outcome])) throw new RuntimeException('Choose a valid lifecycle outcome.');
     $pdo->beginTransaction();
     try{
@@ -47,6 +51,7 @@ function ruminant_exit_outcome_display(string $outcome): string
 {
     return match($outcome){
         'sold_live'=>'Sold live','culled_slaughtered'=>'Culled / slaughtered','manual_dead'=>'Dead',
-        'manual_culled'=>'Culled','manual_transferred'=>'Transferred',default=>'Exit'
+        'manual_culled'=>'Culled','manual_slaughtered'=>'Slaughtered',
+        'manual_transferred'=>'Transferred',default=>'Exit'
     };
 }

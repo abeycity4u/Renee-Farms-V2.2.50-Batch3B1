@@ -16,6 +16,7 @@ function ruminant_lifecycle_population_movement_type(string $outcome): ?string
     return match ($outcome) {
         'manual_dead' => 'mortality',
         'manual_culled', 'culled_slaughtered' => 'cull',
+        'manual_slaughtered' => 'slaughter',
         'sold_live' => 'sale',
         // A transfer must be projected only by the future paired transfer
         // service so one farm/cycle cannot lose stock without the matching in.
