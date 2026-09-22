@@ -139,6 +139,7 @@ $showManagementMenu = $canViewSales || $canViewExpenseReport || $canViewReports 
             <?php endif; ?>
             <?php if ($canViewRuminantAnimals): ?>
             <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/ruminant/animal_registry.php"><i class="bi bi-tags menu-icon me-2"></i> Animal Registry</a></li>
+            <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/ruminant/slaughter_processing.php"><i class="bi bi-box-seam menu-icon me-2"></i> Slaughter Processing</a></li>
             <?php endif; ?>
             <?php if ($canViewRuminantFeeds): ?>
             <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/ruminant/ruminant_feeds_record.php"><i class="bi bi-basket3 menu-icon me-2"></i> Ruminant Feeds</a></li>
