@@ -746,14 +746,12 @@ function ruminant_slaughter_sale_refresh_batch_status(
     $stmt =
         $pdo->prepare(
             "SELECT
-                 COUNT(*) AS output_count,
-                 COALESCE(
-                     SUM(remaining_quantity),
-                     0
-                 ) AS remaining_quantity
+                 id,
+                 remaining_quantity
              FROM ruminant_slaughter_outputs
              WHERE farm_id=?
                AND batch_id=?
+             ORDER BY id
              FOR UPDATE"
         );
 
@@ -762,20 +760,21 @@ function ruminant_slaughter_sale_refresh_batch_status(
         $batchId,
     ]);
 
-    $row =
-        $stmt->fetch(
+    $outputs =
+        $stmt->fetchAll(
             PDO::FETCH_ASSOC
         ) ?: [];
 
+    $remainingQuantity = 0.0;
+
+    foreach ($outputs as $output) {
+        $remainingQuantity +=
+            (float)$output['remaining_quantity'];
+    }
+
     $completed =
-        (int)(
-            $row['output_count']
-            ?? 0
-        ) > 0
-        && (float)(
-            $row['remaining_quantity']
-            ?? 0
-        ) <= 0.00001;
+        count($outputs) > 0
+        && $remainingQuantity <= 0.00001;
 
     $status =
         $completed

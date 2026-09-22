@@ -144,6 +144,18 @@ function stock_apply_movement(
         }
     }
 
+    if (
+        (
+            $outgoingUnitCost !== null
+            || $outgoingTotalCost !== null
+        )
+        && $sourceType !== 'ruminant_slaughter_sale'
+    ) {
+        throw new RuntimeException(
+            'Explicit outgoing cost is reserved for source-owned slaughter sale lot consumption.'
+        );
+    }
+
     $itemSql = "SELECT si.*, COALESCE(ic.financial_type, si.financial_classification, 'other_stock') AS category_financial_type, COALESCE(NULLIF(ic.inventory_role,''),'operational') AS category_inventory_role FROM stock_items si JOIN inventory_categories ic ON ic.id=si.category_id AND ic.farm_id=si.farm_id WHERE si.id = ? AND si.farm_id = ?";
     $params = [$itemId, $farmId];
     if ($farmType !== null) {

@@ -209,6 +209,18 @@ $check(
 );
 
 $check(
+    'Explicit outgoing COGS override is restricted to slaughter sale provenance',
+    str_contains(
+        $sources['stock'],
+        "\$sourceType !== 'ruminant_slaughter_sale'"
+    )
+    && str_contains(
+        $sources['stock'],
+        'Explicit outgoing cost is reserved for source-owned slaughter sale lot consumption.'
+    )
+);
+
+$check(
     'Final depletion conserves remaining frozen output cost after rounding',
     str_contains(
         $sources['service'],
@@ -249,6 +261,22 @@ $check(
     && str_contains(
         $sources['service'],
         'reversal_of_id=?'
+    )
+);
+
+$check(
+    'Batch completion locks source outputs before deriving zero remaining quantity',
+    str_contains(
+        $sources['service'],
+        'ORDER BY id'
+    )
+    && str_contains(
+        $sources['service'],
+        'FOR UPDATE'
+    )
+    && str_contains(
+        $sources['service'],
+        '$remainingQuantity'
     )
 );
 
