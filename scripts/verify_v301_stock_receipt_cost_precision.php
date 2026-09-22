@@ -112,16 +112,38 @@ $check(
     )
 );
 
+$normalizedService =
+    preg_replace(
+        '/\\s+/',
+        ' ',
+        $sources['service']
+    ) ?? '';
+
+$incomingTotalBranch =
+    strpos(
+        $normalizedService,
+        "if ( \\$type === 'received' && \\$incomingTotalCost !== null ) { \\$totalCost = \\$incomingTotalCost;"
+    );
+
+$outgoingTotalBranch =
+    strpos(
+        $normalizedService,
+        "elseif ( \\$type === 'used' && \\$outgoingTotalCost !== null ) { \\$totalCost = \\$outgoingTotalCost;"
+    );
+
+$fallbackTotalBranch =
+    strpos(
+        $normalizedService,
+        "else { \\$totalCost = round( \\$quantity * \\$snapshotUnitCost, 2 );"
+    );
+
 $check(
     'Ledger total preserves exact sourced totals and snapshot-cost fallback',
-    str_contains(
-        preg_replace(
-            '/\\s+/',
-            ' ',
-            $sources['service']
-        ) ?? '',
-        "if ( \\$type === 'received' && \\$incomingTotalCost !== null ) { \\$totalCost = \\$incomingTotalCost; } elseif ( \\$type === 'used' && \\$outgoingTotalCost !== null ) { \\$totalCost = \\$outgoingTotalCost; } else { \\$totalCost = round( \\$quantity * \\$snapshotUnitCost, 2 ); }"
-    )
+    $incomingTotalBranch !== false
+    && $outgoingTotalBranch !== false
+    && $fallbackTotalBranch !== false
+    && $incomingTotalBranch < $outgoingTotalBranch
+    && $outgoingTotalBranch < $fallbackTotalBranch
 );
 
 $check(
