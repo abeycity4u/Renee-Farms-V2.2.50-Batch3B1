@@ -114,18 +114,14 @@ $check(
 
 $check(
     'Ledger total preserves exact sourced totals and snapshot-cost fallback',
-    preg_match(
-        '/if\\s*\\(\\s*\\$type\\s*===\\s*[\\'"]received[\\'"]\\s*&&\\s*\\$incomingTotalCost\\s*!==\\s*null\\s*\\)\\s*\\{\\s*\\$totalCost\\s*=\\s*\\$incomingTotalCost\\s*;/s',
-        $sources['service']
-    ) === 1
-    && preg_match(
-        '/elseif\\s*\\(\\s*\\$type\\s*===\\s*[\\'"]used[\\'"]\\s*&&\\s*\\$outgoingTotalCost\\s*!==\\s*null\\s*\\)\\s*\\{\\s*\\$totalCost\\s*=\\s*\\$outgoingTotalCost\\s*;/s',
-        $sources['service']
-    ) === 1
-    && preg_match(
-        '/else\\s*\\{\\s*\\$totalCost\\s*=\\s*round\\s*\\(\\s*\\$quantity\\s*\\*\\s*\\$snapshotUnitCost\\s*,\\s*2\\s*\\)\\s*;/s',
-        $sources['service']
-    ) === 1
+    str_contains(
+        preg_replace(
+            '/\\s+/',
+            ' ',
+            $sources['service']
+        ) ?? '',
+        "if ( \\$type === 'received' && \\$incomingTotalCost !== null ) { \\$totalCost = \\$incomingTotalCost; } elseif ( \\$type === 'used' && \\$outgoingTotalCost !== null ) { \\$totalCost = \\$outgoingTotalCost; } else { \\$totalCost = round( \\$quantity * \\$snapshotUnitCost, 2 ); }"
+    )
 );
 
 $check(
