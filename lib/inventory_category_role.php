@@ -146,3 +146,127 @@ function inventory_category_role_item_contract_errors(
         array_unique($errors)
     );
 }
+
+/**
+ * A category role becomes part of item provenance once the category contains
+ * stock items. Prevent role reclassification from silently changing the
+ * meaning of existing inventory/history.
+ */
+function inventory_category_role_transition_errors(
+    string $currentRole,
+    string $newRole,
+    int $existingItemCount
+): array {
+    $currentRole = strtolower(trim($currentRole));
+    $newRole = strtolower(trim($newRole));
+
+    if (
+        $currentRole !== $newRole
+        && $existingItemCount > 0
+    ) {
+        return [
+            'Inventory Role cannot be changed while this category contains inventory items. Move or remove the items first.',
+        ];
+    }
+
+    return [];
+}
+
+/**
+ * Slaughter-output items begin at zero. Their first physical receipt must be
+ * created by Slaughter Processing so animal/batch provenance is never guessed.
+ */
+function inventory_category_role_initial_stock_errors(
+    string $inventoryRole,
+    float $initialStock
+): array {
+    $inventoryRole = strtolower(trim($inventoryRole));
+
+    if (
+        $inventoryRole === inventory_category_slaughter_output_role()
+        && $initialStock > 0.00001
+    ) {
+        return [
+            'Initial Stock must be 0 for a Slaughter Output item. Receive produced quantity through Slaughter Processing.',
+        ];
+    }
+
+    return [];
+}
+
+/**
+ * Canonical stock-movement boundary for role-controlled inventory.
+ *
+ * Slaughter output may only enter stock from an already-created slaughter
+ * output row. Consumption is intentionally blocked until the linked Sales lot
+ * workflow owns the decrement.
+ */
+function inventory_category_role_stock_movement_errors(
+    string $inventoryRole,
+    string $movementType,
+    ?string $sourceType,
+    ?int $sourceId
+): array {
+    $inventoryRole = strtolower(trim($inventoryRole));
+    $movementType = strtolower(trim($movementType));
+    $sourceType = strtolower(trim((string)$sourceType));
+
+    if (!inventory_category_role_is_valid($inventoryRole)) {
+        return [
+            'The Inventory Category has an invalid Inventory Role.',
+        ];
+    }
+
+    if (
+        $inventoryRole
+        !== inventory_category_slaughter_output_role()
+    ) {
+        return [];
+    }
+
+    if (
+        $movementType === 'received'
+        && $sourceType === 'ruminant_slaughter_output'
+        && $sourceId !== null
+        && $sourceId > 0
+    ) {
+        return [];
+    }
+
+    if ($movementType === 'received') {
+        return [
+            'Slaughter Output stock can only be received through Slaughter Processing.',
+        ];
+    }
+
+    if ($movementType === 'used') {
+        return [
+            'Slaughter Output stock cannot be adjusted through generic Inventory usage. Use the linked slaughter-output workflow.',
+        ];
+    }
+
+    return [
+        'That stock movement is not valid for Slaughter Output inventory.',
+    ];
+}
+
+/**
+ * Generic ledger reversal cannot safely change a slaughter lot because the
+ * source-specific remaining balance must be corrected in the same transaction.
+ */
+function inventory_category_role_reversal_errors(
+    string $inventoryRole
+): array {
+    $inventoryRole = strtolower(trim($inventoryRole));
+
+    if (
+        $inventoryRole
+        === inventory_category_slaughter_output_role()
+    ) {
+        return [
+            'Slaughter Output stock cannot be reversed through the generic Inventory ledger. Use a slaughter-output correction workflow.',
+        ];
+    }
+
+    return [];
+}

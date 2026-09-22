@@ -4,6 +4,7 @@ require_once __DIR__ . '/attribution.php';
 require_once __DIR__ . '/stock_movement_attribution.php';
 require_once __DIR__ . '/stock_consumption_allocation_persistence.php';
 require_once __DIR__ . '/record_reference_persistence.php';
+require_once __DIR__ . '/inventory_category_role.php';
 /**
  * Canonical inventory ledger service.
  *
@@ -46,7 +47,7 @@ function stock_apply_movement(
         throw new RuntimeException('Quantity must be greater than zero.');
     }
 
-    $itemSql = "SELECT si.*, COALESCE(ic.financial_type, si.financial_classification, 'other_stock') AS category_financial_type FROM stock_items si JOIN inventory_categories ic ON ic.id=si.category_id AND ic.farm_id=si.farm_id WHERE si.id = ? AND si.farm_id = ?";
+    $itemSql = "SELECT si.*, COALESCE(ic.financial_type, si.financial_classification, 'other_stock') AS category_financial_type, COALESCE(NULLIF(ic.inventory_role,''),'operational') AS category_inventory_role FROM stock_items si JOIN inventory_categories ic ON ic.id=si.category_id AND ic.farm_id=si.farm_id WHERE si.id = ? AND si.farm_id = ?";
     $params = [$itemId, $farmId];
     if ($farmType !== null) {
         $itemSql .= " AND si.farm_type IN (?, 'both')";
@@ -65,6 +66,23 @@ function stock_apply_movement(
     }
     if ((int)$item['is_active'] !== 1) {
         throw new RuntimeException('The selected inventory item is inactive. Please select an active item.');
+    }
+
+    $roleMovementErrors =
+        inventory_category_role_stock_movement_errors(
+            (string)(
+                $item['category_inventory_role']
+                ?? 'operational'
+            ),
+            $type,
+            $sourceType,
+            $sourceId
+        );
+
+    if ($roleMovementErrors) {
+        throw new RuntimeException(
+            $roleMovementErrors[0]
+        );
     }
 
     /*
@@ -298,11 +316,39 @@ function stock_reverse_transaction(
         $userId
     );
 
-    $itemStmt = $pdo->prepare("SELECT * FROM stock_items WHERE id = ? AND farm_id = ? FOR UPDATE");
+    $itemStmt = $pdo->prepare(
+        "SELECT
+             si.*,
+             COALESCE(
+                 NULLIF(ic.inventory_role,''),
+                 'operational'
+             ) AS category_inventory_role
+         FROM stock_items si
+         INNER JOIN inventory_categories ic
+             ON ic.id=si.category_id
+            AND ic.farm_id=si.farm_id
+         WHERE si.id=?
+           AND si.farm_id=?
+         FOR UPDATE"
+    );
     $itemStmt->execute([(int)$tx['stock_item_id'], $farmId]);
     $item = $itemStmt->fetch(PDO::FETCH_ASSOC);
     if (!$item) {
         throw new RuntimeException('The inventory item linked to this transaction no longer exists.');
+    }
+
+    $roleReversalErrors =
+        inventory_category_role_reversal_errors(
+            (string)(
+                $item['category_inventory_role']
+                ?? 'operational'
+            )
+        );
+
+    if ($roleReversalErrors) {
+        throw new RuntimeException(
+            $roleReversalErrors[0]
+        );
     }
 
     $previous = round((float)$item['current_stock'], 2);

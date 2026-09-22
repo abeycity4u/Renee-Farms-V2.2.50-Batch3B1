@@ -41,7 +41,7 @@ $inventoryActiveCycles = $inventoryCycleStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
 // Get inventory items
 if ($farmType === 'all') {
-    $query = "SELECT si.*, ic.category_name,
+    $query = "SELECT si.*, ic.category_name, COALESCE(NULLIF(ic.inventory_role,''),'operational') AS inventory_role,
               CASE
                 WHEN si.current_stock <= si.min_stock_level THEN 'danger'
                 WHEN si.current_stock <= si.min_stock_level * 2 THEN 'warning'
@@ -55,7 +55,7 @@ if ($farmType === 'all') {
     $stmt = $pdo->prepare($query);
     $stmt->execute([$currentFarmId]);
 } else {
-    $query = "SELECT si.*, ic.category_name,
+    $query = "SELECT si.*, ic.category_name, COALESCE(NULLIF(ic.inventory_role,''),'operational') AS inventory_role,
               CASE
                 WHEN si.current_stock <= si.min_stock_level THEN 'danger'
                 WHEN si.current_stock <= si.min_stock_level * 2 THEN 'warning'
@@ -384,7 +384,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     'SELECT
                          id,
                          farm_type,
-                         financial_type
+                         financial_type,
+                         inventory_role
                      FROM inventory_categories
                      WHERE id=?
                        AND farm_id=?
@@ -441,10 +442,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $currentFarmId,
             ]);
 
-            foreach (
+            $categoryItems =
                 $categoryItemStmt->fetchAll(
                     PDO::FETCH_ASSOC
-                )
+                );
+
+            $transitionErrors =
+                inventory_category_role_transition_errors(
+                    (string)(
+                        $lockedCategory['inventory_role']
+                        ?? 'operational'
+                    ),
+                    $inventoryRole,
+                    count($categoryItems)
+                );
+
+            if ($transitionErrors) {
+                throw new RuntimeException(
+                    $transitionErrors[0]
+                );
+            }
+
+            foreach (
+                $categoryItems
                 as $categoryItem
             ) {
                 $itemRoleErrors =
@@ -615,6 +635,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $initialStock = (float)$initialStockRaw;
         $minStock = (float)$minStockRaw;
         $unitCost = (float)$unitCostRaw;
+
+        $initialStockErrors =
+            inventory_category_role_initial_stock_errors(
+                (string)(
+                    $selectedCategory['inventory_role']
+                    ?? 'operational'
+                ),
+                $initialStock
+            );
+
+        if ($initialStockErrors) {
+            $_SESSION['error'] =
+                $initialStockErrors[0];
+            header('Location: inventory.php');
+            exit();
+        }
 
         try {
             $pdo->beginTransaction();
@@ -1108,7 +1144,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
                                 <td>
                                     <div class="inventory-action-group d-flex gap-1 flex-wrap">
-                                        <?php if ($canUpdateStock): ?>
+                                        <?php if (
+                                            $canUpdateStock
+                                            && (
+                                                ($item['inventory_role'] ?? 'operational')
+                                                !== inventory_category_slaughter_output_role()
+                                            )
+                                        ): ?>
                                             <button
                                                 type="button"
                                                 class="btn btn-sm btn-primary js-quick-update"
@@ -1116,6 +1158,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                                 data-item-name="<?= htmlspecialchars($item['item_name'] ?? '') ?>">
                                                 <i class="bi bi-arrow-up-down me-1"></i> Update
                                             </button>
+                                        <?php elseif (
+                                            ($item['inventory_role'] ?? 'operational')
+                                            === inventory_category_slaughter_output_role()
+                                        ): ?>
+                                            <span
+                                                class="badge bg-info-subtle text-info-emphasis"
+                                                title="Stock quantity is controlled by Slaughter Processing provenance."
+                                            >
+                                                Slaughter Processing
+                                            </span>
                                         <?php endif; ?>
 
                                         <button class="btn btn-sm btn-outline-info"
@@ -1374,8 +1426,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             <div class="row">
                                 <div class="col-md-4 mb-3">
                                     <label>Initial Stock</label>
-                                    <input type="number" name="initial_stock" class="form-control"
-                                           step="0.01" min="0" required>
+                                    <input
+                                        type="number"
+                                        name="initial_stock"
+                                        id="addItemInitialStock"
+                                        class="form-control"
+                                        step="0.01"
+                                        min="0"
+                                        required
+                                    >
+                                    <small
+                                        id="addItemInitialStockHelp"
+                                        class="text-muted"
+                                    >
+                                        Opening quantity for ordinary Inventory items.
+                                    </small>
                                 </div>
                                 <div class="col-md-4 mb-3">
                                     <label>Minimum Stock Level</label>
@@ -1428,6 +1493,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                         data-inventory-update-item>
                                     <option value="">Select Item</option>
                                     <?php foreach ($inventoryItems as $item): ?>
+                                    <?php if (
+                                        ($item['inventory_role'] ?? 'operational')
+                                        === inventory_category_slaughter_output_role()
+                                    ) continue; ?>
                                     <option value="<?php echo $item['id']; ?>"
                                             data-stock="<?php echo $item['current_stock']; ?>"
                                             data-unit="<?php echo app_attr($item['unit']); ?>"

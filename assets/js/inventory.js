@@ -667,11 +667,47 @@ $(document).ready(function() {
                 : options[0][0];
     }
 
+    function refreshAddItemInitialStockPolicy() {
+        const category =
+            selectedAddItemCategory();
+
+        const input =
+            document.getElementById(
+                'addItemInitialStock'
+            );
+
+        const help =
+            document.getElementById(
+                'addItemInitialStockHelp'
+            );
+
+        if (!input || !help) {
+            return;
+        }
+
+        const isSlaughterOutput =
+            category?.dataset?.inventoryRole
+            === 'slaughter_output';
+
+        if (isSlaughterOutput) {
+            input.value = '0';
+            input.readOnly = true;
+            help.textContent =
+                'Slaughter Output items must start at 0. Produced quantity is received through Slaughter Processing.';
+            return;
+        }
+
+        input.readOnly = false;
+        help.textContent =
+            'Opening quantity for ordinary Inventory items.';
+    }
+
     function refreshAddItemFormContract() {
         refreshAddItemCategoryGuidance();
         refreshAddItemFarmTypeOptions();
         refreshAddItemUsageOptions();
         refreshDefaultProductionAttribution();
+        refreshAddItemInitialStockPolicy();
     }
 
     // Shared app-behaviors.js invokes these Inventory actions through window.

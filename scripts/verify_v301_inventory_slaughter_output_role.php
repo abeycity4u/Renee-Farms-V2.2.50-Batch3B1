@@ -19,6 +19,12 @@ $paths = [
     'inventory' =>
         $root . '/inventory.php',
 
+    'stock' =>
+        $root . '/lib/stock_service.php',
+
+    'js' =>
+        $root . '/assets/js/inventory.js',
+
     'service' =>
         $root . '/lib/ruminant_slaughter_processing.php',
 
@@ -195,6 +201,78 @@ $check(
     && !preg_match(
         '/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+stock_transactions/i',
         $sources['service']
+    )
+);
+
+$check(
+    'Slaughter Output Add Item must begin at zero',
+    str_contains(
+        $sources['role'],
+        'function inventory_category_role_initial_stock_errors'
+    )
+    && str_contains(
+        $sources['inventory'],
+        'inventory_category_role_initial_stock_errors('
+    )
+    && str_contains(
+        $sources['js'],
+        'refreshAddItemInitialStockPolicy'
+    )
+);
+
+$check(
+    'Central stock writer owns slaughter-output provenance gate',
+    str_contains(
+        $sources['stock'],
+        'inventory_category_role_stock_movement_errors('
+    )
+    && str_contains(
+        $sources['stock'],
+        'category_inventory_role'
+    )
+);
+
+$check(
+    'Shared role policy permits only sourced slaughter receipts',
+    str_contains(
+        $sources['role'],
+        "sourceType === 'ruminant_slaughter_output'"
+    )
+    && str_contains(
+        $sources['role'],
+        "movementType === 'received'"
+    )
+);
+
+$check(
+    'Generic stock reversal is blocked for slaughter-output lots',
+    str_contains(
+        $sources['stock'],
+        'inventory_category_role_reversal_errors('
+    )
+);
+
+$check(
+    'Inventory generic Update Stock UI excludes slaughter-output items',
+    str_contains(
+        $sources['inventory'],
+        'Slaughter Processing'
+    )
+    && str_contains(
+        $sources['inventory'],
+        'inventory_category_slaughter_output_role()'
+    )
+);
+
+$check(
+    'Category role changes cannot reclassify categories with items',
+    str_contains(
+        $sources['role'],
+        'function inventory_category_role_transition_errors'
+    )
+    && str_contains(
+        $sources['inventory'],
+        'inventory_category_role_transition_errors('
     )
 );
 
