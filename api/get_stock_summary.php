@@ -2,6 +2,7 @@
 <?php
 require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/../includes/readonly_session.php');
+require_once(__DIR__ . '/../lib/inventory_category_role.php');
 requireLogin();
 
 header('Content-Type: application/json');
@@ -37,21 +38,41 @@ if (!(isPlatformOwner() || hasRole('farm_admin'))) {
     }
 }
 
-// Get low stock count
+// Get low stock count. Slaughter outputs are batch-produced and not reorder-managed.
+$slaughterOutputRole =
+    inventory_category_slaughter_output_role();
+
 if ($farmType === 'both') {
-    $lowStockQuery = "SELECT COUNT(*) as low_stock_count
-                      FROM stock_items
-                      WHERE farm_id = ? AND farm_type IN ('poultry', 'ruminant', 'both')
-                      AND current_stock <= min_stock_level";
+    $lowStockQuery = "SELECT COUNT(*) AS low_stock_count
+                      FROM stock_items si
+                      INNER JOIN inventory_categories ic
+                          ON ic.id=si.category_id
+                         AND ic.farm_id=si.farm_id
+                      WHERE si.farm_id=?
+                        AND si.farm_type IN ('poultry','ruminant','both')
+                        AND COALESCE(NULLIF(ic.inventory_role,''),'operational')<>?
+                        AND si.current_stock<=si.min_stock_level";
     $lowStockStmt = $pdo->prepare($lowStockQuery);
-    $lowStockStmt->execute([$tenantFarmId]);
+    $lowStockStmt->execute([
+        $tenantFarmId,
+        $slaughterOutputRole,
+    ]);
 } else {
-    $lowStockQuery = "SELECT COUNT(*) as low_stock_count
-                      FROM stock_items
-                      WHERE farm_id = ? AND farm_type IN (?, 'both')
-                      AND current_stock <= min_stock_level";
+    $lowStockQuery = "SELECT COUNT(*) AS low_stock_count
+                      FROM stock_items si
+                      INNER JOIN inventory_categories ic
+                          ON ic.id=si.category_id
+                         AND ic.farm_id=si.farm_id
+                      WHERE si.farm_id=?
+                        AND si.farm_type IN (?, 'both')
+                        AND COALESCE(NULLIF(ic.inventory_role,''),'operational')<>?
+                        AND si.current_stock<=si.min_stock_level";
     $lowStockStmt = $pdo->prepare($lowStockQuery);
-    $lowStockStmt->execute([$tenantFarmId, $farmType]);
+    $lowStockStmt->execute([
+        $tenantFarmId,
+        $farmType,
+        $slaughterOutputRole,
+    ]);
 }
 $lowStockCount = $lowStockStmt->fetchColumn();
 

@@ -43,6 +43,7 @@ $inventoryActiveCycles = $inventoryCycleStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 if ($farmType === 'all') {
     $query = "SELECT si.*, ic.category_name, COALESCE(NULLIF(ic.inventory_role,''),'operational') AS inventory_role,
               CASE
+                WHEN COALESCE(NULLIF(ic.inventory_role,''),'operational')='slaughter_output' THEN 'info'
                 WHEN si.current_stock <= si.min_stock_level THEN 'danger'
                 WHEN si.current_stock <= si.min_stock_level * 2 THEN 'warning'
                 ELSE 'success'
@@ -57,6 +58,7 @@ if ($farmType === 'all') {
 } else {
     $query = "SELECT si.*, ic.category_name, COALESCE(NULLIF(ic.inventory_role,''),'operational') AS inventory_role,
               CASE
+                WHEN COALESCE(NULLIF(ic.inventory_role,''),'operational')='slaughter_output' THEN 'info'
                 WHEN si.current_stock <= si.min_stock_level THEN 'danger'
                 WHEN si.current_stock <= si.min_stock_level * 2 THEN 'warning'
                 ELSE 'success'
@@ -90,6 +92,7 @@ $inactiveItemsStmt->execute([$currentFarmId]);
 $inactiveItems = $inactiveItemsStmt->fetchAll();
 
 $totalItems = count($inventoryItems);
+$reorderManagedItems = 0;
 $lowStockItems = 0;
 $moderateStockItems = 0;
 $goodStockItems = 0;
@@ -101,6 +104,8 @@ foreach ($inventoryItems as $item) {
     $currentStock = (float) ($item['current_stock'] ?? 0);
     $minStockLevel = (float) ($item['min_stock_level'] ?? 0);
     $unitCost = (float) ($item['unit_cost'] ?? 0);
+    $inventoryRole =
+        (string)($item['inventory_role'] ?? 'operational');
 
     $totalInventoryValue += $currentStock * $unitCost;
 
@@ -109,6 +114,16 @@ foreach ($inventoryItems as $item) {
     } elseif (($item['farm_type'] ?? '') === 'ruminant') {
         $ruminantItems++;
     }
+
+    if (
+        !inventory_category_role_uses_reorder_policy(
+            $inventoryRole
+        )
+    ) {
+        continue;
+    }
+
+    $reorderManagedItems++;
 
     if ($currentStock <= $minStockLevel) {
         $lowStockItems++;
@@ -119,9 +134,18 @@ foreach ($inventoryItems as $item) {
     }
 }
 
-$criticalInventoryItems = array_values(array_filter($inventoryItems, function ($item) {
-    return (float) ($item['current_stock'] ?? 0) <= (float) ($item['min_stock_level'] ?? 0);
-}));
+$criticalInventoryItems = array_values(
+    array_filter(
+        $inventoryItems,
+        static function ($item): bool {
+            return inventory_category_role_uses_reorder_policy(
+                (string)($item['inventory_role'] ?? 'operational')
+            )
+                && (float)($item['current_stock'] ?? 0)
+                    <= (float)($item['min_stock_level'] ?? 0);
+        }
+    )
+);
 
 usort($criticalInventoryItems, function ($a, $b) {
     $ratioA = ((float) ($a['current_stock'] ?? 0)) / max(1, (float) ($a['min_stock_level'] ?? 0));
@@ -131,7 +155,9 @@ usort($criticalInventoryItems, function ($a, $b) {
 });
 
 $topCriticalInventoryItems = array_slice($criticalInventoryItems, 0, 3);
-$inventoryHealthScore = $totalItems > 0 ? (int) round(($goodStockItems / $totalItems) * 100) : 100;
+$inventoryHealthScore = $reorderManagedItems > 0
+    ? (int) round(($goodStockItems / $reorderManagedItems) * 100)
+    : 100;
 $inventoryHealthLabel = $inventoryHealthScore >= 80 ? 'Healthy' : ($inventoryHealthScore >= 55 ? 'Watch list' : 'Needs urgent restock');
 $inventoryHealthClass = $inventoryHealthScore >= 80 ? 'success' : ($inventoryHealthScore >= 55 ? 'warning' : 'danger');
 $inventoryAutomationMessage = $lowStockItems > 0
@@ -652,6 +678,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             exit();
         }
 
+        $minimumStockErrors =
+            inventory_category_role_min_stock_errors(
+                (string)(
+                    $selectedCategory['inventory_role']
+                    ?? 'operational'
+                ),
+                $minStock
+            );
+
+        if ($minimumStockErrors) {
+            $_SESSION['error'] =
+                $minimumStockErrors[0];
+            header('Location: inventory.php');
+            exit();
+        }
+
         try {
             $pdo->beginTransaction();
             $stmt = $pdo->prepare("INSERT INTO stock_items
@@ -1092,17 +1134,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             </thead>
                             <tbody>
                             <?php if (!empty($inventoryItems) && is_array($inventoryItems)): ?>
-                            <?php foreach ($inventoryItems as $item): 
-                                $currentStock = $item['current_stock'] ?? 0;
-                                $minStockLevel = max(1, ($item['min_stock_level'] ?? 0));
-                                $stockPercentage = ($currentStock / ($minStockLevel * 3)) * 100;
+                            <?php foreach ($inventoryItems as $item):
+                                $currentStock = (float)($item['current_stock'] ?? 0);
+                                $minStockLevel = (float)($item['min_stock_level'] ?? 0);
+                                $inventoryRole =
+                                    (string)($item['inventory_role'] ?? 'operational');
+                                $usesReorderPolicy =
+                                    inventory_category_role_uses_reorder_policy(
+                                        $inventoryRole
+                                    );
+                                $stockPercentage =
+                                    $usesReorderPolicy
+                                        ? (
+                                            $currentStock
+                                            / (max(1, $minStockLevel) * 3)
+                                        ) * 100
+                                        : 0;
 
                                 $statusClass = $item['status_class'] ?? 'success';
 
                                 $statusTextMap = [
                                     'danger' => 'Low Stock',
                                     'warning' => 'Moderate',
-                                    'success' => 'Good'
+                                    'success' => 'Good',
+                                    'info' => 'Output Stock'
                                 ];
                                 $statusText = $statusTextMap[$statusClass] ?? 'Unknown';
                             ?>
@@ -1116,7 +1171,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                     </span>
                                 </td>
 
-                                <td><?= $minStockLevel ?></td>
+                                <td>
+                                    <?php if ($usesReorderPolicy): ?>
+                                        <?= number_format($minStockLevel, 2) ?>
+                                    <?php else: ?>
+                                        <span
+                                            class="text-muted"
+                                            title="Batch-controlled output; supplier reorder threshold does not apply."
+                                        >N/A</span>
+                                    <?php endif; ?>
+                                </td>
                                 <td><?= htmlspecialchars($item['unit'] ?? '-') ?></td>
 
                                 <td>₦<?= number_format($item['unit_cost'] ?? 0, 2) ?></td>
@@ -1135,11 +1199,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 </td>
 
                                 <td>
-                                    <div class="progress stock-progress">
-                                        <div class="progress-bar bg-<?= $statusClass ?> <?= app_percent_class($stockPercentage) ?>">
-                                            <?= round($stockPercentage, 1) ?>%
+                                    <?php if ($usesReorderPolicy): ?>
+                                        <div class="progress stock-progress">
+                                            <div class="progress-bar bg-<?= $statusClass ?> <?= app_percent_class($stockPercentage) ?>">
+                                                <?= round($stockPercentage, 1) ?>%
+                                            </div>
                                         </div>
-                                    </div>
+                                    <?php else: ?>
+                                        <span class="small text-muted">
+                                            Batch-controlled
+                                        </span>
+                                    <?php endif; ?>
                                 </td>
 
                                 <td>
@@ -1444,8 +1514,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 </div>
                                 <div class="col-md-4 mb-3">
                                     <label>Minimum Stock Level</label>
-                                    <input type="number" name="min_stock" class="form-control"
-                                           step="0.01" min="0" required>
+                                    <input
+                                        type="number"
+                                        name="min_stock"
+                                        id="addItemMinStock"
+                                        class="form-control"
+                                        step="0.01"
+                                        min="0"
+                                        required
+                                    >
+                                    <small
+                                        id="addItemMinStockHelp"
+                                        class="text-muted"
+                                    >
+                                        Reorder threshold for ordinary Inventory items.
+                                    </small>
                                 </div>
                                 <div class="col-md-4 mb-3">
                                     <label>Unit</label>

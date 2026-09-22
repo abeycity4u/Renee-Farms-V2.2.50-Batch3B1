@@ -270,3 +270,37 @@ function inventory_category_role_reversal_errors(
 
     return [];
 }
+
+/**
+ * Slaughter outputs are produced from processing, not replenished through
+ * purchasing/reorder workflows.
+ */
+function inventory_category_role_uses_reorder_policy(
+    string $inventoryRole
+): bool {
+    return strtolower(trim($inventoryRole))
+        !== inventory_category_slaughter_output_role();
+}
+
+/**
+ * Slaughter-output stock has no supplier reorder threshold.
+ */
+function inventory_category_role_min_stock_errors(
+    string $inventoryRole,
+    float $minimumStock
+): array {
+    $inventoryRole =
+        strtolower(trim($inventoryRole));
+
+    if (
+        $inventoryRole
+        === inventory_category_slaughter_output_role()
+        && abs($minimumStock) > 0.00001
+    ) {
+        return [
+            'Minimum Stock Level must be 0 for a Slaughter Output item because replenishment is controlled by Slaughter Processing.',
+        ];
+    }
+
+    return [];
+}

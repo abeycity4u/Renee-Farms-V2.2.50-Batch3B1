@@ -33,6 +33,12 @@ $paths = [
 
     'page' =>
         $root . '/ruminant/slaughter_processing.php',
+
+    'dashboard' =>
+        $root . '/dashboard.php',
+
+    'summary_api' =>
+        $root . '/api/get_stock_summary.php',
 ];
 
 $sources = [];
@@ -296,6 +302,86 @@ $check(
     && str_contains(
         $sources['inventory'],
         'inventory_category_role_transition_errors('
+    )
+);
+
+$check(
+    'Slaughter Output minimum stock is centrally fixed at zero',
+    str_contains(
+        $sources['role'],
+        'function inventory_category_role_min_stock_errors'
+    )
+    && str_contains(
+        $sources['inventory'],
+        'inventory_category_role_min_stock_errors('
+    )
+    && str_contains(
+        $sources['bridge'],
+        'inventory_category_role_min_stock_errors('
+    )
+    && str_contains(
+        $sources['js'],
+        'addItemMinStock'
+    )
+);
+
+$check(
+    'Shared role policy excludes slaughter output from reorder workflows',
+    str_contains(
+        $sources['role'],
+        'function inventory_category_role_uses_reorder_policy'
+    )
+    && str_contains(
+        $sources['inventory'],
+        'inventory_category_role_uses_reorder_policy('
+    )
+    && str_contains(
+        $sources['dashboard'],
+        'inventory_category_role_uses_reorder_policy('
+    )
+);
+
+$check(
+    'Inventory renders slaughter output without fake minimum or reorder status',
+    str_contains(
+        $sources['inventory'],
+        "'info' => 'Output Stock'"
+    )
+    && str_contains(
+        $sources['inventory'],
+        'Batch-controlled'
+    )
+    && !str_contains(
+        $sources['inventory'],
+        "\$minStockLevel = max(1, (\$item['min_stock_level'] ?? 0));"
+    )
+);
+
+$check(
+    'Dashboard routes slaughter output to processing instead of generic Update',
+    str_contains(
+        $sources['dashboard'],
+        'Output Stock'
+    )
+    && str_contains(
+        $sources['dashboard'],
+        '/ruminant/slaughter_processing.php'
+    )
+    && str_contains(
+        $sources['dashboard'],
+        'if ($usesReorderPolicy)'
+    )
+);
+
+$check(
+    'Stock summary excludes slaughter output from low-stock count',
+    str_contains(
+        $sources['summary_api'],
+        'inventory_category_slaughter_output_role()'
+    )
+    && str_contains(
+        $sources['summary_api'],
+        "inventory_role,''),'operational')<>?"
     )
 );
 

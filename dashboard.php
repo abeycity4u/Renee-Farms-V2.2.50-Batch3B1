@@ -15,6 +15,7 @@ require_once(__DIR__ . '/includes/functions.php');
 require_once(__DIR__ . '/includes/dashboard_livestock_snapshot.php');
 require_once(__DIR__ . '/lib/farm_intelligence.php');
 require_once(__DIR__ . '/lib/transaction_actor_display.php');
+require_once(__DIR__ . '/lib/inventory_category_role.php');
 requireLogin();
 
 $userType = getUserType();
@@ -114,14 +115,31 @@ if ($dashboardCanUpdateStock) {
 }
 
 if ($farmAccess === 'both') {
-    $stockQuery = "SELECT * FROM stock_items 
-                   WHERE farm_id = ? AND farm_type IN ('poultry', 'ruminant', 'both')
-                   AND is_active = 1 
-                   ORDER BY current_stock ASC";
+    $stockQuery = "SELECT
+                       si.*,
+                       COALESCE(NULLIF(ic.inventory_role,''),'operational') AS inventory_role
+                   FROM stock_items si
+                   INNER JOIN inventory_categories ic
+                       ON ic.id=si.category_id
+                      AND ic.farm_id=si.farm_id
+                   WHERE si.farm_id=?
+                     AND si.farm_type IN ('poultry','ruminant','both')
+                     AND si.is_active=1
+                   ORDER BY si.current_stock ASC";
     $stockStmt = $pdo->prepare($stockQuery);
     $stockStmt->execute([$tenantFarmId]);
 } else {
-    $stockQuery = "SELECT * FROM stock_items WHERE farm_id = ? AND farm_type IN (?, 'both') AND is_active = 1 ORDER BY current_stock ASC";
+    $stockQuery = "SELECT
+                       si.*,
+                       COALESCE(NULLIF(ic.inventory_role,''),'operational') AS inventory_role
+                   FROM stock_items si
+                   INNER JOIN inventory_categories ic
+                       ON ic.id=si.category_id
+                      AND ic.farm_id=si.farm_id
+                   WHERE si.farm_id=?
+                     AND si.farm_type IN (?, 'both')
+                     AND si.is_active=1
+                   ORDER BY si.current_stock ASC";
     $stockStmt = $pdo->prepare($stockQuery);
     $stockStmt->execute([$tenantFarmId, $farmAccess]);
 }
@@ -146,23 +164,20 @@ if ($farmAccess === 'both') {
 }
 $todayTransactions = $transStmt->fetchAll();
 
-// Get low stock items
-if ($farmAccess === 'both') {
-    $lowStockQuery = "SELECT * FROM stock_items
-                      WHERE farm_id = ? AND farm_type IN ('poultry', 'ruminant', 'both')
-                      AND is_active = 1
-                      AND current_stock <= min_stock_level";
-    $lowStockStmt = $pdo->prepare($lowStockQuery);
-    $lowStockStmt->execute([$tenantFarmId]);
-} else {
-    $lowStockQuery = "SELECT * FROM stock_items
-                      WHERE farm_id = ? AND farm_type IN (?, 'both')
-                      AND is_active = 1
-                      AND current_stock <= min_stock_level";
-    $lowStockStmt = $pdo->prepare($lowStockQuery);
-    $lowStockStmt->execute([$tenantFarmId, $farmAccess]);
-}
-$lowStockItems = $lowStockStmt->fetchAll();
+// Low-stock/reorder policy applies only to operational Inventory.
+// Slaughter outputs are replenished through processing, never supplier reorder.
+$lowStockItems = array_values(
+    array_filter(
+        $stockItems,
+        static function (array $item): bool {
+            return inventory_category_role_uses_reorder_policy(
+                (string)($item['inventory_role'] ?? 'operational')
+            )
+                && (float)($item['current_stock'] ?? 0)
+                    <= (float)($item['min_stock_level'] ?? 0);
+        }
+    )
+);
 
 // Get recent sales
 if ($farmAccess === 'both') {
@@ -575,9 +590,25 @@ $pageTitle = "Dashboard";
                                 </thead>
                                 <tbody>
                                     <?php foreach ($stockItems as $item):
-                                        $minStockLevel = max(1, (float) $item['min_stock_level']);
-                                        $stockPercent = ($item['current_stock'] / $minStockLevel) * 100;
-                                        if ($item['current_stock'] <= $item['min_stock_level']) {
+                                        $usesReorderPolicy =
+                                            inventory_category_role_uses_reorder_policy(
+                                                (string)($item['inventory_role'] ?? 'operational')
+                                            );
+                                        $minStockLevel =
+                                            (float)$item['min_stock_level'];
+                                        $stockPercent =
+                                            $usesReorderPolicy
+                                                ? (
+                                                    (float)$item['current_stock']
+                                                    / max(1, $minStockLevel)
+                                                ) * 100
+                                                : 0;
+
+                                        if (!$usesReorderPolicy) {
+                                            $statusClass = 'info';
+                                            $statusText = 'Output Stock';
+                                            $indicatorClass = 'stock-good';
+                                        } elseif ($item['current_stock'] <= $item['min_stock_level']) {
                                             $statusClass = 'danger';
                                             $statusText = 'Low Stock';
                                             $indicatorClass = 'stock-low';
@@ -604,7 +635,13 @@ $pageTitle = "Dashboard";
                                                 <div class="progress-bar bg-<?php echo $statusClass; ?> <?php echo app_percent_class($stockPercent); ?>" role="progressbar"></div>
                                             </div>
                                         </td>
-                                        <td><?php echo number_format((float) $item['min_stock_level'], 2); ?></td>
+                                        <td>
+                                            <?php if ($usesReorderPolicy): ?>
+                                                <?php echo number_format((float)$item['min_stock_level'], 2); ?>
+                                            <?php else: ?>
+                                                <span class="text-muted">N/A</span>
+                                            <?php endif; ?>
+                                        </td>
                                         <td><?php echo htmlspecialchars($item['unit']); ?></td>
                                         <td>
                                             <span class="stock-indicator <?php echo $indicatorClass; ?>"></span>
@@ -618,11 +655,22 @@ $pageTitle = "Dashboard";
                                             </span>
                                         </td>
                                         <td>
-                                            <button class="btn btn-sm btn-primary rounded-pill px-3"
-                                                    data-quick-stock-id="<?php echo (int)$item['id']; ?>"
-                                                    title="Quick Update">
-                                                <i class="bi bi-arrow-up-down me-1"></i> Update
-                                            </button>
+                                            <?php if ($usesReorderPolicy): ?>
+                                                <button class="btn btn-sm btn-primary rounded-pill px-3"
+                                                        data-quick-stock-id="<?php echo (int)$item['id']; ?>"
+                                                        title="Quick Update">
+                                                    <i class="bi bi-arrow-up-down me-1"></i> Update
+                                                </button>
+                                            <?php else: ?>
+                                                <a
+                                                    class="btn btn-sm btn-outline-info rounded-pill px-3"
+                                                    href="<?php echo BASE_URL; ?>/ruminant/slaughter_processing.php"
+                                                    title="Stock is controlled by Slaughter Processing"
+                                                >
+                                                    <i class="bi bi-box-seam me-1"></i>
+                                                    Slaughter Processing
+                                                </a>
+                                            <?php endif; ?>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>

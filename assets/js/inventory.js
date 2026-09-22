@@ -689,6 +689,16 @@ $(document).ready(function() {
             category?.dataset?.inventoryRole
             === 'slaughter_output';
 
+        const minimumStock =
+            document.getElementById(
+                'addItemMinStock'
+            );
+
+        const minimumStockHelp =
+            document.getElementById(
+                'addItemMinStockHelp'
+            );
+
         const unitCost =
             document.getElementById(
                 'addItemUnitCost'
@@ -704,6 +714,16 @@ $(document).ready(function() {
             input.readOnly = true;
             help.textContent =
                 'Slaughter Output items must start at 0. Produced quantity is received through Slaughter Processing.';
+
+            if (minimumStock) {
+                minimumStock.value = '0';
+                minimumStock.readOnly = true;
+            }
+
+            if (minimumStockHelp) {
+                minimumStockHelp.textContent =
+                    'Not reorder-managed. Slaughter Output stock is replenished only through Slaughter Processing.';
+            }
 
             if (unitCost) {
                 unitCost.value = '0';
@@ -721,6 +741,15 @@ $(document).ready(function() {
         input.readOnly = false;
         help.textContent =
             'Opening quantity for ordinary Inventory items.';
+
+        if (minimumStock) {
+            minimumStock.readOnly = false;
+        }
+
+        if (minimumStockHelp) {
+            minimumStockHelp.textContent =
+                'Reorder threshold for ordinary Inventory items.';
+        }
 
         if (unitCost) {
             unitCost.readOnly = false;

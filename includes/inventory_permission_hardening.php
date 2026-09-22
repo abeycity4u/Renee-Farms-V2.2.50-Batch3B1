@@ -251,6 +251,28 @@ function inventory_permission_handle_delegated_add_item(PDO $pdo): void
         exit();
     }
 
+    $minimumStockErrors =
+        inventory_category_role_min_stock_errors(
+            (string)(
+                $selectedCategory['inventory_role']
+                ?? 'operational'
+            ),
+            $minStock
+        );
+
+    if ($minimumStockErrors) {
+        $_SESSION['error'] =
+            $minimumStockErrors[0];
+
+        header(
+            'Location: '
+            . BASE_URL
+            . '/inventory.php'
+        );
+
+        exit();
+    }
+
     try {
         $pdo->beginTransaction();
         $stmt = $pdo->prepare("INSERT INTO stock_items
