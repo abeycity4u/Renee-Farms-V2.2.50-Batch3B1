@@ -46,6 +46,7 @@ verify_check(
 $expectedMap = [
     'manual_dead' => 'mortality',
     'manual_culled' => 'cull',
+    'manual_slaughtered' => 'slaughter',
     'culled_slaughtered' => 'cull',
     'sold_live' => 'sale',
     'manual_transferred' => null,
