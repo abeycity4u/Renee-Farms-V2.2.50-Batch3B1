@@ -13,6 +13,8 @@ $root = dirname(__DIR__);
 $paths = [
     'migration' =>
         $root . '/migrations/069_ruminant_slaughter_processing_foundation.sql',
+    'exit_migration' =>
+        $root . '/migrations/030_ruminant_animal_exit_events.sql',
     'service' =>
         $root . '/lib/ruminant_slaughter_processing.php',
     'page' =>
@@ -75,6 +77,18 @@ $check(
     str_contains(
         $sources['migration'],
         'UNIQUE KEY uniq_ruminant_slaughter_exit'
+    )
+);
+
+$check(
+    'Slaughter exit foreign key matches BIGINT UNSIGNED source identity',
+    str_contains(
+        $sources['exit_migration'],
+        'id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT'
+    )
+    && str_contains(
+        $sources['migration'],
+        'exit_event_id BIGINT UNSIGNED NOT NULL'
     )
 );
 

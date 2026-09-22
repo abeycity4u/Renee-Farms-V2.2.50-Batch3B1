@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS ruminant_slaughter_batches (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     farm_id INT NOT NULL,
     animal_id INT NOT NULL,
-    exit_event_id INT NOT NULL,
+    exit_event_id BIGINT UNSIGNED NOT NULL,
     cycle_id INT NOT NULL,
 
     batch_code VARCHAR(80) NOT NULL,
