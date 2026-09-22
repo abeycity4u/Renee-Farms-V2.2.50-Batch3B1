@@ -42,6 +42,14 @@
             configElement.dataset.salePopulationEffectMap,
             {}
         ),
+        slaughterSaleLots: parseJson(
+            configElement.dataset.slaughterSaleLots,
+            []
+        ),
+        slaughterSaleHistoryMap: parseJson(
+            configElement.dataset.slaughterSaleHistoryMap,
+            {}
+        ),
         csrfToken: configElement.dataset.csrfToken || '',
         deleteSaleUrl: configElement.dataset.deleteSaleUrl || ''
     };
@@ -108,6 +116,8 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
     const ruminantSaleAllocationMap = salesRecordsConfig.ruminantSaleAllocationMap;
     const ruminantSaleExitMap = salesRecordsConfig.ruminantSaleExitMap;
     const salePopulationEffectMap = salesRecordsConfig.salePopulationEffectMap;
+    const slaughterSaleLots = salesRecordsConfig.slaughterSaleLots;
+    const slaughterSaleHistoryMap = salesRecordsConfig.slaughterSaleHistoryMap;
 
     function refreshSaleAttribution(prefix, selectedProduction = '', selectedCycle = 0) {
         // Add modal uses addFarmType; Edit modal uses editSaleFarmType.
@@ -191,6 +201,810 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
         refreshRuminantSaleAnimalChoices('edit', rows);
     }
 
+    function slaughterSaleSelectors(prefix) {
+        const edit = prefix === 'edit';
+
+        return {
+            source: edit
+                ? '#editSaleStockSource'
+                : '#addSaleStockSource',
+
+            panel: edit
+                ? '#editSlaughterLotPanel'
+                : '#addSlaughterLotPanel',
+
+            rows: edit
+                ? '#editSlaughterLotRows'
+                : '#addSlaughterLotRows',
+
+            summary: edit
+                ? '#editSlaughterLotSummary'
+                : '#addSlaughterLotSummary',
+
+            farm: edit
+                ? '#editSaleFarmType'
+                : '#addFarmType',
+
+            production: edit
+                ? '#editSaleProductionType'
+                : '#addProductionType',
+
+            cycle: edit
+                ? '#editSaleCycleId'
+                : '#addCycleId',
+
+            product: edit
+                ? '#editSaleProduct'
+                : '#addProductType',
+
+            quantity: edit
+                ? '#editSaleQuantity'
+                : '#addQuantity',
+
+            unitPreset: edit
+                ? '#editSaleUnitPreset'
+                : '#addUnitPreset',
+
+            unitCustom: edit
+                ? '#editSaleUnitCustom'
+                : '#addUnitCustom',
+
+            populationCard: edit
+                ? '#editPopulationEffectCard'
+                : '#addPopulationEffectCard',
+
+            populationMode: edit
+                ? '#editPopulationEffectMode'
+                : '#addPopulationEffectMode',
+
+            animalPanel: edit
+                ? '#editRuminantSaleAnimalPanel'
+                : '#addRuminantSaleAnimalPanel',
+
+            animalMode: edit
+                ? '#editSaleAnimalAllocationMode'
+                : '#addSaleAnimalAllocationMode'
+        };
+    }
+
+    function activeSlaughterSaleHistory(saleId) {
+        return (
+            slaughterSaleHistoryMap[String(saleId)]
+            || []
+        ).filter(
+            row =>
+                Number(row.is_active || 0) === 1
+        );
+    }
+
+    function slaughterSaleCatalog(
+        prefix
+    ) {
+        const saleId =
+            prefix === 'edit'
+                ? Number(
+                    $('#editSaleId').val()
+                    || 0
+                )
+                : 0;
+
+        const catalog =
+            new Map();
+
+        slaughterSaleLots.forEach(
+            lot => {
+                const id =
+                    Number(
+                        lot.output_id
+                        || 0
+                    );
+
+                if (!id) return;
+
+                catalog.set(
+                    id,
+                    Object.assign(
+                        {},
+                        lot,
+                        {
+                            available_for_sale:
+                                Number(
+                                    lot.remaining_quantity
+                                    || 0
+                                )
+                        }
+                    )
+                );
+            }
+        );
+
+        if (
+            prefix === 'edit'
+            && saleId > 0
+        ) {
+            activeSlaughterSaleHistory(
+                saleId
+            ).forEach(
+                row => {
+                    const id =
+                        Number(
+                            row.output_id
+                            || 0
+                        );
+
+                    if (!id) return;
+
+                    const existing =
+                        catalog.get(id)
+                        || {};
+
+                    catalog.set(
+                        id,
+                        Object.assign(
+                            {},
+                            existing,
+                            row,
+                            {
+                                output_id:
+                                    id,
+
+                                unit:
+                                    row.inventory_unit
+                                    || existing.unit
+                                    || '',
+
+                                sales_unit:
+                                    existing.sales_unit
+                                    || row.inventory_unit
+                                    || '',
+
+                                available_for_sale:
+                                    Number(
+                                        row.remaining_quantity
+                                        || 0
+                                    )
+                                    + Number(
+                                        row.quantity
+                                        || 0
+                                    )
+                            }
+                        )
+                    );
+                }
+            );
+        }
+
+        return Array.from(
+            catalog.values()
+        );
+    }
+
+    function slaughterSaleLot(
+        prefix,
+        outputId
+    ) {
+        return (
+            slaughterSaleCatalog(prefix)
+                .find(
+                    lot =>
+                        Number(lot.output_id)
+                        === Number(outputId)
+                )
+            || null
+        );
+    }
+
+    function slaughterSaleLabel(lot) {
+        const unit =
+            String(
+                lot.unit
+                || lot.inventory_unit
+                || ''
+            );
+
+        const available =
+            Number(
+                lot.available_for_sale
+                ?? lot.remaining_quantity
+                ?? 0
+            );
+
+        return (
+            String(
+                lot.item_name
+                || 'Slaughter output'
+            )
+            + ' | Batch '
+            + String(
+                lot.batch_code
+                || '—'
+            )
+            + ' | Animal '
+            + String(
+                lot.tag_no
+                || '—'
+            )
+            + ' | '
+            + String(
+                lot.slaughter_date
+                || '—'
+            )
+            + ' | Available '
+            + available.toFixed(2)
+            + ' '
+            + unit
+        );
+    }
+
+    function setSlaughterUnit(
+        prefix,
+        unit
+    ) {
+        const ids =
+            slaughterSaleSelectors(
+                prefix
+            );
+
+        unit =
+            String(
+                unit
+                || ''
+            ).trim();
+
+        if (
+            saleUnitPresets.includes(
+                unit
+            )
+        ) {
+            $(ids.unitPreset)
+                .val(unit);
+
+            $(ids.unitCustom)
+                .val('')
+                .addClass('d-none')
+                .prop('required', false);
+
+            return;
+        }
+
+        if (unit) {
+            $(ids.unitPreset)
+                .val('__custom__');
+
+            $(ids.unitCustom)
+                .val(unit)
+                .removeClass('d-none')
+                .prop('required', true);
+        }
+    }
+
+    function setSlaughterLocks(
+        prefix,
+        locked
+    ) {
+        const ids =
+            slaughterSaleSelectors(
+                prefix
+            );
+
+        $(
+            ids.farm
+            + ','
+            + ids.production
+            + ','
+            + ids.cycle
+            + ','
+            + ids.unitPreset
+        ).prop(
+            'disabled',
+            locked
+        );
+
+        $(ids.product)
+            .prop(
+                'readonly',
+                locked
+            );
+
+        $(ids.quantity)
+            .prop(
+                'readonly',
+                locked
+            );
+
+        $(ids.unitCustom)
+            .prop(
+                'disabled',
+                locked
+            );
+
+        if (!locked) {
+            toggleCustomSaleUnit(
+                ids.unitPreset,
+                ids.unitCustom
+            );
+        }
+    }
+
+    function refreshSlaughterRowLimit(
+        prefix,
+        row
+    ) {
+        const lot =
+            slaughterSaleLot(
+                prefix,
+                Number(
+                    row.find(
+                        '.slaughter-sale-lot-select'
+                    ).val()
+                    || 0
+                )
+            );
+
+        const quantity =
+            row.find(
+                '.slaughter-sale-lot-quantity'
+            );
+
+        if (!lot) {
+            quantity.removeAttr(
+                'max'
+            );
+            return;
+        }
+
+        quantity.attr(
+            'max',
+            Number(
+                lot.available_for_sale
+                ?? lot.remaining_quantity
+                ?? 0
+            ).toFixed(2)
+        );
+    }
+
+    function appendSlaughterSaleRow(
+        prefix,
+        selected = {}
+    ) {
+        const ids =
+            slaughterSaleSelectors(
+                prefix
+            );
+
+        const catalog =
+            slaughterSaleCatalog(
+                prefix
+            );
+
+        if (!catalog.length) {
+            $(ids.summary)
+                .removeClass('text-success')
+                .addClass('text-warning')
+                .text(
+                    'No eligible slaughter-output lot is currently available.'
+                );
+            return;
+        }
+
+        const wrapper =
+            $('<div>', {
+                class:
+                    'row g-2 align-items-end mb-2 slaughter-sale-lot-row'
+            });
+
+        const lotCol =
+            $('<div>', {
+                class:
+                    'col-md-7'
+            });
+
+        const qtyCol =
+            $('<div>', {
+                class:
+                    'col-md-3'
+            });
+
+        const actionCol =
+            $('<div>', {
+                class:
+                    'col-md-2'
+            });
+
+        lotCol.append(
+            $('<label>', {
+                class:
+                    'form-label small mb-1',
+                text:
+                    'Output lot'
+            })
+        );
+
+        const select =
+            $('<select>', {
+                class:
+                    'form-select slaughter-sale-lot-select',
+                name:
+                    'slaughter_output_ids[]',
+                required:
+                    true
+            }).attr(
+                'data-slaughter-prefix',
+                prefix
+            );
+
+        select.append(
+            new Option(
+                'Select slaughter output lot...',
+                ''
+            )
+        );
+
+        catalog.forEach(
+            lot => {
+                select.append(
+                    new Option(
+                        slaughterSaleLabel(
+                            lot
+                        ),
+                        String(
+                            lot.output_id
+                        ),
+                        false,
+                        Number(
+                            lot.output_id
+                        ) === Number(
+                            selected.output_id
+                            || 0
+                        )
+                    )
+                );
+            }
+        );
+
+        lotCol.append(
+            select
+        );
+
+        qtyCol.append(
+            $('<label>', {
+                class:
+                    'form-label small mb-1',
+                text:
+                    'Quantity sold'
+            })
+        );
+
+        qtyCol.append(
+            $('<input>', {
+                type:
+                    'number',
+                class:
+                    'form-control slaughter-sale-lot-quantity',
+                name:
+                    'slaughter_output_quantities[]',
+                min:
+                    '0.01',
+                step:
+                    '0.01',
+                required:
+                    true,
+                value:
+                    selected.quantity
+                    ?? ''
+            }).attr(
+                'data-slaughter-prefix',
+                prefix
+            )
+        );
+
+        actionCol.append(
+            $('<button>', {
+                type:
+                    'button',
+                class:
+                    'btn btn-outline-danger slaughter-sale-lot-remove',
+                text:
+                    'Remove'
+            }).attr(
+                'data-slaughter-prefix',
+                prefix
+            )
+        );
+
+        wrapper.append(
+            lotCol,
+            qtyCol,
+            actionCol
+        );
+
+        $(ids.rows)
+            .append(
+                wrapper
+            );
+
+        refreshSlaughterRowLimit(
+            prefix,
+            wrapper
+        );
+    }
+
+    function refreshSlaughterDerived(
+        prefix
+    ) {
+        const ids =
+            slaughterSaleSelectors(
+                prefix
+            );
+
+        let total =
+            0;
+
+        let first =
+            null;
+
+        $(ids.rows)
+            .find(
+                '.slaughter-sale-lot-row'
+            )
+            .each(
+                function () {
+                    const row =
+                        $(this);
+
+                    const outputId =
+                        Number(
+                            row.find(
+                                '.slaughter-sale-lot-select'
+                            ).val()
+                            || 0
+                        );
+
+                    const quantity =
+                        Number(
+                            row.find(
+                                '.slaughter-sale-lot-quantity'
+                            ).val()
+                            || 0
+                        );
+
+                    if (
+                        outputId > 0
+                        && quantity > 0
+                    ) {
+                        total +=
+                            quantity;
+
+                        if (!first) {
+                            first =
+                                slaughterSaleLot(
+                                    prefix,
+                                    outputId
+                                );
+                        }
+                    }
+
+                    refreshSlaughterRowLimit(
+                        prefix,
+                        row
+                    );
+                }
+            );
+
+        if (first) {
+            $(ids.farm)
+                .val(
+                    'ruminant'
+                );
+
+            const production =
+                String(
+                    first.production_type
+                    || $(ids.production).val()
+                    || ''
+                );
+
+            const cycleId =
+                Number(
+                    first.cycle_id
+                    || $(ids.cycle).val()
+                    || 0
+                );
+
+            refreshSaleAttribution(
+                prefix,
+                production,
+                cycleId
+            );
+
+            $(ids.product)
+                .val(
+                    String(
+                        first.item_name
+                        || ''
+                    )
+                );
+
+            setSlaughterUnit(
+                prefix,
+                first.sales_unit
+                || first.unit
+                || first.inventory_unit
+                || ''
+            );
+
+            $(ids.summary)
+                .removeClass('text-warning')
+                .addClass('text-success')
+                .text(
+                    'Inventory-linked sale. Quantity is derived from the selected lot rows; frozen COGS is independent of selling price.'
+                );
+        }
+
+        $(ids.quantity)
+            .val(
+                total > 0
+                    ? total.toFixed(2)
+                    : ''
+            )
+            .trigger(
+                'input'
+            );
+
+        setSlaughterLocks(
+            prefix,
+            true
+        );
+    }
+
+    function setSlaughterSaleMode(
+        prefix,
+        enabled,
+        selectedRows = null
+    ) {
+        const ids =
+            slaughterSaleSelectors(
+                prefix
+            );
+
+        $(ids.panel)
+            .toggleClass(
+                'd-none',
+                !enabled
+            );
+
+        if (!enabled) {
+            $(ids.rows)
+                .empty();
+
+            $(ids.summary)
+                .text('')
+                .removeClass(
+                    'text-success text-warning'
+                );
+
+            setSlaughterLocks(
+                prefix,
+                false
+            );
+
+            $(ids.populationCard)
+                .removeClass(
+                    'd-none'
+                );
+
+            refreshSalePopulationEffect(
+                prefix
+            );
+
+            refreshRuminantSaleAnimalChoices(
+                prefix
+            );
+
+            return;
+        }
+
+        $(ids.rows)
+            .empty();
+
+        if (
+            Array.isArray(
+                selectedRows
+            )
+            && selectedRows.length
+        ) {
+            selectedRows.forEach(
+                row =>
+                    appendSlaughterSaleRow(
+                        prefix,
+                        row
+                    )
+            );
+        } else {
+            appendSlaughterSaleRow(
+                prefix
+            );
+        }
+
+        $(ids.populationMode)
+            .val(
+                'financial_only'
+            );
+
+        refreshSalePopulationEffect(
+            prefix,
+            []
+        );
+
+        $(ids.populationCard)
+            .addClass(
+                'd-none'
+            );
+
+        $(ids.animalMode)
+            .val(
+                'shared'
+            );
+
+        $(ids.animalPanel)
+            .addClass(
+                'd-none'
+            );
+
+        refreshSlaughterDerived(
+            prefix
+        );
+    }
+
+    function loadEditSlaughterSale(
+        saleId
+    ) {
+        const rows =
+            activeSlaughterSaleHistory(
+                saleId
+            ).map(
+                row => ({
+                    output_id:
+                        Number(
+                            row.output_id
+                            || 0
+                        ),
+
+                    quantity:
+                        Number(
+                            row.quantity
+                            || 0
+                        )
+                })
+            );
+
+        if (rows.length) {
+            $('#editSaleStockSource')
+                .val(
+                    'slaughter_output'
+                );
+
+            setSlaughterSaleMode(
+                'edit',
+                true,
+                rows
+            );
+
+            return;
+        }
+
+        $('#editSaleStockSource')
+            .val(
+                'financial_only'
+            );
+
+        setSlaughterSaleMode(
+            'edit',
+            false
+        );
+    }
+
+
     function salePopulationSelectors(prefix) {
         const isEdit = prefix === 'edit';
         return {
@@ -212,7 +1026,7 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
     const salePopulationEffectExplanations = {
         financial_only: {
             default:
-                'This option creates no sale-owned live-population deduction. Product type, quantity, and unit of measure are treated as financial/revenue data only.',
+                'This option updates only the financial sale record. It creates no sale-owned live-population deduction. Product type, quantity, and unit of measure are treated as financial/revenue data only.',
             ruminant:
                 'This sale creates no additional aggregate/group headcount deduction. Tagged ruminants explicitly marked Sold live or Culled/slaughtered are still removed from live population through the Animal Registry lifecycle. Product type, quantity, and unit of measure remain financial/revenue data only.'
         },
@@ -478,10 +1292,141 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
         refreshSalePopulationEffect('edit', rows);
     }
 
+
     $(document).ready(function() {
         refreshSaleAttribution('add');
         refreshRuminantSaleAnimalChoices('add');
         refreshSalePopulationEffect('add');
+
+
+        $('#addSaleStockSource').on(
+            'change',
+            function () {
+                setSlaughterSaleMode(
+                    'add',
+                    String(
+                        $(this).val()
+                        || ''
+                    ) === 'slaughter_output'
+                );
+            }
+        );
+
+        $('#editSaleStockSource').on(
+            'change',
+            function () {
+                setSlaughterSaleMode(
+                    'edit',
+                    String(
+                        $(this).val()
+                        || ''
+                    ) === 'slaughter_output'
+                );
+            }
+        );
+
+        $('#addSlaughterLotAddRow').on(
+            'click',
+            function () {
+                appendSlaughterSaleRow(
+                    'add'
+                );
+
+                refreshSlaughterDerived(
+                    'add'
+                );
+            }
+        );
+
+        $('#editSlaughterLotAddRow').on(
+            'click',
+            function () {
+                appendSlaughterSaleRow(
+                    'edit'
+                );
+
+                refreshSlaughterDerived(
+                    'edit'
+                );
+            }
+        );
+
+        $(document).on(
+            'change',
+            '.slaughter-sale-lot-select',
+            function () {
+                const prefix =
+                    String(
+                        $(this).attr(
+                            'data-slaughter-prefix'
+                        )
+                        || 'add'
+                    );
+
+                refreshSlaughterDerived(
+                    prefix
+                );
+            }
+        );
+
+        $(document).on(
+            'input',
+            '.slaughter-sale-lot-quantity',
+            function () {
+                const prefix =
+                    String(
+                        $(this).attr(
+                            'data-slaughter-prefix'
+                        )
+                        || 'add'
+                    );
+
+                refreshSlaughterDerived(
+                    prefix
+                );
+            }
+        );
+
+        $(document).on(
+            'click',
+            '.slaughter-sale-lot-remove',
+            function () {
+                const prefix =
+                    String(
+                        $(this).attr(
+                            'data-slaughter-prefix'
+                        )
+                        || 'add'
+                    );
+
+                const ids =
+                    slaughterSaleSelectors(
+                        prefix
+                    );
+
+                $(this)
+                    .closest(
+                        '.slaughter-sale-lot-row'
+                    )
+                    .remove();
+
+                if (
+                    !$(ids.rows)
+                        .find(
+                            '.slaughter-sale-lot-row'
+                        )
+                        .length
+                ) {
+                    appendSlaughterSaleRow(
+                        prefix
+                    );
+                }
+
+                refreshSlaughterDerived(
+                    prefix
+                );
+            }
+        );
 
         $('#addFarmType').on('change', () => {
             refreshSaleAttribution('add');
@@ -668,6 +1613,7 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
             setEditSaleUnit(String(data.unit || ''));
             loadEditSaleAnimalAllocation(Number(data.id || 0));
             loadEditSalePopulationEffect(Number(data.id || 0));
+            loadEditSlaughterSale(Number(data.id || 0));
             updateTotalField('#editSaleQuantity', '#editSalePrice', '#editTotalAmount');
         }
     });

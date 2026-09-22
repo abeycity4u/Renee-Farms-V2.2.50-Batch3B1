@@ -18,6 +18,7 @@ require_once(__DIR__ . '/../lib/sale_population_effects.php');
 require_once(__DIR__ . '/../lib/sales_units.php');
 require_once(__DIR__ . '/../lib/transaction_actor_display.php');
 require_once(__DIR__ . '/../lib/record_reference_persistence.php');
+require_once(__DIR__ . '/../lib/ruminant_slaughter_sale_consumption.php');
 $tenantFarmId = requireCurrentFarmId();
 
 $userType = getUserType();
@@ -81,6 +82,109 @@ $allSalesCycles = $allCyclesStmt->fetchAll(PDO::FETCH_ASSOC);
 $saleFarmTypeLabel = static function (string $type): string {
     return ucfirst($type);
 };
+
+
+$prepareSlaughterSaleInput =
+    static function (
+        array &$input,
+        ?int $saleId = null
+    ) use (
+        $pdo,
+        $tenantFarmId
+    ): array {
+        $rows =
+            ruminant_slaughter_sale_rows_from_post(
+                $input
+            );
+
+        $selection =
+            ruminant_slaughter_sale_selection(
+                $pdo,
+                $tenantFarmId,
+                (string)(
+                    $input['sale_date']
+                    ?? ''
+                ),
+                $rows,
+                $saleId
+            );
+
+        if (
+            ($selection['mode'] ?? 'financial_only')
+            !== 'slaughter_output'
+        ) {
+            return $selection;
+        }
+
+        /*
+         * Physical slaughter-output provenance owns these fields.
+         * Never trust browser-supplied equivalents for an Inventory-linked sale.
+         */
+        $input['farm_type'] =
+            'ruminant';
+
+        $input['production_type'] =
+            (string)$selection['production_type'];
+
+        $input['cycle_id'] =
+            (string)(int)$selection['cycle_id'];
+
+        $input['product_type'] =
+            (string)$selection['product_type'];
+
+        $input['quantity'] =
+            number_format(
+                (float)$selection['quantity'],
+                2,
+                '.',
+                ''
+            );
+
+        $derivedUnit =
+            (string)$selection['unit_of_measure'];
+
+        if (
+            array_key_exists(
+                $derivedUnit,
+                sales_unit_presets()
+            )
+        ) {
+            $input['unit_preset'] =
+                $derivedUnit;
+
+            $input['unit_custom'] =
+                '';
+        } else {
+            $input['unit_preset'] =
+                '__custom__';
+
+            $input['unit_custom'] =
+                $derivedUnit;
+        }
+
+        /*
+         * The source animal already left live population at slaughter.
+         * Output sale must not create a second animal/population exit.
+         */
+        $input['population_effect_mode'] =
+            'financial_only';
+
+        unset(
+            $input['population_cycle_ids'],
+            $input['population_quantities']
+        );
+
+        $input['sale_animal_allocation_mode'] =
+            'shared';
+
+        unset(
+            $input['sale_animal_ids'],
+            $input['sale_animal_amounts'],
+            $input['sale_animal_exit_outcomes']
+        );
+
+        return $selection;
+    };
 
 $renderSalePopulationEffectControls = static function (string $prefix): void {
     $idPrefix = $prefix === 'edit' ? 'edit' : 'add';
@@ -178,6 +282,29 @@ $salePopulationEffectMap = sale_population_effect_rows_for_sales(
     $tenantFarmId,
     array_column($salesRecords, 'id')
 );
+
+
+$slaughterSaleLots =
+    in_array(
+        'ruminant',
+        $saleFarmTypes,
+        true
+    )
+        ? ruminant_slaughter_sale_available_lots(
+            $pdo,
+            $tenantFarmId
+        )
+        : [];
+
+$slaughterSaleHistoryMap =
+    ruminant_slaughter_sale_history_for_sales(
+        $pdo,
+        $tenantFarmId,
+        array_column(
+            $salesRecords,
+            'id'
+        )
+    );
 
 // Get sales summary with the same attribution scope as the detail ledger.
 if ($farmType === '') {
@@ -286,6 +413,21 @@ if ($debtFeatureEnabled && $selectedCustomer !== '') {
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['add_sale'])) {
         if (!$canAddSales) { http_response_code(403); exit('You do not have permission to add sales.'); }
+
+        try {
+            $slaughterSaleSelection =
+                $prepareSlaughterSaleInput(
+                    $_POST
+                );
+        } catch (RuminantSlaughterSaleException $e) {
+            $_SESSION['error'] =
+                $e->getMessage();
+
+            header(
+                "Location: sales_records.php?report_mode={$reportMode}&month={$month}&year={$year}&farm_type={$farmType}"
+            );
+            exit();
+        }
         $quantity = (float)($_POST['quantity'] ?? 0);
         $unitPrice = (float)($_POST['unit_price'] ?? 0);
         $totalAmount = $quantity * $unitPrice;
@@ -456,6 +598,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         (int)$pdo->lastInsertId();
                 }
             );
+
+        ruminant_slaughter_sale_sync(
+            $pdo,
+            $tenantFarmId,
+            $saleId,
+            $slaughterSaleSelection,
+            (int)$_SESSION['user_id']
+        );
 
         ruminant_sale_save_animal_allocations($pdo, $tenantFarmId, $saleId, $animalRevenueAllocation, (int)$_SESSION['user_id']);
         if ($saleFarmType === 'ruminant') {
@@ -700,6 +850,38 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             exit();
         }
 
+        $saleIdForSlaughter =
+            (int)(
+                $_POST['sale_id']
+                ?? 0
+            );
+
+        if ($saleIdForSlaughter <= 0) {
+            $_SESSION['error'] =
+                'Invalid sale selected for update.';
+
+            header(
+                "Location: sales_records.php?report_mode={$reportMode}&month={$month}&year={$year}&farm_type={$farmType}"
+            );
+            exit();
+        }
+
+        try {
+            $slaughterSaleSelection =
+                $prepareSlaughterSaleInput(
+                    $_POST,
+                    $saleIdForSlaughter
+                );
+        } catch (RuminantSlaughterSaleException $e) {
+            $_SESSION['error'] =
+                $e->getMessage();
+
+            header(
+                "Location: sales_records.php?report_mode={$reportMode}&month={$month}&year={$year}&farm_type={$farmType}"
+            );
+            exit();
+        }
+
         $saleFarmType = $_POST['farm_type'] ?? '';
         if (!in_array($saleFarmType, $saleFarmTypes, true)) {
             $_SESSION['error'] = "That farm type is not enabled for this farm.";
@@ -804,6 +986,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $_POST['unit_price'], $_POST['customer_name'], $_POST['remarks'],
             $_POST['sale_id'], $tenantFarmId
         ]);
+        ruminant_slaughter_sale_sync(
+            $pdo,
+            $tenantFarmId,
+            (int)$_POST['sale_id'],
+            $slaughterSaleSelection,
+            (int)$_SESSION['user_id']
+        );
+
         ruminant_sale_save_animal_allocations($pdo, $tenantFarmId, (int)$_POST['sale_id'], $animalRevenueAllocation, (int)$_SESSION['user_id']);
         if ($saleFarmType === 'ruminant') {
             ruminant_sale_apply_exit_outcomes($pdo, $tenantFarmId, (int)$_POST['sale_id'], (string)$_POST['sale_date'], $animalRevenueAllocation, $_POST, (int)$_SESSION['user_id']);
@@ -1315,10 +1505,27 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                                         data-remarks="<?php echo htmlspecialchars($sale['remarks'] ?? '', ENT_QUOTES); ?>">
                                                     <i class="bi bi-pencil"></i>
                                                 </button>
+                                                <?php
+                                                    $slaughterSaleHistoryRows =
+                                                        $slaughterSaleHistoryMap[
+                                                            (int)$sale['id']
+                                                        ] ?? [];
+                                                ?>
+                                                <?php if ($slaughterSaleHistoryRows): ?>
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-sm btn-outline-secondary"
+                                                    disabled
+                                                    title="This sale has slaughter-output Inventory history and cannot be hard-deleted."
+                                                >
+                                                    <i class="bi bi-lock"></i>
+                                                </button>
+                                                <?php else: ?>
                                                 <button class="btn btn-sm btn-outline-danger"
                                                         data-sale-delete-id="<?php echo (int)$sale['id']; ?>">
                                                     <i class="bi bi-trash"></i>
                                                 </button>
+                                                <?php endif; ?>
                                             </td>
                                             <?php endif; ?>
                                         </tr>
@@ -1343,6 +1550,57 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
+                        <div class="mb-3">
+                            <label>Sales Stock Source</label>
+                            <select
+                                name="sale_stock_source"
+                                id="addSaleStockSource"
+                                class="form-select"
+                            >
+                                <option value="financial_only" selected>
+                                    Financial only — no Inventory movement
+                                </option>
+                                <option
+                                    value="slaughter_output"
+                                    <?php echo empty($slaughterSaleLots) ? 'disabled' : ''; ?>
+                                >
+                                    Slaughter Output Inventory — explicit lot
+                                </option>
+                            </select>
+                            <small class="text-muted">
+                                Use Slaughter Output Inventory only when this sale physically consumes a recorded slaughter output.
+                            </small>
+                        </div>
+
+                        <div
+                            class="card mb-3 d-none"
+                            id="addSlaughterLotPanel"
+                        >
+                            <div class="card-body py-3">
+                                <div class="fw-semibold mb-1">
+                                    Slaughter Output Lots
+                                </div>
+                                <div class="small text-muted mb-3">
+                                    Select the exact output lot and quantity sold. Product, source cycle, unit and total quantity are derived from Inventory provenance. Selling price does not change frozen COGS.
+                                </div>
+
+                                <div id="addSlaughterLotRows"></div>
+
+                                <button
+                                    type="button"
+                                    id="addSlaughterLotAddRow"
+                                    class="btn btn-sm btn-outline-secondary"
+                                >
+                                    Add matching lot
+                                </button>
+
+                                <div
+                                    id="addSlaughterLotSummary"
+                                    class="small mt-2"
+                                ></div>
+                            </div>
+                        </div>
+
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label>Sale Date</label>
@@ -1561,6 +1819,54 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
+                        <div class="mb-3">
+                            <label>Sales Stock Source</label>
+                            <select
+                                name="sale_stock_source"
+                                id="editSaleStockSource"
+                                class="form-select"
+                            >
+                                <option value="financial_only">
+                                    Financial only — no active slaughter-output consumption
+                                </option>
+                                <option value="slaughter_output">
+                                    Slaughter Output Inventory — explicit lot
+                                </option>
+                            </select>
+                            <small class="text-muted">
+                                Corrections keep prior slaughter-output Inventory history auditable.
+                            </small>
+                        </div>
+
+                        <div
+                            class="card mb-3 d-none"
+                            id="editSlaughterLotPanel"
+                        >
+                            <div class="card-body py-3">
+                                <div class="fw-semibold mb-1">
+                                    Slaughter Output Lots
+                                </div>
+                                <div class="small text-muted mb-3">
+                                    Changing lot or quantity restores the previous active lot usage append-only before applying the corrected selection.
+                                </div>
+
+                                <div id="editSlaughterLotRows"></div>
+
+                                <button
+                                    type="button"
+                                    id="editSlaughterLotAddRow"
+                                    class="btn btn-sm btn-outline-secondary"
+                                >
+                                    Add matching lot
+                                </button>
+
+                                <div
+                                    id="editSlaughterLotSummary"
+                                    class="small mt-2"
+                                ></div>
+                            </div>
+                        </div>
+
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label>Sale Date</label>
@@ -1708,6 +2014,16 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
         ); ?>"
         data-sale-population-effect-map="<?php echo htmlspecialchars(
             app_json_script($salePopulationEffectMap),
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        ); ?>"
+        data-slaughter-sale-lots="<?php echo htmlspecialchars(
+            app_json_script($slaughterSaleLots),
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        ); ?>"
+        data-slaughter-sale-history-map="<?php echo htmlspecialchars(
+            app_json_script($slaughterSaleHistoryMap),
             ENT_QUOTES | ENT_SUBSTITUTE,
             'UTF-8'
         ); ?>"
