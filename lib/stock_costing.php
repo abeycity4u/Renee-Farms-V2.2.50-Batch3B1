@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/stock_reporting.php';
+require_once __DIR__ . '/stock_receipt_cost_adjustments.php';
 
 /**
  * V2.2.16 historical inventory costing helpers.
@@ -51,8 +52,25 @@ if (!function_exists('stock_feed_transaction_sql_predicate')) {
 if (!function_exists('stock_weighted_cost_replay')) {
     function stock_weighted_cost_replay(PDO $pdo, int $farmId, int $itemId, ?string $throughDate = null): array
     {
-        $effective = stock_effective_sql_predicate('t');
-        $sql = "SELECT t.id,t.transaction_type,t.quantity,t.unit_cost,t.total_cost,t.transaction_date,t.created_at
+        $effective =
+            stock_effective_sql_predicate(
+                't'
+            );
+
+        $receiptAdjustment =
+            stock_receipt_cost_adjustment_total_sql(
+                't'
+            );
+
+        $sql = "SELECT
+                    t.id,
+                    t.transaction_type,
+                    t.quantity,
+                    t.unit_cost,
+                    t.total_cost,
+                    {$receiptAdjustment} AS receipt_cost_adjustment_total,
+                    t.transaction_date,
+                    t.created_at
                 FROM stock_transactions t
                 WHERE t.farm_id=? AND t.stock_item_id=? AND {$effective}";
         $params = [$farmId, $itemId];
@@ -76,13 +94,18 @@ if (!function_exists('stock_weighted_cost_replay')) {
 
                 if ($row['total_cost'] !== null) {
                     /*
-                     * The posted line total is the monetary authority for a
-                     * receipt. Unit cost is a rate snapshot and may be rounded
-                     * to four decimals, so quantity × unit rate can differ by
-                     * a cent from an exact supplier/source allocation.
+                     * The immutable posted line total plus append-only receipt
+                     * cost adjustments is the monetary authority. Unit cost is
+                     * a rate snapshot and may be rounded to four decimals.
                      */
                     $value +=
-                        (float)$row['total_cost'];
+                        (float)$row['total_cost']
+                        + (float)(
+                            $row[
+                                'receipt_cost_adjustment_total'
+                            ]
+                            ?? 0
+                        );
                 } elseif ($row['unit_cost'] !== null) {
                     $value +=
                         $q

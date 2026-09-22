@@ -54,10 +54,25 @@ try {
         }
     }
 
+    $receiptCostAdjustmentSql =
+        stock_receipt_cost_adjustment_total_sql(
+            't'
+        );
+
+    $receiptEffectiveTotalSql =
+        stock_receipt_effective_total_cost_sql(
+            't'
+        );
+
     // Keep the full audit trail. Physical balances use every posted movement;
     // reversal pairs cancel each other mathematically. Active-only filtering is
     // reserved for operational consumption/cost summaries.
-    $query = "SELECT t.*, s.item_name, s.unit,
+    $query = "SELECT
+                     t.*,
+                     {$receiptCostAdjustmentSql} AS receipt_cost_adjustment_total,
+                     {$receiptEffectiveTotalSql} AS effective_total_cost,
+                     s.item_name,
+                     s.unit,
                      u.full_name AS recorded_by_name,
                      u.user_type AS recorded_by_user_type,
                      pc.cycle_code, pc.status AS cycle_status

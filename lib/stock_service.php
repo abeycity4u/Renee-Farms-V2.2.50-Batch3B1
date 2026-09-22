@@ -372,6 +372,212 @@ function stock_apply_movement(
     return $transactionId;
 }
 
+/**
+ * Append a monetary correction to an immutable RECEIVED stock transaction.
+ *
+ * No physical quantity is posted here. The original ledger row stays intact;
+ * canonical costing projects original total + adjustment rows.
+ */
+function stock_post_receipt_cost_adjustment(
+    PDO $pdo,
+    int $farmId,
+    int $transactionId,
+    float $amountDelta,
+    string $reason,
+    ?int $userId,
+    string $sourceType,
+    int $sourceId
+): int {
+    record_reference_persistence_require_transaction(
+        $pdo
+    );
+
+    $amountDelta =
+        round(
+            $amountDelta,
+            2
+        );
+
+    $reason =
+        trim(
+            $reason
+        );
+
+    $sourceType =
+        trim(
+            $sourceType
+        );
+
+    if (
+        $farmId <= 0
+        || $transactionId <= 0
+        || !is_finite($amountDelta)
+        || abs($amountDelta) < 0.005
+        || $reason === ''
+        || $sourceType === ''
+        || $sourceId <= 0
+    ) {
+        throw new InvalidArgumentException(
+            'Receipt cost adjustment requires a valid farm, receipt, non-zero amount, reason and source identity.'
+        );
+    }
+
+    $stmt =
+        $pdo->prepare(
+            "SELECT
+                 t.*,
+                 s.id AS item_id
+             FROM stock_transactions t
+             INNER JOIN stock_items s
+                 ON s.id=t.stock_item_id
+                AND s.farm_id=t.farm_id
+             WHERE t.id=?
+               AND t.farm_id=?
+             LIMIT 1
+             FOR UPDATE"
+        );
+
+    $stmt->execute([
+        $transactionId,
+        $farmId,
+    ]);
+
+    $transaction =
+        $stmt->fetch(
+            PDO::FETCH_ASSOC
+        );
+
+    if (!$transaction) {
+        throw new RuntimeException(
+            'The stock receipt to adjust could not be found.'
+        );
+    }
+
+    if (
+        (string)$transaction['transaction_type']
+            !== 'received'
+        || (int)(
+            $transaction['is_reversed']
+            ?? 0
+        ) !== 0
+        || !empty(
+            $transaction['reversal_of_id']
+        )
+    ) {
+        throw new RuntimeException(
+            'Only an active original received-stock transaction can receive a cost adjustment.'
+        );
+    }
+
+    if ($transaction['total_cost'] === null) {
+        throw new RuntimeException(
+            'The stock receipt has no posted monetary total to adjust.'
+        );
+    }
+
+    $duplicateStmt =
+        $pdo->prepare(
+            "SELECT id
+             FROM stock_receipt_cost_adjustments
+             WHERE farm_id=?
+               AND source_type=?
+               AND source_id=?
+             LIMIT 1
+             FOR UPDATE"
+        );
+
+    $duplicateStmt->execute([
+        $farmId,
+        $sourceType,
+        $sourceId,
+    ]);
+
+    if ($duplicateStmt->fetchColumn() !== false) {
+        throw new RuntimeException(
+            'This receipt-cost adjustment source has already been posted.'
+        );
+    }
+
+    $sumStmt =
+        $pdo->prepare(
+            "SELECT
+                 COALESCE(
+                     SUM(amount_delta),
+                     0
+                 )
+             FROM stock_receipt_cost_adjustments
+             WHERE farm_id=?
+               AND stock_transaction_id=?"
+        );
+
+    $sumStmt->execute([
+        $farmId,
+        $transactionId,
+    ]);
+
+    $existingDelta =
+        (float)$sumStmt
+            ->fetchColumn();
+
+    $effectiveAfter =
+        round(
+            (float)$transaction['total_cost']
+            + $existingDelta
+            + $amountDelta,
+            2
+        );
+
+    if ($effectiveAfter < -0.005) {
+        throw new RuntimeException(
+            'This receipt cost adjustment would make the effective receipt value negative.'
+        );
+    }
+
+    $insert =
+        $pdo->prepare(
+            "INSERT INTO stock_receipt_cost_adjustments
+             (
+                 farm_id,
+                 stock_transaction_id,
+                 amount_delta,
+                 reason,
+                 source_type,
+                 source_id,
+                 created_by
+             )
+             VALUES (?,?,?,?,?,?,?)"
+        );
+
+    $insert->execute([
+        $farmId,
+        $transactionId,
+        $amountDelta,
+        $reason,
+        $sourceType,
+        $sourceId,
+        $userId && $userId > 0
+            ? $userId
+            : null,
+    ]);
+
+    $adjustmentId =
+        (int)$pdo->lastInsertId();
+
+    if (
+        !stock_recalculate_current_unit_cost(
+            $pdo,
+            $farmId,
+            (int)$transaction['item_id']
+        )
+    ) {
+        throw new RuntimeException(
+            'Receipt cost adjustment was not posted because current Inventory valuation could not be reconciled.'
+        );
+    }
+
+    return $adjustmentId;
+}
+
 function stock_reverse_transaction(
     PDO $pdo,
     int $farmId,
