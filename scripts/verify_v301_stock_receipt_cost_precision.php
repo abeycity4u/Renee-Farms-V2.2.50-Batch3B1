@@ -122,19 +122,19 @@ $normalizedService =
 $incomingTotalBranch =
     strpos(
         $normalizedService,
-        "if ( \\$type === 'received' && \\$incomingTotalCost !== null ) { \\$totalCost = \\$incomingTotalCost;"
+        'if ( $type === \'received\' && $incomingTotalCost !== null ) { $totalCost = $incomingTotalCost;'
     );
 
 $outgoingTotalBranch =
     strpos(
         $normalizedService,
-        "elseif ( \\$type === 'used' && \\$outgoingTotalCost !== null ) { \\$totalCost = \\$outgoingTotalCost;"
+        'elseif ( $type === \'used\' && $outgoingTotalCost !== null ) { $totalCost = $outgoingTotalCost;'
     );
 
 $fallbackTotalBranch =
     strpos(
         $normalizedService,
-        "else { \\$totalCost = round( \\$quantity * \\$snapshotUnitCost, 2 );"
+        'else { $totalCost = round( $quantity * $snapshotUnitCost, 2 );'
     );
 
 $check(
