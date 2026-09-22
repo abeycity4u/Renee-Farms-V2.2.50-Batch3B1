@@ -8,7 +8,17 @@ $life=file_get_contents($root.'/lib/ruminant_lifecycle_integrity.php');
 $mem=file_get_contents($root.'/lib/ruminant_cycle_membership.php');
 ck(str_contains($reg,'manual_exit'),'Registry records non-sale exits explicitly');
 ck(str_contains($reg,'Effective Date'),'Manual exit requires an effective date');
-ck(str_contains($reg,'Dead')&&str_contains($reg,'Transferred')&&str_contains($reg,'Culled'),'Non-sale outcomes cover dead/transferred/culled');
+ck(
+    str_contains($reg,'<option value="dead">Dead</option>')
+    && str_contains($reg,'<option value="culled">Culled</option>')
+    && str_contains($reg,'<option value="slaughtered">Slaughtered</option>'),
+    'Non-sale terminal outcomes cover dead/culled/slaughtered'
+);
+ck(
+    str_contains($reg,'Move to another cycle')
+    && !str_contains($reg,'<option value="transferred">Transferred</option>'),
+    'Internal transfer stays on dedicated cycle-transfer workflow'
+);
 ck(!str_contains($reg,'name="status" id="status"'),'Animal edit cannot directly overwrite lifecycle status');
 ck(str_contains($life,'ruminant_animal_exit_events'),'Manual exits use canonical exit-event history');
 ck(str_contains($life,'ruminant_lifecycle_apply_exit_boundary') || str_contains($life,'ruminant_cycle_close_open_membership_at_exit'),'Manual exit closes open membership history');
