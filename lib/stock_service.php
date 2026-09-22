@@ -29,7 +29,9 @@ function stock_apply_movement(
     ?int $sourceId = null,
     ?float $incomingUnitCost = null,
     ?string $productionTypeOverride = null,
-    ?float $incomingTotalCost = null
+    ?float $incomingTotalCost = null,
+    ?float $outgoingUnitCost = null,
+    ?float $outgoingTotalCost = null
 ): int {
     /*
      * Stock mutations and their human-facing reference assignment must be
@@ -91,6 +93,51 @@ function stock_apply_movement(
             $incomingUnitCost =
                 round(
                     $incomingTotalCost
+                    / $quantity,
+                    4
+                );
+        }
+    }
+
+    if ($outgoingUnitCost !== null) {
+        if (
+            $type !== 'used'
+            || !is_finite($outgoingUnitCost)
+            || $outgoingUnitCost < 0
+        ) {
+            throw new RuntimeException(
+                'An explicit outgoing unit cost is valid only for used stock and must be zero or greater.'
+            );
+        }
+
+        $outgoingUnitCost =
+            round(
+                $outgoingUnitCost,
+                4
+            );
+    }
+
+    if ($outgoingTotalCost !== null) {
+        if (
+            $type !== 'used'
+            || !is_finite($outgoingTotalCost)
+            || $outgoingTotalCost < 0
+        ) {
+            throw new RuntimeException(
+                'An exact outgoing total cost is valid only for used stock and must be zero or greater.'
+            );
+        }
+
+        $outgoingTotalCost =
+            round(
+                $outgoingTotalCost,
+                2
+            );
+
+        if ($outgoingUnitCost === null) {
+            $outgoingUnitCost =
+                round(
+                    $outgoingTotalCost
                     / $quantity,
                     4
                 );
@@ -233,6 +280,9 @@ function stock_apply_movement(
             $incomingUnitCost !== null
                 ? (float)$incomingUnitCost
                 : $unitCost;
+    } elseif ($outgoingUnitCost !== null) {
+        $snapshotUnitCost =
+            $outgoingUnitCost;
     } else {
         $snapshotUnitCost =
             stock_historical_unit_cost(
@@ -253,15 +303,28 @@ function stock_apply_movement(
             4
         );
 
-    $totalCost =
+    if (
         $type === 'received'
         && $incomingTotalCost !== null
-            ? $incomingTotalCost
-            : round(
+    ) {
+        $totalCost =
+            $incomingTotalCost;
+
+    } elseif (
+        $type === 'used'
+        && $outgoingTotalCost !== null
+    ) {
+        $totalCost =
+            $outgoingTotalCost;
+
+    } else {
+        $totalCost =
+            round(
                 $quantity
                 * $snapshotUnitCost,
                 2
             );
+    }
 
 
 

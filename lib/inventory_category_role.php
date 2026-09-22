@@ -226,7 +226,23 @@ function inventory_category_role_stock_movement_errors(
 
     if (
         $movementType === 'received'
-        && $sourceType === 'ruminant_slaughter_output'
+        && in_array(
+            $sourceType,
+            [
+                'ruminant_slaughter_output',
+                'ruminant_slaughter_sale_reversal',
+            ],
+            true
+        )
+        && $sourceId !== null
+        && $sourceId > 0
+    ) {
+        return [];
+    }
+
+    if (
+        $movementType === 'used'
+        && $sourceType === 'ruminant_slaughter_sale'
         && $sourceId !== null
         && $sourceId > 0
     ) {
@@ -235,13 +251,13 @@ function inventory_category_role_stock_movement_errors(
 
     if ($movementType === 'received') {
         return [
-            'Slaughter Output stock can only be received through Slaughter Processing.',
+            'Slaughter Output stock can only be received through Slaughter Processing or a source-owned slaughter-sale correction.',
         ];
     }
 
     if ($movementType === 'used') {
         return [
-            'Slaughter Output stock cannot be adjusted through generic Inventory usage. Use the linked slaughter-output workflow.',
+            'Slaughter Output stock can only be consumed through the linked Sales lot workflow.',
         ];
     }
 
