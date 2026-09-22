@@ -1459,8 +1459,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label>Unit Cost (₦)</label>
-                                    <input type="number" name="unit_cost" class="form-control" step="0.01" min="0" placeholder="0.00">
-                                    <small class="text-muted">Used for valuing stock on dashboards.</small>
+                                    <input
+                                        type="number"
+                                        name="unit_cost"
+                                        id="addItemUnitCost"
+                                        class="form-control"
+                                        step="0.01"
+                                        min="0"
+                                        placeholder="0.00"
+                                    >
+                                    <small
+                                        id="addItemUnitCostHelp"
+                                        class="text-muted"
+                                    >
+                                        Used for valuing ordinary opening stock on dashboards.
+                                    </small>
                                 </div>
                             </div>
                         </div>

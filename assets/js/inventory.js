@@ -689,17 +689,47 @@ $(document).ready(function() {
             category?.dataset?.inventoryRole
             === 'slaughter_output';
 
+        const unitCost =
+            document.getElementById(
+                'addItemUnitCost'
+            );
+
+        const unitCostHelp =
+            document.getElementById(
+                'addItemUnitCostHelp'
+            );
+
         if (isSlaughterOutput) {
             input.value = '0';
             input.readOnly = true;
             help.textContent =
                 'Slaughter Output items must start at 0. Produced quantity is received through Slaughter Processing.';
+
+            if (unitCost) {
+                unitCost.value = '0';
+                unitCost.readOnly = true;
+            }
+
+            if (unitCostHelp) {
+                unitCostHelp.textContent =
+                    'Calculated automatically from the slaughter batch cost basis when output is received. Selling price is recorded separately in Sales.';
+            }
+
             return;
         }
 
         input.readOnly = false;
         help.textContent =
             'Opening quantity for ordinary Inventory items.';
+
+        if (unitCost) {
+            unitCost.readOnly = false;
+        }
+
+        if (unitCostHelp) {
+            unitCostHelp.textContent =
+                'Used for valuing ordinary opening stock on dashboards.';
+        }
     }
 
     function refreshAddItemFormContract() {

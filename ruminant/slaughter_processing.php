@@ -50,6 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 (int)($_POST['batch_id'] ?? 0),
                 (int)($_POST['stock_item_id'] ?? 0),
                 (float)($_POST['quantity'] ?? 0),
+                (float)($_POST['cost_share_percent'] ?? 0),
                 isset($_SESSION['user_id'])
                     ? (int)$_SESSION['user_id']
                     : null
@@ -149,7 +150,9 @@ $outputItems = $itemStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
                 Slaughter has already removed the animal from live population.
                 Recording meat, hide, head, offal or other outputs here only
                 receives physical product into Inventory. It does not remove
-                another animal from population.
+                another animal from population. Output cost is derived from the
+                animal's frozen production cost basis; selling price remains a
+                separate Sales fact and may change over time.
             </div>
         </div>
     </div>
@@ -299,6 +302,46 @@ $outputItems = $itemStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
                         </span>
                     </div>
 
+                    <div class="alert alert-secondary py-2 mb-3">
+                        <?php if ($batch['cost_basis_amount'] === null): ?>
+                            <strong>Cost basis:</strong>
+                            Will be frozen automatically when the first output is received,
+                            using purchase cost + direct animal expenses + allocated shared
+                            costs through the slaughter date.
+                            Record any slaughter-day animal expense before receiving the first output.
+                        <?php else: ?>
+                            <strong>Frozen cost basis:</strong>
+                            ₦<?php echo number_format(
+                                (float)$batch['cost_basis_amount'],
+                                2
+                            ); ?>
+                            <span class="text-muted">
+                                · Purchase ₦<?php echo number_format(
+                                    (float)($batch['cost_basis_purchase'] ?? 0),
+                                    2
+                                ); ?>
+                                · Direct ₦<?php echo number_format(
+                                    (float)($batch['cost_basis_direct_expense'] ?? 0),
+                                    2
+                                ); ?>
+                                · Shared ₦<?php echo number_format(
+                                    (float)($batch['cost_basis_shared'] ?? 0),
+                                    2
+                                ); ?>
+                                · Allocated
+                                <?php echo number_format(
+                                    (float)($batch['allocated_cost_percent'] ?? 0),
+                                    2
+                                ); ?>%
+                                · Unallocated
+                                <?php echo number_format(
+                                    (float)($batch['unallocated_cost_percent'] ?? 100),
+                                    2
+                                ); ?>%
+                            </span>
+                        <?php endif; ?>
+                    </div>
+
                     <div class="table-responsive mb-3">
                         <table class="table table-sm align-middle mb-0">
                             <thead>
@@ -306,6 +349,8 @@ $outputItems = $itemStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
                                 <th>Inventory output</th>
                                 <th>Initial</th>
                                 <th>Remaining</th>
+                                <th>Cost share</th>
+                                <th>Unit cost</th>
                                 <th>Stock receipt</th>
                             </tr>
                             </thead>
@@ -336,6 +381,27 @@ $outputItems = $itemStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
                                         ); ?>
                                     </td>
                                     <td>
+                                        <?php echo number_format(
+                                            (float)($output['cost_share_percent'] ?? 0),
+                                            2
+                                        ); ?>%
+                                        <div class="small text-muted">
+                                            ₦<?php echo number_format(
+                                                (float)($output['allocated_cost'] ?? 0),
+                                                2
+                                            ); ?>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        ₦<?php echo number_format(
+                                            (float)($output['unit_cost_snapshot'] ?? 0),
+                                            4
+                                        ); ?>
+                                        / <?php echo htmlspecialchars(
+                                            (string)$output['unit']
+                                        ); ?>
+                                    </td>
+                                    <td>
                                         <?php echo htmlspecialchars(
                                             (string)(
                                                 $output['stock_reference']
@@ -348,7 +414,7 @@ $outputItems = $itemStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
                             <?php if (empty($batch['outputs'])): ?>
                                 <tr>
-                                    <td colspan="4" class="text-muted text-center">
+                                    <td colspan="6" class="text-muted text-center">
                                         No Inventory output recorded yet.
                                     </td>
                                 </tr>
@@ -372,7 +438,7 @@ $outputItems = $itemStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
                                     value="<?php echo (int)$batch['id']; ?>"
                                 >
 
-                                <div class="col-md-7">
+                                <div class="col-md-5">
                                     <label class="form-label">
                                         Inventory output item
                                     </label>
@@ -405,7 +471,7 @@ $outputItems = $itemStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
                                     </select>
                                 </div>
 
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <label class="form-label">
                                         Quantity produced
                                     </label>
@@ -417,6 +483,34 @@ $outputItems = $itemStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
                                         step="0.01"
                                         required
                                     >
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label class="form-label">
+                                        Batch cost share (%)
+                                    </label>
+                                    <input
+                                        class="form-control"
+                                        type="number"
+                                        name="cost_share_percent"
+                                        min="0.0001"
+                                        max="<?php echo htmlspecialchars(
+                                            (string)max(
+                                                0,
+                                                (float)($batch['unallocated_cost_percent'] ?? 100)
+                                            )
+                                        ); ?>"
+                                        step="0.0001"
+                                        required
+                                    >
+                                    <div class="form-text">
+                                        Allocate production cost, not selling price.
+                                        Remaining:
+                                        <?php echo number_format(
+                                            (float)($batch['unallocated_cost_percent'] ?? 100),
+                                            2
+                                        ); ?>%.
+                                    </div>
                                 </div>
 
                                 <div class="col-md-2">

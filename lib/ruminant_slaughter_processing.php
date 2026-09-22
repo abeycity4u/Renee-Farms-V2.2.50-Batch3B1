@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/stock_service.php';
 require_once __DIR__ . '/inventory_category_role.php';
+require_once __DIR__ . '/ruminant_slaughter_costing.php';
 
 /**
  * Ruminant slaughter processing.
@@ -236,9 +237,15 @@ function ruminant_slaughter_processing_add_output(
     int $batchId,
     int $stockItemId,
     float $quantity,
+    float $costSharePercent,
     ?int $userId
 ): int {
     $quantity = round($quantity, 2);
+    $costSharePercent =
+        round(
+            $costSharePercent,
+            4
+        );
 
     if (
         $farmId <= 0
@@ -246,9 +253,12 @@ function ruminant_slaughter_processing_add_output(
         || $stockItemId <= 0
         || $quantity <= 0
         || !is_finite($quantity)
+        || $costSharePercent <= 0
+        || $costSharePercent > 100
+        || !is_finite($costSharePercent)
     ) {
         throw new InvalidArgumentException(
-            'Choose a valid slaughter batch, inventory item and quantity greater than zero.'
+            'Choose a valid slaughter batch, inventory item, quantity and cost share greater than zero.'
         );
     }
 
@@ -306,6 +316,157 @@ function ruminant_slaughter_processing_add_output(
                 'This slaughter batch is no longer linked to a valid Slaughtered lifecycle event.'
             );
         }
+
+        /*
+         * Freeze the animal's cost basis on the first output receipt.
+         * Future changes to selling price never rewrite this snapshot.
+         */
+        if ($batch['cost_basis_amount'] === null) {
+            $legacyOutputStmt = $pdo->prepare(
+                'SELECT COUNT(*)
+                 FROM ruminant_slaughter_outputs
+                 WHERE farm_id=?
+                   AND batch_id=?'
+            );
+            $legacyOutputStmt->execute([
+                $farmId,
+                $batchId,
+            ]);
+
+            if ((int)$legacyOutputStmt->fetchColumn() > 0) {
+                throw new RuntimeException(
+                    'This batch already has an uncosted legacy output and requires costing review before another output can be received.'
+                );
+            }
+
+            $basis =
+                ruminant_slaughter_costing_as_of(
+                    $pdo,
+                    $farmId,
+                    (int)$batch['animal_id'],
+                    (string)$batch['slaughter_date']
+                );
+
+            $pdo->prepare(
+                'UPDATE ruminant_slaughter_batches
+                 SET
+                     cost_basis_amount=?,
+                     cost_basis_purchase=?,
+                     cost_basis_direct_expense=?,
+                     cost_basis_shared=?,
+                     cost_basis_method=?,
+                     cost_basis_snapshot_at=NOW()
+                 WHERE id=?
+                   AND farm_id=?'
+            )->execute([
+                (float)$basis['total_cost_basis'],
+                (float)$basis['purchase_cost'],
+                (float)$basis['direct_expense_cost'],
+                (float)$basis['shared_cost'],
+                (string)$basis['method'],
+                $batchId,
+                $farmId,
+            ]);
+
+            $batch['cost_basis_amount'] =
+                (float)$basis['total_cost_basis'];
+            $batch['cost_basis_purchase'] =
+                (float)$basis['purchase_cost'];
+            $batch['cost_basis_direct_expense'] =
+                (float)$basis['direct_expense_cost'];
+            $batch['cost_basis_shared'] =
+                (float)$basis['shared_cost'];
+        }
+
+        $allocationStmt = $pdo->prepare(
+            "SELECT
+                 COALESCE(
+                     SUM(cost_share_percent),
+                     0
+                 ) AS allocated_percent,
+                 COALESCE(
+                     SUM(allocated_cost),
+                     0
+                 ) AS allocated_cost
+             FROM ruminant_slaughter_outputs
+             WHERE farm_id=?
+               AND batch_id=?"
+        );
+        $allocationStmt->execute([
+            $farmId,
+            $batchId,
+        ]);
+        $allocation =
+            $allocationStmt->fetch(
+                PDO::FETCH_ASSOC
+            ) ?: [];
+
+        $alreadyPercent =
+            round(
+                (float)(
+                    $allocation['allocated_percent']
+                    ?? 0
+                ),
+                4
+            );
+
+        $alreadyCost =
+            round(
+                (float)(
+                    $allocation['allocated_cost']
+                    ?? 0
+                ),
+                2
+            );
+
+        $newPercent =
+            round(
+                $alreadyPercent
+                + $costSharePercent,
+                4
+            );
+
+        if ($newPercent > 100.0001) {
+            throw new RuntimeException(
+                'Output cost shares cannot exceed 100% of the slaughter batch cost basis.'
+            );
+        }
+
+        $batchCost =
+            round(
+                (float)(
+                    $batch['cost_basis_amount']
+                    ?? 0
+                ),
+                2
+            );
+
+        $allocatedCost =
+            round(
+                $batchCost
+                * $costSharePercent
+                / 100,
+                2
+            );
+
+        if ($newPercent >= 99.9999) {
+            $allocatedCost =
+                round(
+                    max(
+                        0,
+                        $batchCost
+                        - $alreadyCost
+                    ),
+                    2
+                );
+        }
+
+        $unitCostSnapshot =
+            round(
+                $allocatedCost
+                / $quantity,
+                4
+            );
 
         $itemStmt = $pdo->prepare(
             "SELECT
@@ -383,9 +544,12 @@ function ruminant_slaughter_processing_add_output(
                  initial_quantity,
                  remaining_quantity,
                  unit,
+                 cost_share_percent,
+                 allocated_cost,
+                 unit_cost_snapshot,
                  created_by
              )
-             VALUES (?,?,?,NULL,?,?,?,?)"
+             VALUES (?,?,?,NULL,?,?,?,?,?,?,?)"
         );
         $insert->execute([
             $farmId,
@@ -394,6 +558,9 @@ function ruminant_slaughter_processing_add_output(
             $quantity,
             $quantity,
             (string)$item['unit'],
+            $costSharePercent,
+            $allocatedCost,
+            $unitCostSnapshot,
             $userId && $userId > 0 ? $userId : null,
         ]);
 
@@ -416,7 +583,7 @@ function ruminant_slaughter_processing_add_output(
             (int)$batch['cycle_id'],
             'ruminant_slaughter_output',
             $outputId,
-            null,
+            $unitCostSnapshot,
             (string)$batch['production_type']
         );
 
@@ -510,6 +677,57 @@ function ruminant_slaughter_processing_batches(
     foreach ($batches as &$batch) {
         $batch['outputs'] =
             $outputMap[(int)$batch['id']] ?? [];
+
+        $batch['allocated_cost_percent'] = 0.0;
+        $batch['allocated_cost_amount'] = 0.0;
+
+        foreach ($batch['outputs'] as $output) {
+            $batch['allocated_cost_percent'] +=
+                (float)(
+                    $output['cost_share_percent']
+                    ?? 0
+                );
+
+            $batch['allocated_cost_amount'] +=
+                (float)(
+                    $output['allocated_cost']
+                    ?? 0
+                );
+        }
+
+        $batch['allocated_cost_percent'] =
+            round(
+                (float)$batch['allocated_cost_percent'],
+                4
+            );
+
+        $batch['allocated_cost_amount'] =
+            round(
+                (float)$batch['allocated_cost_amount'],
+                2
+            );
+
+        $batch['unallocated_cost_percent'] =
+            round(
+                max(
+                    0,
+                    100
+                    - (float)$batch['allocated_cost_percent']
+                ),
+                4
+            );
+
+        $batch['unallocated_cost_amount'] =
+            $batch['cost_basis_amount'] === null
+                ? null
+                : round(
+                    max(
+                        0,
+                        (float)$batch['cost_basis_amount']
+                        - (float)$batch['allocated_cost_amount']
+                    ),
+                    2
+                );
     }
     unset($batch);
 

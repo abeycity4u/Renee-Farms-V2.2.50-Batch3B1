@@ -140,7 +140,7 @@ function stock_apply_movement(
         $newStock = round($previous - $quantity, 2);
     } else {
         $newStock = round($previous + $quantity, 2);
-        if ($incomingUnitCost !== null && $incomingUnitCost > 0) {
+        if ($incomingUnitCost !== null && $incomingUnitCost >= 0) {
             $newUnitCost = $newStock > 0
                 ? (($previous * $unitCost) + ($quantity * $incomingUnitCost)) / $newStock
                 : $incomingUnitCost;
