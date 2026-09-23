@@ -20,7 +20,9 @@ function farm_intelligence_summary(PDO $pdo, int $farmId, string $startDate, str
         return [
             'revenue'=>0.0,'feed_consumption_cost'=>0.0,'non_feed_expenses'=>0.0,
             'manual_non_feed_expenses'=>0.0,'inventory_operating_consumption_cost'=>0.0,
-            'inventory_operating_consumption_breakdown'=>[],'total_operating_cost'=>0.0,
+            'inventory_operating_consumption_breakdown'=>[],'cost_of_goods_sold'=>0.0,
+            'slaughter_output_cogs'=>0.0,'total_operating_cost'=>0.0,
+            'total_recognized_cost'=>0.0,
             'profit'=>0.0,'cash_feed_expenses'=>0.0,'expense_breakdown'=>[],
             'start_date'=>$startDate,'end_date'=>$endDate,'farm_type'=>'','margin_percent'=>null,
         ];
@@ -49,7 +51,7 @@ function farm_intelligence_monthly_series(PDO $pdo, int $farmId, int $year, stri
             'total_sales' => (float)$summary['revenue'],
             'feed_consumed' => (float)$summary['feed_consumption_cost'],
             'other_operating_cost' => (float)$summary['non_feed_expenses'],
-            'total_expenses' => (float)$summary['total_operating_cost'],
+            'total_expenses' => (float)($summary['total_recognized_cost'] ?? $summary['total_operating_cost']),
             'net_profit' => (float)$summary['profit'],
             'margin_percent' => $summary['margin_percent'],
         ];
@@ -61,6 +63,12 @@ if (!function_exists('farm_intelligence_expense_breakdown')) {
 function farm_intelligence_expense_breakdown(PDO $pdo, int $farmId, string $startDate, string $endDate, string $farmType = 'all'): array {
     $summary = farm_intelligence_summary($pdo, $farmId, $startDate, $endDate, $farmType);
     $breakdown = [];
+
+    if ((float)($summary['cost_of_goods_sold'] ?? 0) != 0.0) {
+        $breakdown['Cost of Goods Sold · Slaughter Output'] =
+            (float)$summary['cost_of_goods_sold'];
+    }
+
     if ((float)$summary['feed_consumption_cost'] != 0.0) {
         $breakdown['Feed Consumed'] = (float)$summary['feed_consumption_cost'];
     }
@@ -107,7 +115,7 @@ function farm_intelligence_rolling_months(PDO $pdo, int $farmId, int $months = 1
         $startObj=$anchor->modify("-{$i} months");
         $start=$startObj->format('Y-m-01'); $end=$startObj->format('Y-m-t');
         $s=farm_intelligence_summary($pdo,$farmId,$start,$end,$farmType);
-        $rows[]=['period'=>$startObj->format('Y-m'),'label'=>$startObj->format('M Y'),'revenue'=>(float)$s['revenue'],'cost'=>(float)$s['total_operating_cost'],'profit'=>(float)$s['profit']];
+        $rows[]=['period'=>$startObj->format('Y-m'),'label'=>$startObj->format('M Y'),'revenue'=>(float)$s['revenue'],'cost'=>(float)($s['total_recognized_cost'] ?? $s['total_operating_cost']),'profit'=>(float)$s['profit']];
     }
     return $rows;
 }}
@@ -181,13 +189,17 @@ function farm_intelligence_explainable_signals(
     // Financial position — factual, canonical, and period-matched.
     $currentProfit = (float)$current['profit'];
     $currentRevenue = (float)$current['revenue'];
-    $currentCost = (float)$current['total_operating_cost'];
+    $currentCost =
+        (float)(
+            $current['total_recognized_cost']
+            ?? $current['total_operating_cost']
+        );
     if ($currentRevenue != 0.0 || $currentCost != 0.0) {
         if ($currentProfit < 0) {
             $signals[] = farm_intelligence_signal(
                 'financial-operating-position','Financial','danger','Operating loss recorded',
                 '₦'.number_format($currentProfit, 2),
-                'Canonical month-to-date revenue is below consumed feed and other operating cost.',
+                'Canonical month-to-date revenue is below cost of goods sold, consumed feed and other operating cost.',
                 $periodLabel,'Review profitability','management/profitability.php','bi-graph-down-arrow'
             );
         } else {
@@ -196,7 +208,7 @@ function farm_intelligence_explainable_signals(
             $signals[] = farm_intelligence_signal(
                 'financial-operating-position','Financial','success','Positive operating position',
                 $measure,
-                'Canonical month-to-date revenue exceeds consumed feed and other operating cost.',
+                'Canonical month-to-date revenue exceeds cost of goods sold, consumed feed and other operating cost.',
                 $periodLabel,'Review profitability','management/profitability.php','bi-graph-up-arrow'
             );
         }
@@ -204,12 +216,20 @@ function farm_intelligence_explainable_signals(
         $signals[] = farm_intelligence_signal(
             'financial-no-activity','Financial','info','No financial activity yet',
             '₦0.00 revenue · ₦0.00 operating cost',
-            'No sales or operating cost has been recognised in the canonical profitability engine for this period.',
+            'No sales, cost of goods sold or operating cost has been recognised in the canonical profitability engine for this period.',
             $periodLabel,'Open profitability','management/profitability.php','bi-receipt'
         );
     }
 
-    $priorHasActivity = ((float)$prior['revenue'] != 0.0 || (float)$prior['total_operating_cost'] != 0.0);
+    $priorHasActivity =
+        (
+            (float)$prior['revenue'] != 0.0
+            ||
+            (float)(
+                $prior['total_recognized_cost']
+                ?? $prior['total_operating_cost']
+            ) != 0.0
+        );
     $currentHasActivity = ($currentRevenue != 0.0 || $currentCost != 0.0);
     if ($priorHasActivity && $currentHasActivity) {
         $delta = $currentProfit - (float)$prior['profit'];

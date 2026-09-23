@@ -4,6 +4,7 @@ require_once __DIR__ . '/../lib/stock_costing.php';
 require_once __DIR__ . '/../lib/attribution.php';
 require_once __DIR__ . '/../lib/inventory_financial.php';
 require_once __DIR__ . '/../lib/stock_consumption_economics.php';
+require_once __DIR__ . '/../lib/ruminant_slaughter_sale_economics.php';
 /**
  * Traceable profitability engine.
  *
@@ -460,8 +461,44 @@ function getProfitabilitySummary(
         );
     }
 
+    /*
+     * Sale-specific cost of goods sold.
+     *
+     * Slaughter output remains Financial Type other_stock so unrelated
+     * general stock is never turned into period operating cost. The
+     * dedicated reader recognises only explicit effective slaughter-sale
+     * lot consumption with conserved frozen COGS provenance.
+     */
+    $slaughterSaleEconomics =
+        ruminant_slaughter_sale_economics_summary(
+            $pdo,
+            $farmId,
+            $startDate,
+            $endDate,
+            $farmType,
+            $productionType !== ''
+                ? $productionType
+                : null,
+            $cycleId
+        );
+
+    $slaughterOutputCogs =
+        (float)(
+            $slaughterSaleEconomics[
+                'slaughter_output_cogs'
+            ]
+            ?? 0
+        );
+
     $nonFeedExpenses=$manualNonFeedExpenses+$inventoryOperatingConsumption;
-    $totalCost=$nonFeedExpenses+$feedCost;
+
+    /*
+     * Keep operating cost semantically distinct from COGS.
+     * Profit uses total recognised cost so downstream reporting can
+     * explain both values without double-counting either one.
+     */
+    $totalOperatingCost=$nonFeedExpenses+$feedCost;
+    $totalRecognizedCost=$totalOperatingCost+$slaughterOutputCogs;
 
     return [
         'revenue'=>$revenue,
@@ -470,8 +507,14 @@ function getProfitabilitySummary(
         'manual_non_feed_expenses'=>$manualNonFeedExpenses,
         'inventory_operating_consumption_cost'=>$inventoryOperatingConsumption,
         'inventory_operating_consumption_breakdown'=>$inventoryConsumptionBreakdown,
-        'total_operating_cost'=>$totalCost,
-        'profit'=>$revenue-$totalCost,
+        'cost_of_goods_sold'=>$slaughterOutputCogs,
+        'slaughter_output_cogs'=>$slaughterOutputCogs,
+        'cost_of_goods_sold_breakdown'=>[
+            'ruminant_slaughter_output'=>$slaughterOutputCogs,
+        ],
+        'total_operating_cost'=>$totalOperatingCost,
+        'total_recognized_cost'=>$totalRecognizedCost,
+        'profit'=>$revenue-$totalRecognizedCost,
         'cash_feed_expenses'=>$cashFeed,
         'expense_breakdown'=>$expenseRows,
         'allocated_shared_revenue'=>$allocatedSharedRevenue,
@@ -499,6 +542,10 @@ function getProfitabilitySummary(
                 'explicit_shared_expense_allocation'=>$allocatedManualNonFeedExpenses,
                 'total'=>$manualNonFeedExpenses,
             ],
+            'cost_of_goods_sold'=>[
+                'ruminant_slaughter_output'=>$slaughterOutputCogs,
+                'total'=>$slaughterOutputCogs,
+            ],
             'other_operating_cost'=>[
                 'manual_non_feed_expenses'=>$manualNonFeedExpenses,
                 'inventory_operating_consumption'=>$inventoryOperatingConsumption,
@@ -508,8 +555,9 @@ function getProfitabilitySummary(
                 'native_parent_rows'=>$stockSourceCounts['native_parent'],
                 'explicit_allocation_rows'=>$stockSourceCounts['explicit_allocation'],
             ],
-            'total_operating_cost'=>$totalCost,
-            'profit'=>$revenue-$totalCost,
+            'total_operating_cost'=>$totalOperatingCost,
+            'total_recognized_cost'=>$totalRecognizedCost,
+            'profit'=>$revenue-$totalRecognizedCost,
         ],
     ];
 }}

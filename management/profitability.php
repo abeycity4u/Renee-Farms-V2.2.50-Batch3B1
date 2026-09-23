@@ -144,7 +144,7 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
 <?php include(__DIR__.'/../navbar.php'); ?>
 <div class="container-fluid py-4">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 app-responsive-toolbar">
-        <div><h2 class="mb-1">Profitability</h2><p class="text-muted mb-0">Traceable operating profitability using effective feed consumption and recorded business activity.</p></div>
+        <div><h2 class="mb-1">Profitability</h2><p class="text-muted mb-0">Traceable profitability using recorded revenue, sale-specific cost of goods sold, effective feed consumption and operating costs.</p></div>
         <a class="btn btn-outline-secondary" href="<?php echo BASE_URL; ?>/management/reports.php">Back to Analytics</a>
     </div>
 
@@ -192,10 +192,11 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
 
     <div class="d-flex justify-content-between align-items-center mb-2"><h5 class="mb-0"><?php echo $period === 'daily' ? 'Daily Analysis' : 'Monthly Analysis'; ?></h5><span class="text-muted"><?php echo htmlspecialchars($periodLabel); ?></span></div>
     <div class="row g-3 mb-4">
-        <div class="col-12 col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-muted">Revenue</div><h3 class="mt-2">₦<?php echo number_format($summary['revenue'],2); ?></h3></div></div></div>
-        <div class="col-12 col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-muted">Feed consumed</div><h3 class="mt-2">₦<?php echo number_format($summary['feed_consumption_cost'],2); ?></h3></div></div></div>
-        <div class="col-12 col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-muted">Other operating cost</div><h3 class="mt-2">₦<?php echo number_format($summary['non_feed_expenses'],2); ?></h3></div></div></div>
-        <div class="col-12 col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-muted">Profit / Loss</div><h3 class="mt-2 <?php echo $summary['profit']>=0?'text-success':'text-danger'; ?>">₦<?php echo number_format($summary['profit'],2); ?></h3></div></div></div>
+        <div class="col-12 col-sm-6 col-xl"><div class="card h-100"><div class="card-body"><div class="text-muted">Revenue</div><h3 class="mt-2">₦<?php echo number_format($summary['revenue'],2); ?></h3></div></div></div>
+        <div class="col-12 col-sm-6 col-xl"><div class="card h-100"><div class="card-body"><div class="text-muted">Cost of goods sold</div><h3 class="mt-2">₦<?php echo number_format($summary['cost_of_goods_sold'] ?? 0,2); ?></h3><div class="small text-muted">Recognised from sold slaughter-output lots.</div></div></div></div>
+        <div class="col-12 col-sm-6 col-xl"><div class="card h-100"><div class="card-body"><div class="text-muted">Feed consumed</div><h3 class="mt-2">₦<?php echo number_format($summary['feed_consumption_cost'],2); ?></h3></div></div></div>
+        <div class="col-12 col-sm-6 col-xl"><div class="card h-100"><div class="card-body"><div class="text-muted">Other operating cost</div><h3 class="mt-2">₦<?php echo number_format($summary['non_feed_expenses'],2); ?></h3></div></div></div>
+        <div class="col-12 col-sm-6 col-xl"><div class="card h-100"><div class="card-body"><div class="text-muted">Profit / Loss</div><h3 class="mt-2 <?php echo $summary['profit']>=0?'text-success':'text-danger'; ?>">₦<?php echo number_format($summary['profit'],2); ?></h3></div></div></div>
     </div>
 
 
