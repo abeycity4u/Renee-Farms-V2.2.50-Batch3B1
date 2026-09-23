@@ -376,17 +376,38 @@ function ruminant_shared_cost_economics(PDO $pdo, int $farmId, int $animalId, st
     // Amounts in the animal's species cost centre that cannot be allocated to
     // any animal because no explicit membership covers the transaction date.
     $uncovered=0.0;
+    $uncoveredRows=[];
+
     foreach($rows as $r){
         $amount=round((float)$r['pool_amount'],2);
         if($amount<=0) continue;
-        $eligible=ruminant_cycle_eligible_animal_ids($pdo,$farmId,$species,(string)$r['source_date'],!empty($r['cycle_id'])?(int)$r['cycle_id']:null);
-        if(!$eligible) $uncovered+=$amount;
+
+        $eligible=ruminant_cycle_eligible_animal_ids(
+            $pdo,
+            $farmId,
+            $species,
+            (string)$r['source_date'],
+            !empty($r['cycle_id'])
+                ? (int)$r['cycle_id']
+                : null
+        );
+
+        if(!$eligible) {
+            $uncovered += $amount;
+
+            $r['uncovered_amount'] =
+                $amount;
+
+            $uncoveredRows[] =
+                $r;
+        }
     }
 
     return [
         'allocated_shared_cost'=>round($total,2),
         'shared_cost_rows'=>$allocated,
         'uncovered_species_shared_cost'=>round($uncovered,2),
+        'uncovered_shared_cost_rows'=>$uncoveredRows,
         'eligible_species_pool'=>round($eligiblePool,2),
         'method'=>'Active headcount on each transaction date',
     ];

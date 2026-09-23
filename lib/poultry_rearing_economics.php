@@ -1794,6 +1794,7 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
              e.production_type,
              e.cycle_id AS expense_cycle_id,
              e.category,
+             e.description,
              e.amount,
              e.unit,
              e.expense_revision_no,
@@ -1868,11 +1869,38 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
                     $row['expense_causal_fingerprint'],
             ];
 
+            $sourceLabel =
+                trim(
+                    (string)(
+                        $row['description']
+                        ?? ''
+                    )
+                );
+
+            if ($sourceLabel === '') {
+                $sourceLabel =
+                    (string)$row['category'];
+            }
+
             $sharedPoolExpenses[$expenseId] = [
+                'source_id' =>
+                    $expenseId,
+
+                'source_type' =>
+                    'expense',
+
+                'source_date' =>
+                    (string)$row['expense_date'],
+
+                'source_label' =>
+                    $sourceLabel,
+
                 'gross' =>
                     (float)$row['amount']
                     * (float)$row['unit'],
-                'allocated' => 0.0,
+
+                'allocated' =>
+                    0.0,
             ];
 
             $base['provenance_sources'][] =
@@ -1920,19 +1948,74 @@ function poultry_rearing_economics(PDO $pdo, int $farmId, int $cycleId): array
     $base['unallocated_shared_expense_pool'] =
         0.0;
 
+    $base['unallocated_shared_expense_rows'] =
+        [];
+
     foreach (
         $sharedPoolExpenses
         as $sharedPoolExpense
     ) {
+        $unallocatedAmount =
+            round(
+                max(
+                    (float)$sharedPoolExpense['gross']
+                    - (float)$sharedPoolExpense[
+                        'allocated'
+                    ],
+                    0.0
+                ),
+                2
+            );
+
         $base[
             'unallocated_shared_expense_pool'
-        ] += max(
-            (float)$sharedPoolExpense['gross']
-            - (float)$sharedPoolExpense[
-                'allocated'
-            ],
-            0.0
-        );
+        ] +=
+            $unallocatedAmount;
+
+        if ($unallocatedAmount > 0.00001) {
+            $base[
+                'unallocated_shared_expense_rows'
+            ][] = [
+                'source_id' =>
+                    (int)$sharedPoolExpense[
+                        'source_id'
+                    ],
+
+                'source_type' =>
+                    (string)$sharedPoolExpense[
+                        'source_type'
+                    ],
+
+                'source_date' =>
+                    (string)$sharedPoolExpense[
+                        'source_date'
+                    ],
+
+                'source_label' =>
+                    (string)$sharedPoolExpense[
+                        'source_label'
+                    ],
+
+                'parent_amount' =>
+                    round(
+                        (float)$sharedPoolExpense[
+                            'gross'
+                        ],
+                        2
+                    ),
+
+                'allocated_amount' =>
+                    round(
+                        (float)$sharedPoolExpense[
+                            'allocated'
+                        ],
+                        2
+                    ),
+
+                'unallocated_amount' =>
+                    $unallocatedAmount,
+            ];
+        }
     }
 
     $base['unallocated_shared_expense_pool'] =

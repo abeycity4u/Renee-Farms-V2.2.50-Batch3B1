@@ -8,6 +8,7 @@ require_once(__DIR__ . '/../lib/production_cycle_service.php');
 require_once(__DIR__ . '/../lib/poultry_cycle_lifecycle.php');
 require_once(__DIR__ . '/../lib/poultry_cycle_acquisition.php');
 require_once(__DIR__ . '/../lib/poultry_rearing_economics.php');
+require_once(__DIR__ . '/../lib/shared_allocation_navigation.php');
 require_once(__DIR__ . '/../lib/poultry_production_entry_snapshots.php');
 require_once(__DIR__ . '/../lib/poultry_production_entry_clarity.php');
 require_once(__DIR__ . '/../lib/poultry_cycle_completion.php');
@@ -1189,7 +1190,42 @@ $confirmationText .=
         </div>
         <div class="explain-row"><span class="label">Surviving flock at Production entry</span><strong><?php echo $rearingEconomics['production_entry_headcount']===null?'-':number_format((int)$rearingEconomics['production_entry_headcount']); ?></strong></div>
         <?php if($rearingEconomics['production_entry_headcount_source']): ?><div class="small text-muted mt-2">Headcount source: <?php echo htmlspecialchars($rearingEconomics['production_entry_headcount_source']); ?></div><?php endif; ?>
-        <?php if((float)$rearingEconomics['unallocated_shared_expense_pool']>0): ?><div class="alert alert-warning mt-3 mb-0"><strong>Unallocated shared Layer expense pool in this rearing window:</strong> <?php echo $moneyOrDash($rearingEconomics['unallocated_shared_expense_pool']); ?>. It is disclosed but not silently assigned to this cycle.</div><?php endif; ?>
+        <?php if((float)$rearingEconomics['unallocated_shared_expense_pool']>0): ?>
+          <?php
+          $poultrySharedCostActions =
+              shared_allocation_navigation_actions(
+                  $pdo,
+                  $farmId,
+                  $rearingEconomics[
+                      'unallocated_shared_expense_rows'
+                  ] ?? []
+              );
+          ?>
+          <div class="alert alert-warning mt-3 mb-0">
+            <strong>Unallocated shared Layer expense pool in this rearing window:</strong>
+            <?php echo $moneyOrDash($rearingEconomics['unallocated_shared_expense_pool']); ?>.
+            It is disclosed but not silently assigned to this cycle.
+
+            <?php if ($poultrySharedCostActions): ?>
+              <div class="mt-2 d-flex flex-wrap gap-2">
+                <?php foreach ($poultrySharedCostActions as $action): ?>
+                  <a
+                    class="btn btn-sm btn-outline-warning"
+                    href="<?php echo htmlspecialchars((string)$action['url'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>"
+                  >
+                    <i class="bi bi-diagram-3 me-1"></i>
+                    <?php echo htmlspecialchars((string)$action['action_label']); ?>
+                    ·
+                    <?php echo htmlspecialchars((string)$action['source_label']); ?>
+                    <?php if (!empty($action['source_date'])): ?>
+                      · <?php echo htmlspecialchars((string)$action['source_date']); ?>
+                    <?php endif; ?>
+                  </a>
+                <?php endforeach; ?>
+              </div>
+            <?php endif; ?>
+          </div>
+        <?php endif; ?>
       <?php endif; ?>
       <?php if(!empty($rearingEconomics['warnings'])): ?>
         <?php $visibleWarnings=array_values(array_filter($rearingEconomics['warnings'],static function($warning) use ($rearingEconomics): bool {

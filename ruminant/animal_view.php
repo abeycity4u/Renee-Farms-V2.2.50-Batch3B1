@@ -4,6 +4,7 @@ require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/../includes/audit_helpers.php');
 require_once(__DIR__ . '/../lib/ruminant_animal_economics.php');
+require_once(__DIR__ . '/../lib/shared_allocation_navigation.php');
 require_once(__DIR__ . '/../lib/ruminant_cycle_membership.php');
 require_once(__DIR__ . '/../lib/ruminant_cycle_transfer_workspace.php');
 require_once(__DIR__ . '/../lib/ruminant_lifecycle_integrity.php');
@@ -545,10 +546,58 @@ $today = app_today();
             Shared species/cycle operating costs are allocated by <strong>active headcount on each transaction date</strong>. Across a period this behaves like animal-days. The platform uses explicit production-cycle membership and does not estimate weight-based consumption or silently assign cross-species Shared Ruminant costs.
           </div>
           <?php if (!$memberships): ?>
-            <div class="alert alert-warning py-2 small"><strong>Cycle membership required.</strong> Direct economics remains valid, but shared costs cannot be assigned to this animal until its production-cycle membership dates are recorded.</div>
+            <div class="alert alert-warning py-2 small">
+              <strong>Cycle membership required.</strong>
+              Direct economics remains valid, but shared costs cannot be assigned to this animal until its production-cycle membership dates are recorded.
+              <a class="alert-link ms-1" href="#cycle-membership">
+                Review cycle membership
+              </a>
+            </div>
           <?php endif; ?>
+
           <?php if (($economics['uncovered_species_shared_cost'] ?? 0) > 0): ?>
-            <div class="alert alert-warning py-2 small"><strong>Incomplete shared-cost coverage:</strong> ₦<?php echo number_format((float)$economics['uncovered_species_shared_cost'],2); ?> of <?php echo htmlspecialchars(ucfirst((string)$animal['species'])); ?> shared operating cost falls on dates with no eligible cycle membership. It remains unallocated instead of being guessed.</div>
+            <?php
+            $ruminantSharedCostActions =
+                shared_allocation_navigation_actions(
+                    $pdo,
+                    $farmId,
+                    $economics[
+                        'uncovered_shared_cost_rows'
+                    ] ?? []
+                );
+            ?>
+            <div class="alert alert-warning py-2 small">
+              <strong>Incomplete shared-cost coverage:</strong>
+              ₦<?php echo number_format((float)$economics['uncovered_species_shared_cost'],2); ?>
+              of <?php echo htmlspecialchars(ucfirst((string)$animal['species'])); ?>
+              shared operating cost falls on dates with no eligible cycle membership.
+              It remains unallocated instead of being guessed.
+
+              <div class="mt-2 d-flex flex-wrap gap-2">
+                <a
+                  class="btn btn-sm btn-outline-warning"
+                  href="#cycle-membership"
+                >
+                  <i class="bi bi-calendar-range me-1"></i>
+                  Review cycle membership
+                </a>
+
+                <?php foreach ($ruminantSharedCostActions as $action): ?>
+                  <a
+                    class="btn btn-sm btn-outline-warning"
+                    href="<?php echo htmlspecialchars((string)$action['url'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>"
+                  >
+                    <i class="bi bi-diagram-3 me-1"></i>
+                    <?php echo htmlspecialchars((string)$action['action_label']); ?>
+                    ·
+                    <?php echo htmlspecialchars((string)$action['source_label']); ?>
+                    <?php if (!empty($action['source_date'])): ?>
+                      · <?php echo htmlspecialchars((string)$action['source_date']); ?>
+                    <?php endif; ?>
+                  </a>
+                <?php endforeach; ?>
+              </div>
+            </div>
           <?php endif; ?>
           <div class="row g-3">
             <div class="col-6 col-xl-4"><div class="border rounded p-3 h-100"><small class="text-muted">Direct Cost Basis</small><div class="fs-5 fw-semibold">₦<?php echo number_format((float)$economics['direct_cost_total'],2); ?></div></div></div>

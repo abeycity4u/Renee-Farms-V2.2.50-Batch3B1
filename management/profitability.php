@@ -190,7 +190,15 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
     <?php if ($cycleId && $unallocatedPooledRevenue > 0.009): ?>
         <div class="alert alert-warning d-flex align-items-start gap-2" role="alert">
             <i class="bi bi-exclamation-triangle-fill mt-1"></i>
-            <div><strong>Some shared revenue could not be assigned yet.</strong> ₦<?php echo number_format($unallocatedPooledRevenue,2); ?> remains at the production-type level. For Layer egg sales, check that Daily Records support enough unsold egg stock for the quantity sold.</div>
+            <div>
+                <strong>Some shared revenue could not be assigned yet.</strong>
+                ₦<?php echo number_format($unallocatedPooledRevenue,2); ?>
+                remains at the production-type level.
+                For Layer egg sales, check that Daily Records support enough unsold egg stock for the quantity sold.
+                <a class="alert-link ms-1" href="#unallocated-shared-balances">
+                    Review exact allocation sources
+                </a>
+            </div>
         </div>
     <?php endif; ?>
 
@@ -239,6 +247,14 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
                             Pooled Poultry/Ruminant revenue only.
                             General income is not treated as a shared allocation parent.
                         </div>
+
+                        <?php if ((float)($unallocatedShared['revenue_unallocated'] ?? 0) > 0.009): ?>
+                            <div class="small mt-2">
+                                <a href="#unallocated-shared-source-table">
+                                    Review exact sources
+                                </a>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -255,6 +271,14 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
                         <div class="small text-muted">
                             Manual operating expense + consumed Feed + consumed operating inventory.
                         </div>
+
+                        <?php if ((float)($unallocatedShared['operating_shared_unallocated'] ?? 0) > 0.009): ?>
+                            <div class="small mt-2">
+                                <a href="#unallocated-shared-source-table">
+                                    Review exact sources
+                                </a>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -302,7 +326,15 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
             </div>
 
             <?php if (!empty($unallocatedShared['rows'])): ?>
-                <div class="table-responsive">
+                <div class="small text-muted mb-2">
+                    Click an actionable status badge to open the exact shared-expense,
+                    consumed-stock or shared-revenue allocation workspace.
+                </div>
+
+                <div
+                    class="table-responsive"
+                    id="unallocated-shared-source-table"
+                >
                     <table class="table table-sm align-middle mb-0">
                         <thead>
                         <tr>

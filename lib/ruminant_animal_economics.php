@@ -88,6 +88,7 @@ function ruminant_animal_economics(PDO $pdo, int $farmId, int $animalId): array
         'fully_allocated_roi_percent' => $fullyAllocatedRoi,
         'shared_cost_rows' => $shared['shared_cost_rows'] ?? [],
         'uncovered_species_shared_cost' => (float)($shared['uncovered_species_shared_cost'] ?? 0),
+        'uncovered_shared_cost_rows' => $shared['uncovered_shared_cost_rows'] ?? [],
         'shared_allocation_method' => $shared['method'] ?? 'Active headcount on each transaction date',
         'expenses' => $expenses,
         'revenues' => $revenues,
