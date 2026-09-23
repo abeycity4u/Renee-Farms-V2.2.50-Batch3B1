@@ -373,10 +373,22 @@ function ruminant_shared_cost_economics(PDO $pdo, int $farmId, int $animalId, st
         $total+=$share;
     }
 
-    // Amounts in the animal's species cost centre that cannot be allocated to
-    // any animal because no explicit membership covers the transaction date.
-    $uncovered=0.0;
-    $uncoveredRows=[];
+    /*
+     * Species/cost-centre allocation exceptions.
+     *
+     * These rows are NOT automatically an individual-animal membership
+     * failure. A row may already be explicitly allocated to another cycle
+     * of the same species whose own membership coverage is empty.
+     *
+     * Such amounts stay outside the target animal's economics and retain
+     * their exact source/cycle provenance for correction at the owning
+     * allocation workspace.
+     */
+    $speciesAllocationExceptionCost =
+        0.0;
+
+    $speciesAllocationExceptionRows =
+        [];
 
     foreach($rows as $r){
         $amount=round((float)$r['pool_amount'],2);
@@ -393,21 +405,58 @@ function ruminant_shared_cost_economics(PDO $pdo, int $farmId, int $animalId, st
         );
 
         if(!$eligible) {
-            $uncovered += $amount;
+            $speciesAllocationExceptionCost +=
+                $amount;
 
+            $r[
+                'species_allocation_exception_amount'
+            ] =
+                $amount;
+
+            /*
+             * Compatibility alias retained for existing navigation/read
+             * contracts. New callers should use the explicit exception key.
+             */
             $r['uncovered_amount'] =
                 $amount;
 
-            $uncoveredRows[] =
+            $r[
+                'species_allocation_exception_reason'
+            ] =
+                !empty($r['cycle_id'])
+                    ? 'cycle_has_no_eligible_animals'
+                    : 'species_scope_has_no_eligible_animals';
+
+            $speciesAllocationExceptionRows[] =
                 $r;
         }
     }
 
+    $speciesAllocationExceptionCost =
+        round(
+            $speciesAllocationExceptionCost,
+            2
+        );
+
     return [
         'allocated_shared_cost'=>round($total,2),
         'shared_cost_rows'=>$allocated,
-        'uncovered_species_shared_cost'=>round($uncovered,2),
-        'uncovered_shared_cost_rows'=>$uncoveredRows,
+
+        'species_allocation_exception_cost'=>
+            $speciesAllocationExceptionCost,
+
+        'species_allocation_exception_rows'=>
+            $speciesAllocationExceptionRows,
+
+        /*
+         * Compatibility aliases for older callers.
+         */
+        'uncovered_species_shared_cost'=>
+            $speciesAllocationExceptionCost,
+
+        'uncovered_shared_cost_rows'=>
+            $speciesAllocationExceptionRows,
+
         'eligible_species_pool'=>round($eligiblePool,2),
         'method'=>'Active headcount on each transaction date',
     ];

@@ -555,48 +555,126 @@ $today = app_today();
             </div>
           <?php endif; ?>
 
-          <?php if (($economics['uncovered_species_shared_cost'] ?? 0) > 0): ?>
+          <?php if (($economics['species_allocation_exception_cost'] ?? 0) > 0): ?>
             <?php
+            $ruminantSpeciesAllocationExceptions =
+                $economics[
+                    'species_allocation_exception_rows'
+                ] ?? [];
+
             $ruminantSharedCostActions =
                 shared_allocation_navigation_actions(
                     $pdo,
                     $farmId,
-                    $economics[
-                        'uncovered_shared_cost_rows'
-                    ] ?? []
+                    $ruminantSpeciesAllocationExceptions
                 );
             ?>
+
             <div class="alert alert-warning py-2 small">
-              <strong>Incomplete shared-cost coverage:</strong>
-              ₦<?php echo number_format((float)$economics['uncovered_species_shared_cost'],2); ?>
-              of <?php echo htmlspecialchars(ucfirst((string)$animal['species'])); ?>
-              shared operating cost falls on dates with no eligible cycle membership.
-              It remains unallocated instead of being guessed.
+              <strong>
+                <?php echo htmlspecialchars(ucfirst((string)$animal['species'])); ?>
+                shared-cost allocation issue:
+              </strong>
 
-              <div class="mt-2 d-flex flex-wrap gap-2">
-                <a
-                  class="btn btn-sm btn-outline-warning"
-                  href="#cycle-membership"
-                >
-                  <i class="bi bi-calendar-range me-1"></i>
-                  Review cycle membership
-                </a>
+              ₦<?php echo number_format(
+                  (float)$economics[
+                      'species_allocation_exception_cost'
+                  ],
+                  2
+              ); ?>
+              of
+              <?php echo htmlspecialchars(ucfirst((string)$animal['species'])); ?>
+              shared operating cost is attached to source/cycle scopes that had
+              no eligible animals on their transaction date(s).
 
-                <?php foreach ($ruminantSharedCostActions as $action): ?>
-                  <a
-                    class="btn btn-sm btn-outline-warning"
-                    href="<?php echo htmlspecialchars((string)$action['url'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>"
-                  >
-                    <i class="bi bi-diagram-3 me-1"></i>
-                    <?php echo htmlspecialchars((string)$action['action_label']); ?>
-                    ·
-                    <?php echo htmlspecialchars((string)$action['source_label']); ?>
-                    <?php if (!empty($action['source_date'])): ?>
-                      · <?php echo htmlspecialchars((string)$action['source_date']); ?>
-                    <?php endif; ?>
-                  </a>
-                <?php endforeach; ?>
-              </div>
+              <strong>
+                This amount is outside
+                <?php echo htmlspecialchars((string)$animal['tag_no']); ?>'s
+                individual economics and is not assigned to this animal.
+              </strong>
+
+              <?php if ($ruminantSpeciesAllocationExceptions): ?>
+                <div class="mt-2">
+                  <div class="fw-semibold mb-1">
+                    Affected source/cycle scope(s):
+                  </div>
+
+                  <ul class="mb-2 ps-3">
+                    <?php foreach ($ruminantSpeciesAllocationExceptions as $exception): ?>
+                      <li>
+                        <?php echo htmlspecialchars(
+                            (string)(
+                                $exception['source_label']
+                                ?? (
+                                    ucfirst(
+                                        str_replace(
+                                            '_',
+                                            ' ',
+                                            (string)(
+                                                $exception['source_type']
+                                                ?? 'shared cost'
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        ); ?>
+
+                        ·
+                        <?php echo htmlspecialchars(
+                            (string)(
+                                $exception['cycle_code']
+                                ?? (
+                                    'Shared '
+                                    . ucfirst((string)$animal['species'])
+                                    . ' cost centre'
+                                )
+                            )
+                        ); ?>
+
+                        ·
+                        <?php echo htmlspecialchars(
+                            (string)(
+                                $exception['source_date']
+                                ?? ''
+                            )
+                        ); ?>
+
+                        · ₦<?php echo number_format(
+                            (float)(
+                                $exception[
+                                    'species_allocation_exception_amount'
+                                ]
+                                ?? $exception['pool_amount']
+                                ?? 0
+                            ),
+                            2
+                        ); ?>
+                      </li>
+                    <?php endforeach; ?>
+                  </ul>
+                </div>
+              <?php endif; ?>
+
+              <?php if ($ruminantSharedCostActions): ?>
+                <div class="mt-2 d-flex flex-wrap gap-2">
+                  <?php foreach ($ruminantSharedCostActions as $action): ?>
+                    <a
+                      class="btn btn-sm btn-outline-warning"
+                      href="<?php echo htmlspecialchars((string)$action['url'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>"
+                    >
+                      <i class="bi bi-diagram-3 me-1"></i>
+                      <?php echo htmlspecialchars((string)$action['action_label']); ?>
+                      ·
+                      <?php echo htmlspecialchars((string)$action['source_label']); ?>
+
+                      <?php if (!empty($action['source_date'])): ?>
+                        · <?php echo htmlspecialchars((string)$action['source_date']); ?>
+                      <?php endif; ?>
+                    </a>
+                  <?php endforeach; ?>
+                </div>
+              <?php endif; ?>
             </div>
           <?php endif; ?>
           <div class="row g-3">
