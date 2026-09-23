@@ -3,6 +3,7 @@ require_once __DIR__.'/ruminant_cycle_membership.php';
 require_once __DIR__.'/inventory_financial.php';
 require_once __DIR__.'/stock_reporting.php';
 require_once __DIR__.'/stock_consumption_economics.php';
+require_once __DIR__.'/shared_cost_contract.php';
 
 /**
  * Analytical allocation of shared ruminant operating costs.
@@ -183,6 +184,7 @@ function ruminant_shared_cost_stock_row_from_economics(
     }
 
     $cycleCode = null;
+    $cycleStartDate = null;
 
     if ($cycleId !== null) {
         $cycleCode =
@@ -193,6 +195,14 @@ function ruminant_shared_cost_stock_row_from_economics(
                 'cycle_code'
             ]
             ?? null;
+
+        if ($mode === 'explicit_allocation') {
+            $cycleStartDate =
+                $row[
+                    'target_cycle_start_date'
+                ]
+                ?? null;
+        }
     }
 
     $label =
@@ -239,6 +249,9 @@ function ruminant_shared_cost_stock_row_from_economics(
         'cycle_code' =>
             $cycleCode,
 
+        'cycle_start_date' =>
+            $cycleStartDate,
+
         'production_type' =>
             $species,
 
@@ -264,6 +277,146 @@ function ruminant_shared_cost_stock_row_from_economics(
     ];
 }
 
+function ruminant_shared_cost_eligibility_context(
+    PDO $pdo,
+    int $farmId,
+    string $species,
+    array $row
+): array {
+    $sourceDate =
+        shared_cost_contract_business_date(
+            $row['source_date']
+            ?? null,
+            'Shared-cost source date'
+        );
+
+    $cycleId =
+        (int)(
+            $row['cycle_id']
+            ?? 0
+        );
+
+    $sourceType =
+        strtolower(
+            trim(
+                (string)(
+                    $row['source_type']
+                    ?? ''
+                )
+            )
+        );
+
+    $stockMode =
+        strtolower(
+            trim(
+                (string)(
+                    $row['stock_attribution_mode']
+                    ?? ''
+                )
+            )
+        );
+
+    /*
+     * Only an EXPLICIT shared-cost allocation can become pre-cycle
+     * preparation. Never infer this from an inventory item name,
+     * description, category or animal species.
+     */
+    $explicitCycleAllocation =
+        $sourceType === 'allocated_expense'
+        ||
+        (
+            $sourceType === 'inventory_use'
+            &&
+            $stockMode === 'explicit_allocation'
+        );
+
+    $cycleStartRaw =
+        trim(
+            (string)(
+                $row['cycle_start_date']
+                ?? ''
+            )
+        );
+
+    if (
+        $cycleId > 0
+        &&
+        $explicitCycleAllocation
+        &&
+        $cycleStartRaw !== ''
+    ) {
+        $cycleStartDate =
+            shared_cost_contract_business_date(
+                $cycleStartRaw,
+                'Production cycle start date'
+            );
+
+        if ($cycleStartDate > $sourceDate) {
+            $cohort =
+                ruminant_cycle_first_eligible_cohort(
+                    $pdo,
+                    $farmId,
+                    $species,
+                    $cycleId,
+                    $cycleStartDate
+                );
+
+            $eligible =
+                $cohort['animal_ids']
+                ?? [];
+
+            return [
+                'eligible_animal_ids' =>
+                    $eligible,
+
+                'allocation_date' =>
+                    $cohort['date']
+                    ?? null,
+
+                'pre_cycle_preparation' =>
+                    true,
+
+                'allocation_method' =>
+                    'Pre-cycle preparation · first eligible cycle cohort',
+
+                'exception_reason' =>
+                    $eligible
+                        ? null
+                        : 'pre_cycle_target_has_no_eligible_animals',
+            ];
+        }
+    }
+
+    $eligible =
+        ruminant_cycle_eligible_animal_ids(
+            $pdo,
+            $farmId,
+            $species,
+            $sourceDate,
+            $cycleId > 0
+                ? $cycleId
+                : null
+        );
+
+    return [
+        'eligible_animal_ids' =>
+            $eligible,
+
+        'allocation_date' =>
+            $sourceDate,
+
+        'pre_cycle_preparation' =>
+            false,
+
+        'allocation_method' =>
+            'Active headcount on transaction date',
+
+        'exception_reason' =>
+            null,
+    ];
+}
+
+
 function ruminant_shared_cost_economics(PDO $pdo, int $farmId, int $animalId, string $species): array
 {
     $species=strtolower(trim($species));
@@ -274,6 +427,7 @@ function ruminant_shared_cost_economics(PDO $pdo, int $farmId, int $animalId, st
     $expenseSql="SELECT e.id source_id,e.expense_date source_date,'expense' source_type,
                        COALESCE(NULLIF(e.description,''),e.category) source_label,
                        e.category classification,(e.amount*e.unit) pool_amount,e.cycle_id,pc.cycle_code,
+                       pc.start_date cycle_start_date,
                        LOWER(COALESCE(pc.production_type,e.production_type,'')) production_type
                 FROM farm_expenses e
                 LEFT JOIN production_cycles pc ON pc.id=e.cycle_id AND pc.farm_id=e.farm_id
@@ -287,6 +441,7 @@ function ruminant_shared_cost_economics(PDO $pdo, int $farmId, int $animalId, st
     $allocSql="SELECT e.id source_id,e.expense_date source_date,'allocated_expense' source_type,
                      COALESCE(NULLIF(e.description,''),e.category) source_label,
                      e.category classification,fa.allocated_amount pool_amount,fa.cycle_id,pc.cycle_code,
+                     pc.start_date cycle_start_date,
                      LOWER(pc.production_type) production_type
               FROM financial_allocations fa
               JOIN farm_expenses e ON e.id=fa.expense_id AND e.farm_id=fa.farm_id
@@ -357,18 +512,43 @@ function ruminant_shared_cost_economics(PDO $pdo, int $farmId, int $animalId, st
         return $t!==0?$t:((int)$a['source_id']<=> (int)$b['source_id']);
     });
 
+    $eligibilityContexts = [];
+
+    foreach ($rows as $index => $r) {
+        $eligibilityContexts[$index] =
+            ruminant_shared_cost_eligibility_context(
+                $pdo,
+                $farmId,
+                $species,
+                $r
+            );
+    }
+
     $allocated=[]; $total=0.0; $eligiblePool=0.0;
-    foreach($rows as $r){
+
+    foreach($rows as $index => $r){
         $amount=round((float)$r['pool_amount'],2);
         if($amount<=0) continue;
-        $eligible=ruminant_cycle_eligible_animal_ids($pdo,$farmId,$species,(string)$r['source_date'],!empty($r['cycle_id'])?(int)$r['cycle_id']:null);
-        if(!$eligible) continue; // visible as uncovered below
+
+        $context =
+            $eligibilityContexts[$index];
+
+        $eligible =
+            $context['eligible_animal_ids'];
+
+        if(!$eligible) continue; // visible as exception below
+
         $eligiblePool+=$amount;
         $share=ruminant_shared_cost_share_for_target($amount,$eligible,$animalId);
+
         if($share<=0) continue;
+
         $r['eligible_animal_count']=count($eligible);
         $r['allocated_amount']=$share;
-        $r['allocation_method']='Active headcount on transaction date';
+        $r['allocation_method']=$context['allocation_method'];
+        $r['allocation_effective_date']=$context['allocation_date'];
+        $r['pre_cycle_preparation']=!empty($context['pre_cycle_preparation']);
+
         $allocated[]=$r;
         $total+=$share;
     }
@@ -390,19 +570,15 @@ function ruminant_shared_cost_economics(PDO $pdo, int $farmId, int $animalId, st
     $speciesAllocationExceptionRows =
         [];
 
-    foreach($rows as $r){
+    foreach($rows as $index => $r){
         $amount=round((float)$r['pool_amount'],2);
         if($amount<=0) continue;
 
-        $eligible=ruminant_cycle_eligible_animal_ids(
-            $pdo,
-            $farmId,
-            $species,
-            (string)$r['source_date'],
-            !empty($r['cycle_id'])
-                ? (int)$r['cycle_id']
-                : null
-        );
+        $context =
+            $eligibilityContexts[$index];
+
+        $eligible =
+            $context['eligible_animal_ids'];
 
         if(!$eligible) {
             $speciesAllocationExceptionCost +=
@@ -423,9 +599,25 @@ function ruminant_shared_cost_economics(PDO $pdo, int $farmId, int $animalId, st
             $r[
                 'species_allocation_exception_reason'
             ] =
-                !empty($r['cycle_id'])
-                    ? 'cycle_has_no_eligible_animals'
-                    : 'species_scope_has_no_eligible_animals';
+                $context['exception_reason']
+                ?? (
+                    !empty($r['cycle_id'])
+                        ? 'cycle_has_no_eligible_animals'
+                        : 'species_scope_has_no_eligible_animals'
+                );
+
+            $r['pre_cycle_preparation'] =
+                !empty(
+                    $context[
+                        'pre_cycle_preparation'
+                    ]
+                );
+
+            $r['allocation_effective_date'] =
+                $context[
+                    'allocation_date'
+                ]
+                ?? null;
 
             $speciesAllocationExceptionRows[] =
                 $r;

@@ -454,6 +454,51 @@ function shared_cost_contract_is_pre_cycle(
 }
 }
 
+if (!function_exists('shared_cost_contract_reason_is_meaningful')) {
+function shared_cost_contract_reason_is_meaningful(
+    ?string $reason
+): bool {
+    $normalized =
+        preg_replace(
+            '/\\s+/u',
+            ' ',
+            trim(
+                (string)(
+                    $reason
+                    ?? ''
+                )
+            )
+        );
+
+    $normalized =
+        strtolower(
+            trim(
+                (string)$normalized
+            )
+        );
+
+    if ($normalized === '') {
+        return false;
+    }
+
+    return !in_array(
+        $normalized,
+        [
+            'na',
+            'n/a',
+            'n.a.',
+            'none',
+            'nil',
+            'not applicable',
+            'no reason',
+            '-',
+            '--',
+        ],
+        true
+    );
+}
+}
+
 if (!function_exists('shared_cost_contract_assert_pre_cycle_reason')) {
 function shared_cost_contract_assert_pre_cycle_reason(
     $parentDate,
@@ -519,15 +564,12 @@ function shared_cost_contract_assert_pre_cycle_reason(
                 $cycleMap[$cycleId]
             )
             &&
-            trim(
-                (string)(
-                    $reason
-                    ?? ''
-                )
-            ) === ''
+            !shared_cost_contract_reason_is_meaningful(
+                $reason
+            )
         ) {
             throw new InvalidArgumentException(
-                'Enter a reason explaining how this cost prepared the selected future-start cycle.'
+                'Enter a specific reason explaining how this cost prepared the selected future-start cycle. Placeholder reasons such as NA are not accepted.'
             );
         }
     }

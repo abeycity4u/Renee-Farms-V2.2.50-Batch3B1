@@ -186,6 +186,102 @@ function ruminant_cycle_eligible_animal_ids(PDO $pdo, int $farmId, string $speci
 }
 
 
+if (!function_exists(
+    'ruminant_cycle_first_eligible_cohort'
+)) {
+function ruminant_cycle_first_eligible_cohort(
+    PDO $pdo,
+    int $farmId,
+    string $species,
+    int $cycleId,
+    string $notBeforeDate
+): array {
+    $species =
+        strtolower(
+            trim($species)
+        );
+
+    if (
+        $farmId < 1
+        || $cycleId < 1
+        || $species === ''
+    ) {
+        throw new InvalidArgumentException(
+            'Ruminant pre-cycle cohort identity is invalid.'
+        );
+    }
+
+    if (
+        preg_match(
+            '/^\\d{4}-\\d{2}-\\d{2}$/',
+            $notBeforeDate
+        ) !== 1
+    ) {
+        throw new InvalidArgumentException(
+            'Ruminant pre-cycle cohort boundary is invalid.'
+        );
+    }
+
+    $stmt =
+        $pdo->prepare(
+            "SELECT MIN(m.start_date)
+             FROM ruminant_animal_cycle_memberships m
+             INNER JOIN production_cycles pc
+               ON pc.id=m.cycle_id
+              AND pc.farm_id=m.farm_id
+             INNER JOIN ruminant_animals a
+               ON a.id=m.animal_id
+              AND a.farm_id=m.farm_id
+             WHERE m.farm_id=?
+               AND m.cycle_id=?
+               AND LOWER(pc.production_type)=?
+               AND m.start_date>=?
+               AND NOT EXISTS (
+                   SELECT 1
+                   FROM ruminant_animal_exit_events xe
+                   WHERE xe.farm_id=m.farm_id
+                     AND xe.animal_id=m.animal_id
+                     AND xe.exit_date < m.start_date
+               )"
+        );
+
+    $stmt->execute([
+        $farmId,
+        $cycleId,
+        $species,
+        $notBeforeDate,
+    ]);
+
+    $firstDate =
+        $stmt->fetchColumn();
+
+    if (!$firstDate) {
+        return [
+            'date' => null,
+            'animal_ids' => [],
+        ];
+    }
+
+    $firstDate =
+        (string)$firstDate;
+
+    $animalIds =
+        ruminant_cycle_eligible_animal_ids(
+            $pdo,
+            $farmId,
+            $species,
+            $firstDate,
+            $cycleId
+        );
+
+    return [
+        'date' => $firstDate,
+        'animal_ids' => $animalIds,
+    ];
+}
+}
+
+
 /**
  * Return memberships that would cross a proposed production-cycle end date.
  *

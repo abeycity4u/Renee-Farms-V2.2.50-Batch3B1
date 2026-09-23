@@ -379,6 +379,12 @@ function stock_consumption_economics_output_row(
         ]
         ?? null;
 
+    $row['target_cycle_start_date'] =
+        $allocation[
+            'target_cycle_start_date'
+        ]
+        ?? null;
+
     $row['effective_cycle_id'] =
         $allocation !== null
             ? (
@@ -898,6 +904,7 @@ function stock_consumption_economics_allocation_rows(
              pc.farm_type AS target_farm_type,
              pc.production_type AS target_production_type,
              pc.cycle_code AS target_cycle_code,
+             pc.start_date AS target_cycle_start_date,
              pc.status AS target_cycle_status
          FROM stock_consumption_allocations a
          JOIN production_cycles pc

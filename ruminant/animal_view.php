@@ -543,7 +543,15 @@ $today = app_today();
         </div>
         <div class="card-body">
           <div class="alert alert-secondary py-2 small mb-3">
-            Shared species/cycle operating costs are allocated by <strong>active headcount on each transaction date</strong>. Across a period this behaves like animal-days. The platform uses explicit production-cycle membership and does not estimate weight-based consumption or silently assign cross-species Shared Ruminant costs.
+            Ordinary shared species/cycle operating costs are allocated by
+            <strong>active headcount on the source transaction date</strong>.
+            Across a period this behaves like animal-days.
+            <strong>Explicit pre-cycle preparation costs</strong> keep their
+            real source date but are allocated to the first eligible livestock
+            cohort that actually enters the selected future-start cycle.
+            The platform never invents earlier animal membership, estimate
+            weight-based consumption, or silently assign cross-species Shared
+            Ruminant costs.
           </div>
           <?php if (!$memberships): ?>
             <div class="alert alert-warning py-2 small">
@@ -584,8 +592,9 @@ $today = app_today();
               ); ?>
               of
               <?php echo htmlspecialchars(ucfirst((string)$animal['species'])); ?>
-              shared operating cost is attached to source/cycle scopes that had
-              no eligible animals on their transaction date(s).
+              shared operating cost remains unresolved because one or more
+              allocated source/cycle scopes currently have no eligible
+              livestock cohort to receive the cost.
 
               <strong>
                 This amount is outside
@@ -601,55 +610,120 @@ $today = app_today();
 
                   <ul class="mb-2 ps-3">
                     <?php foreach ($ruminantSpeciesAllocationExceptions as $exception): ?>
-                      <li>
-                        <?php echo htmlspecialchars(
-                            (string)(
-                                $exception['source_label']
-                                ?? (
-                                    ucfirst(
-                                        str_replace(
-                                            '_',
-                                            ' ',
-                                            (string)(
-                                                $exception['source_type']
-                                                ?? 'shared cost'
-                                            )
-                                        )
-                                    )
-                                )
-                            )
-                        ); ?>
+                      <?php
+                      $exceptionReason =
+                          strtolower(
+                              trim(
+                                  (string)(
+                                      $exception[
+                                          'species_allocation_exception_reason'
+                                      ]
+                                      ?? ''
+                                  )
+                              )
+                          );
 
-                        ·
-                        <?php echo htmlspecialchars(
-                            (string)(
-                                $exception['cycle_code']
-                                ?? (
-                                    'Shared '
-                                    . ucfirst((string)$animal['species'])
-                                    . ' cost centre'
-                                )
-                            )
-                        ); ?>
+                      $exceptionIsPreCycle =
+                          !empty(
+                              $exception[
+                                  'pre_cycle_preparation'
+                              ]
+                          )
+                          ||
+                          $exceptionReason
+                              === 'pre_cycle_target_has_no_eligible_animals';
 
-                        ·
-                        <?php echo htmlspecialchars(
-                            (string)(
-                                $exception['source_date']
-                                ?? ''
-                            )
-                        ); ?>
+                      if ($exceptionIsPreCycle) {
+                          $exceptionExplanation =
+                              'Pre-cycle preparation · the selected future cycle has no eligible livestock cohort to receive this cost.';
 
-                        · ₦<?php echo number_format(
-                            (float)(
-                                $exception[
-                                    'species_allocation_exception_amount'
+                      } elseif (
+                          $exceptionReason
+                          === 'cycle_has_no_eligible_animals'
+                      ) {
+                          $exceptionExplanation =
+                              'In-cycle allocation · no eligible livestock membership covered the source date.';
+
+                      } else {
+                          $exceptionExplanation =
+                              'Shared species scope · no eligible livestock membership covered the source date.';
+                      }
+                      ?>
+
+                      <li class="mb-1">
+                        <div>
+                          <?php echo htmlspecialchars(
+                              (string)(
+                                  $exception['source_label']
+                                  ?? (
+                                      ucfirst(
+                                          str_replace(
+                                              '_',
+                                              ' ',
+                                              (string)(
+                                                  $exception['source_type']
+                                                  ?? 'shared cost'
+                                              )
+                                          )
+                                      )
+                                  )
+                              )
+                          ); ?>
+
+                          ·
+                          <?php echo htmlspecialchars(
+                              (string)(
+                                  $exception['cycle_code']
+                                  ?? (
+                                      'Shared '
+                                      . ucfirst((string)$animal['species'])
+                                      . ' cost centre'
+                                  )
+                              )
+                          ); ?>
+
+                          · Source
+                          <?php echo htmlspecialchars(
+                              (string)(
+                                  $exception['source_date']
+                                  ?? ''
+                              )
+                          ); ?>
+
+                          <?php if (
+                              $exceptionIsPreCycle
+                              &&
+                              !empty(
+                                  $exception[
+                                      'cycle_start_date'
+                                  ]
+                              )
+                          ): ?>
+                            · Cycle starts
+                            <?php echo htmlspecialchars(
+                                (string)$exception[
+                                    'cycle_start_date'
                                 ]
-                                ?? $exception['pool_amount']
-                                ?? 0
-                            ),
-                            2
-                        ); ?>
+                            ); ?>
+                          <?php endif; ?>
+
+                          · ₦<?php echo number_format(
+                              (float)(
+                                  $exception[
+                                      'species_allocation_exception_amount'
+                                  ]
+                                  ?? $exception['pool_amount']
+                                  ?? 0
+                              ),
+                              2
+                          ); ?>
+                        </div>
+
+                        <div class="small text-muted">
+                          <?php echo htmlspecialchars(
+                              $exceptionExplanation
+                          ); ?>
+                        </div>
                       </li>
                     <?php endforeach; ?>
                   </ul>
@@ -683,7 +757,7 @@ $today = app_today();
             <div class="col-6 col-xl-4"><div class="border rounded p-3 h-100"><small class="text-muted">Fully Allocated Cost Basis</small><div class="fs-5 fw-semibold">₦<?php echo number_format((float)$economics['fully_allocated_cost_total'],2); ?></div></div></div>
             <div class="col-6 col-xl-4"><div class="border rounded p-3 h-100"><small class="text-muted">Attributed Revenue</small><div class="fs-5 fw-semibold">₦<?php echo number_format((float)$economics['revenue_total'],2); ?></div></div></div>
             <div class="col-6 col-xl-4"><div class="border rounded p-3 h-100"><small class="text-muted">Fully Allocated Net Position</small><div class="fs-5 fw-semibold <?php echo $economics['fully_allocated_net_position']>=0?'text-success':'text-danger'; ?>"><?php echo $economics['fully_allocated_net_position']>=0?'':'−'; ?>₦<?php echo number_format(abs((float)$economics['fully_allocated_net_position']),2); ?></div><small class="text-muted"><?php echo $economics['fully_allocated_roi_percent']===null?'ROI N/A':'Fully allocated ROI '.number_format((float)$economics['fully_allocated_roi_percent'],2).'%'; ?></small></div></div>
-            <div class="col-6 col-xl-4"><div class="border rounded p-3 h-100"><small class="text-muted">Allocation Driver</small><div class="fw-semibold">Active headcount</div><small class="text-muted">Transaction-date / animal-days</small></div></div>
+            <div class="col-6 col-xl-4"><div class="border rounded p-3 h-100"><small class="text-muted">Allocation Driver</small><div class="fw-semibold">Active headcount</div><small class="text-muted">Source date · or first real cohort for explicit pre-cycle preparation</small></div></div>
           </div>
           <div class="small text-muted mt-3"><strong>Formula:</strong> Attributed Revenue − Purchase Cost − Direct Allocated Expenses − Allocated Shared Operating Cost. Shared Ruminant cross-species pools remain outside this figure until assigned to a species/cost centre.</div>
         </div>
@@ -693,7 +767,136 @@ $today = app_today();
         <div class="card-header"><strong><i class="bi bi-people"></i> Allocated Shared Cost History</strong></div>
         <div class="table-responsive"><table class="table table-sm mb-0"><thead><tr><th>Date</th><th>Source</th><th>Cycle</th><th>Pool Cost</th><th>Eligible Animals</th><th class="text-end">This Animal</th></tr></thead><tbody>
         <?php foreach (($economics['shared_cost_rows'] ?? []) as $c): ?>
-          <tr><td><?php echo date('d/m/Y',strtotime((string)$c['source_date'])); ?></td><td><?php echo htmlspecialchars((string)$c['source_label']); ?><div class="small text-muted"><?php echo htmlspecialchars(ucfirst(str_replace('_',' ',(string)$c['source_type']))); ?> · <?php echo htmlspecialchars(ucfirst(str_replace('_',' ',(string)$c['classification']))); ?></div></td><td><?php echo htmlspecialchars((string)($c['cycle_code'] ?: 'Shared between species cycles')); ?></td><td>₦<?php echo number_format((float)$c['pool_amount'],2); ?></td><td><?php echo (int)$c['eligible_animal_count']; ?><div class="small text-muted">Active headcount</div></td><td class="text-end fw-semibold">₦<?php echo number_format((float)$c['allocated_amount'],2); ?></td></tr>
+          <?php
+          $sharedCostIsPreCycle =
+              !empty(
+                  $c[
+                      'pre_cycle_preparation'
+                  ]
+              );
+
+          $sharedCostEffectiveDate =
+              (string)(
+                  $c[
+                      'allocation_effective_date'
+                  ]
+                  ?? $c['source_date']
+                  ?? ''
+              );
+          ?>
+
+          <tr>
+            <td>
+              <?php echo date(
+                  'd/m/Y',
+                  strtotime(
+                      (string)$c[
+                          'source_date'
+                      ]
+                  )
+              ); ?>
+
+              <?php if ($sharedCostIsPreCycle): ?>
+                <div class="small text-muted">
+                  Preparation source date
+                </div>
+              <?php endif; ?>
+            </td>
+
+            <td>
+              <?php echo htmlspecialchars(
+                  (string)$c[
+                      'source_label'
+                  ]
+              ); ?>
+
+              <div class="small text-muted">
+                <?php echo htmlspecialchars(
+                    ucfirst(
+                        str_replace(
+                            '_',
+                            ' ',
+                            (string)$c[
+                                'source_type'
+                            ]
+                        )
+                    )
+                ); ?>
+                ·
+                <?php echo htmlspecialchars(
+                    ucfirst(
+                        str_replace(
+                            '_',
+                            ' ',
+                            (string)$c[
+                                'classification'
+                            ]
+                        )
+                    )
+                ); ?>
+              </div>
+            </td>
+
+            <td>
+              <?php echo htmlspecialchars(
+                  (string)(
+                      $c[
+                          'cycle_code'
+                      ]
+                      ?: 'Shared between species cycles'
+                  )
+              ); ?>
+
+              <?php if ($sharedCostIsPreCycle): ?>
+                <div class="mt-1">
+                  <span class="badge text-bg-warning">
+                    Pre-cycle preparation
+                  </span>
+                </div>
+              <?php endif; ?>
+            </td>
+
+            <td>
+              ₦<?php echo number_format(
+                  (float)$c[
+                      'pool_amount'
+                  ],
+                  2
+              ); ?>
+            </td>
+
+            <td>
+              <?php echo (int)$c[
+                  'eligible_animal_count'
+              ]; ?>
+
+              <div class="small text-muted">
+                <?php if ($sharedCostIsPreCycle): ?>
+                  First eligible cohort
+                  <?php if ($sharedCostEffectiveDate !== ''): ?>
+                    ·
+                    <?php echo date(
+                        'd/m/Y',
+                        strtotime(
+                            $sharedCostEffectiveDate
+                        )
+                    ); ?>
+                  <?php endif; ?>
+                <?php else: ?>
+                  Active headcount on source date
+                <?php endif; ?>
+              </div>
+            </td>
+
+            <td class="text-end fw-semibold">
+              ₦<?php echo number_format(
+                  (float)$c[
+                      'allocated_amount'
+                  ],
+                  2
+              ); ?>
+            </td>
+          </tr>
         <?php endforeach; if (empty($economics['shared_cost_rows'])): ?><tr><td colspan="6" class="text-center text-muted py-3">No eligible shared species/cycle operating cost has been allocated to this animal yet.</td></tr><?php endif; ?>
         </tbody></table></div>
       </div>
