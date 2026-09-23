@@ -214,7 +214,39 @@ $check(
         $profitability,
         'Cost of goods sold'
     ),
-    'Profitability UI discloses COGS'
+    'Profitability headline UI discloses COGS'
+);
+
+$check(
+    $contains(
+        $profitability,
+        "\$profitabilityAttribution['cost_of_goods_sold']"
+    ),
+    'Profitability trace reuses canonical COGS attribution'
+);
+
+$check(
+    $contains(
+        $profitability,
+        'Slaughter-sale allocations / canonical stock ledger'
+    ),
+    'Profitability source breakdown explains slaughter COGS provenance'
+);
+
+$check(
+    $contains(
+        $profitability,
+        'Cost of goods sold (sold slaughter-output lots)'
+    ),
+    'Profitability calculation explanation includes COGS'
+);
+
+$check(
+    $contains(
+        $profitability,
+        'Unsold slaughter-output value remains in Inventory'
+    ),
+    'Profitability explains unsold output carrying value boundary'
 );
 
 $inventory =

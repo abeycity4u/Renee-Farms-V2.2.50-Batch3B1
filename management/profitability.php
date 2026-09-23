@@ -65,6 +65,10 @@ $revenueAttribution =
     $profitabilityAttribution['revenue']
     ?? [];
 
+$cogsAttribution =
+    $profitabilityAttribution['cost_of_goods_sold']
+    ?? [];
+
 $feedAttribution =
     $profitabilityAttribution['feed_consumption']
     ?? [];
@@ -529,6 +533,44 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
                         </tr>
 
                         <tr>
+                            <td class="fw-semibold">Cost of goods sold</td>
+                            <td>
+                                <div>
+                                    Sold slaughter-output lots:
+                                    ₦<?php echo number_format(
+                                        (float)(
+                                            $cogsAttribution[
+                                                'ruminant_slaughter_output'
+                                            ]
+                                            ??
+                                            $summary[
+                                                'cost_of_goods_sold'
+                                            ]
+                                            ??
+                                            0
+                                        ),
+                                        2
+                                    ); ?>
+                                </div>
+                            </td>
+                            <td class="small text-muted">
+                                Slaughter-sale allocations / canonical stock ledger
+                            </td>
+                            <td class="text-end fw-semibold">
+                                ₦<?php echo number_format(
+                                    (float)(
+                                        $cogsAttribution['total']
+                                        ??
+                                        $summary['cost_of_goods_sold']
+                                        ??
+                                        0
+                                    ),
+                                    2
+                                ); ?>
+                            </td>
+                        </tr>
+
+                        <tr>
                             <td class="fw-semibold">Feed consumed</td>
                             <td>
                                 <div>Direct/native consumed stock: ₦<?php echo number_format((float)($feedAttribution['direct_native_stock'] ?? 0),2); ?></div>
@@ -627,7 +669,7 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
     <?php endif; ?>
 
     <div class="row g-4">
-        <div class="col-lg-7"><div class="card"><div class="card-header fw-semibold">How this result is calculated</div><div class="card-body"><dl class="row mb-0"><dt class="col-7">Revenue from sales</dt><dd class="col-5 text-end">₦<?php echo number_format($summary['revenue'],2); ?></dd><dt class="col-7">Feed consumed (cost snapshot)</dt><dd class="col-5 text-end">₦<?php echo number_format($summary['feed_consumption_cost'],2); ?></dd><dt class="col-7">Other operating expenses</dt><dd class="col-5 text-end">₦<?php echo number_format($summary['non_feed_expenses'],2); ?></dd><dd class="col-12 small text-muted text-end mb-2">Manual/non-stock: ₦<?php echo number_format($summary['manual_non_feed_expenses'] ?? 0,2); ?> · Consumed operating inventory: ₦<?php echo number_format($summary['inventory_operating_consumption_cost'] ?? 0,2); ?></dd><hr><dt class="col-7">Profit / Loss</dt><dd class="col-5 text-end fw-bold <?php echo $summary['profit']>=0?'text-success':'text-danger'; ?>">₦<?php echo number_format($summary['profit'],2); ?></dd></dl><p class="small text-muted mt-3 mb-0">Feed purchases are tracked as cash expenses (₦<?php echo number_format($summary['cash_feed_expenses'],2); ?>) but are not added again to consumed-feed cost. Feed profitability is consumption-based, preventing purchase-day distortion and double counting. Medication/Vaccine, Supplement and Consumables inventory are likewise recognised inside Other operating cost when USED; their purchase receipts remain spending/cash-flow records rather than a second profitability charge.<?php if (!empty($poultryEconomics['available'])): ?> Mortality value is tracked separately as productive-bird loss intelligence and is not deducted again from period Profit / Loss.<?php endif; ?></p></div></div></div>
+        <div class="col-lg-7"><div class="card"><div class="card-header fw-semibold">How this result is calculated</div><div class="card-body"><dl class="row mb-0"><dt class="col-7">Revenue from sales</dt><dd class="col-5 text-end">₦<?php echo number_format($summary['revenue'],2); ?></dd><dt class="col-7">Cost of goods sold (sold slaughter-output lots)</dt><dd class="col-5 text-end">₦<?php echo number_format($summary['cost_of_goods_sold'] ?? 0,2); ?></dd><dt class="col-7">Feed consumed (cost snapshot)</dt><dd class="col-5 text-end">₦<?php echo number_format($summary['feed_consumption_cost'],2); ?></dd><dt class="col-7">Other operating expenses</dt><dd class="col-5 text-end">₦<?php echo number_format($summary['non_feed_expenses'],2); ?></dd><dd class="col-12 small text-muted text-end mb-2">Manual/non-stock: ₦<?php echo number_format($summary['manual_non_feed_expenses'] ?? 0,2); ?> · Consumed operating inventory: ₦<?php echo number_format($summary['inventory_operating_consumption_cost'] ?? 0,2); ?></dd><hr><dt class="col-7">Profit / Loss</dt><dd class="col-5 text-end fw-bold <?php echo $summary['profit']>=0?'text-success':'text-danger'; ?>">₦<?php echo number_format($summary['profit'],2); ?></dd></dl><p class="small text-muted mt-3 mb-0">Slaughter-output COGS is recognised only from sold output lots using their frozen sale-lot cost basis. Unsold slaughter-output value remains in Inventory and is not charged again to period Profit / Loss. Feed purchases are tracked as cash expenses (₦<?php echo number_format($summary['cash_feed_expenses'],2); ?>) but are not added again to consumed-feed cost. Feed profitability is consumption-based, preventing purchase-day distortion and double counting. Medication/Vaccine, Supplement and Consumables inventory are likewise recognised inside Other operating cost when USED; their purchase receipts remain spending/cash-flow records rather than a second profitability charge.<?php if (!empty($poultryEconomics['available'])): ?> Mortality value is tracked separately as productive-bird loss intelligence and is not deducted again from period Profit / Loss.<?php endif; ?></p></div></div></div>
         <div class="col-lg-5"><div class="card"><div class="card-header fw-semibold">Reporting integrity</div><div class="card-body"><p class="mb-2">Daily and monthly views use the same calculation engine. Monthly is the sum of activity inside the selected month; Daily limits that engine to one date.</p><p class="mb-0 text-muted small">Reversed originals and restoration/reversal rows remain available in the audit ledger but are excluded from operational feed quantity and profitability calculations. Feed usage is valued from its transaction cost snapshot, so a later inventory price change does not rewrite historical profit. Production type and cycle attribution keep Layer, Broiler and ruminant species costs separated; pooled activity remains explicit instead of being guessed.</p></div></div></div>
     </div>
 </div>
