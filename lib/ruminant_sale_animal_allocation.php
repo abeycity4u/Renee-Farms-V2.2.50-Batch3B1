@@ -88,6 +88,227 @@ function ruminant_sale_build_animal_allocations(PDO $pdo, int $farmId, string $p
     return ['mode' => $mode, 'rows' => $rows];
 }
 
+
+/**
+ * Build individual-animal revenue attribution from canonical slaughter-output
+ * lot provenance.
+ *
+ * This does not mutate animal lifecycle or population. It only attributes the
+ * already-created financial sale revenue to the animal(s) whose processed
+ * output physically supplied the sale.
+ *
+ * When more than one source animal contributes matching lots, revenue follows
+ * contributed quantity. Integer centi-units and largest-remainder monetary
+ * rounding guarantee that allocated revenue equals the sale total exactly.
+ */
+function ruminant_sale_build_slaughter_output_allocations(
+    array $slaughterSelection,
+    float $saleTotal
+): array {
+    if (
+        ($slaughterSelection['mode'] ?? 'financial_only')
+        !== 'slaughter_output'
+    ) {
+        return [
+            'mode' => 'shared',
+            'rows' => [],
+        ];
+    }
+
+    $totalCents =
+        (int)round(
+            round(
+                $saleTotal,
+                2
+            ) * 100
+        );
+
+    if ($totalCents <= 0) {
+        throw new RuntimeException(
+            'Sale total must be greater than zero before slaughter-output animal revenue attribution.'
+        );
+    }
+
+    $quantityUnitsByAnimal = [];
+
+    foreach (
+        ($slaughterSelection['rows'] ?? [])
+        as $row
+    ) {
+        $animalId =
+            (int)(
+                $row['animal_id']
+                ?? 0
+            );
+
+        $quantityUnits =
+            (int)round(
+                round(
+                    (float)(
+                        $row['quantity']
+                        ?? 0
+                    ),
+                    2
+                ) * 100
+            );
+
+        if (
+            $animalId <= 0
+            || $quantityUnits <= 0
+        ) {
+            throw new RuntimeException(
+                'Slaughter-output revenue attribution requires valid source animal and quantity provenance.'
+            );
+        }
+
+        $quantityUnitsByAnimal[$animalId] =
+            (
+                $quantityUnitsByAnimal[$animalId]
+                ?? 0
+            )
+            + $quantityUnits;
+    }
+
+    if (!$quantityUnitsByAnimal) {
+        throw new RuntimeException(
+            'Slaughter-output revenue attribution could not identify a source animal.'
+        );
+    }
+
+    ksort(
+        $quantityUnitsByAnimal,
+        SORT_NUMERIC
+    );
+
+    $totalQuantityUnits =
+        array_sum(
+            $quantityUnitsByAnimal
+        );
+
+    if ($totalQuantityUnits <= 0) {
+        throw new RuntimeException(
+            'Slaughter-output revenue attribution has no usable source quantity.'
+        );
+    }
+
+    $centsByAnimal = [];
+    $remainders = [];
+    $assignedCents = 0;
+
+    foreach (
+        $quantityUnitsByAnimal
+        as $animalId => $quantityUnits
+    ) {
+        $numerator =
+            $totalCents
+            * $quantityUnits;
+
+        $baseCents =
+            intdiv(
+                $numerator,
+                $totalQuantityUnits
+            );
+
+        $remainder =
+            $numerator
+            % $totalQuantityUnits;
+
+        $centsByAnimal[$animalId] =
+            $baseCents;
+
+        $remainders[] = [
+            'animal_id' =>
+                (int)$animalId,
+
+            'remainder' =>
+                $remainder,
+        ];
+
+        $assignedCents +=
+            $baseCents;
+    }
+
+    $remainingCents =
+        $totalCents
+        - $assignedCents;
+
+    usort(
+        $remainders,
+        static function (
+            array $a,
+            array $b
+        ): int {
+            $remainderCompare =
+                $b['remainder']
+                <=> $a['remainder'];
+
+            if ($remainderCompare !== 0) {
+                return $remainderCompare;
+            }
+
+            return
+                $a['animal_id']
+                <=> $b['animal_id'];
+        }
+    );
+
+    for (
+        $i = 0;
+        $i < $remainingCents;
+        $i++
+    ) {
+        $animalId =
+            (int)$remainders[
+                $i % count($remainders)
+            ]['animal_id'];
+
+        $centsByAnimal[$animalId]++;
+    }
+
+    ksort(
+        $centsByAnimal,
+        SORT_NUMERIC
+    );
+
+    $rows = [];
+
+    foreach (
+        $centsByAnimal
+        as $animalId => $cents
+    ) {
+        $rows[] = [
+            'animal_id' =>
+                (int)$animalId,
+
+            'allocated_amount' =>
+                $cents / 100,
+
+            'allocation_percent' =>
+                round(
+                    (
+                        $cents
+                        / $totalCents
+                    ) * 100,
+                    4
+                ),
+
+            /*
+             * Reuse the established persisted allocation method vocabulary.
+             * Provenance is determined by the slaughter selection, not by
+             * trusting browser-entered custom amounts.
+             */
+            'allocation_method' =>
+                'custom',
+        ];
+    }
+
+    return [
+        'mode' => 'custom',
+        'rows' => $rows,
+        'source' => 'slaughter_output',
+    ];
+}
+
 function ruminant_sale_save_animal_allocations(PDO $pdo, int $farmId, int $saleId, array $allocation, ?int $createdBy): void
 {
     $delete = $pdo->prepare('DELETE FROM ruminant_sale_animal_allocations WHERE farm_id=? AND sale_id=?');

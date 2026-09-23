@@ -476,9 +476,32 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             exit();
         }
         try {
-            $animalRevenueAllocation = $saleFarmType === 'ruminant'
-                ? ruminant_sale_build_animal_allocations($pdo, $tenantFarmId, $productionType, $totalAmount, $_POST)
-                : ['mode' => 'shared', 'rows' => []];
+            if ($saleFarmType !== 'ruminant') {
+                $animalRevenueAllocation = [
+                    'mode' => 'shared',
+                    'rows' => [],
+                ];
+
+            } elseif (
+                ($slaughterSaleSelection['mode'] ?? 'financial_only')
+                === 'slaughter_output'
+            ) {
+                $animalRevenueAllocation =
+                    ruminant_sale_build_slaughter_output_allocations(
+                        $slaughterSaleSelection,
+                        $totalAmount
+                    );
+
+            } else {
+                $animalRevenueAllocation =
+                    ruminant_sale_build_animal_allocations(
+                        $pdo,
+                        $tenantFarmId,
+                        $productionType,
+                        $totalAmount,
+                        $_POST
+                    );
+            }
         } catch (RuntimeException $e) {
             $_SESSION['error'] = $e->getMessage();
             header("Location: sales_records.php?report_mode={$reportMode}&month={$month}&year={$year}&farm_type={$farmType}");
@@ -913,9 +936,32 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             exit();
         }
         try {
-            $animalRevenueAllocation = $saleFarmType === 'ruminant'
-                ? ruminant_sale_build_animal_allocations($pdo, $tenantFarmId, $productionType, $newTotal, $_POST)
-                : ['mode' => 'shared', 'rows' => []];
+            if ($saleFarmType !== 'ruminant') {
+                $animalRevenueAllocation = [
+                    'mode' => 'shared',
+                    'rows' => [],
+                ];
+
+            } elseif (
+                ($slaughterSaleSelection['mode'] ?? 'financial_only')
+                === 'slaughter_output'
+            ) {
+                $animalRevenueAllocation =
+                    ruminant_sale_build_slaughter_output_allocations(
+                        $slaughterSaleSelection,
+                        $newTotal
+                    );
+
+            } else {
+                $animalRevenueAllocation =
+                    ruminant_sale_build_animal_allocations(
+                        $pdo,
+                        $tenantFarmId,
+                        $productionType,
+                        $newTotal,
+                        $_POST
+                    );
+            }
         } catch (RuntimeException $e) {
             $_SESSION['error'] = $e->getMessage();
             header("Location: sales_records.php?report_mode={$reportMode}&month={$month}&year={$year}&farm_type={$farmType}");
@@ -1581,7 +1627,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                     Slaughter Output Lots
                                 </div>
                                 <div class="small text-muted mb-3">
-                                    Select the exact output lot and quantity sold. Product, source cycle, unit and total quantity are derived from Inventory provenance. Selling price does not change frozen COGS.
+                                    Select the exact output lot and quantity sold. Product, source cycle, unit, total quantity and source-animal revenue attribution are derived from Inventory provenance. Selling price does not change frozen COGS.
                                 </div>
 
                                 <div id="addSlaughterLotRows"></div>
@@ -1847,7 +1893,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                     Slaughter Output Lots
                                 </div>
                                 <div class="small text-muted mb-3">
-                                    Changing lot or quantity restores the previous active lot usage append-only before applying the corrected selection.
+                                    Changing lot or quantity restores the previous active lot usage append-only before applying the corrected selection. Animal revenue attribution follows the selected source lot automatically.
                                 </div>
 
                                 <div id="editSlaughterLotRows"></div>
