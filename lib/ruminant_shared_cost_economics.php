@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/ruminant_cycle_membership.php';
+require_once __DIR__.'/ruminant_economic_participation.php';
 require_once __DIR__.'/inventory_financial.php';
 require_once __DIR__.'/stock_reporting.php';
 require_once __DIR__.'/stock_consumption_economics.php';
@@ -317,9 +318,8 @@ function ruminant_shared_cost_eligibility_context(
         );
 
     /*
-     * Only an EXPLICIT shared-cost allocation can become pre-cycle
-     * preparation. Never infer this from an inventory item name,
-     * description, category or animal species.
+     * Only explicit allocation provenance can convert a source recorded
+     * before cycle start into pre-cycle preparation.
      */
     $explicitCycleAllocation =
         $sourceType === 'allocated_expense'
@@ -329,6 +329,9 @@ function ruminant_shared_cost_eligibility_context(
             &&
             $stockMode === 'explicit_allocation'
         );
+
+    $preCyclePreparation =
+        false;
 
     $cycleStartRaw =
         trim(
@@ -351,71 +354,141 @@ function ruminant_shared_cost_eligibility_context(
                 'Production cycle start date'
             );
 
-        if ($cycleStartDate > $sourceDate) {
-            $cohort =
-                ruminant_cycle_first_eligible_cohort(
-                    $pdo,
-                    $farmId,
-                    $species,
-                    $cycleId,
-                    $cycleStartDate
-                );
-
-            $eligible =
-                $cohort['animal_ids']
-                ?? [];
-
-            return [
-                'eligible_animal_ids' =>
-                    $eligible,
-
-                'allocation_date' =>
-                    $cohort['date']
-                    ?? null,
-
-                'pre_cycle_preparation' =>
-                    true,
-
-                'allocation_method' =>
-                    'Pre-cycle preparation · first eligible cycle cohort',
-
-                'exception_reason' =>
-                    $eligible
-                        ? null
-                        : 'pre_cycle_target_has_no_eligible_animals',
-            ];
-        }
+        $preCyclePreparation =
+            $cycleStartDate
+            >
+            $sourceDate;
     }
 
-    $eligible =
-        ruminant_cycle_eligible_animal_ids(
+    $participation =
+        ruminant_economic_participation_context(
             $pdo,
             $farmId,
             $species,
             $sourceDate,
             $cycleId > 0
                 ? $cycleId
-                : null
+                : null,
+            $preCyclePreparation
         );
 
+    $resolved =
+        (
+            $participation[
+                'status'
+            ]
+            ?? ''
+        )
+        ===
+        'resolved';
+
+    $registered =
+        $resolved
+            ? (
+                $participation[
+                    'registered_animal_ids'
+                ]
+                ?? []
+            )
+            : [];
+
     return [
+        /*
+         * Compatibility key:
+         * these are NAMED/REGISTERED participants, not the denominator.
+         */
         'eligible_animal_ids' =>
-            $eligible,
+            $registered,
 
         'allocation_date' =>
-            $sourceDate,
+            $participation[
+                'effective_date'
+            ]
+            ?? $sourceDate,
 
         'pre_cycle_preparation' =>
-            false,
+            $preCyclePreparation,
 
         'allocation_method' =>
-            'Active headcount on transaction date',
+            $preCyclePreparation
+                ? 'Pre-cycle preparation · first physical cycle cohort'
+                : (
+                    $cycleId > 0
+                        ? 'Physical herd exposure headcount on transaction date'
+                        : 'Physical species exposure headcount on transaction date'
+                ),
 
         'exception_reason' =>
-            null,
+            $resolved
+                ? null
+                : (
+                    $participation[
+                        'review_reason'
+                    ]
+                    ?? 'physical_population_review_required'
+                ),
+
+        'participation_status' =>
+            $participation[
+                'status'
+            ]
+            ?? 'review',
+
+        'participation_review_reason' =>
+            $participation[
+                'review_reason'
+            ]
+            ?? null,
+
+        'physical_headcount' =>
+            $participation[
+                'physical_headcount'
+            ]
+            ?? null,
+
+        'registered_participant_count' =>
+            $participation[
+                'registered_participant_count'
+            ]
+            ?? 0,
+
+        'aggregate_unregistered_headcount' =>
+            $participation[
+                'aggregate_unregistered_headcount'
+            ]
+            ?? null,
+
+        'population_source' =>
+            $participation[
+                'population_source'
+            ]
+            ?? null,
+
+        'opening_headcount' =>
+            $participation[
+                'opening_headcount'
+            ]
+            ?? null,
+
+        'closing_headcount' =>
+            $participation[
+                'closing_headcount'
+            ]
+            ?? null,
+
+        'additions' =>
+            $participation[
+                'additions'
+            ]
+            ?? null,
+
+        'removals' =>
+            $participation[
+                'removals'
+            ]
+            ?? null,
     ];
 }
-
 
 function ruminant_shared_cost_economics(PDO $pdo, int $farmId, int $animalId, string $species): array
 {
@@ -524,45 +597,219 @@ function ruminant_shared_cost_economics(PDO $pdo, int $farmId, int $animalId, st
             );
     }
 
-    $allocated=[]; $total=0.0; $eligiblePool=0.0;
+    $allocated = [];
+    $total = 0.0;
+    $eligiblePool = 0.0;
 
-    foreach($rows as $index => $r){
-        $amount=round((float)$r['pool_amount'],2);
-        if($amount<=0) continue;
+    /*
+     * Valid herd/cycle cost that belongs to physical livestock which has not
+     * been individually identified in the registry.
+     *
+     * This is NOT an exception and is never added to the target animal.
+     */
+    $aggregateUnregisteredSharedCost = 0.0;
+    $aggregateUnregisteredRows = [];
+
+    foreach ($rows as $index => $r) {
+        $amount =
+            round(
+                (float)$r['pool_amount'],
+                2
+            );
+
+        if ($amount <= 0) {
+            continue;
+        }
 
         $context =
-            $eligibilityContexts[$index];
+            $eligibilityContexts[
+                $index
+            ];
 
-        $eligible =
-            $context['eligible_animal_ids'];
+        if (
+            (
+                $context[
+                    'participation_status'
+                ]
+                ?? 'review'
+            )
+            !==
+            'resolved'
+        ) {
+            continue;
+        }
 
-        if(!$eligible) continue; // visible as exception below
+        $physicalHeadcount =
+            (int)(
+                $context[
+                    'physical_headcount'
+                ]
+                ?? 0
+            );
 
-        $eligiblePool+=$amount;
-        $share=ruminant_shared_cost_share_for_target($amount,$eligible,$animalId);
+        $registered =
+            $context[
+                'eligible_animal_ids'
+            ]
+            ?? [];
 
-        if($share<=0) continue;
+        if ($physicalHeadcount <= 0) {
+            continue;
+        }
 
-        $r['eligible_animal_count']=count($eligible);
-        $r['allocated_amount']=$share;
-        $r['allocation_method']=$context['allocation_method'];
-        $r['allocation_effective_date']=$context['allocation_date'];
-        $r['pre_cycle_preparation']=!empty($context['pre_cycle_preparation']);
+        $eligiblePool +=
+            $amount;
 
-        $allocated[]=$r;
-        $total+=$share;
+        $namedTotal =
+            ruminant_economic_participation_named_total(
+                $amount,
+                $physicalHeadcount,
+                $registered
+            );
+
+        $aggregateAmount =
+            round(
+                max(
+                    0.0,
+                    $amount
+                    -
+                    $namedTotal
+                ),
+                2
+            );
+
+        if ($aggregateAmount > 0) {
+            $aggregateRow =
+                $r;
+
+            $aggregateRow[
+                'aggregate_unregistered_amount'
+            ] =
+                $aggregateAmount;
+
+            $aggregateRow[
+                'physical_headcount'
+            ] =
+                $physicalHeadcount;
+
+            $aggregateRow[
+                'registered_participant_count'
+            ] =
+                count($registered);
+
+            $aggregateRow[
+                'aggregate_unregistered_headcount'
+            ] =
+                (int)(
+                    $context[
+                        'aggregate_unregistered_headcount'
+                    ]
+                    ?? 0
+                );
+
+            $aggregateRow[
+                'allocation_effective_date'
+            ] =
+                $context[
+                    'allocation_date'
+                ];
+
+            $aggregateRow[
+                'population_source'
+            ] =
+                $context[
+                    'population_source'
+                ];
+
+            $aggregateRow[
+                'pre_cycle_preparation'
+            ] =
+                !empty(
+                    $context[
+                        'pre_cycle_preparation'
+                    ]
+                );
+
+            $aggregateUnregisteredRows[] =
+                $aggregateRow;
+
+            $aggregateUnregisteredSharedCost +=
+                $aggregateAmount;
+        }
+
+        $share =
+            ruminant_economic_participation_share_for_animal(
+                $amount,
+                $physicalHeadcount,
+                $registered,
+                $animalId
+            );
+
+        if ($share <= 0) {
+            continue;
+        }
+
+        /*
+         * Legacy field retained for existing UI/verifiers.
+         * It is now explicitly the REGISTERED participant count.
+         */
+        $r['eligible_animal_count'] =
+            count($registered);
+
+        $r['registered_participant_count'] =
+            count($registered);
+
+        $r['physical_headcount'] =
+            $physicalHeadcount;
+
+        $r['aggregate_unregistered_headcount'] =
+            (int)(
+                $context[
+                    'aggregate_unregistered_headcount'
+                ]
+                ?? 0
+            );
+
+        $r['allocated_amount'] =
+            $share;
+
+        $r['allocation_method'] =
+            $context[
+                'allocation_method'
+            ];
+
+        $r['allocation_effective_date'] =
+            $context[
+                'allocation_date'
+            ];
+
+        $r['population_source'] =
+            $context[
+                'population_source'
+            ];
+
+        $r['pre_cycle_preparation'] =
+            !empty(
+                $context[
+                    'pre_cycle_preparation'
+                ]
+            );
+
+        $allocated[] =
+            $r;
+
+        $total +=
+            $share;
     }
 
     /*
-     * Species/cost-centre allocation exceptions.
+     * Participation/population review rows.
      *
-     * These rows are NOT automatically an individual-animal membership
-     * failure. A row may already be explicitly allocated to another cycle
-     * of the same species whose own membership coverage is empty.
+     * A valid physical herd with zero tagged animals is NOT an exception:
+     * its cost belongs to aggregate/unregistered livestock.
      *
-     * Such amounts stay outside the target animal's economics and retain
-     * their exact source/cycle provenance for correction at the owning
-     * allocation workspace.
+     * Review exists only when physical evidence is missing/zero or when
+     * registered participation contradicts the physical population.
      */
     $speciesAllocationExceptionCost =
         0.0;
@@ -570,58 +817,105 @@ function ruminant_shared_cost_economics(PDO $pdo, int $farmId, int $animalId, st
     $speciesAllocationExceptionRows =
         [];
 
-    foreach($rows as $index => $r){
-        $amount=round((float)$r['pool_amount'],2);
-        if($amount<=0) continue;
+    foreach ($rows as $index => $r) {
+        $amount =
+            round(
+                (float)$r['pool_amount'],
+                2
+            );
+
+        if ($amount <= 0) {
+            continue;
+        }
 
         $context =
-            $eligibilityContexts[$index];
+            $eligibilityContexts[
+                $index
+            ];
 
-        $eligible =
-            $context['eligible_animal_ids'];
-
-        if(!$eligible) {
-            $speciesAllocationExceptionCost +=
-                $amount;
-
-            $r[
-                'species_allocation_exception_amount'
-            ] =
-                $amount;
-
-            /*
-             * Compatibility alias retained for existing navigation/read
-             * contracts. New callers should use the explicit exception key.
-             */
-            $r['uncovered_amount'] =
-                $amount;
-
-            $r[
-                'species_allocation_exception_reason'
-            ] =
-                $context['exception_reason']
-                ?? (
-                    !empty($r['cycle_id'])
-                        ? 'cycle_has_no_eligible_animals'
-                        : 'species_scope_has_no_eligible_animals'
-                );
-
-            $r['pre_cycle_preparation'] =
-                !empty(
-                    $context[
-                        'pre_cycle_preparation'
-                    ]
-                );
-
-            $r['allocation_effective_date'] =
+        if (
+            (
                 $context[
-                    'allocation_date'
+                    'participation_status'
                 ]
-                ?? null;
-
-            $speciesAllocationExceptionRows[] =
-                $r;
+                ?? 'review'
+            )
+            ===
+            'resolved'
+        ) {
+            continue;
         }
+
+        $speciesAllocationExceptionCost +=
+            $amount;
+
+        $r[
+            'species_allocation_exception_amount'
+        ] =
+            $amount;
+
+        /*
+         * Compatibility alias.
+         */
+        $r['uncovered_amount'] =
+            $amount;
+
+        $r[
+            'species_allocation_exception_reason'
+        ] =
+            $context[
+                'participation_review_reason'
+            ]
+            ??
+            $context[
+                'exception_reason'
+            ]
+            ??
+            'physical_population_review_required';
+
+        $r[
+            'physical_headcount'
+        ] =
+            $context[
+                'physical_headcount'
+            ]
+            ?? null;
+
+        $r[
+            'registered_participant_count'
+        ] =
+            $context[
+                'registered_participant_count'
+            ]
+            ?? 0;
+
+        $r[
+            'allocation_effective_date'
+        ] =
+            $context[
+                'allocation_date'
+            ]
+            ?? null;
+
+        $r[
+            'population_source'
+        ] =
+            $context[
+                'population_source'
+            ]
+            ?? null;
+
+        $r[
+            'pre_cycle_preparation'
+        ] =
+            !empty(
+                $context[
+                    'pre_cycle_preparation'
+                ]
+            );
+
+        $speciesAllocationExceptionRows[] =
+            $r;
     }
 
     $speciesAllocationExceptionCost =
@@ -630,9 +924,20 @@ function ruminant_shared_cost_economics(PDO $pdo, int $farmId, int $animalId, st
             2
         );
 
+    $aggregateUnregisteredSharedCost =
+        round(
+            $aggregateUnregisteredSharedCost,
+            2
+        );
     return [
         'allocated_shared_cost'=>round($total,2),
         'shared_cost_rows'=>$allocated,
+
+        'aggregate_unregistered_shared_cost'=>
+            $aggregateUnregisteredSharedCost,
+
+        'aggregate_unregistered_shared_cost_rows'=>
+            $aggregateUnregisteredRows,
 
         'species_allocation_exception_cost'=>
             $speciesAllocationExceptionCost,
@@ -650,6 +955,6 @@ function ruminant_shared_cost_economics(PDO $pdo, int $farmId, int $animalId, st
             $speciesAllocationExceptionRows,
 
         'eligible_species_pool'=>round($eligiblePool,2),
-        'method'=>'Active headcount on each transaction date',
+        'method'=>'Physical herd exposure headcount on each economic date',
     ];
 }

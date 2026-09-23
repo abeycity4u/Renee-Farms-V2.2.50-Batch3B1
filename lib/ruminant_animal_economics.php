@@ -88,6 +88,27 @@ function ruminant_animal_economics(PDO $pdo, int $farmId, int $animalId): array
         'fully_allocated_roi_percent' => $fullyAllocatedRoi,
         'shared_cost_rows' => $shared['shared_cost_rows'] ?? [],
 
+        /*
+         * Valid herd/cycle economics belonging to physical livestock
+         * that are not individually identified in the registry.
+         *
+         * These amounts remain cycle/herd cost. They are disclosure
+         * only and are never added to this animal's cost basis.
+         */
+        'aggregate_unregistered_shared_cost' =>
+            (float)(
+                $shared[
+                    'aggregate_unregistered_shared_cost'
+                ]
+                ?? 0
+            ),
+
+        'aggregate_unregistered_shared_cost_rows' =>
+            $shared[
+                'aggregate_unregistered_shared_cost_rows'
+            ]
+            ?? [],
+
         'species_allocation_exception_cost' =>
             (float)(
                 $shared[
@@ -119,7 +140,7 @@ function ruminant_animal_economics(PDO $pdo, int $farmId, int $animalId): array
             ]
             ?? [],
 
-        'shared_allocation_method' => $shared['method'] ?? 'Active headcount on each transaction date',
+        'shared_allocation_method' => $shared['method'] ?? 'Physical herd exposure headcount on each economic date',
         'expenses' => $expenses,
         'revenues' => $revenues,
         'shared_costs_included' => true,

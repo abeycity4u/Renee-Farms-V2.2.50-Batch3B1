@@ -6,6 +6,8 @@
  * belonged to a cycle merely because its species matches the cycle.
  */
 
+require_once __DIR__ . '/ruminant_animal_entry.php';
+
 function ruminant_cycle_memberships_for_animal(PDO $pdo, int $farmId, int $animalId): array
 {
     $stmt = $pdo->prepare("SELECT m.*, pc.cycle_code, pc.production_type, pc.status AS cycle_status,
@@ -62,7 +64,7 @@ function ruminant_cycle_membership_add(PDO $pdo, int $farmId, int $animalId, int
         throw new RuntimeException('Membership end date must be on or after the start date.');
     }
 
-    $animalStmt=$pdo->prepare('SELECT species,tag_no,status,purchase_date,birth_date FROM ruminant_animals WHERE id=? AND farm_id=? LIMIT 1');
+    $animalStmt=$pdo->prepare('SELECT species,tag_no,status,farm_entry_date,purchase_date,birth_date,created_at FROM ruminant_animals WHERE id=? AND farm_id=? LIMIT 1');
     $animalStmt->execute([$animalId,$farmId]);
     $animal=$animalStmt->fetch(PDO::FETCH_ASSOC);
     if(!$animal) throw new RuntimeException('Animal not found.');
@@ -74,9 +76,18 @@ function ruminant_cycle_membership_add(PDO $pdo, int $farmId, int $animalId, int
     if(strtolower((string)$cycle['production_type']) !== strtolower((string)$animal['species'])) {
         throw new RuntimeException('The selected production cycle must match the animal species.');
     }
-    $economicEntryDate = !empty($animal['purchase_date']) ? (string)$animal['purchase_date'] : (!empty($animal['birth_date']) ? (string)$animal['birth_date'] : null);
-    if ($economicEntryDate !== null && $startDate < $economicEntryDate) {
-        throw new RuntimeException('Membership cannot start before the animal entered the farm/operation.');
+    $economicEntryDate =
+        ruminant_animal_farm_entry_date_from_row(
+            $animal
+        );
+
+    if (
+        $economicEntryDate !== null
+        && $startDate < $economicEntryDate
+    ) {
+        throw new RuntimeException(
+            'Physical participation cannot start before the animal physically entered the farm/operation.'
+        );
     }
 
     // An exited animal may receive a historical correction membership only
