@@ -36,6 +36,52 @@ function ruminant_slaughter_sale_economics_money_cents(
 }
 
 if (!function_exists(
+    'ruminant_slaughter_sale_economics_proportional_cents'
+)) {
+function ruminant_slaughter_sale_economics_proportional_cents(
+    int $amountCents,
+    int $componentCents,
+    int $totalBasisCents
+): int {
+    if (
+        $amountCents < 0
+        ||
+        $componentCents < 0
+        ||
+        $totalBasisCents < 0
+        ||
+        $componentCents > $totalBasisCents
+    ) {
+        throw new RuntimeException(
+            'Slaughter-sale economic basis is invalid.'
+        );
+    }
+
+    if ($totalBasisCents === 0) {
+        if ($amountCents !== 0) {
+            throw new RuntimeException(
+                'A non-zero slaughter-sale valuation has no frozen cost basis.'
+            );
+        }
+
+        return 0;
+    }
+
+    return (int)round(
+        $amountCents
+        *
+        (
+            $componentCents
+            /
+            $totalBasisCents
+        ),
+        0,
+        PHP_ROUND_HALF_UP
+    );
+}
+}
+
+if (!function_exists(
     'ruminant_slaughter_sale_economics_rows'
 )) {
 function ruminant_slaughter_sale_economics_rows(
@@ -137,6 +183,10 @@ function ruminant_slaughter_sale_economics_rows(
              o.batch_id,
 
              b.cycle_id AS batch_cycle_id,
+             b.cost_basis_amount AS batch_cost_basis_amount,
+             b.cost_basis_purchase AS batch_cost_basis_purchase,
+             b.cost_basis_direct_expense AS batch_cost_basis_direct_expense,
+             b.cost_basis_shared AS batch_cost_basis_shared,
 
              pc.farm_type AS cycle_farm_type,
              pc.production_type AS cycle_production_type,
@@ -423,6 +473,96 @@ function ruminant_slaughter_sale_economics_rows(
             );
         }
 
+        /*
+         * Two economic truths are deliberately kept separate:
+         *
+         * 1. total_cost_snapshot is the immutable FULL-COST valuation
+         *    carried by the physical slaughter-output lot.
+         *
+         * 2. Profit/Loss COGS releases only the frozen purchase/capital
+         *    portion. Direct/shared operating components already originate
+         *    from canonical expense / consumed-stock economics and must not
+         *    be charged to Profit/Loss a second time.
+         */
+        $basisTotalCents =
+            ruminant_slaughter_sale_economics_money_cents(
+                $row['batch_cost_basis_amount']
+            );
+
+        $basisPurchaseCents =
+            ruminant_slaughter_sale_economics_money_cents(
+                $row['batch_cost_basis_purchase']
+            );
+
+        $basisDirectCents =
+            ruminant_slaughter_sale_economics_money_cents(
+                $row['batch_cost_basis_direct_expense']
+            );
+
+        $basisSharedCents =
+            ruminant_slaughter_sale_economics_money_cents(
+                $row['batch_cost_basis_shared']
+            );
+
+        if (
+            $basisPurchaseCents
+            +
+            $basisDirectCents
+            +
+            $basisSharedCents
+            !==
+            $basisTotalCents
+        ) {
+            throw new RuntimeException(
+                'Slaughter-sale frozen cost-basis components do not conserve the batch total.'
+            );
+        }
+
+        $recognizedCogsCents =
+            ruminant_slaughter_sale_economics_proportional_cents(
+                $snapshotCents,
+                $basisPurchaseCents,
+                $basisTotalCents
+            );
+
+        $embeddedOperatingCents =
+            $snapshotCents
+            -
+            $recognizedCogsCents;
+
+        if ($embeddedOperatingCents < 0) {
+            throw new RuntimeException(
+                'Slaughter-sale embedded operating cost became negative.'
+            );
+        }
+
+        $row['full_cost_valuation_cents'] =
+            $snapshotCents;
+
+        $row['full_cost_valuation'] =
+            round(
+                $snapshotCents / 100,
+                2
+            );
+
+        $row['recognized_cogs_cents'] =
+            $recognizedCogsCents;
+
+        $row['recognized_cogs'] =
+            round(
+                $recognizedCogsCents / 100,
+                2
+            );
+
+        $row['embedded_operating_cost_cents'] =
+            $embeddedOperatingCents;
+
+        $row['embedded_operating_cost'] =
+            round(
+                $embeddedOperatingCents / 100,
+                2
+            );
+
         $saleQuantityTotals[$saleId] =
             (
                 $saleQuantityTotals[$saleId]
@@ -433,15 +573,6 @@ function ruminant_slaughter_sale_economics_rows(
 
         $saleRecordedQuantities[$saleId] =
             (float)$row['sale_quantity'];
-
-        $row['recognized_cogs_cents'] =
-            $snapshotCents;
-
-        $row['recognized_cogs'] =
-            round(
-                $snapshotCents / 100,
-                2
-            );
 
         $validated[] = $row;
     }
@@ -533,17 +664,60 @@ function ruminant_slaughter_sale_economics_summary(
             $cycleId
         );
 
-    $cents = 0;
+    $recognizedCogsCents = 0;
+    $fullCostCents = 0;
+    $embeddedOperatingCents = 0;
 
     foreach ($rows as $row) {
-        $cents +=
+        $recognizedCogsCents +=
             (int)$row['recognized_cogs_cents'];
+
+        $fullCostCents +=
+            (int)$row['full_cost_valuation_cents'];
+
+        $embeddedOperatingCents +=
+            (int)$row['embedded_operating_cost_cents'];
+    }
+
+    if (
+        $recognizedCogsCents
+        +
+        $embeddedOperatingCents
+        !==
+        $fullCostCents
+    ) {
+        throw new RuntimeException(
+            'Slaughter-sale valuation decomposition does not conserve full cost.'
+        );
     }
 
     return [
+        /*
+         * P&L-recognisable COGS only.
+         */
         'slaughter_output_cogs' =>
             round(
-                $cents / 100,
+                $recognizedCogsCents / 100,
+                2
+            ),
+
+        /*
+         * Management / Inventory valuation disclosure.
+         * This value is NOT deducted again from Profit/Loss.
+         */
+        'slaughter_output_full_cost_valuation' =>
+            round(
+                $fullCostCents / 100,
+                2
+            ),
+
+        /*
+         * Direct/shared operating economics already represented by
+         * their authoritative expense/consumption sources.
+         */
+        'slaughter_output_embedded_operating_cost' =>
+            round(
+                $embeddedOperatingCents / 100,
                 2
             ),
 

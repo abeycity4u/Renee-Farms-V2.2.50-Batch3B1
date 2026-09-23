@@ -490,6 +490,40 @@ function getProfitabilitySummary(
             ?? 0
         );
 
+    $slaughterOutputFullCostValuation =
+        (float)(
+            $slaughterSaleEconomics[
+                'slaughter_output_full_cost_valuation'
+            ]
+            ?? 0
+        );
+
+    $slaughterOutputEmbeddedOperatingCost =
+        (float)(
+            $slaughterSaleEconomics[
+                'slaughter_output_embedded_operating_cost'
+            ]
+            ?? 0
+        );
+
+    if (
+        (int)round(
+            (
+                $slaughterOutputCogs
+                +
+                $slaughterOutputEmbeddedOperatingCost
+            ) * 100
+        )
+        !==
+        (int)round(
+            $slaughterOutputFullCostValuation * 100
+        )
+    ) {
+        throw new RuntimeException(
+            'Profitability slaughter-output valuation decomposition does not conserve full cost.'
+        );
+    }
+
     $nonFeedExpenses=$manualNonFeedExpenses+$inventoryOperatingConsumption;
 
     /*
@@ -509,8 +543,12 @@ function getProfitabilitySummary(
         'inventory_operating_consumption_breakdown'=>$inventoryConsumptionBreakdown,
         'cost_of_goods_sold'=>$slaughterOutputCogs,
         'slaughter_output_cogs'=>$slaughterOutputCogs,
+        'slaughter_output_full_cost_valuation'=>$slaughterOutputFullCostValuation,
+        'slaughter_output_embedded_operating_cost'=>$slaughterOutputEmbeddedOperatingCost,
         'cost_of_goods_sold_breakdown'=>[
             'ruminant_slaughter_output'=>$slaughterOutputCogs,
+            'full_cost_sold_valuation'=>$slaughterOutputFullCostValuation,
+            'embedded_operating_cost_already_recognized'=>$slaughterOutputEmbeddedOperatingCost,
         ],
         'total_operating_cost'=>$totalOperatingCost,
         'total_recognized_cost'=>$totalRecognizedCost,
@@ -544,6 +582,8 @@ function getProfitabilitySummary(
             ],
             'cost_of_goods_sold'=>[
                 'ruminant_slaughter_output'=>$slaughterOutputCogs,
+                'full_cost_sold_valuation'=>$slaughterOutputFullCostValuation,
+                'embedded_operating_cost_already_recognized'=>$slaughterOutputEmbeddedOperatingCost,
                 'total'=>$slaughterOutputCogs,
             ],
             'other_operating_cost'=>[

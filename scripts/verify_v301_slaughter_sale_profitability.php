@@ -144,6 +144,45 @@ $check(
     'COGS reader is read-only'
 );
 
+$check(
+    $contains(
+        $reader,
+        'batch_cost_basis_purchase'
+    )
+    &&
+    $contains(
+        $reader,
+        'batch_cost_basis_direct_expense'
+    )
+    &&
+    $contains(
+        $reader,
+        'batch_cost_basis_shared'
+    ),
+    'COGS decomposes the frozen slaughter batch basis'
+);
+
+$check(
+    $contains(
+        $reader,
+        'full_cost_valuation_cents'
+    )
+    &&
+    $contains(
+        $reader,
+        'embedded_operating_cost_cents'
+    ),
+    'reader preserves full-cost valuation separately from P&L COGS'
+);
+
+$check(
+    $contains(
+        $reader,
+        'ruminant_slaughter_sale_economics_proportional_cents'
+    ),
+    'P&L COGS uses frozen-basis proportional decomposition'
+);
+
 $financial =
     $source['financial'];
 
@@ -185,6 +224,27 @@ $check(
         "'profit'=>\$revenue-\$totalRecognizedCost"
     ),
     'profit uses total recognised cost'
+);
+
+$check(
+    $contains(
+        $financial,
+        'slaughter_output_full_cost_valuation'
+    )
+    &&
+    $contains(
+        $financial,
+        'slaughter_output_embedded_operating_cost'
+    ),
+    'canonical profitability exposes valuation and embedded-cost disclosures'
+);
+
+$check(
+    $contains(
+        $financial,
+        'slaughter-output valuation decomposition does not conserve full cost'
+    ),
+    'canonical profitability enforces full-cost conservation'
 );
 
 $intelligence =
@@ -236,7 +296,7 @@ $check(
 $check(
     $contains(
         $profitability,
-        'Cost of goods sold (sold slaughter-output lots)'
+        'Cost of goods sold (purchase/capital basis released on sale)'
     ),
     'Profitability calculation explanation includes COGS'
 );
@@ -247,6 +307,19 @@ $check(
         'Unsold slaughter-output value remains in Inventory'
     ),
     'Profitability explains unsold output carrying value boundary'
+);
+
+$check(
+    $contains(
+        $profitability,
+        'Full-cost sold valuation'
+    )
+    &&
+    $contains(
+        $profitability,
+        'Embedded operating cost already recognised elsewhere'
+    ),
+    'Profitability explains P&L COGS versus full-cost valuation'
 );
 
 $inventory =
