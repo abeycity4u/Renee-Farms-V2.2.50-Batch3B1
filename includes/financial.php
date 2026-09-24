@@ -4,7 +4,7 @@ require_once __DIR__ . '/../lib/stock_costing.php';
 require_once __DIR__ . '/../lib/attribution.php';
 require_once __DIR__ . '/../lib/inventory_financial.php';
 require_once __DIR__ . '/../lib/stock_consumption_economics.php';
-require_once __DIR__ . '/../lib/ruminant_slaughter_sale_economics.php';
+require_once __DIR__ . '/../lib/slaughter_output_sale_economics.php';
 /**
  * Traceable profitability engine.
  *
@@ -470,7 +470,7 @@ function getProfitabilitySummary(
      * lot consumption with conserved frozen COGS provenance.
      */
     $slaughterSaleEconomics =
-        ruminant_slaughter_sale_economics_summary(
+        slaughter_output_sale_economics_summary(
             $pdo,
             $farmId,
             $startDate,
@@ -505,6 +505,114 @@ function getProfitabilitySummary(
             ]
             ?? 0
         );
+
+    $slaughterOutputDomainBreakdown =
+        $slaughterSaleEconomics[
+            'domain_breakdown'
+        ]
+        ?? [];
+
+    $poultrySlaughterOutputCogs =
+        (float)(
+            $slaughterOutputDomainBreakdown[
+                'poultry'
+            ][
+                'slaughter_output_cogs'
+            ]
+            ?? 0
+        );
+
+    $ruminantSlaughterOutputCogs =
+        (float)(
+            $slaughterOutputDomainBreakdown[
+                'ruminant'
+            ][
+                'slaughter_output_cogs'
+            ]
+            ?? 0
+        );
+
+    $poultrySlaughterOutputFullCostValuation =
+        (float)(
+            $slaughterOutputDomainBreakdown[
+                'poultry'
+            ][
+                'slaughter_output_full_cost_valuation'
+            ]
+            ?? 0
+        );
+
+    $ruminantSlaughterOutputFullCostValuation =
+        (float)(
+            $slaughterOutputDomainBreakdown[
+                'ruminant'
+            ][
+                'slaughter_output_full_cost_valuation'
+            ]
+            ?? 0
+        );
+
+    $poultrySlaughterOutputEmbeddedOperatingCost =
+        (float)(
+            $slaughterOutputDomainBreakdown[
+                'poultry'
+            ][
+                'slaughter_output_embedded_operating_cost'
+            ]
+            ?? 0
+        );
+
+    $ruminantSlaughterOutputEmbeddedOperatingCost =
+        (float)(
+            $slaughterOutputDomainBreakdown[
+                'ruminant'
+            ][
+                'slaughter_output_embedded_operating_cost'
+            ]
+            ?? 0
+        );
+
+    if (
+        (int)round(
+            (
+                $poultrySlaughterOutputCogs
+                +
+                $ruminantSlaughterOutputCogs
+            ) * 100
+        )
+        !==
+        (int)round(
+            $slaughterOutputCogs * 100
+        )
+        ||
+        (int)round(
+            (
+                $poultrySlaughterOutputFullCostValuation
+                +
+                $ruminantSlaughterOutputFullCostValuation
+            ) * 100
+        )
+        !==
+        (int)round(
+            $slaughterOutputFullCostValuation * 100
+        )
+        ||
+        (int)round(
+            (
+                $poultrySlaughterOutputEmbeddedOperatingCost
+                +
+                $ruminantSlaughterOutputEmbeddedOperatingCost
+            ) * 100
+        )
+        !==
+        (int)round(
+            $slaughterOutputEmbeddedOperatingCost * 100
+        )
+    ) {
+        throw new RuntimeException(
+            'Profitability slaughter-output domain aggregation does not conserve its canonical totals.'
+        );
+    }
 
     if (
         (int)round(
@@ -545,8 +653,12 @@ function getProfitabilitySummary(
         'slaughter_output_cogs'=>$slaughterOutputCogs,
         'slaughter_output_full_cost_valuation'=>$slaughterOutputFullCostValuation,
         'slaughter_output_embedded_operating_cost'=>$slaughterOutputEmbeddedOperatingCost,
+        'slaughter_output_domain_breakdown'=>$slaughterOutputDomainBreakdown,
+        'poultry_slaughter_output_cogs'=>$poultrySlaughterOutputCogs,
+        'ruminant_slaughter_output_cogs'=>$ruminantSlaughterOutputCogs,
         'cost_of_goods_sold_breakdown'=>[
-            'ruminant_slaughter_output'=>$slaughterOutputCogs,
+            'poultry_slaughter_output'=>$poultrySlaughterOutputCogs,
+            'ruminant_slaughter_output'=>$ruminantSlaughterOutputCogs,
             'full_cost_sold_valuation'=>$slaughterOutputFullCostValuation,
             'embedded_operating_cost_already_recognized'=>$slaughterOutputEmbeddedOperatingCost,
         ],
@@ -581,7 +693,8 @@ function getProfitabilitySummary(
                 'total'=>$manualNonFeedExpenses,
             ],
             'cost_of_goods_sold'=>[
-                'ruminant_slaughter_output'=>$slaughterOutputCogs,
+                'poultry_slaughter_output'=>$poultrySlaughterOutputCogs,
+            'ruminant_slaughter_output'=>$ruminantSlaughterOutputCogs,
                 'full_cost_sold_valuation'=>$slaughterOutputFullCostValuation,
                 'embedded_operating_cost_already_recognized'=>$slaughterOutputEmbeddedOperatingCost,
                 'total'=>$slaughterOutputCogs,

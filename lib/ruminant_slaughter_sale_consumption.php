@@ -1,8 +1,10 @@
 <?php
 
 require_once __DIR__ . '/stock_service.php';
+require_once __DIR__ . '/slaughter_output_sale_stock.php';
 require_once __DIR__ . '/inventory_category_role.php';
 require_once __DIR__ . '/sales_units.php';
+require_once __DIR__ . '/slaughter_output_sale_common.php';
 
 /**
  * Slaughter-output Sales lot consumption.
@@ -10,7 +12,7 @@ require_once __DIR__ . '/sales_units.php';
  * Responsibilities:
  *   - explicit output-lot selection only; never infer a lot from product text;
  *   - one sale line consumes one Inventory item/unit from one production cycle;
- *   - physical decrement goes through stock_apply_movement();
+ *   - physical decrement/reversal goes through the shared canonical slaughter-sale stock boundary;
  *   - source-lot remaining quantity changes in the same transaction;
  *   - lot-specific COGS uses the frozen slaughter-output cost snapshot;
  *   - edits reverse old lot movements append-only, then append new movements;
@@ -26,209 +28,68 @@ if (!class_exists('RuminantSlaughterSaleException')) {
 function ruminant_slaughter_sale_require_transaction(
     PDO $pdo
 ): void {
-    if (!$pdo->inTransaction()) {
-        throw new RuminantSlaughterSaleException(
-            'Slaughter-output Sales changes require a caller-owned database transaction.'
-        );
-    }
+    slaughter_output_sale_common_require_transaction(
+        $pdo,
+        static function (
+            string $message
+        ): Throwable {
+            return
+                new RuminantSlaughterSaleException(
+                    $message
+                );
+        }
+    );
 }
 
 function ruminant_slaughter_sale_sales_unit(
     string $inventoryUnit
 ): string {
-    $unit =
-        strtolower(
-            trim(
-                $inventoryUnit
-            )
+    return
+        slaughter_output_sale_common_sales_unit(
+            $inventoryUnit,
+            static function (
+                string $message
+            ): Throwable {
+                return
+                    new RuminantSlaughterSaleException(
+                        $message
+                    );
+            }
         );
-
-    $map = [
-        'kg' => 'Kg',
-        'kilogram' => 'Kg',
-        'kilograms' => 'Kg',
-        'g' => 'Gram',
-        'gram' => 'Gram',
-        'grams' => 'Gram',
-        'pc' => 'Piece',
-        'pcs' => 'Piece',
-        'piece' => 'Piece',
-        'pieces' => 'Piece',
-        'head' => 'Head',
-        'litre' => 'Litre',
-        'liter' => 'Litre',
-        'litres' => 'Litre',
-        'liters' => 'Litre',
-        'ml' => 'Ml',
-        'unit' => 'Unit',
-    ];
-
-    if (isset($map[$unit])) {
-        return $map[$unit];
-    }
-
-    foreach (array_keys(sales_unit_presets()) as $preset) {
-        if (strtolower($preset) === $unit) {
-            return $preset;
-        }
-    }
-
-    $clean =
-        trim(
-            preg_replace(
-                '/\s+/',
-                ' ',
-                $inventoryUnit
-            )
-        );
-
-    if ($clean === '') {
-        throw new RuminantSlaughterSaleException(
-            'The selected slaughter output has no usable unit of measure.'
-        );
-    }
-
-    if (
-        (function_exists('mb_strlen') ? mb_strlen($clean) : strlen($clean))
-        > 30
-    ) {
-        throw new RuminantSlaughterSaleException(
-            'The slaughter output unit is too long for Sales.'
-        );
-    }
-
-    return $clean;
 }
 
 function ruminant_slaughter_sale_normalize_rows(
     array $rows
 ): array {
-    $normalized = [];
-
-    foreach ($rows as $row) {
-        if (!is_array($row)) {
-            throw new RuminantSlaughterSaleException(
-                'Slaughter sale lot selection is invalid.'
-            );
-        }
-
-        $outputId =
-            (int)(
-                $row['output_id']
-                ?? 0
-            );
-
-        $quantity =
-            round(
-                (float)(
-                    $row['quantity']
-                    ?? 0
-                ),
-                2
-            );
-
-        if (
-            $outputId <= 0
-            || !is_finite($quantity)
-            || $quantity <= 0
-        ) {
-            throw new RuminantSlaughterSaleException(
-                'Choose a valid slaughter output lot and quantity greater than zero.'
-            );
-        }
-
-        if (isset($normalized[$outputId])) {
-            throw new RuminantSlaughterSaleException(
-                'The same slaughter output lot cannot be selected twice in one sale.'
-            );
-        }
-
-        $normalized[$outputId] = [
-            'output_id' => $outputId,
-            'quantity' => $quantity,
-        ];
-    }
-
-    ksort(
-        $normalized,
-        SORT_NUMERIC
-    );
-
-    return $normalized;
+    return
+        slaughter_output_sale_common_normalize_rows(
+            $rows,
+            static function (
+                string $message
+            ): Throwable {
+                return
+                    new RuminantSlaughterSaleException(
+                        $message
+                    );
+            }
+        );
 }
 
 function ruminant_slaughter_sale_rows_from_post(
     array $input
 ): array {
-    $mode =
-        strtolower(
-            trim(
-                (string)(
-                    $input['sale_stock_source']
-                    ?? 'financial_only'
-                )
-            )
+    return
+        slaughter_output_sale_common_rows_from_post(
+            $input,
+            static function (
+                string $message
+            ): Throwable {
+                return
+                    new RuminantSlaughterSaleException(
+                        $message
+                    );
+            }
         );
-
-    if ($mode === '' || $mode === 'financial_only') {
-        return [];
-    }
-
-    if ($mode !== 'slaughter_output') {
-        throw new RuminantSlaughterSaleException(
-            'Choose a valid Sales stock source.'
-        );
-    }
-
-    $ids =
-        $input['slaughter_output_ids']
-        ?? [];
-
-    $quantities =
-        $input['slaughter_output_quantities']
-        ?? [];
-
-    if (!is_array($ids)) {
-        $ids = [$ids];
-    }
-
-    if (!is_array($quantities)) {
-        $quantities = [$quantities];
-    }
-
-    if (count($ids) !== count($quantities)) {
-        throw new RuminantSlaughterSaleException(
-            'Every slaughter output lot requires a sale quantity.'
-        );
-    }
-
-    $rows = [];
-
-    foreach ($ids as $index => $outputId) {
-        $rows[] = [
-            'output_id' =>
-                (int)$outputId,
-
-            'quantity' =>
-                (float)(
-                    $quantities[$index]
-                    ?? 0
-                ),
-        ];
-    }
-
-    $normalized =
-        ruminant_slaughter_sale_normalize_rows(
-            $rows
-        );
-
-    if (!$normalized) {
-        throw new RuminantSlaughterSaleException(
-            'Select at least one slaughter output lot.'
-        );
-    }
-
-    return $normalized;
 }
 
 function ruminant_slaughter_sale_current_active_rows(
@@ -701,41 +562,10 @@ function ruminant_slaughter_sale_selection(
 function ruminant_slaughter_sale_semantic_rows(
     array $rows
 ): array {
-    $semantic = [];
-
-    foreach ($rows as $row) {
-        $outputId =
-            (int)(
-                $row['output_id']
-                ?? 0
-            );
-
-        $quantity =
-            round(
-                (float)(
-                    $row['quantity']
-                    ?? 0
-                ),
-                2
-            );
-
-        if ($outputId > 0 && $quantity > 0) {
-            $semantic[$outputId] =
-                number_format(
-                    $quantity,
-                    2,
-                    '.',
-                    ''
-                );
-        }
-    }
-
-    ksort(
-        $semantic,
-        SORT_NUMERIC
-    );
-
-    return $semantic;
+    return
+        slaughter_output_sale_common_semantic_rows(
+            $rows
+        );
 }
 
 function ruminant_slaughter_sale_refresh_batch_status(
@@ -925,50 +755,14 @@ function ruminant_slaughter_sale_reverse_allocation(
     }
 
     $reversalId =
-        stock_apply_movement(
+        slaughter_output_sale_stock_reverse(
             $pdo,
             $farmId,
-            (int)$output['stock_item_id'],
-            'received',
-            $quantity,
-            (string)$tx['transaction_date'],
-            'Restore slaughter output after Sale lot correction',
-            $userId,
             'ruminant',
-            'general',
-            (int)$output['cycle_id'],
-            'ruminant_slaughter_sale_reversal',
             $allocationId,
-            (float)$tx['unit_cost'],
-            (string)$output['production_type'],
-            (float)$tx['total_cost']
+            $stockTransactionId,
+            $userId
         );
-
-    $pdo->prepare(
-        "UPDATE stock_transactions
-         SET is_reversed=1,
-             reversal_of_id=?,
-             reversed_at=NOW()
-         WHERE id=?
-           AND farm_id=?
-           AND is_reversed=0
-           AND reversal_of_id IS NULL"
-    )->execute([
-        $reversalId,
-        $stockTransactionId,
-        $farmId,
-    ]);
-
-    $pdo->prepare(
-        "UPDATE stock_transactions
-         SET reversal_of_id=?
-         WHERE id=?
-           AND farm_id=?"
-    )->execute([
-        $stockTransactionId,
-        $reversalId,
-        $farmId,
-    ]);
 
     $pdo->prepare(
         "UPDATE ruminant_slaughter_outputs
@@ -999,11 +793,6 @@ function ruminant_slaughter_sale_reverse_allocation(
         $farmId,
     ]);
 
-    stock_recalculate_current_unit_cost(
-        $pdo,
-        $farmId,
-        (int)$output['stock_item_id']
-    );
 
     ruminant_slaughter_sale_refresh_batch_status(
         $pdo,
@@ -1207,28 +996,21 @@ function ruminant_slaughter_sale_apply_output(
         (int)$pdo->lastInsertId();
 
     $transactionId =
-        stock_apply_movement(
+        slaughter_output_sale_stock_consume(
             $pdo,
             $farmId,
+            'ruminant',
+            (int)$locked['cycle_id'],
+            (string)$locked['production_type'],
             (int)$locked['stock_item_id'],
-            'used',
+            $allocationId,
+            $saleId,
+            (string)$locked['batch_code'],
             $quantity,
             $saleDate,
-            'Slaughter output consumed by Sale #'
-                . $saleId
-                . ' · '
-                . (string)$locked['batch_code'],
-            $userId,
-            'ruminant',
-            'general',
-            (int)$locked['cycle_id'],
-            'ruminant_slaughter_sale',
-            $allocationId,
-            null,
-            (string)$locked['production_type'],
-            null,
             $unitCost,
-            $totalCost
+            $totalCost,
+            $userId
         );
 
     $pdo->prepare(

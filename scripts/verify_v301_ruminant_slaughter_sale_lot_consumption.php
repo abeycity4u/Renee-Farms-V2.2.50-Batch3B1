@@ -21,6 +21,12 @@ $paths = [
 
     'role' =>
         $root . '/lib/inventory_category_role.php',
+
+    'shared_sale_stock' =>
+        $root . '/lib/slaughter_output_sale_stock.php',
+
+    'shared_sale_common' =>
+        $root . '/lib/slaughter_output_sale_common.php',
 ];
 
 $sources = [];
@@ -116,14 +122,18 @@ $check(
     'Sale lot selection is explicit and never inferred from product text',
     str_contains(
         $sources['service'],
+        'slaughter_output_sale_common_rows_from_post('
+    )
+    && str_contains(
+        $sources['shared_sale_common'],
         "sale_stock_source"
     )
     && str_contains(
-        $sources['service'],
+        $sources['shared_sale_common'],
         "slaughter_output_ids"
     )
     && str_contains(
-        $sources['service'],
+        $sources['shared_sale_common'],
         "slaughter_output_quantities"
     )
 );
@@ -157,11 +167,19 @@ $check(
 );
 
 $check(
-    'Physical sale decrement delegates to canonical stock writer',
-    preg_match(
-        "/stock_apply_movement\(.*?'used'.*?'ruminant_slaughter_sale'/s",
-        $sources['service']
-    ) === 1
+    'Physical sale decrement delegates through shared canonical stock boundary',
+    str_contains(
+        $sources['service'],
+        'slaughter_output_sale_stock_consume('
+    )
+    && str_contains(
+        $sources['shared_sale_stock'],
+        'stock_apply_movement('
+    )
+    && str_contains(
+        $sources['shared_sale_stock'],
+        "'used'"
+    )
 );
 
 $check(
@@ -209,14 +227,18 @@ $check(
 );
 
 $check(
-    'Explicit outgoing COGS override is restricted to slaughter sale provenance',
+    'Explicit outgoing COGS override is restricted to shared slaughter-sale provenance',
     str_contains(
         $sources['stock'],
-        "\$sourceType !== 'ruminant_slaughter_sale'"
+        'inventory_category_role_slaughter_used_sources()'
     )
     && str_contains(
         $sources['stock'],
         'Explicit outgoing cost is reserved for source-owned slaughter sale lot consumption.'
+    )
+    && str_contains(
+        $sources['shared_sale_stock'],
+        'slaughter_output_sale_stock_source('
     )
 );
 
@@ -249,18 +271,22 @@ $check(
 );
 
 $check(
-    'Sale correction creates append-only stock restoration and reversal linkage',
+    'Sale correction delegates append-only stock restoration to canonical reversal writer',
     str_contains(
         $sources['service'],
-        "'ruminant_slaughter_sale_reversal'"
+        'slaughter_output_sale_stock_reverse('
     )
     && str_contains(
-        $sources['service'],
-        'SET is_reversed=1'
+        $sources['shared_sale_stock'],
+        'stock_reverse_transaction('
     )
     && str_contains(
-        $sources['service'],
-        'reversal_of_id=?'
+        $sources['stock'],
+        'SET is_reversed = 1'
+    )
+    && str_contains(
+        $sources['stock'],
+        'reversal_of_id'
     )
 );
 

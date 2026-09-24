@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/stock_service.php';
 require_once __DIR__ . '/inventory_category_role.php';
+require_once __DIR__ . '/slaughter_output_inventory.php';
 require_once __DIR__ . '/ruminant_slaughter_costing.php';
 
 /**
@@ -401,37 +402,6 @@ function ruminant_slaughter_processing_add_output(
                 PDO::FETCH_ASSOC
             ) ?: [];
 
-        $alreadyPercent =
-            round(
-                (float)(
-                    $allocation['allocated_percent']
-                    ?? 0
-                ),
-                4
-            );
-
-        $alreadyCost =
-            round(
-                (float)(
-                    $allocation['allocated_cost']
-                    ?? 0
-                ),
-                2
-            );
-
-        $newPercent =
-            round(
-                $alreadyPercent
-                + $costSharePercent,
-                4
-            );
-
-        if ($newPercent > 100.0001) {
-            throw new RuntimeException(
-                'Output cost shares cannot exceed 100% of the slaughter batch cost basis.'
-            );
-        }
-
         $batchCost =
             round(
                 (float)(
@@ -441,77 +411,38 @@ function ruminant_slaughter_processing_add_output(
                 2
             );
 
-        $allocatedCost =
-            round(
-                $batchCost
-                * $costSharePercent
-                / 100,
-                2
+        $allocationQuote =
+            slaughter_output_inventory_allocation(
+                $batchCost,
+                (float)(
+                    $allocation['allocated_percent']
+                    ?? 0
+                ),
+                (float)(
+                    $allocation['allocated_cost']
+                    ?? 0
+                ),
+                $quantity,
+                $costSharePercent
             );
 
-        if ($newPercent >= 99.9999) {
-            $allocatedCost =
-                round(
-                    max(
-                        0,
-                        $batchCost
-                        - $alreadyCost
-                    ),
-                    2
-                );
-        }
+        $allocatedCost =
+            (float)$allocationQuote[
+                'allocated_cost'
+            ];
 
         $unitCostSnapshot =
-            round(
-                $allocatedCost
-                / $quantity,
-                4
-            );
+            (float)$allocationQuote[
+                'unit_cost_snapshot'
+            ];
 
-        $itemStmt = $pdo->prepare(
-            "SELECT
-                 si.id,
-                 si.item_name,
-                 si.unit,
-                 si.farm_type,
-                 si.feed_category,
-                 si.is_active
-             FROM stock_items si
-             INNER JOIN inventory_categories ic
-                 ON ic.id=si.category_id
-                AND ic.farm_id=si.farm_id
-                AND ic.inventory_role=?
-             WHERE si.id=?
-               AND si.farm_id=?
-             LIMIT 1
-             FOR UPDATE"
-        );
-        $itemStmt->execute([
-            inventory_category_slaughter_output_role(),
-            $stockItemId,
-            $farmId,
-        ]);
-        $item = $itemStmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$item) {
-            throw new RuntimeException(
-                'The selected Inventory item could not be found.'
+        $item =
+            slaughter_output_inventory_lock_item(
+                $pdo,
+                $farmId,
+                $stockItemId,
+                'ruminant'
             );
-        }
-
-        if (
-            (int)$item['is_active'] !== 1
-            || !in_array(
-                (string)$item['farm_type'],
-                ['ruminant', 'both'],
-                true
-            )
-            || (string)$item['feed_category'] !== 'general'
-        ) {
-            throw new RuntimeException(
-                'Slaughter outputs require an active Ruminant/Shared non-feed Inventory item.'
-            );
-        }
 
         $duplicateStmt = $pdo->prepare(
             'SELECT id
@@ -566,27 +497,25 @@ function ruminant_slaughter_processing_add_output(
 
         $outputId = (int)$pdo->lastInsertId();
 
-        $transactionId = stock_apply_movement(
-            $pdo,
-            $farmId,
-            $stockItemId,
-            'received',
-            $quantity,
-            (string)$batch['slaughter_date'],
-            'Slaughter output '
-                . (string)$batch['batch_code']
-                . ' · '
-                . (string)$batch['tag_no'],
-            $userId,
-            'ruminant',
-            'general',
-            (int)$batch['cycle_id'],
-            'ruminant_slaughter_output',
-            $outputId,
-            $unitCostSnapshot,
-            (string)$batch['production_type'],
-            $allocatedCost
-        );
+        $transactionId =
+            slaughter_output_inventory_receive(
+                $pdo,
+                $farmId,
+                $stockItemId,
+                $quantity,
+                (string)$batch['slaughter_date'],
+                'Slaughter output '
+                    . (string)$batch['batch_code']
+                    . ' · '
+                    . (string)$batch['tag_no'],
+                $userId,
+                'ruminant',
+                (int)$batch['cycle_id'],
+                $outputId,
+                $unitCostSnapshot,
+                (string)$batch['production_type'],
+                $allocatedCost
+            );
 
         $pdo->prepare(
             'UPDATE ruminant_slaughter_outputs

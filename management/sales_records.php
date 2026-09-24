@@ -18,7 +18,7 @@ require_once(__DIR__ . '/../lib/sale_population_effects.php');
 require_once(__DIR__ . '/../lib/sales_units.php');
 require_once(__DIR__ . '/../lib/transaction_actor_display.php');
 require_once(__DIR__ . '/../lib/record_reference_persistence.php');
-require_once(__DIR__ . '/../lib/ruminant_slaughter_sale_consumption.php');
+require_once(__DIR__ . '/../lib/slaughter_output_sale_dispatch.php');
 $tenantFarmId = requireCurrentFarmId();
 
 $userType = getUserType();
@@ -92,20 +92,15 @@ $prepareSlaughterSaleInput =
         $pdo,
         $tenantFarmId
     ): array {
-        $rows =
-            ruminant_slaughter_sale_rows_from_post(
-                $input
-            );
-
         $selection =
-            ruminant_slaughter_sale_selection(
+            slaughter_output_sale_selection_from_post(
                 $pdo,
                 $tenantFarmId,
                 (string)(
                     $input['sale_date']
                     ?? ''
                 ),
-                $rows,
+                $input,
                 $saleId
             );
 
@@ -117,11 +112,11 @@ $prepareSlaughterSaleInput =
         }
 
         /*
-         * Physical slaughter-output provenance owns these fields.
-         * Never trust browser-supplied equivalents for an Inventory-linked sale.
+         * Physical Slaughter Output provenance owns these financial identity
+         * fields. Browser equivalents are never authoritative.
          */
         $input['farm_type'] =
-            'ruminant';
+            (string)$selection['farm_type'];
 
         $input['production_type'] =
             (string)$selection['production_type'];
@@ -163,8 +158,8 @@ $prepareSlaughterSaleInput =
         }
 
         /*
-         * The source animal already left live population at slaughter.
-         * Output sale must not create a second animal/population exit.
+         * Live population was already changed by the source slaughter event.
+         * Selling processed output must never remove live livestock again.
          */
         $input['population_effect_mode'] =
             'financial_only';
@@ -174,6 +169,11 @@ $prepareSlaughterSaleInput =
             $input['population_quantities']
         );
 
+        /*
+         * Tagged-animal allocation remains a Ruminant financial concern.
+         * The downstream Ruminant allocation service derives slaughter-output
+         * revenue attribution from provenance when applicable.
+         */
         $input['sale_animal_allocation_mode'] =
             'shared';
 
@@ -285,19 +285,14 @@ $salePopulationEffectMap = sale_population_effect_rows_for_sales(
 
 
 $slaughterSaleLots =
-    in_array(
-        'ruminant',
-        $saleFarmTypes,
-        true
-    )
-        ? ruminant_slaughter_sale_available_lots(
-            $pdo,
-            $tenantFarmId
-        )
-        : [];
+    slaughter_output_sale_available_lots(
+        $pdo,
+        $tenantFarmId,
+        $saleFarmTypes
+    );
 
 $slaughterSaleHistoryMap =
-    ruminant_slaughter_sale_history_for_sales(
+    slaughter_output_sale_history_for_sales(
         $pdo,
         $tenantFarmId,
         array_column(
@@ -305,7 +300,6 @@ $slaughterSaleHistoryMap =
             'id'
         )
     );
-
 // Get sales summary with the same attribution scope as the detail ledger.
 if ($farmType === '') {
     $summaries=[]; $summary=['total_sales'=>0,'transaction_count'=>0,'avg_price'=>0];
@@ -419,7 +413,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $prepareSlaughterSaleInput(
                     $_POST
                 );
-        } catch (RuminantSlaughterSaleException $e) {
+        } catch (SlaughterOutputSaleException $e) {
             $_SESSION['error'] =
                 $e->getMessage();
 
@@ -622,7 +616,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 }
             );
 
-        ruminant_slaughter_sale_sync(
+        slaughter_output_sale_sync(
             $pdo,
             $tenantFarmId,
             $saleId,
@@ -895,7 +889,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $_POST,
                     $saleIdForSlaughter
                 );
-        } catch (RuminantSlaughterSaleException $e) {
+        } catch (SlaughterOutputSaleException $e) {
             $_SESSION['error'] =
                 $e->getMessage();
 
@@ -1032,7 +1026,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $_POST['unit_price'], $_POST['customer_name'], $_POST['remarks'],
             $_POST['sale_id'], $tenantFarmId
         ]);
-        ruminant_slaughter_sale_sync(
+        slaughter_output_sale_sync(
             $pdo,
             $tenantFarmId,
             (int)$_POST['sale_id'],
@@ -1613,8 +1607,14 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                     Slaughter Output Inventory — explicit lot
                                 </option>
                             </select>
+                            <input
+                                type="hidden"
+                                name="slaughter_output_domain"
+                                id="addSlaughterOutputDomain"
+                                value=""
+                            >
                             <small class="text-muted">
-                                Use Slaughter Output Inventory only when this sale physically consumes a recorded slaughter output.
+                                Use Slaughter Output Inventory only when this sale physically consumes a recorded Poultry or Ruminant slaughter output.
                             </small>
                         </div>
 
@@ -1627,7 +1627,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                     Slaughter Output Lots
                                 </div>
                                 <div class="small text-muted mb-3">
-                                    Select the exact output lot and quantity sold. Product, source cycle, unit, total quantity and source-animal revenue attribution are derived from Inventory provenance. Selling price does not change frozen COGS.
+                                    Select the exact output lot and quantity sold. Product, source cycle, unit and total quantity are derived from Inventory provenance. Selling price does not change frozen COGS.
                                 </div>
 
                                 <div id="addSlaughterLotRows"></div>
@@ -1879,8 +1879,14 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                     Slaughter Output Inventory — explicit lot
                                 </option>
                             </select>
+                            <input
+                                type="hidden"
+                                name="slaughter_output_domain"
+                                id="editSlaughterOutputDomain"
+                                value=""
+                            >
                             <small class="text-muted">
-                                Corrections keep prior slaughter-output Inventory history auditable.
+                                Corrections keep prior Poultry or Ruminant slaughter-output Inventory history auditable.
                             </small>
                         </div>
 
@@ -1893,7 +1899,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                     Slaughter Output Lots
                                 </div>
                                 <div class="small text-muted mb-3">
-                                    Changing lot or quantity restores the previous active lot usage append-only before applying the corrected selection. Animal revenue attribution follows the selected source lot automatically.
+                                    Changing lot, quantity or livestock domain restores the previous active lot usage append-only before applying the corrected selection.
                                 </div>
 
                                 <div id="editSlaughterLotRows"></div>

@@ -111,6 +111,7 @@ if (!isPlatformOwner()) {
 // Hide unauthorized top-level/module links before first paint.
 $navLinks = [
     '/inventory.php' => 'inventory',
+    '/poultry/slaughter_processing.php' => 'poultry_slaughter',
     '/ruminant/animal_registry.php' => 'ruminant_animals',
     '/ruminant/ruminant_expenses.php' => 'ruminant_expenses',
     '/management/sales_records.php' => 'sales',

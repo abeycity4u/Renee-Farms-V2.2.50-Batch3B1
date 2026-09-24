@@ -82,6 +82,7 @@ if (!function_exists('production_population_source_types')) {
             'ruminant_exit',
             'transfer',
             'poultry_acquisition',
+            'poultry_slaughter',
             'adjustment',
         ];
     }

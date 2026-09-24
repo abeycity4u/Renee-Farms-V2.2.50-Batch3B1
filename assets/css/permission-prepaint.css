@@ -46,6 +46,7 @@ html[data-permission-prepaint~="hide-ruminant-menu"] #ruminantMenu,
 html[data-permission-prepaint~="hide-ruminant-menu"] #ruminantMenu + .dropdown-menu{display:none!important;}
 
 html[data-permission-prepaint~="hide-nav-inventory"] #appNavbar a[href$="/inventory.php"]{display:none!important;}
+html[data-permission-prepaint~="hide-nav-poultry-slaughter"] #appNavbar a[href$="/poultry/slaughter_processing.php"]{display:none!important;}
 html[data-permission-prepaint~="hide-nav-ruminant-animals"] #appNavbar a[href$="/ruminant/animal_registry.php"]{display:none!important;}
 html[data-permission-prepaint~="hide-nav-ruminant-expenses"] #appNavbar a[href$="/ruminant/ruminant_expenses.php"]{display:none!important;}
 html[data-permission-prepaint~="hide-nav-sales"] #appNavbar a[href$="/management/sales_records.php"]{display:none!important;}

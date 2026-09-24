@@ -16,6 +16,9 @@ $paths = [
     'role' =>
         $root . '/lib/inventory_category_role.php',
 
+    'shared_output' =>
+        $root . '/lib/slaughter_output_inventory.php',
+
     'inventory' =>
         $root . '/inventory.php',
 
@@ -114,27 +117,51 @@ $check(
 );
 
 $check(
-    'Slaughter Output category is constrained to Ruminant and Other Stock',
-    str_contains(
-        $sources['role'],
-        "categoryFarmType !== 'ruminant'"
-    )
-    && str_contains(
-        $sources['role'],
-        "financialType !== 'other_stock'"
-    )
+    'Slaughter Output category accepts only Poultry/Ruminant Other Stock',
+    inventory_category_role_contract_errors(
+        inventory_category_slaughter_output_role(),
+        'ruminant',
+        'other_stock'
+    ) === []
+    && inventory_category_role_contract_errors(
+        inventory_category_slaughter_output_role(),
+        'poultry',
+        'other_stock'
+    ) === []
+    && inventory_category_role_contract_errors(
+        inventory_category_slaughter_output_role(),
+        'both',
+        'other_stock'
+    ) !== []
+    && inventory_category_role_contract_errors(
+        inventory_category_slaughter_output_role(),
+        'poultry',
+        'feed'
+    ) !== []
 );
 
 $check(
-    'Slaughter Output item is constrained to Ruminant general stock',
-    str_contains(
-        $sources['role'],
-        "itemFarmType !== 'ruminant'"
-    )
-    && str_contains(
-        $sources['role'],
-        "feedCategory !== 'general'"
-    )
+    'Slaughter Output item accepts Poultry/Ruminant/Shared general stock',
+    inventory_category_role_item_contract_errors(
+        inventory_category_slaughter_output_role(),
+        'ruminant',
+        'general'
+    ) === []
+    && inventory_category_role_item_contract_errors(
+        inventory_category_slaughter_output_role(),
+        'poultry',
+        'general'
+    ) === []
+    && inventory_category_role_item_contract_errors(
+        inventory_category_slaughter_output_role(),
+        'both',
+        'general'
+    ) === []
+    && inventory_category_role_item_contract_errors(
+        inventory_category_slaughter_output_role(),
+        'poultry',
+        'feed'
+    ) !== []
 );
 
 $check(
@@ -182,14 +209,14 @@ $check(
 );
 
 $check(
-    'Slaughter service resolves output role through shared policy',
+    'Slaughter service resolves output through shared Inventory policy',
     str_contains(
         $sources['service'],
-        'inventory_category_slaughter_output_role()'
+        'slaughter_output_inventory_lock_item('
     )
     && str_contains(
-        $sources['service'],
-        'ic.inventory_role=?'
+        $sources['shared_output'],
+        'inventory_category_slaughter_output_role()'
     )
 );
 
@@ -206,14 +233,22 @@ $check(
 );
 
 $check(
-    'Slaughter writer still delegates physical stock to canonical stock service',
+    'Slaughter writer delegates physical stock through shared canonical boundary',
     str_contains(
         $sources['service'],
+        'slaughter_output_inventory_receive('
+    )
+    && str_contains(
+        $sources['shared_output'],
         'stock_apply_movement('
     )
     && !preg_match(
-        '/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+stock_transactions/i',
+        '/(?:INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\s+stock_transactions/i',
         $sources['service']
+    )
+    && !preg_match(
+        '/(?:INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\s+stock_transactions/i',
+        $sources['shared_output']
     )
 );
 
@@ -310,6 +345,34 @@ $check(
         inventory_category_slaughter_output_role(),
         'used',
         'ruminant_slaughter_sale',
+        null
+    ) !== []
+);
+
+$check(
+    'Shared role policy permits sourced Poultry slaughter movements',
+    inventory_category_role_stock_movement_errors(
+        inventory_category_slaughter_output_role(),
+        'received',
+        'poultry_slaughter_output',
+        1
+    ) === []
+    && inventory_category_role_stock_movement_errors(
+        inventory_category_slaughter_output_role(),
+        'received',
+        'poultry_slaughter_sale_reversal',
+        1
+    ) === []
+    && inventory_category_role_stock_movement_errors(
+        inventory_category_slaughter_output_role(),
+        'used',
+        'poultry_slaughter_sale',
+        1
+    ) === []
+    && inventory_category_role_stock_movement_errors(
+        inventory_category_slaughter_output_role(),
+        'received',
+        'poultry_slaughter_output',
         null
     ) !== []
 );

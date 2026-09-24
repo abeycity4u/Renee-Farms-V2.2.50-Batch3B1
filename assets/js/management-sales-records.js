@@ -209,6 +209,10 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
                 ? '#editSaleStockSource'
                 : '#addSaleStockSource',
 
+            domain: edit
+                ? '#editSlaughterOutputDomain'
+                : '#addSlaughterOutputDomain',
+
             panel: edit
                 ? '#editSlaughterLotPanel'
                 : '#addSlaughterLotPanel',
@@ -267,6 +271,40 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
         };
     }
 
+    function slaughterSaleDomain(value) {
+        const domain =
+            String(
+                value
+                || ''
+            )
+                .trim()
+                .toLowerCase();
+
+        return ['poultry', 'ruminant'].includes(domain)
+            ? domain
+            : '';
+    }
+
+    function slaughterSaleKey(
+        domain,
+        outputId
+    ) {
+        const normalizedDomain =
+            slaughterSaleDomain(
+                domain
+            );
+
+        const id =
+            Number(
+                outputId
+                || 0
+            );
+
+        return normalizedDomain && id > 0
+            ? normalizedDomain + ':' + String(id)
+            : '';
+    }
+
     function activeSlaughterSaleHistory(saleId) {
         return (
             slaughterSaleHistoryMap[String(saleId)]
@@ -280,6 +318,16 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
     function slaughterSaleCatalog(
         prefix
     ) {
+        const ids =
+            slaughterSaleSelectors(
+                prefix
+            );
+
+        const selectedDomain =
+            slaughterSaleDomain(
+                $(ids.domain).val()
+            );
+
         const saleId =
             prefix === 'edit'
                 ? Number(
@@ -293,20 +341,44 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
 
         slaughterSaleLots.forEach(
             lot => {
+                const domain =
+                    slaughterSaleDomain(
+                        lot.slaughter_domain
+                    );
+
                 const id =
                     Number(
                         lot.output_id
                         || 0
                     );
 
-                if (!id) return;
+                const key =
+                    slaughterSaleKey(
+                        domain,
+                        id
+                    );
+
+                if (
+                    !key
+                    ||
+                    (
+                        selectedDomain
+                        &&
+                        domain !== selectedDomain
+                    )
+                ) {
+                    return;
+                }
 
                 catalog.set(
-                    id,
+                    key,
                     Object.assign(
                         {},
                         lot,
                         {
+                            slaughter_domain:
+                                domain,
+
                             available_for_sale:
                                 Number(
                                     lot.remaining_quantity
@@ -320,31 +392,56 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
 
         if (
             prefix === 'edit'
-            && saleId > 0
+            &&
+            saleId > 0
         ) {
             activeSlaughterSaleHistory(
                 saleId
             ).forEach(
                 row => {
+                    const domain =
+                        slaughterSaleDomain(
+                            row.slaughter_domain
+                        );
+
                     const id =
                         Number(
                             row.output_id
                             || 0
                         );
 
-                    if (!id) return;
+                    const key =
+                        slaughterSaleKey(
+                            domain,
+                            id
+                        );
+
+                    if (
+                        !key
+                        ||
+                        (
+                            selectedDomain
+                            &&
+                            domain !== selectedDomain
+                        )
+                    ) {
+                        return;
+                    }
 
                     const existing =
-                        catalog.get(id)
+                        catalog.get(key)
                         || {};
 
                     catalog.set(
-                        id,
+                        key,
                         Object.assign(
                             {},
                             existing,
                             row,
                             {
+                                slaughter_domain:
+                                    domain,
+
                                 output_id:
                                     id,
 
@@ -363,7 +460,8 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
                                         row.remaining_quantity
                                         || 0
                                     )
-                                    + Number(
+                                    +
+                                    Number(
                                         row.quantity
                                         || 0
                                     )
@@ -381,20 +479,83 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
 
     function slaughterSaleLot(
         prefix,
-        outputId
+        outputId,
+        domain = ''
     ) {
+        const ids =
+            slaughterSaleSelectors(
+                prefix
+            );
+
+        const normalizedDomain =
+            slaughterSaleDomain(
+                domain
+                ||
+                $(ids.domain).val()
+            );
+
+        const key =
+            slaughterSaleKey(
+                normalizedDomain,
+                outputId
+            );
+
+        if (!key) return null;
+
         return (
             slaughterSaleCatalog(prefix)
                 .find(
                     lot =>
-                        Number(lot.output_id)
-                        === Number(outputId)
+                        slaughterSaleKey(
+                            lot.slaughter_domain,
+                            lot.output_id
+                        )
+                        === key
                 )
             || null
         );
     }
 
+    function slaughterSaleLotFromSelect(
+        prefix,
+        select
+    ) {
+        const option =
+            select.find(
+                'option:selected'
+            );
+
+        const domain =
+            slaughterSaleDomain(
+                option.attr(
+                    'data-slaughter-domain'
+                )
+            );
+
+        const outputId =
+            Number(
+                select.val()
+                || 0
+            );
+
+        return slaughterSaleLot(
+            prefix,
+            outputId,
+            domain
+        );
+    }
+
     function slaughterSaleLabel(lot) {
+        const domain =
+            slaughterSaleDomain(
+                lot.slaughter_domain
+            );
+
+        const sourceLabel =
+            domain === 'poultry'
+                ? 'Poultry'
+                : 'Ruminant';
+
         const unit =
             String(
                 lot.unit
@@ -409,8 +570,43 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
                 ?? 0
             );
 
+        let provenance = '';
+
+        if (
+            domain === 'ruminant'
+            &&
+            lot.tag_no
+        ) {
+            provenance =
+                ' | Animal '
+                +
+                String(
+                    lot.tag_no
+                );
+        }
+
+        if (
+            domain === 'poultry'
+            &&
+            Number(
+                lot.bird_count
+                || 0
+            ) > 0
+        ) {
+            provenance =
+                ' | Batch birds '
+                +
+                String(
+                    Number(
+                        lot.bird_count
+                    )
+                );
+        }
+
         return (
-            String(
+            sourceLabel
+            + ' | '
+            + String(
                 lot.item_name
                 || 'Slaughter output'
             )
@@ -419,11 +615,7 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
                 lot.batch_code
                 || '—'
             )
-            + ' | Animal '
-            + String(
-                lot.tag_no
-                || '—'
-            )
+            + provenance
             + ' | '
             + String(
                 lot.slaughter_date
@@ -435,7 +627,6 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
             + unit
         );
     }
-
     function setSlaughterUnit(
         prefix,
         unit
@@ -531,13 +722,10 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
         row
     ) {
         const lot =
-            slaughterSaleLot(
+            slaughterSaleLotFromSelect(
                 prefix,
-                Number(
-                    row.find(
-                        '.slaughter-sale-lot-select'
-                    ).val()
-                    || 0
+                row.find(
+                    '.slaughter-sale-lot-select'
                 )
             );
 
@@ -562,7 +750,6 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
             ).toFixed(2)
         );
     }
-
     function appendSlaughterSaleRow(
         prefix,
         selected = {}
@@ -642,7 +829,17 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
 
         catalog.forEach(
             lot => {
-                select.append(
+                const domain =
+                    slaughterSaleDomain(
+                        lot.slaughter_domain
+                    );
+
+                const selectedDomain =
+                    slaughterSaleDomain(
+                        selected.slaughter_domain
+                    );
+
+                const option =
                     new Option(
                         slaughterSaleLabel(
                             lot
@@ -657,7 +854,21 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
                             selected.output_id
                             || 0
                         )
-                    )
+                        &&
+                        (
+                            !selectedDomain
+                            ||
+                            domain === selectedDomain
+                        )
+                    );
+
+                $(option).attr(
+                    'data-slaughter-domain',
+                    domain
+                );
+
+                select.append(
+                    option
                 );
             }
         );
@@ -743,6 +954,12 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
         let first =
             null;
 
+        let firstDomain =
+            '';
+
+        let mixedDomainReset =
+            false;
+
         $(ids.rows)
             .find(
                 '.slaughter-sale-lot-row'
@@ -752,35 +969,66 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
                     const row =
                         $(this);
 
-                    const outputId =
-                        Number(
-                            row.find(
-                                '.slaughter-sale-lot-select'
-                            ).val()
-                            || 0
+                    const select =
+                        row.find(
+                            '.slaughter-sale-lot-select'
+                        );
+
+                    const quantityInput =
+                        row.find(
+                            '.slaughter-sale-lot-quantity'
+                        );
+
+                    const lot =
+                        slaughterSaleLotFromSelect(
+                            prefix,
+                            select
                         );
 
                     const quantity =
                         Number(
-                            row.find(
-                                '.slaughter-sale-lot-quantity'
-                            ).val()
+                            quantityInput.val()
                             || 0
                         );
 
                     if (
-                        outputId > 0
-                        && quantity > 0
+                        lot
+                        &&
+                        quantity > 0
                     ) {
+                        const domain =
+                            slaughterSaleDomain(
+                                lot.slaughter_domain
+                            );
+
+                        if (!firstDomain) {
+                            firstDomain =
+                                domain;
+                        }
+
+                        if (
+                            domain
+                            !== firstDomain
+                        ) {
+                            select.val('');
+                            quantityInput.val('');
+                            mixedDomainReset =
+                                true;
+
+                            refreshSlaughterRowLimit(
+                                prefix,
+                                row
+                            );
+
+                            return;
+                        }
+
                         total +=
                             quantity;
 
                         if (!first) {
                             first =
-                                slaughterSaleLot(
-                                    prefix,
-                                    outputId
-                                );
+                                lot;
                         }
                     }
 
@@ -791,10 +1039,15 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
                 }
             );
 
+        $(ids.domain)
+            .val(
+                firstDomain
+            );
+
         if (first) {
             $(ids.farm)
                 .val(
-                    'ruminant'
+                    firstDomain
                 );
 
             const production =
@@ -834,10 +1087,43 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
             );
 
             $(ids.summary)
-                .removeClass('text-warning')
-                .addClass('text-success')
+                .removeClass(
+                    'text-warning'
+                )
+                .addClass(
+                    'text-success'
+                )
                 .text(
-                    'Inventory-linked sale. Quantity is derived from the selected lot rows; frozen COGS is independent of selling price.'
+                    (
+                        firstDomain === 'poultry'
+                            ? 'Poultry'
+                            : 'Ruminant'
+                    )
+                    + ' Inventory-linked sale. Quantity is derived from the selected lot rows; frozen COGS is independent of selling price.'
+                );
+        } else {
+            $(ids.summary)
+                .removeClass(
+                    'text-success'
+                )
+                .addClass(
+                    'text-warning'
+                )
+                .text(
+                    'Select an eligible Poultry or Ruminant slaughter-output lot.'
+                );
+        }
+
+        if (mixedDomainReset) {
+            $(ids.summary)
+                .removeClass(
+                    'text-success'
+                )
+                .addClass(
+                    'text-warning'
+                )
+                .text(
+                    'One sale line cannot mix Poultry and Ruminant slaughter-output lots. The conflicting row was cleared.'
                 );
         }
 
@@ -856,7 +1142,6 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
             true
         );
     }
-
     function setSlaughterSaleMode(
         prefix,
         enabled,
@@ -876,6 +1161,9 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
         if (!enabled) {
             $(ids.rows)
                 .empty();
+
+            $(ids.domain)
+                .val('');
 
             $(ids.summary)
                 .text('')
@@ -904,6 +1192,23 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
             return;
         }
 
+        const initialDomain =
+            Array.isArray(
+                selectedRows
+            )
+            &&
+            selectedRows.length
+                ? slaughterSaleDomain(
+                    selectedRows[0]
+                        .slaughter_domain
+                )
+                : '';
+
+        $(ids.domain)
+            .val(
+                initialDomain
+            );
+
         $(ids.rows)
             .empty();
 
@@ -911,7 +1216,8 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
             Array.isArray(
                 selectedRows
             )
-            && selectedRows.length
+            &&
+            selectedRows.length
         ) {
             selectedRows.forEach(
                 row =>
@@ -955,7 +1261,6 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
             prefix
         );
     }
-
     function loadEditSlaughterSale(
         saleId
     ) {
@@ -964,6 +1269,11 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
                 saleId
             ).map(
                 row => ({
+                    slaughter_domain:
+                        slaughterSaleDomain(
+                            row.slaughter_domain
+                        ),
+
                     output_id:
                         Number(
                             row.output_id
@@ -984,6 +1294,12 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
                     'slaughter_output'
                 );
 
+            $('#editSlaughterOutputDomain')
+                .val(
+                    rows[0].slaughter_domain
+                    || ''
+                );
+
             setSlaughterSaleMode(
                 'edit',
                 true,
@@ -998,12 +1314,14 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
                 'financial_only'
             );
 
+        $('#editSlaughterOutputDomain')
+            .val('');
+
         setSlaughterSaleMode(
             'edit',
             false
         );
     }
-
 
     function salePopulationSelectors(prefix) {
         const isEdit = prefix === 'edit';

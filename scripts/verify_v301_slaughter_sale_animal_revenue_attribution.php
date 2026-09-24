@@ -239,14 +239,25 @@ $check(
 );
 
 $check(
-    'Slaughter UI explains automatic source-animal attribution',
-    str_contains(
+    'Shared slaughter-output UI stays livestock-neutral while Ruminant attribution remains service-owned',
+    !str_contains(
         $sales,
         'source-animal revenue attribution'
     )
-    && str_contains(
+    &&
+    !str_contains(
         $sales,
         'Animal revenue attribution follows the selected source lot automatically.'
+    )
+    &&
+    str_contains(
+        $sales,
+        'recorded Poultry or Ruminant slaughter output'
+    )
+    &&
+    str_contains(
+        $sales,
+        'Changing lot, quantity or livestock domain restores the previous active lot usage append-only'
     )
 );
 

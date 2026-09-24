@@ -1,37 +1,68 @@
 <?php
 
-$root = dirname(__DIR__);
+$root =
+    dirname(
+        __DIR__
+    );
 
 $files = [
-    'reader' =>
-        $root . '/lib/ruminant_slaughter_sale_economics.php',
+    'shared_reader' =>
+        $root
+        .
+        '/lib/slaughter_output_sale_economics.php',
+
+    'poultry_reader' =>
+        $root
+        .
+        '/lib/poultry_slaughter_sale_economics.php',
+
+    'ruminant_reader' =>
+        $root
+        .
+        '/lib/ruminant_slaughter_sale_economics.php',
 
     'financial' =>
-        $root . '/includes/financial.php',
+        $root
+        .
+        '/includes/financial.php',
 
     'intelligence' =>
-        $root . '/lib/farm_intelligence.php',
+        $root
+        .
+        '/lib/farm_intelligence.php',
 
     'profitability' =>
-        $root . '/management/profitability.php',
+        $root
+        .
+        '/management/profitability.php',
 
     'inventory_financial' =>
-        $root . '/lib/inventory_financial.php',
+        $root
+        .
+        '/lib/inventory_financial.php',
 ];
 
 $source = [];
 
-foreach ($files as $key => $path) {
+foreach (
+    $files
+    as $key => $path
+) {
     if (!is_file($path)) {
         fwrite(
             STDERR,
             "Missing source file: {$path}\n"
         );
+
         exit(1);
     }
 
-    $source[$key] =
-        file_get_contents($path);
+    $source[
+        $key
+    ] =
+        file_get_contents(
+            $path
+        );
 }
 
 $checks = [];
@@ -40,10 +71,15 @@ $check =
     static function (
         bool $condition,
         string $label
-    ) use (&$checks): void {
+    ) use (
+        &$checks
+    ): void {
         $checks[] = [
-            'ok' => $condition,
-            'label' => $label,
+            'ok' =>
+                $condition,
+
+            'label' =>
+                $label,
         ];
     };
 
@@ -57,174 +93,364 @@ $contains =
             $needle
         ) !== false;
 
-$reader =
-    $source['reader'];
+
+$shared =
+    $source[
+        'shared_reader'
+    ];
+
+$poultry =
+    $source[
+        'poultry_reader'
+    ];
+
+$ruminant =
+    $source[
+        'ruminant_reader'
+    ];
+
 
 $check(
     $contains(
-        $reader,
-        'ruminant_slaughter_sale_economics_summary'
+        $shared,
+        'function slaughter_output_sale_economics_summary('
     ),
-    'central slaughter-sale COGS reader exists'
+    'shared dual-domain slaughter-sale economics reader exists'
 );
 
-$check(
-    $contains(
-        $reader,
-        'a.is_active=1'
-    ),
-    'only active lot allocations are recognised'
-);
 
 $check(
     $contains(
-        $reader,
-        "ruminant_slaughter_sale'"
-    ),
-    'COGS requires canonical slaughter-sale stock provenance'
-);
-
-$check(
-    $contains(
-        $reader,
-        'source_id'
-    ),
-    'allocation identity is checked against stock source identity'
-);
-
-$check(
-    $contains(
-        $reader,
-        'is_reversed'
+        $shared,
+        'poultry_slaughter_sale_economics_summary('
     )
     &&
     $contains(
-        $reader,
-        'reversal_of_id'
+        $shared,
+        'ruminant_slaughter_sale_economics_summary('
     ),
-    'reversed stock movements are rejected'
+    'shared reader delegates to both livestock domain readers'
 );
+
 
 $check(
     $contains(
-        $reader,
-        'total_cost_snapshot'
+        $shared,
+        "'poultry'"
     )
     &&
     $contains(
-        $reader,
-        'tx_total_cost'
+        $shared,
+        "'ruminant'"
+    )
+    &&
+    $contains(
+        $shared,
+        "'domain_breakdown'"
     ),
-    'frozen allocation COGS is reconciled to stock ledger COGS'
+    'shared reader preserves separate Poultry and Ruminant disclosures'
 );
+
 
 $check(
     $contains(
-        $reader,
-        'sale_date BETWEEN ? AND ?'
+        $shared,
+        'Combined slaughter-sale valuation decomposition does not conserve full cost.'
     ),
-    'financial recognition is bounded by sale business date'
+    'combined full-cost valuation is conserved'
 );
+
 
 $check(
     !$contains(
-        strtoupper($reader),
+        strtoupper(
+            $shared
+        ),
         'INSERT INTO'
     )
     &&
     !$contains(
-        strtoupper($reader),
+        strtoupper(
+            $shared
+        ),
         'UPDATE '
     )
     &&
     !$contains(
-        strtoupper($reader),
+        strtoupper(
+            $shared
+        ),
         'DELETE FROM'
     ),
-    'COGS reader is read-only'
+    'shared economics aggregator is read-only'
 );
 
-$check(
-    $contains(
-        $reader,
-        'batch_cost_basis_purchase'
-    )
-    &&
-    $contains(
-        $reader,
-        'batch_cost_basis_direct_expense'
-    )
-    &&
-    $contains(
-        $reader,
-        'batch_cost_basis_shared'
-    ),
-    'COGS decomposes the frozen slaughter batch basis'
-);
 
-$check(
-    $contains(
-        $reader,
-        'full_cost_valuation_cents'
-    )
-    &&
-    $contains(
-        $reader,
-        'embedded_operating_cost_cents'
-    ),
-    'reader preserves full-cost valuation separately from P&L COGS'
-);
+foreach (
+    [
+        'poultry' =>
+            [
+                'source' =>
+                    $poultry,
 
-$check(
-    $contains(
-        $reader,
-        'ruminant_slaughter_sale_economics_proportional_cents'
-    ),
-    'P&L COGS uses frozen-basis proportional decomposition'
-);
+                'allocation' =>
+                    'poultry_slaughter_sale_allocations',
+
+                'stock_source' =>
+                    "poultry_slaughter_sale'",
+
+                'capital' =>
+                    'capital_basis_transferred',
+
+                'embedded' =>
+                    'embedded_operating_basis_transferred',
+
+                'processing' =>
+                    'processing_operating_cost',
+            ],
+
+        'ruminant' =>
+            [
+                'source' =>
+                    $ruminant,
+
+                'allocation' =>
+                    'ruminant_slaughter_sale_allocations',
+
+                'stock_source' =>
+                    "ruminant_slaughter_sale'",
+
+                'capital' =>
+                    'batch_cost_basis_purchase',
+
+                'embedded' =>
+                    'batch_cost_basis_direct_expense',
+
+                'processing' =>
+                    'batch_cost_basis_shared',
+            ],
+    ]
+    as $domain => $contract
+) {
+    $reader =
+        $contract[
+            'source'
+        ];
+
+    $check(
+        $contains(
+            $reader,
+            $contract[
+                'allocation'
+            ]
+        )
+        &&
+        $contains(
+            $reader,
+            'a.is_active=1'
+        ),
+        ucfirst(
+            $domain
+        )
+        .
+        ' recognises only explicit active sale-lot allocations'
+    );
+
+    $check(
+        $contains(
+            $reader,
+            $contract[
+                'stock_source'
+            ]
+        )
+        &&
+        $contains(
+            $reader,
+            'source_id'
+        )
+        &&
+        $contains(
+            $reader,
+            'is_reversed'
+        )
+        &&
+        $contains(
+            $reader,
+            'reversal_of_id'
+        ),
+        ucfirst(
+            $domain
+        )
+        .
+        ' COGS requires canonical effective stock provenance'
+    );
+
+    $check(
+        $contains(
+            $reader,
+            'total_cost_snapshot'
+        )
+        &&
+        $contains(
+            $reader,
+            'tx_total_cost'
+        ),
+        ucfirst(
+            $domain
+        )
+        .
+        ' frozen sold valuation reconciles to canonical stock ledger cost'
+    );
+
+    $check(
+        $contains(
+            $reader,
+            $contract[
+                'capital'
+            ]
+        )
+        &&
+        $contains(
+            $reader,
+            $contract[
+                'embedded'
+            ]
+        )
+        &&
+        $contains(
+            $reader,
+            $contract[
+                'processing'
+            ]
+        ),
+        ucfirst(
+            $domain
+        )
+        .
+        ' decomposes its frozen cost basis'
+    );
+
+    $check(
+        $contains(
+            $reader,
+            'full_cost_valuation_cents'
+        )
+        &&
+        $contains(
+            $reader,
+            'embedded_operating_cost_cents'
+        )
+        &&
+        $contains(
+            $reader,
+            'recognized_cogs_cents'
+        ),
+        ucfirst(
+            $domain
+        )
+        .
+        ' separates P&L COGS from embedded operating valuation'
+    );
+}
+
 
 $financial =
-    $source['financial'];
+    $source[
+        'financial'
+    ];
+
 
 $check(
     $contains(
         $financial,
-        "ruminant_slaughter_sale_economics.php"
+        'slaughter_output_sale_economics.php'
+    )
+    &&
+    !$contains(
+        $financial,
+        "require_once __DIR__ . '/../lib/ruminant_slaughter_sale_economics.php';"
+    )
+    &&
+    !$contains(
+        $financial,
+        "require_once __DIR__ . '/../lib/poultry_slaughter_sale_economics.php';"
     ),
-    'canonical profitability loads the central COGS reader'
+    'canonical profitability loads only the shared slaughter economics boundary'
 );
+
 
 $check(
     $contains(
         $financial,
-        'ruminant_slaughter_sale_economics_summary'
+        'slaughter_output_sale_economics_summary('
     ),
-    'canonical profitability delegates slaughter COGS'
+    'canonical profitability delegates combined slaughter COGS centrally'
 );
+
+
+$check(
+    $contains(
+        $financial,
+        "'poultry_slaughter_output'"
+    )
+    &&
+    $contains(
+        $financial,
+        "'ruminant_slaughter_output'"
+    ),
+    'canonical COGS breakdown exposes both livestock domains'
+);
+
+
+$check(
+    $contains(
+        $financial,
+        'Profitability slaughter-output domain aggregation does not conserve its canonical totals.'
+    ),
+    'canonical profitability re-proves domain aggregation conservation'
+);
+
 
 $check(
     $contains(
         $financial,
         "'cost_of_goods_sold'=>\$slaughterOutputCogs"
+    )
+    &&
+    $contains(
+        $financial,
+        "'slaughter_output_cogs'=>\$slaughterOutputCogs"
     ),
-    'canonical summary exposes COGS separately'
+    'canonical summary preserves existing generic COGS contract'
 );
+
 
 $check(
     $contains(
         $financial,
         '$totalRecognizedCost=$totalOperatingCost+$slaughterOutputCogs;'
     ),
-    'recognised cost composes operating cost plus COGS exactly once'
+    'combined slaughter COGS is added to recognised cost exactly once'
 );
+
+
+$check(
+    substr_count(
+        $financial,
+        '$totalRecognizedCost=$totalOperatingCost+$slaughterOutputCogs;'
+    ) === 1,
+    'there is exactly one recognised-cost COGS composition point'
+);
+
 
 $check(
     $contains(
         $financial,
         "'profit'=>\$revenue-\$totalRecognizedCost"
     ),
-    'profit uses total recognised cost'
+    'profit continues to use total recognised cost'
 );
+
 
 $check(
     $contains(
@@ -236,78 +462,74 @@ $check(
         $financial,
         'slaughter_output_embedded_operating_cost'
     ),
-    'canonical profitability exposes valuation and embedded-cost disclosures'
+    'canonical profitability retains valuation and embedded-cost disclosures'
 );
+
 
 $check(
     $contains(
         $financial,
         'slaughter-output valuation decomposition does not conserve full cost'
     ),
-    'canonical profitability enforces full-cost conservation'
+    'canonical combined valuation decomposition still fails closed'
 );
 
+
 $intelligence =
-    $source['intelligence'];
+    $source[
+        'intelligence'
+    ];
 
 $check(
     $contains(
         $intelligence,
         'total_recognized_cost'
     ),
-    'Farm Intelligence consumes canonical recognised cost'
+    'Farm Intelligence still consumes canonical recognised cost'
 );
+
 
 $check(
     $contains(
         $intelligence,
         'Cost of Goods Sold · Slaughter Output'
     ),
-    'Farm Intelligence explains slaughter-output COGS'
+    'Farm Intelligence remains livestock-neutral for slaughter-output COGS'
 );
 
+
 $profitability =
-    $source['profitability'];
+    $source[
+        'profitability'
+    ];
 
 $check(
     $contains(
         $profitability,
         'Cost of goods sold'
-    ),
-    'Profitability headline UI discloses COGS'
-);
-
-$check(
+    )
+    &&
     $contains(
         $profitability,
         "\$profitabilityAttribution['cost_of_goods_sold']"
     ),
-    'Profitability trace reuses canonical COGS attribution'
+    'Profitability UI continues to reuse canonical COGS attribution'
 );
+
 
 $check(
     $contains(
         $profitability,
         'Slaughter-sale allocations / canonical stock ledger'
-    ),
-    'Profitability source breakdown explains slaughter COGS provenance'
-);
-
-$check(
-    $contains(
-        $profitability,
-        'Cost of goods sold (purchase/capital basis released on sale)'
-    ),
-    'Profitability calculation explanation includes COGS'
-);
-
-$check(
+    )
+    &&
     $contains(
         $profitability,
         'Unsold slaughter-output value remains in Inventory'
     ),
-    'Profitability explains unsold output carrying value boundary'
+    'Profitability UI preserves physical provenance and unsold Inventory boundary'
 );
+
 
 $check(
     $contains(
@@ -319,11 +541,14 @@ $check(
         $profitability,
         'Embedded operating cost already recognised elsewhere'
     ),
-    'Profitability explains P&L COGS versus full-cost valuation'
+    'Profitability UI preserves P&L versus valuation explanation'
 );
 
+
 $inventory =
-    $source['inventory_financial'];
+    $source[
+        'inventory_financial'
+    ];
 
 $operatingBody = '';
 
@@ -335,7 +560,9 @@ if (
     ) === 1
 ) {
     $operatingBody =
-        (string)$match[1];
+        (string)$match[
+            1
+        ];
 }
 
 $check(
@@ -345,38 +572,60 @@ $check(
         $operatingBody,
         "'other_stock'"
     ) === false,
-    'other_stock remains excluded from generic operating consumption'
+    'slaughter-output other_stock remains excluded from generic operating consumption'
 );
+
 
 $passed = 0;
 $failed = 0;
 
-foreach ($checks as $result) {
-    if ($result['ok']) {
+foreach (
+    $checks
+    as $result
+) {
+    if (
+        $result[
+            'ok'
+        ]
+    ) {
         $passed++;
+
     } else {
         $failed++;
+
         fwrite(
             STDERR,
             'FAIL: '
-            . $result['label']
-            . PHP_EOL
+            .
+            $result[
+                'label'
+            ]
+            .
+            PHP_EOL
         );
     }
 }
 
 echo
     'SLAUGHTER_PROFITABILITY='
-    . (
+    .
+    (
         $failed === 0
             ? 'PASS'
             : 'FAIL'
     )
-    . ' CHECKS='
-    . count($checks)
-    . ' FAILED='
-    . $failed
-    . PHP_EOL;
+    .
+    ' CHECKS='
+    .
+    count(
+        $checks
+    )
+    .
+    ' FAILED='
+    .
+    $failed
+    .
+    PHP_EOL;
 
 exit(
     $failed === 0

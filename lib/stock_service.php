@@ -149,7 +149,11 @@ function stock_apply_movement(
             $outgoingUnitCost !== null
             || $outgoingTotalCost !== null
         )
-        && $sourceType !== 'ruminant_slaughter_sale'
+        && !in_array(
+            $sourceType,
+            inventory_category_role_slaughter_used_sources(),
+            true
+        )
     ) {
         throw new RuntimeException(
             'Explicit outgoing cost is reserved for source-owned slaughter sale lot consumption.'
@@ -724,7 +728,9 @@ function stock_reverse_transaction(
             (string)(
                 $item['category_inventory_role']
                 ?? 'operational'
-            )
+            ),
+            $sourceType,
+            $sourceId
         );
 
     if ($roleReversalErrors) {
@@ -820,14 +826,26 @@ function stock_reverse_transaction(
                         $tx['unit_cost']
                         ?? 0
                     ),
-                    round(
-                        $quantity
-                        * (float)(
-                            $tx['unit_cost']
-                            ?? 0
+                    in_array(
+                        $reversalSourceType,
+                        inventory_category_role_slaughter_reversal_sources(),
+                        true
+                    )
+                        ? round(
+                            (float)(
+                                $tx['total_cost']
+                                ?? 0
+                            ),
+                            2
+                        )
+                        : round(
+                            $quantity
+                            * (float)(
+                                $tx['unit_cost']
+                                ?? 0
+                            ),
+                            2
                         ),
-                        2
-                    ),
                     $previous,
                     $newStock,
                     $tx['transaction_date'],

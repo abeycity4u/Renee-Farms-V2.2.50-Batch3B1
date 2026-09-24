@@ -24,6 +24,12 @@ function permission_catalog(): array
             'poultry_health_add' => ['label' => 'Poultry Health & Treatment', 'action' => 'Add', 'description' => 'Record new health and treatment events.', 'roles' => ['poultry_manager']],
             'poultry_health_edit' => ['label' => 'Poultry Health & Treatment', 'action' => 'Edit', 'description' => 'Modify existing health and treatment events.', 'roles' => ['poultry_manager']],
             'poultry_health_delete' => ['label' => 'Poultry Health & Treatment', 'action' => 'Delete', 'description' => 'Delete health and treatment events.', 'roles' => ['poultry_manager']],
+
+            'poultry_slaughter' => ['label' => 'Poultry Slaughter Processing', 'action' => 'View', 'description' => 'View Poultry slaughter batches, processing cost basis and processed-output history.', 'roles' => ['poultry_manager']],
+            'poultry_slaughter_batch_add' => ['label' => 'Poultry Slaughter Processing', 'action' => 'Create Batch', 'description' => 'Record a Poultry slaughter event and its canonical live-population exit.', 'roles' => ['poultry_manager']],
+            'poultry_slaughter_processing_expense_add' => ['label' => 'Poultry Slaughter Processing', 'action' => 'Add Processing Expense', 'description' => 'Record canonical processing expenses against an open Poultry slaughter batch.', 'roles' => ['poultry_manager']],
+            'poultry_slaughter_finalize' => ['label' => 'Poultry Slaughter Processing', 'action' => 'Finalize Cost Basis', 'description' => 'Freeze the Poultry slaughter batch processing cost basis before processed outputs are received.', 'roles' => ['poultry_manager']],
+            'poultry_slaughter_output_add' => ['label' => 'Poultry Slaughter Processing', 'action' => 'Add Output', 'description' => 'Receive processed Poultry output into canonical Slaughter Output Inventory after cost finalization.', 'roles' => ['poultry_manager']],
         ],
         'Poultry Expenses' => [
             'poultry_layer_expenses' => ['label' => 'Layer Expenses', 'action' => 'View', 'description' => 'View Layer expense records.', 'roles' => $salesOptionalExpenseRoles],

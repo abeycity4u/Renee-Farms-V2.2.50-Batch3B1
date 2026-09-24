@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/slaughter_output_sale_economics_common.php';
+
 /**
  * Canonical read-only economics for slaughter-output sales.
  *
@@ -17,21 +19,10 @@ if (!function_exists(
 function ruminant_slaughter_sale_economics_money_cents(
     $value
 ): int {
-    if (
-        $value === null
-        ||
-        $value === ''
-        ||
-        !is_numeric($value)
-    ) {
-        throw new RuntimeException(
-            'Slaughter-sale COGS contains an invalid monetary amount.'
+    return
+        slaughter_output_sale_economics_money_cents(
+            $value
         );
-    }
-
-    return (int)round(
-        ((float)$value) * 100
-    );
 }
 }
 
@@ -43,41 +34,12 @@ function ruminant_slaughter_sale_economics_proportional_cents(
     int $componentCents,
     int $totalBasisCents
 ): int {
-    if (
-        $amountCents < 0
-        ||
-        $componentCents < 0
-        ||
-        $totalBasisCents < 0
-        ||
-        $componentCents > $totalBasisCents
-    ) {
-        throw new RuntimeException(
-            'Slaughter-sale economic basis is invalid.'
-        );
-    }
-
-    if ($totalBasisCents === 0) {
-        if ($amountCents !== 0) {
-            throw new RuntimeException(
-                'A non-zero slaughter-sale valuation has no frozen cost basis.'
-            );
-        }
-
-        return 0;
-    }
-
-    return (int)round(
-        $amountCents
-        *
-        (
-            $componentCents
-            /
+    return
+        slaughter_output_sale_economics_proportional_cents(
+            $amountCents,
+            $componentCents,
             $totalBasisCents
-        ),
-        0,
-        PHP_ROUND_HALF_UP
-    );
+        );
 }
 }
 
