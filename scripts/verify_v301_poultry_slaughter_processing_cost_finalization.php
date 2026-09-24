@@ -72,7 +72,7 @@ $requiredMigration = [
     'UNIQUE KEY uniq_psbe_request',
     'expense_revision_id BIGINT UNSIGNED NOT NULL',
     'REFERENCES farm_expense_revisions(id)',
-    'chk_poultry_slaughter_cost_finalization_pair',
+    'CONSTRAINT fk_psb_cost_finalized_by',
 ];
 
 foreach (
@@ -92,6 +92,35 @@ foreach (
         );
     }
 }
+
+if (
+    str_contains(
+        $migration,
+        'chk_poultry_slaughter_cost_finalization_pair'
+    )
+) {
+    $fail(
+        'Migration 079 must not place cost_basis_finalized_by inside a CHECK constraint because its user FK uses ON DELETE SET NULL.'
+    );
+}
+
+if (
+    preg_match(
+        '/CONSTRAINT\s+fk_psb_cost_finalized_by\s+FOREIGN\s+KEY\s*\(\s*cost_basis_finalized_by\s*\)\s+REFERENCES\s+users\s*\(\s*id\s*\)\s+ON\s+DELETE\s+SET\s+NULL/is',
+        $migration
+    )
+    !==
+    1
+) {
+    $fail(
+        'Migration 079 must preserve nullable finalizer attribution through ON DELETE SET NULL.'
+    );
+}
+
+$pass(
+    'Migration 079 keeps finalized timestamp durable while finalizer attribution follows user-deletion semantics'
+);
+
 
 $pass(
     'Migration 079 owns idempotent processing-expense provenance and finalization state'
@@ -130,6 +159,24 @@ foreach (
         );
     }
 }
+
+if (
+    preg_match(
+        '/UPDATE\s+poultry_slaughter_batches\s+SET[\s\S]{0,3000}?cost_basis_finalized_at\s*=\s*NOW\s*\(\s*\)\s*,\s*cost_basis_finalized_by\s*=\s*\?[\s\S]{0,1500}?AND\s+cost_basis_finalized_at\s+IS\s+NULL/i',
+        $service
+    )
+    !==
+    1
+) {
+    $fail(
+        'Central Poultry slaughter finalization must write finalized_at and finalized_by together in one guarded UPDATE.'
+    );
+}
+
+$pass(
+    'Central finalization writes timestamp and actor together while timestamp remains the durable state authority'
+);
+
 
 $pass(
     'Poultry slaughter service uses canonical expense and immutable revision authorities'

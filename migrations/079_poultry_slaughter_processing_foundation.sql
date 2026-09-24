@@ -154,18 +154,17 @@ CREATE TABLE IF NOT EXISTS poultry_slaughter_batches (
               + processing_operating_cost
         ),
 
-    CONSTRAINT chk_poultry_slaughter_cost_finalization_pair
-        CHECK (
-            (
-                cost_basis_finalized_at IS NULL
-                AND cost_basis_finalized_by IS NULL
-            )
-            OR
-            (
-                cost_basis_finalized_at IS NOT NULL
-                AND cost_basis_finalized_by IS NOT NULL
-            )
-        ),
+    -- cost_basis_finalized_at is the durable finalized-state authority.
+    --
+    -- cost_basis_finalized_by intentionally remains nullable attribution with
+    -- ON DELETE SET NULL below, matching the platform-wide user-deletion
+    -- contract. MariaDB does not permit a CHECK constraint to reference a
+    -- column governed by an ON DELETE SET NULL foreign key.
+    --
+    -- The central Poultry slaughter service writes finalized_at and
+    -- finalized_by together in one guarded UPDATE. If the user is later
+    -- deleted, the timestamp remains frozen while actor attribution may
+    -- become NULL without changing the finalized state.
 
     CONSTRAINT fk_psb_farm
         FOREIGN KEY (farm_id)
