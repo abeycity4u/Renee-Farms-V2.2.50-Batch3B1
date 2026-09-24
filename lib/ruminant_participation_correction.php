@@ -25,8 +25,9 @@ if (!class_exists(
  *
  * This service is intentionally narrow:
  *
- * - it may move a confirmed physical farm-entry date EARLIER;
- * - it may move one confirmed cycle-membership start EARLIER;
+ * - it may correct a confirmed physical farm-entry date earlier OR later;
+ * - it may correct one confirmed cycle-membership start earlier OR later;
+ * - later contractions fail closed against earlier durable animal facts;
  * - it never rewrites purchase/tag/registry dates;
  * - it never rewrites membership end dates;
  * - it never rewrites transfer-owned membership starts;
@@ -101,6 +102,470 @@ function ruminant_participation_correction_request_token(
 }
 }
 
+
+
+if (!function_exists(
+    'ruminant_participation_correction_direction'
+)) {
+function ruminant_participation_correction_direction(
+    string $oldFarmEntryDate,
+    string $newFarmEntryDate,
+    string $oldMembershipStartDate,
+    string $newMembershipStartDate
+): string {
+    $entryCompare =
+        strcmp(
+            $newFarmEntryDate,
+            $oldFarmEntryDate
+        );
+
+    $membershipCompare =
+        strcmp(
+            $newMembershipStartDate,
+            $oldMembershipStartDate
+        );
+
+    $hasEarlier =
+        $entryCompare < 0
+        ||
+        $membershipCompare < 0;
+
+    $hasLater =
+        $entryCompare > 0
+        ||
+        $membershipCompare > 0;
+
+    if (
+        $hasEarlier
+        &&
+        $hasLater
+    ) {
+        throw new RuminantParticipationCorrectionException(
+            'Farm entry and cycle participation cannot be corrected in opposite historical directions in one request.'
+        );
+    }
+
+    if ($hasLater) {
+        return 'later';
+    }
+
+    if ($hasEarlier) {
+        return 'earlier';
+    }
+
+    return 'unchanged';
+}
+}
+
+
+if (!function_exists(
+    'ruminant_participation_correction_later_dependency_blockers_locked'
+)) {
+function ruminant_participation_correction_later_dependency_blockers_locked(
+    PDO $pdo,
+    int $farmId,
+    int $animalId,
+    int $membershipId,
+    int $cycleId,
+    ?int $closedByExitEventId,
+    string $oldFarmEntryDate,
+    string $newFarmEntryDate,
+    string $oldMembershipStartDate,
+    string $newMembershipStartDate
+): array {
+    $blockers = [];
+
+    $lockFirst =
+        static function (
+            string $type,
+            string $sql,
+            array $params
+        ) use (
+            $pdo,
+            &$blockers
+        ): void {
+            $stmt =
+                $pdo->prepare(
+                    $sql
+                );
+
+            $stmt->execute(
+                $params
+            );
+
+            $row =
+                $stmt->fetch(
+                    PDO::FETCH_ASSOC
+                );
+
+            if (!$row) {
+                return;
+            }
+
+            $blockers[] = [
+                'type' =>
+                    $type,
+
+                'id' =>
+                    (int)(
+                        $row[
+                            'fact_id'
+                        ]
+                        ?? 0
+                    ),
+
+                'date' =>
+                    (string)(
+                        $row[
+                            'fact_date'
+                        ]
+                        ?? ''
+                    ),
+            ];
+        };
+
+
+    /*
+     * Moving physical farm entry later must not place any already-recorded
+     * physical/economic/lifecycle fact before the animal supposedly entered
+     * the operation.
+     *
+     * Purchase and registry dates are deliberately NOT blockers:
+     * farm entry is an independent physical-provenance fact.
+     */
+    if (
+        $newFarmEntryDate
+        >
+        $oldFarmEntryDate
+    ) {
+        $lockFirst(
+            'other cycle membership',
+            "SELECT
+                 id AS fact_id,
+                 start_date AS fact_date
+             FROM ruminant_animal_cycle_memberships
+             WHERE farm_id=?
+               AND animal_id=?
+               AND id<>?
+               AND start_date<?
+             ORDER BY
+                 start_date,
+                 id
+             LIMIT 1
+             FOR UPDATE",
+            [
+                $farmId,
+                $animalId,
+                $membershipId,
+                $newFarmEntryDate,
+            ]
+        );
+
+        $lockFirst(
+            'weight',
+            "SELECT
+                 id AS fact_id,
+                 weight_date AS fact_date
+             FROM ruminant_animal_weights
+             WHERE farm_id=?
+               AND animal_id=?
+               AND weight_date<?
+             ORDER BY
+                 weight_date,
+                 id
+             LIMIT 1
+             FOR UPDATE",
+            [
+                $farmId,
+                $animalId,
+                $newFarmEntryDate,
+            ]
+        );
+
+        $lockFirst(
+            'health event',
+            "SELECT
+                 id AS fact_id,
+                 event_date AS fact_date
+             FROM ruminant_health_events
+             WHERE farm_id=?
+               AND animal_id=?
+               AND event_date<?
+             ORDER BY
+                 event_date,
+                 id
+             LIMIT 1
+             FOR UPDATE",
+            [
+                $farmId,
+                $animalId,
+                $newFarmEntryDate,
+            ]
+        );
+
+        $lockFirst(
+            'lifecycle exit',
+            "SELECT
+                 id AS fact_id,
+                 exit_date AS fact_date
+             FROM ruminant_animal_exit_events
+             WHERE farm_id=?
+               AND animal_id=?
+               AND exit_date<?
+             ORDER BY
+                 exit_date,
+                 id
+             LIMIT 1
+             FOR UPDATE",
+            [
+                $farmId,
+                $animalId,
+                $newFarmEntryDate,
+            ]
+        );
+
+        $lockFirst(
+            'animal sale allocation',
+            "SELECT
+                 a.id AS fact_id,
+                 s.sale_date AS fact_date
+             FROM ruminant_sale_animal_allocations a
+             INNER JOIN sales_records s
+               ON s.id=a.sale_id
+              AND s.farm_id=a.farm_id
+             WHERE a.farm_id=?
+               AND a.animal_id=?
+               AND s.sale_date<?
+             ORDER BY
+                 s.sale_date,
+                 a.id
+             LIMIT 1
+             FOR UPDATE",
+            [
+                $farmId,
+                $animalId,
+                $newFarmEntryDate,
+            ]
+        );
+
+        $lockFirst(
+            'animal expense allocation',
+            "SELECT
+                 a.id AS fact_id,
+                 e.expense_date AS fact_date
+             FROM ruminant_expense_animal_allocations a
+             INNER JOIN farm_expenses e
+               ON e.id=a.expense_id
+              AND e.farm_id=a.farm_id
+             WHERE a.farm_id=?
+               AND a.animal_id=?
+               AND e.expense_date<?
+             ORDER BY
+                 e.expense_date,
+                 a.id
+             LIMIT 1
+             FOR UPDATE",
+            [
+                $farmId,
+                $animalId,
+                $newFarmEntryDate,
+            ]
+        );
+
+        $lockFirst(
+            'slaughter batch',
+            "SELECT
+                 id AS fact_id,
+                 slaughter_date AS fact_date
+             FROM ruminant_slaughter_batches
+             WHERE farm_id=?
+               AND animal_id=?
+               AND slaughter_date<?
+             ORDER BY
+                 slaughter_date,
+                 id
+             LIMIT 1
+             FOR UPDATE",
+            [
+                $farmId,
+                $animalId,
+                $newFarmEntryDate,
+            ]
+        );
+
+        $lockFirst(
+            'cycle transfer',
+            "SELECT
+                 t.id AS fact_id,
+                 p.transfer_date AS fact_date
+             FROM ruminant_animal_cycle_transfers t
+             INNER JOIN production_population_transfers p
+               ON p.id=t.population_transfer_id
+              AND p.farm_id=t.farm_id
+             WHERE t.farm_id=?
+               AND t.animal_id=?
+               AND p.transfer_date<?
+             ORDER BY
+                 p.transfer_date,
+                 t.id
+             LIMIT 1
+             FOR UPDATE",
+            [
+                $farmId,
+                $animalId,
+                $newFarmEntryDate,
+            ]
+        );
+    }
+
+
+    /*
+     * Moving only cycle participation later is narrower than moving farm
+     * entry. Only durable facts that specifically bind the animal to the
+     * target cycle constrain this boundary.
+     */
+    if (
+        $newMembershipStartDate
+        >
+        $oldMembershipStartDate
+    ) {
+        $lockFirst(
+            'target-cycle sale allocation',
+            "SELECT
+                 a.id AS fact_id,
+                 s.sale_date AS fact_date
+             FROM ruminant_sale_animal_allocations a
+             INNER JOIN sales_records s
+               ON s.id=a.sale_id
+              AND s.farm_id=a.farm_id
+             WHERE a.farm_id=?
+               AND a.animal_id=?
+               AND s.cycle_id=?
+               AND s.sale_date<?
+             ORDER BY
+                 s.sale_date,
+                 a.id
+             LIMIT 1
+             FOR UPDATE",
+            [
+                $farmId,
+                $animalId,
+                $cycleId,
+                $newMembershipStartDate,
+            ]
+        );
+
+        $lockFirst(
+            'target-cycle expense allocation',
+            "SELECT
+                 a.id AS fact_id,
+                 e.expense_date AS fact_date
+             FROM ruminant_expense_animal_allocations a
+             INNER JOIN farm_expenses e
+               ON e.id=a.expense_id
+              AND e.farm_id=a.farm_id
+             WHERE a.farm_id=?
+               AND a.animal_id=?
+               AND e.cycle_id=?
+               AND e.expense_date<?
+             ORDER BY
+                 e.expense_date,
+                 a.id
+             LIMIT 1
+             FOR UPDATE",
+            [
+                $farmId,
+                $animalId,
+                $cycleId,
+                $newMembershipStartDate,
+            ]
+        );
+
+        $lockFirst(
+            'target-cycle slaughter',
+            "SELECT
+                 id AS fact_id,
+                 slaughter_date AS fact_date
+             FROM ruminant_slaughter_batches
+             WHERE farm_id=?
+               AND animal_id=?
+               AND cycle_id=?
+               AND slaughter_date<?
+             ORDER BY
+                 slaughter_date,
+                 id
+             LIMIT 1
+             FOR UPDATE",
+            [
+                $farmId,
+                $animalId,
+                $cycleId,
+                $newMembershipStartDate,
+            ]
+        );
+
+        $lockFirst(
+            'membership transfer',
+            "SELECT
+                 t.id AS fact_id,
+                 p.transfer_date AS fact_date
+             FROM ruminant_animal_cycle_transfers t
+             INNER JOIN production_population_transfers p
+               ON p.id=t.population_transfer_id
+              AND p.farm_id=t.farm_id
+             WHERE t.farm_id=?
+               AND t.animal_id=?
+               AND (
+                   t.from_membership_id=?
+                   OR
+                   t.to_membership_id=?
+               )
+               AND p.transfer_date<?
+             ORDER BY
+                 p.transfer_date,
+                 t.id
+             LIMIT 1
+             FOR UPDATE",
+            [
+                $farmId,
+                $animalId,
+                $membershipId,
+                $membershipId,
+                $newMembershipStartDate,
+            ]
+        );
+
+        if (
+            $closedByExitEventId !== null
+            &&
+            $closedByExitEventId > 0
+        ) {
+            $lockFirst(
+                'membership lifecycle exit',
+                "SELECT
+                     id AS fact_id,
+                     exit_date AS fact_date
+                 FROM ruminant_animal_exit_events
+                 WHERE farm_id=?
+                   AND animal_id=?
+                   AND id=?
+                   AND exit_date<?
+                 LIMIT 1
+                 FOR UPDATE",
+                [
+                    $farmId,
+                    $animalId,
+                    $closedByExitEventId,
+                    $newMembershipStartDate,
+                ]
+            );
+        }
+    }
+
+
+    return $blockers;
+}
+}
 
 if (!function_exists(
     'ruminant_participation_correction_history'
@@ -242,20 +707,6 @@ function ruminant_participation_correction_preview_locked(
         );
     }
 
-    /*
-     * This workflow extends known participation earlier.
-     * It is deliberately not a generic date rewrite.
-     */
-    if (
-        $newFarmEntryDate
-        >
-        $oldFarmEntryDate
-    ) {
-        throw new RuminantParticipationCorrectionException(
-            'Historical participation correction cannot move farm entry later. Review the animal history instead.'
-        );
-    }
-
     ruminant_animal_assert_farm_entry_date(
         $newFarmEntryDate,
         $animal[
@@ -349,15 +800,13 @@ function ruminant_participation_correction_preview_locked(
             'start_date'
         ];
 
-    if (
-        $newMembershipStartDate
-        >
-        $oldMembershipStartDate
-    ) {
-        throw new RuminantParticipationCorrectionException(
-            'Historical participation correction cannot move cycle participation later.'
+    $direction =
+        ruminant_participation_correction_direction(
+            $oldFarmEntryDate,
+            $newFarmEntryDate,
+            $oldMembershipStartDate,
+            $newMembershipStartDate
         );
-    }
 
     if (
         $newFarmEntryDate
@@ -454,6 +903,48 @@ function ruminant_participation_correction_preview_locked(
             . '.'
         );
     }
+
+    $laterDependencyBlockers = [];
+
+    if ($direction === 'later') {
+        $laterDependencyBlockers =
+            ruminant_participation_correction_later_dependency_blockers_locked(
+                $pdo,
+                $farmId,
+                $animalId,
+                $membershipId,
+                (int)$membership[
+                    'cycle_id'
+                ],
+                !empty(
+                    $membership[
+                        'closed_by_exit_event_id'
+                    ]
+                )
+                    ? (int)$membership[
+                        'closed_by_exit_event_id'
+                    ]
+                    : null,
+                $oldFarmEntryDate,
+                $newFarmEntryDate,
+                $oldMembershipStartDate,
+                $newMembershipStartDate
+            );
+
+        if ($laterDependencyBlockers) {
+            $first =
+                $laterDependencyBlockers[0];
+
+            throw new RuminantParticipationCorrectionException(
+                'Later participation correction would move this animal past an existing '
+                . $first['type']
+                . ' fact dated '
+                . $first['date']
+                . '. Correct or reverse that durable fact first.'
+            );
+        }
+    }
+
 
     /*
      * Physical population is authoritative.
@@ -552,6 +1043,25 @@ function ruminant_participation_correction_preview_locked(
     $frozenSlaughterCount =
         (int)$frozenStmt->fetchColumn();
 
+    $frozenCycleStmt =
+        $pdo->prepare(
+            "SELECT COUNT(*)
+             FROM ruminant_slaughter_batches
+             WHERE farm_id=?
+               AND cycle_id=?
+               AND cost_basis_snapshot_at IS NOT NULL"
+        );
+
+    $frozenCycleStmt->execute([
+        $farmId,
+        (int)$membership[
+            'cycle_id'
+        ],
+    ]);
+
+    $frozenCycleSlaughterCount =
+        (int)$frozenCycleStmt->fetchColumn();
+
     return [
         'farm_id' =>
             $farmId,
@@ -592,6 +1102,9 @@ function ruminant_participation_correction_preview_locked(
         'new_membership_start_date' =>
             $newMembershipStartDate,
 
+        'correction_direction' =>
+            $direction,
+
         'physical_headcount' =>
             $physicalHeadcount,
 
@@ -611,8 +1124,16 @@ function ruminant_participation_correction_preview_locked(
                 ?? ''
             ),
 
+        'later_dependency_blocker_count' =>
+            count(
+                $laterDependencyBlockers
+            ),
+
         'frozen_slaughter_batch_count' =>
             $frozenSlaughterCount,
+
+        'frozen_cycle_slaughter_batch_count' =>
+            $frozenCycleSlaughterCount,
 
         'reason' =>
             trim($reason),
