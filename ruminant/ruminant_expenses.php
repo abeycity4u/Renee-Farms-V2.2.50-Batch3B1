@@ -75,11 +75,60 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_expense'])) {
     $dateObject = DateTime::createFromFormat('Y-m-d', $expenseDate);
     $amount = (float)($_POST['amount'] ?? 0);
     $unit = (float)($_POST['unit'] ?? 1);
-    $expenseCategory = trim((string)($_POST['category'] ?? ''));
-    $allowedCategories = ['salary', 'logistic', 'fuel', 'misc'];
-    if (!$dateObject || $dateObject->format('Y-m-d') !== $expenseDate || $amount <= 0 || $unit <= 0 || !in_array($expenseCategory, $allowedCategories, true)) {
-        $_SESSION['error'] = 'Please provide a valid date, category, amount and quantity greater than zero.';
-        header("Location: ruminant_expenses.php?month=" . date('Y-m', strtotime($expenseDate ?: 'now')));
+    $expenseCategoryInput =
+        trim(
+            (string)(
+                $_POST[
+                    'category'
+                ]
+                ?? ''
+            )
+        );
+
+    $expenseCategoryValid =
+        true;
+
+    try {
+        $expenseCategory =
+            expense_category_normalize(
+                $expenseCategoryInput,
+                'manual'
+            );
+
+    } catch (InvalidArgumentException $e) {
+        $expenseCategory =
+            $expenseCategoryInput;
+
+        $expenseCategoryValid =
+            false;
+    }
+
+    if (
+        !$dateObject
+        ||
+        $dateObject->format('Y-m-d') !== $expenseDate
+        ||
+        $amount <= 0
+        ||
+        $unit <= 0
+        ||
+        !$expenseCategoryValid
+    ) {
+        $_SESSION['error'] =
+            'Please provide a valid date, non-stock expense category, amount and quantity greater than zero.';
+
+        header(
+            "Location: ruminant_expenses.php?month="
+            .
+            date(
+                'Y-m',
+                strtotime(
+                    $expenseDate
+                    ?: 'now'
+                )
+            )
+        );
+
         exit();
     }
 
@@ -358,7 +407,16 @@ $pdfReportUrl = pdf_report_current_url();
                                                         default: echo 'dark';
                                                     }
                                                 ?>">
-                                                    <?php echo ucfirst($expense['category']); ?>
+
+                <?php echo htmlspecialchars(
+                    expense_category_label(
+                        (string)(
+                            $expense["category"]
+                            ?? "misc"
+                        )
+                    )
+                ); ?>
+
                                                 </span>
                                             </td>
                                             <td><?php echo number_format($expense['unit'] ?? 1, 2); ?></td>
@@ -471,12 +529,11 @@ $pdfReportUrl = pdf_report_current_url();
                         <div class="mb-3">
                             <label>Category</label>
                             <select name="category" id="editCategory" class="form-select" required>
-                                <option value="feeds">Feeds (legacy historical record)</option>
-                                <option value="medication">Medication</option>
-                                <option value="salary">Salary</option>
-                                <option value="logistic">Logistic</option>
-                                <option value="fuel">Fuel</option>
-                                <option value="misc">Misc</option>
+                                <?php foreach (expense_category_options('report') as $expenseCategoryKey => $expenseCategoryLabel): ?>
+                                    <option value="<?php echo app_attr($expenseCategoryKey); ?>">
+                                        <?php echo htmlspecialchars($expenseCategoryLabel, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>
+                                    </option>
+                                <?php endforeach; ?>
                             </select>
                         </div>
                         <div class="mb-3">
@@ -544,10 +601,11 @@ $pdfReportUrl = pdf_report_current_url();
                         <div class="mb-3">
                             <label>Category</label>
                             <select name="category" class="form-select" required>
-                                <option value="salary">Salary</option>
-                                <option value="logistic">Logistic</option>
-                                <option value="fuel">Fuel</option>
-                                <option value="misc">Miscellaneous</option>
+                                <?php foreach (expense_category_options('manual') as $expenseCategoryKey => $expenseCategoryLabel): ?>
+                                    <option value="<?php echo app_attr($expenseCategoryKey); ?>">
+                                        <?php echo htmlspecialchars($expenseCategoryLabel, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>
+                                    </option>
+                                <?php endforeach; ?>
                             </select>
                             <small class="text-muted">Stock purchases such as feed, medication and vaccines are recorded through Inventory. Use this form for non-stock operating costs and services.</small>
                         </div>

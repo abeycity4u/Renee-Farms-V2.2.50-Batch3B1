@@ -43,7 +43,32 @@ else $farmType = normalizeFarmType($requestedFarmType, true, false, $canChooseFa
 $productionType = strtolower(trim((string)($_GET['production_type'] ?? 'all')));
 $productionOptions = $farmType === 'all' ? [] : attribution_production_types($farmType);
 if ($productionType !== 'all' && !isset($productionOptions[$productionType])) $productionType='all';
-$category = $_GET['category'] ?? 'all';
+$categoryOptions =
+    expense_category_options(
+        'report'
+    );
+
+$category =
+    strtolower(
+        trim(
+            (string)(
+                $_GET['category']
+                ?? 'all'
+            )
+        )
+    );
+
+if (
+    $category !== 'all'
+    &&
+    !array_key_exists(
+        $category,
+        $categoryOptions
+    )
+) {
+    $category =
+        'all';
+}
 
 // Build query based on filters
 $whereClause = "WHERE e.farm_id = ? AND e.expense_date BETWEEN ? AND ?";
@@ -120,13 +145,29 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                 <?php foreach($productionOptions as $value=>$label): ?><option value="<?php echo htmlspecialchars($value); ?>" <?php echo $productionType===$value?'selected':''; ?>><?php echo htmlspecialchars($label); ?></option><?php endforeach; ?>
                             </select>
                             <select class="form-select app-width-150" id="categoryFilter">
-                                <option value="all" <?php echo $category == 'all' ? 'selected' : ''; ?>>All Categories</option>
-                                <option value="feeds" <?php echo $category == 'feeds' ? 'selected' : ''; ?>>Feeds</option>
-                                <option value="medication" <?php echo $category == 'medication' ? 'selected' : ''; ?>>Medication</option>
-                                <option value="salary" <?php echo $category == 'salary' ? 'selected' : ''; ?>>Salary</option>
-                                <option value="logistic" <?php echo $category == 'logistic' ? 'selected' : ''; ?>>Logistic</option>
-                                <option value="fuel" <?php echo $category == 'fuel' ? 'selected' : ''; ?>>Fuel</option>
-                                <option value="misc" <?php echo $category == 'misc' ? 'selected' : ''; ?>>Misc</option>
+                                <option
+                                    value="all"
+                                    <?= $category === 'all' ? 'selected' : '' ?>
+                                >
+                                    All Categories
+                                </option>
+
+                                <?php foreach ($categoryOptions as $value => $label): ?>
+                                    <option
+                                        value="<?= htmlspecialchars(
+                                            (string)$value,
+                                            ENT_QUOTES | ENT_SUBSTITUTE,
+                                            'UTF-8'
+                                        ) ?>"
+                                        <?= $category === (string)$value ? 'selected' : '' ?>
+                                    >
+                                        <?= htmlspecialchars(
+                                            (string)$label,
+                                            ENT_QUOTES | ENT_SUBSTITUTE,
+                                            'UTF-8'
+                                        ) ?>
+                                    </option>
+                                <?php endforeach; ?>
                             </select>
                             <select class="form-select app-width-140" id="reportMode">
                                 <option value="monthly" <?php echo $reportMode === 'monthly' ? 'selected' : ''; ?>>Monthly</option>
@@ -214,7 +255,13 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                                             default: echo 'dark';
                                                         }
                                                     ?>">
-                                                        <?php echo ucfirst($cat); ?>
+                                                        <?= htmlspecialchars(
+                                                            expense_category_label(
+                                                                (string)$cat
+                                                            ),
+                                                            ENT_QUOTES | ENT_SUBSTITUTE,
+                                                            'UTF-8'
+                                                        ) ?>
                                                     </span>
                                                 </span>
                                                 <span>₦<?php echo number_format($total, 2); ?></span>
@@ -300,7 +347,13 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                                         default: echo 'dark';
                                                     }
                                                 ?>">
-                                                    <?php echo ucfirst($expense['category']); ?>
+                                                    <?= htmlspecialchars(
+                                                        expense_category_label(
+                                                            (string)$expense['category']
+                                                        ),
+                                                        ENT_QUOTES | ENT_SUBSTITUTE,
+                                                        'UTF-8'
+                                                    ) ?>
                                                 </span>
                                             </td>
                                             <td>
@@ -391,14 +444,43 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                         </div>
                         <div class="mb-3">
                             <label>Category</label>
-                            <select name="category" id="editCategory" class="form-select" required>
-                                <option value="feeds">Feeds</option>
-                                <option value="medication">Medication</option>
-                                <option value="salary">Salary</option>
-                                <option value="logistic">Logistic</option>
-                                <option value="fuel">Fuel</option>
-                                <option value="misc">Misc</option>
+
+                            <select
+                                name="category"
+                                id="editCategory"
+                                class="form-select"
+                                required
+                            >
+                                <?php foreach ($categoryOptions as $value => $label): ?>
+                                    <option
+                                        value="<?= htmlspecialchars(
+                                            (string)$value,
+                                            ENT_QUOTES | ENT_SUBSTITUTE,
+                                            'UTF-8'
+                                        ) ?>"
+                                    >
+                                        <?= htmlspecialchars(
+                                            (string)$label
+                                            .
+                                            (
+                                                expense_category_is_historical(
+                                                    (string)$value
+                                                )
+                                                    ? ' — historical only'
+                                                    : ''
+                                            ),
+                                            ENT_QUOTES | ENT_SUBSTITUTE,
+                                            'UTF-8'
+                                        ) ?>
+                                    </option>
+                                <?php endforeach; ?>
                             </select>
+
+                            <small class="text-muted">
+                                Feed and Medication are historical-only categories.
+                                They may be preserved on an existing matching record,
+                                but new stock purchases are recorded through Inventory.
+                            </small>
                         </div>
                         <div class="mb-3">
                             <label>Unit</label>

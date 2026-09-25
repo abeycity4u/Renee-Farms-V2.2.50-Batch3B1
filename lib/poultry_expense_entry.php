@@ -238,33 +238,11 @@ if (!function_exists(
 function poultry_expense_entry_category(
     $value
 ): string {
-    $category =
-        strtolower(
-            trim(
-                (string)$value
-            )
+    return
+        expense_category_normalize(
+            $value,
+            'manual'
         );
-
-    $allowed = [
-        'salary',
-        'logistic',
-        'fuel',
-        'misc',
-    ];
-
-    if (
-        !in_array(
-            $category,
-            $allowed,
-            true
-        )
-    ) {
-        throw new InvalidArgumentException(
-            'Stock purchases such as feed, medication and vaccines are recorded through Inventory. Choose a non-stock expense category.'
-        );
-    }
-
-    return $category;
 }
 }
 

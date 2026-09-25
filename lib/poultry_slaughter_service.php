@@ -3,6 +3,7 @@
 require_once __DIR__ . '/production_population_projection.php';
 require_once __DIR__ . '/poultry_cycle_acquisition.php';
 require_once __DIR__ . '/expense_revision_service.php';
+require_once __DIR__ . '/financial_allocation_service.php';
 require_once __DIR__ . '/slaughter_output_inventory.php';
 require_once dirname(__DIR__) . '/includes/financial.php';
 require_once dirname(__DIR__) . '/includes/audit_helpers.php';
@@ -1645,8 +1646,9 @@ function poultry_slaughter_processing_expense_add(
         );
 
     $category =
-        poultry_expense_entry_category(
-            $category
+        expense_category_normalize(
+            $category,
+            'slaughter_processing'
         );
 
     $amount =
@@ -2027,6 +2029,768 @@ function poultry_slaughter_processing_expense_add(
 }
 
 
+
+/*
+ * Link one existing canonical Poultry Shared expense allocation to a
+ * still-open slaughter batch.
+ *
+ * This is deliberately NOT a second allocation engine.
+ *
+ * Authority chain:
+ *
+ * farm_expenses
+ *   -> financial_allocations
+ *   -> immutable farm_expense_revisions
+ *   -> slaughter batch amount_snapshot
+ *
+ * amount_snapshot is the amount of this cycle's existing Shared allocation
+ * consumed by this physical slaughter batch.
+ */
+if (!function_exists('poultry_slaughter_processing_shared_expense_link')) {
+function poultry_slaughter_processing_shared_expense_link(
+    PDO $pdo,
+    int $farmId,
+    int $batchId,
+    int $expenseId,
+    $batchAmount,
+    int $actorUserId,
+    string $requestToken
+): array {
+    if (
+        $farmId < 1
+        ||
+        $batchId < 1
+        ||
+        $expenseId < 1
+        ||
+        $actorUserId < 1
+    ) {
+        throw new InvalidArgumentException(
+            'Shared processing cost requires a valid farm, slaughter batch, expense and user.'
+        );
+    }
+
+    poultry_slaughter_load_expense_authority();
+
+    $requestToken =
+        poultry_slaughter_request_token(
+            $requestToken
+        );
+
+    $batchAmount =
+        poultry_expense_entry_positive_decimal(
+            $batchAmount,
+            'Shared processing amount'
+        );
+
+    $batchAmountCents =
+        poultry_slaughter_money_cents(
+            $batchAmount
+        );
+
+    if ($batchAmountCents < 1) {
+        throw new InvalidArgumentException(
+            'Shared processing amount must be greater than zero.'
+        );
+    }
+
+    $requestPayload = [
+        'mode' =>
+            'shared_processing_allocation',
+
+        'batch_id' =>
+            $batchId,
+
+        'expense_id' =>
+            $expenseId,
+
+        'amount_snapshot' =>
+            poultry_slaughter_money_from_cents(
+                $batchAmountCents
+            ),
+    ];
+
+    $requestJson =
+        json_encode(
+            $requestPayload,
+            JSON_UNESCAPED_SLASHES
+            |
+            JSON_PRESERVE_ZERO_FRACTION
+        );
+
+    if (!is_string($requestJson)) {
+        throw new PoultrySlaughterException(
+            'Shared processing-cost request identity could not be serialized.'
+        );
+    }
+
+    $requestFingerprint =
+        hash(
+            'sha256',
+            $requestJson
+        );
+
+    $startedTransaction =
+        !$pdo->inTransaction();
+
+    if ($startedTransaction) {
+        $pdo->beginTransaction();
+    }
+
+    try {
+        $batch =
+            poultry_slaughter_batch_locked(
+                $pdo,
+                $farmId,
+                $batchId
+            );
+
+        if (
+            strtolower(
+                (string)$batch['status']
+            ) === 'reversed'
+        ) {
+            throw new PoultrySlaughterException(
+                'A reversed Poultry slaughter batch cannot receive Shared processing costs.'
+            );
+        }
+
+        /*
+         * Preserve the existing slaughter request-token idempotency contract.
+         */
+        $requestStmt =
+            $pdo->prepare(
+                "SELECT *
+                 FROM poultry_slaughter_batch_expenses
+                 WHERE farm_id=?
+                   AND request_token=?
+                 LIMIT 1
+                 FOR UPDATE"
+            );
+
+        $requestStmt->execute([
+            $farmId,
+            $requestToken,
+        ]);
+
+        $existingRequest =
+            $requestStmt->fetch(
+                PDO::FETCH_ASSOC
+            );
+
+        if ($existingRequest) {
+            if (
+                (int)$existingRequest['batch_id']
+                    !== $batchId
+                ||
+                (int)$existingRequest['expense_id']
+                    !== $expenseId
+                ||
+                !hash_equals(
+                    (string)$existingRequest[
+                        'request_fingerprint'
+                    ],
+                    $requestFingerprint
+                )
+            ) {
+                throw new PoultrySlaughterException(
+                    'This Shared processing-cost submission token has already been used for different details. Refresh and try again.'
+                );
+            }
+
+            if ($startedTransaction) {
+                $pdo->commit();
+            }
+
+            return [
+                'link_id' =>
+                    (int)$existingRequest['id'],
+
+                'expense_id' =>
+                    (int)$existingRequest[
+                        'expense_id'
+                    ],
+
+                'expense_revision_id' =>
+                    (int)$existingRequest[
+                        'expense_revision_id'
+                    ],
+
+                'amount_snapshot' =>
+                    round(
+                        (float)$existingRequest[
+                            'amount_snapshot'
+                        ],
+                        2
+                    ),
+
+                'idempotent' =>
+                    true,
+            ];
+        }
+
+
+        if (
+            !empty(
+                $batch[
+                    'cost_basis_finalized_at'
+                ]
+            )
+        ) {
+            throw new PoultrySlaughterException(
+                'Shared processing costs cannot be linked after this slaughter batch cost basis has been finalized.'
+            );
+        }
+
+        $outputStmt =
+            $pdo->prepare(
+                "SELECT COUNT(*)
+                 FROM poultry_slaughter_outputs
+                 WHERE farm_id=?
+                   AND batch_id=?"
+            );
+
+        $outputStmt->execute([
+            $farmId,
+            $batchId,
+        ]);
+
+        if (
+            (int)$outputStmt->fetchColumn()
+            > 0
+        ) {
+            throw new PoultrySlaughterException(
+                'Shared processing costs cannot change after slaughter output Inventory has been created.'
+            );
+        }
+
+
+        /*
+         * Lock the canonical parent + financial allocation projection.
+         *
+         * Financial Allocation mutation uses this same parent-first
+         * serialization boundary. This prevents an allocation from changing
+         * underneath the slaughter-link conservation proof.
+         */
+        $state =
+            expense_revision_service_state(
+                $pdo,
+                $farmId,
+                $expenseId,
+                true
+            );
+
+        $expense =
+            $state[
+                'expense'
+            ];
+
+        $expenseCycleId =
+            $expense[
+                'cycle_id'
+            ]
+            ?? null;
+
+        $poultryCategory =
+            trim(
+                (string)(
+                    $expense[
+                        'poultry_category'
+                    ]
+                    ?? ''
+                )
+            );
+
+        if (
+            strtolower(
+                trim(
+                    (string)$expense[
+                        'farm_type'
+                    ]
+                )
+            ) !== 'poultry'
+            ||
+            strtolower(
+                trim(
+                    (string)$expense[
+                        'production_type'
+                    ]
+                )
+            ) !== 'shared'
+            ||
+            strtolower(
+                trim(
+                    (string)(
+                        $expense[
+                            'attribution_scope'
+                        ]
+                        ?? ''
+                    )
+                )
+            ) !== 'farm'
+            ||
+            (
+                $expenseCycleId !== null
+                &&
+                trim(
+                    (string)$expenseCycleId
+                ) !== ''
+                &&
+                (int)$expenseCycleId > 0
+            )
+            ||
+            $poultryCategory !== ''
+            ||
+            (string)$expense[
+                'expense_date'
+            ]
+                !==
+                (string)$batch[
+                    'slaughter_date'
+                ]
+        ) {
+            throw new PoultrySlaughterException(
+                'Select a canonical Poultry Shared expense recorded for this slaughter date.'
+            );
+        }
+
+
+        /*
+         * Shared Slaughter may use only the same processing categories as the
+         * direct Layer/Broiler slaughter form. Salary and Inventory-owned
+         * expense classes remain outside this boundary.
+         */
+        expense_category_normalize(
+            (string)$expense[
+                'category'
+            ],
+            'slaughter_processing'
+        );
+
+
+        poultry_slaughter_assert_shared_processing_not_embedded(
+            $pdo,
+            $batch,
+            $expense
+        );
+
+        $allocationRows =
+            $state[
+                'financial_allocations'
+            ]
+            ?? [];
+
+        $animalAllocationRows =
+            $state[
+                'animal_allocations'
+            ]
+            ?? [];
+
+        if ($animalAllocationRows !== []) {
+            throw new PoultrySlaughterException(
+                'A Poultry Shared processing expense cannot also carry Ruminant animal allocations.'
+            );
+        }
+
+
+        /*
+         * Reuse the existing Shared Cost Allocation domain authority.
+         */
+        $cycleIds = [];
+
+        foreach ($allocationRows as $allocationRow) {
+            $cycleId =
+                (int)(
+                    $allocationRow[
+                        'cycle_id'
+                    ]
+                    ?? 0
+                );
+
+            if ($cycleId > 0) {
+                $cycleIds[
+                    $cycleId
+                ] =
+                    $cycleId;
+            }
+        }
+
+        $targetCycles =
+            financial_allocation_service_target_cycles(
+                $pdo,
+                $farmId,
+                array_values(
+                    $cycleIds
+                ),
+                true
+            );
+
+        $validated =
+            financial_allocation_service_validate_desired_rows(
+                $expense,
+                $targetCycles,
+                $allocationRows,
+                count(
+                    $animalAllocationRows
+                )
+            );
+
+        $targetAllocation =
+            null;
+
+        foreach (
+            $validated[
+                'rows'
+            ]
+            ?? []
+            as $allocationRow
+        ) {
+            if (
+                (int)$allocationRow[
+                    'cycle_id'
+                ]
+                ===
+                (int)$batch[
+                    'cycle_id'
+                ]
+            ) {
+                $targetAllocation =
+                    $allocationRow;
+
+                break;
+            }
+        }
+
+        if ($targetAllocation === null) {
+            throw new PoultrySlaughterException(
+                'Allocate this Poultry Shared expense to the slaughter batch cycle before linking it as a processing cost.'
+            );
+        }
+
+        $allocatedCents =
+            poultry_slaughter_money_cents(
+                $targetAllocation[
+                    'allocated_amount'
+                ]
+            );
+
+
+        /*
+         * The exact allocation state is already causal input to the Expense
+         * Revision fingerprint. Prove current projection == immutable latest
+         * revision before slaughter can consume any share.
+         */
+        $latest =
+            expense_revision_service_latest(
+                $pdo,
+                $farmId,
+                $expenseId,
+                true
+            );
+
+        $builtFingerprint =
+            (string)(
+                $state[
+                    'built'
+                ][
+                    'causal_fingerprint'
+                ]
+                ?? ''
+            );
+
+        if (
+            $latest === null
+            ||
+            (int)$latest[
+                'revision_no'
+            ] < 1
+            ||
+            (int)$expense[
+                'expense_revision_no'
+            ]
+                !==
+                (int)$latest[
+                    'revision_no'
+                ]
+            ||
+            !hash_equals(
+                (string)$expense[
+                    'expense_causal_fingerprint'
+                ],
+                (string)$latest[
+                    'causal_fingerprint'
+                ]
+            )
+            ||
+            !hash_equals(
+                $builtFingerprint,
+                (string)$latest[
+                    'causal_fingerprint'
+                ]
+            )
+        ) {
+            throw new PoultrySlaughterException(
+                'The Shared expense allocation revision is not in canonical agreement. Review Shared Cost Allocation before linking it.'
+            );
+        }
+
+
+        /*
+         * The locked parent serializes every supported mutation of this
+         * expense. Existing slaughter links can therefore be inspected for
+         * conservation without inventing another allocation lock authority.
+         */
+        $linksStmt =
+            $pdo->prepare(
+                "SELECT
+                     l.id,
+                     l.batch_id,
+                     l.expense_revision_id,
+                     l.expense_revision_no,
+                     l.expense_causal_fingerprint,
+                     l.amount_snapshot,
+                     b.cycle_id AS linked_cycle_id,
+                     b.status AS linked_batch_status
+                 FROM poultry_slaughter_batch_expenses l
+                 INNER JOIN poultry_slaughter_batches b
+                   ON b.id=l.batch_id
+                  AND b.farm_id=l.farm_id
+                 WHERE l.farm_id=?
+                   AND l.expense_id=?
+                 ORDER BY l.id"
+            );
+
+        $linksStmt->execute([
+            $farmId,
+            $expenseId,
+        ]);
+
+        $existingLinks =
+            $linksStmt->fetchAll(
+                PDO::FETCH_ASSOC
+            ) ?: [];
+
+        $usedCents = 0;
+
+        foreach ($existingLinks as $existingLink) {
+            if (
+                strtolower(
+                    (string)$existingLink[
+                        'linked_batch_status'
+                    ]
+                ) === 'reversed'
+            ) {
+                continue;
+            }
+
+            /*
+             * Once a Shared expense revision has been consumed by Slaughter,
+             * a later allocation revision cannot be silently mixed with those
+             * frozen batch snapshots.
+             */
+            if (
+                (int)$existingLink[
+                    'expense_revision_id'
+                ]
+                    !==
+                    (int)$latest['id']
+                ||
+                (int)$existingLink[
+                    'expense_revision_no'
+                ]
+                    !==
+                    (int)$latest[
+                        'revision_no'
+                    ]
+                ||
+                !hash_equals(
+                    (string)$existingLink[
+                        'expense_causal_fingerprint'
+                    ],
+                    (string)$latest[
+                        'causal_fingerprint'
+                    ]
+                )
+            ) {
+                throw new PoultrySlaughterException(
+                    'This Shared expense allocation changed after an earlier slaughter link. Correct the existing linkage before assigning another batch share.'
+                );
+            }
+
+            if (
+                (int)$existingLink[
+                    'batch_id'
+                ]
+                ===
+                $batchId
+            ) {
+                throw new PoultrySlaughterException(
+                    'This Shared expense is already linked to the selected slaughter batch.'
+                );
+            }
+
+            if (
+                (int)$existingLink[
+                    'linked_cycle_id'
+                ]
+                !==
+                (int)$batch[
+                    'cycle_id'
+                ]
+            ) {
+                continue;
+            }
+
+            $usedCents +=
+                poultry_slaughter_money_cents(
+                    $existingLink[
+                        'amount_snapshot'
+                    ]
+                );
+        }
+
+
+        if ($usedCents > $allocatedCents) {
+            throw new PoultrySlaughterException(
+                'Existing slaughter links exceed this cycle Shared Cost Allocation.'
+            );
+        }
+
+        $remainingCents =
+            $allocatedCents
+            -
+            $usedCents;
+
+        if (
+            $batchAmountCents
+            >
+            $remainingCents
+        ) {
+            throw new PoultrySlaughterException(
+                'The amount assigned to this slaughter batch exceeds the remaining Shared Cost Allocation for its cycle.'
+            );
+        }
+
+
+        $amountSnapshot =
+            poultry_slaughter_money_from_cents(
+                $batchAmountCents
+            );
+
+        $insert =
+            $pdo->prepare(
+                "INSERT INTO poultry_slaughter_batch_expenses
+                 (
+                     farm_id,
+                     batch_id,
+                     request_token,
+                     request_fingerprint,
+                     expense_id,
+                     expense_revision_id,
+                     expense_revision_no,
+                     expense_causal_fingerprint,
+                     amount_snapshot
+                 )
+                 VALUES (?,?,?,?,?,?,?,?,?)"
+            );
+
+        $insert->execute([
+            $farmId,
+            $batchId,
+            $requestToken,
+            $requestFingerprint,
+            $expenseId,
+            (int)$latest['id'],
+            (int)$latest[
+                'revision_no'
+            ],
+            (string)$latest[
+                'causal_fingerprint'
+            ],
+            $amountSnapshot,
+        ]);
+
+        $linkId =
+            (int)$pdo->lastInsertId();
+
+
+        if (function_exists('audit_log_event')) {
+            audit_log_event(
+                'poultry_slaughter_shared_processing_expense_linked',
+                'poultry_slaughter_batch',
+                $batchId,
+                [
+                    'expense_id' =>
+                        $expenseId,
+
+                    'expense_revision_id' =>
+                        (int)$latest['id'],
+
+                    'cycle_id' =>
+                        (int)$batch[
+                            'cycle_id'
+                        ],
+
+                    'amount_snapshot' =>
+                        $amountSnapshot,
+
+                    'linked_by_user_id' =>
+                        $actorUserId,
+
+                    'request_fingerprint' =>
+                        $requestFingerprint,
+                ]
+            );
+        }
+
+
+        if ($startedTransaction) {
+            $pdo->commit();
+        }
+
+        return [
+            'link_id' =>
+                $linkId,
+
+            'expense_id' =>
+                $expenseId,
+
+            'expense_revision_id' =>
+                (int)$latest['id'],
+
+            'cycle_id' =>
+                (int)$batch[
+                    'cycle_id'
+                ],
+
+            'amount_snapshot' =>
+                $amountSnapshot,
+
+            'remaining_allocation' =>
+                poultry_slaughter_money_from_cents(
+                    $remainingCents
+                    -
+                    $batchAmountCents
+                ),
+
+            'idempotent' =>
+                false,
+        ];
+
+    } catch (Throwable $e) {
+        if (
+            $startedTransaction
+            &&
+            $pdo->inTransaction()
+        ) {
+            $pdo->rollBack();
+        }
+
+        throw $e;
+    }
+}
+}
+
 /*
  * Freeze the batch valuation before any processed output may enter Inventory.
  *
@@ -2233,32 +2997,53 @@ function poultry_slaughter_cost_basis_finalize(
                 );
             }
 
-            if (
+            /*
+             * Shared processing expense finalizer bridge.
+             *
+             * Direct Layer/Broiler processing expenses keep the original
+             * exact-expense contract.
+             *
+             * Poultry Shared expenses instead use the canonical
+             * financial_allocations projection. The slaughter link's
+             * amount_snapshot is the portion assigned to this physical batch,
+             * never the gross Shared parent expense.
+             */
+            $expenseFarmType =
                 strtolower(
-                    (string)$expense[
-                        'farm_type'
-                    ]
-                ) !== 'poultry'
-                ||
+                    trim(
+                        (string)$expense[
+                            'farm_type'
+                        ]
+                    )
+                );
+
+            $expenseProductionType =
                 strtolower(
-                    (string)$expense[
-                        'production_type'
-                    ]
-                )
-                    !==
-                    strtolower(
+                    trim(
+                        (string)$expense[
+                            'production_type'
+                        ]
+                    )
+                );
+
+            $batchProductionType =
+                strtolower(
+                    trim(
                         (string)$batch[
                             'production_type'
                         ]
                     )
-                ||
-                (int)$expense[
-                    'cycle_id'
-                ]
-                    !==
-                    (int)$batch[
-                        'cycle_id'
+                );
+
+            $snapshotCents =
+                poultry_slaughter_money_cents(
+                    $link[
+                        'amount_snapshot'
                     ]
+                );
+
+            if (
+                $expenseFarmType !== 'poultry'
                 ||
                 (string)$expense[
                     'expense_date'
@@ -2273,28 +3058,292 @@ function poultry_slaughter_cost_basis_finalize(
                 );
             }
 
-            $currentCents =
-                poultry_slaughter_money_cents(
-                    (float)$expense['amount']
-                    *
-                    (float)$expense['unit']
-                );
-
-            $snapshotCents =
-                poultry_slaughter_money_cents(
-                    $link[
-                        'amount_snapshot'
-                    ]
-                );
 
             if (
-                $currentCents
-                !==
-                $snapshotCents
+                $expenseProductionType
+                === 'shared'
             ) {
-                throw new PoultrySlaughterException(
-                    'A linked processing expense amount changed after selection. Correct the slaughter processing expense linkage before finalizing this batch.'
+                /*
+                 * Canonical Poultry Shared representation:
+                 *
+                 * production_type   = shared
+                 * attribution_scope = farm
+                 * cycle_id          = NULL
+                 * poultry_category  = NULL
+                 */
+                $expenseCycleId =
+                    $expense[
+                        'cycle_id'
+                    ]
+                    ?? null;
+
+                $poultryCategory =
+                    trim(
+                        (string)(
+                            $expense[
+                                'poultry_category'
+                            ]
+                            ?? ''
+                        )
+                    );
+
+                if (
+                    strtolower(
+                        trim(
+                            (string)(
+                                $expense[
+                                    'attribution_scope'
+                                ]
+                                ?? ''
+                            )
+                        )
+                    ) !== 'farm'
+                    ||
+                    (
+                        $expenseCycleId !== null
+                        &&
+                        trim(
+                            (string)$expenseCycleId
+                        ) !== ''
+                        &&
+                        (int)$expenseCycleId > 0
+                    )
+                    ||
+                    $poultryCategory !== ''
+                ) {
+                    throw new PoultrySlaughterException(
+                        'A linked Shared processing expense no longer has canonical Poultry Shared attribution.'
+                    );
+                }
+
+                /*
+                 * Salary and stock-owned expense classes must not enter
+                 * Slaughter Processing merely because the parent is Shared.
+                 */
+                poultry_slaughter_load_expense_authority();
+
+                expense_category_normalize(
+                    (string)$expense[
+                        'category'
+                    ],
+                    'slaughter_processing'
                 );
+
+
+                /*
+                 * The parent expense row is already locked by
+                 * expense_revision_service_expense(). Canonical Shared Cost
+                 * Allocation mutations also lock that parent first, so the
+                 * current projection is serialized while finalization proves
+                 * it.
+                 */
+                poultry_slaughter_assert_shared_processing_not_embedded(
+                    $pdo,
+                    $batch,
+                    $expense
+                );
+
+                $allocationRows =
+                    expense_revision_service_financial_allocations(
+                        $pdo,
+                        $farmId,
+                        $expenseId,
+                        true
+                    );
+
+                $animalAllocationRows =
+                    expense_revision_service_animal_allocations(
+                        $pdo,
+                        $farmId,
+                        $expenseId,
+                        true
+                    );
+
+                if (
+                    $animalAllocationRows
+                    !== []
+                ) {
+                    throw new PoultrySlaughterException(
+                        'A Poultry Shared processing expense cannot also carry Ruminant animal allocations.'
+                    );
+                }
+
+
+                /*
+                 * Financial allocations are part of the immutable causal
+                 * expense revision. Rebuild the fingerprint from live
+                 * projection state so out-of-band allocation drift cannot
+                 * silently enter a frozen slaughter valuation.
+                 */
+                $rebuiltExpenseState =
+                    expense_revision_build(
+                        $expense,
+                        $allocationRows,
+                        $animalAllocationRows
+                    );
+
+                if (
+                    !hash_equals(
+                        (string)$link[
+                            'expense_causal_fingerprint'
+                        ],
+                        (string)$rebuiltExpenseState[
+                            'causal_fingerprint'
+                        ]
+                    )
+                ) {
+                    throw new PoultrySlaughterException(
+                        'The linked Shared processing allocation changed after selection. Correct the linkage before finalizing this batch.'
+                    );
+                }
+
+
+                /*
+                 * Existing Shared Cost Allocation authority permits one
+                 * semantic allocation per production cycle.
+                 */
+                $targetAllocationRows = [];
+
+                foreach (
+                    $allocationRows
+                    as $allocationRow
+                ) {
+                    if (
+                        (int)$allocationRow[
+                            'cycle_id'
+                        ]
+                        ===
+                        (int)$batch[
+                            'cycle_id'
+                        ]
+                    ) {
+                        $targetAllocationRows[] =
+                            $allocationRow;
+                    }
+                }
+
+                if (
+                    count(
+                        $targetAllocationRows
+                    )
+                    !== 1
+                ) {
+                    throw new PoultrySlaughterException(
+                        'The linked Shared processing expense must have exactly one allocation for this slaughter batch cycle.'
+                    );
+                }
+
+                $allocatedCents =
+                    poultry_slaughter_money_cents(
+                        $targetAllocationRows[0][
+                            'allocated_amount'
+                        ]
+                    );
+
+                if (
+                    $snapshotCents < 1
+                    ||
+                    $snapshotCents
+                    >
+                    $allocatedCents
+                ) {
+                    throw new PoultrySlaughterException(
+                        'The slaughter processing snapshot exceeds the Shared expense allocation for this cycle.'
+                    );
+                }
+
+
+                /*
+                 * Integrity/conservation proof:
+                 *
+                 * one Shared parent may serve multiple slaughter batches in
+                 * the same cycle, but their non-reversed frozen shares may
+                 * never exceed that cycle's canonical allocation.
+                 */
+                $linkedTotalStmt =
+                    $pdo->prepare(
+                        "SELECT
+                             COALESCE(
+                                 SUM(l.amount_snapshot),
+                                 0
+                             )
+                         FROM poultry_slaughter_batch_expenses l
+                         INNER JOIN poultry_slaughter_batches b
+                           ON b.id=l.batch_id
+                          AND b.farm_id=l.farm_id
+                         WHERE l.farm_id=?
+                           AND l.expense_id=?
+                           AND b.cycle_id=?
+                           AND b.status <> 'reversed'"
+                    );
+
+                $linkedTotalStmt->execute([
+                    $farmId,
+                    $expenseId,
+                    (int)$batch[
+                        'cycle_id'
+                    ],
+                ]);
+
+                $linkedTotalCents =
+                    poultry_slaughter_money_cents(
+                        $linkedTotalStmt->fetchColumn()
+                        ?: 0
+                    );
+
+                if (
+                    $linkedTotalCents
+                    >
+                    $allocatedCents
+                ) {
+                    throw new PoultrySlaughterException(
+                        'Shared processing-cost slaughter links exceed the canonical allocation for this cycle.'
+                    );
+                }
+
+
+            } else {
+                /*
+                 * Existing direct Layer/Broiler contract remains unchanged.
+                 */
+                if (
+                    $expenseProductionType
+                        !==
+                        $batchProductionType
+                    ||
+                    (int)$expense[
+                        'cycle_id'
+                    ]
+                        !==
+                        (int)$batch[
+                            'cycle_id'
+                        ]
+                ) {
+                    throw new PoultrySlaughterException(
+                        'A linked processing expense no longer belongs to this Poultry slaughter batch.'
+                    );
+                }
+
+                $currentCents =
+                    poultry_slaughter_money_cents(
+                        (float)$expense[
+                            'amount'
+                        ]
+                        *
+                        (float)$expense[
+                            'unit'
+                        ]
+                    );
+
+                if (
+                    $currentCents
+                    !==
+                    $snapshotCents
+                ) {
+                    throw new PoultrySlaughterException(
+                        'A linked processing expense amount changed after selection. Correct the slaughter processing expense linkage before finalizing this batch.'
+                    );
+                }
             }
 
             $processingCents +=
@@ -3014,5 +4063,119 @@ function poultry_slaughter_output_add(
 
         throw $e;
     }
+}
+}
+
+
+/*
+ * Prevent one Shared Poultry expense from being counted both inside the
+ * batch's frozen embedded operating basis and again as post-snapshot
+ * slaughter processing cost.
+ *
+ * Writer and finalizer deliberately share this same assertion.
+ */
+if (!function_exists(
+    'poultry_slaughter_assert_shared_processing_not_embedded'
+)) {
+function poultry_slaughter_assert_shared_processing_not_embedded(
+    PDO $pdo,
+    array $batch,
+    array $expense
+): array {
+    $farmId =
+        (int)(
+            $batch[
+                'farm_id'
+            ]
+            ?? 0
+        );
+
+    $cycleId =
+        (int)(
+            $batch[
+                'cycle_id'
+            ]
+            ?? 0
+        );
+
+    $expenseId =
+        (int)(
+            $expense[
+                'id'
+            ]
+            ?? 0
+        );
+
+    $expenseCreatedAt =
+        trim(
+            (string)(
+                $expense[
+                    'created_at'
+                ]
+                ?? ''
+            )
+        );
+
+    $costBasisSnapshotAt =
+        trim(
+            (string)(
+                $batch[
+                    'cost_basis_snapshot_at'
+                ]
+                ?? ''
+            )
+        );
+
+    $timing =
+        expense_revision_service_cycle_allocation_timing(
+            $pdo,
+            $farmId,
+            $expenseId,
+            $cycleId,
+            $expenseCreatedAt,
+            $costBasisSnapshotAt
+        );
+
+    if (
+        !empty(
+            $timing[
+                'eligible_as_post_snapshot_processing'
+            ]
+        )
+    ) {
+        return $timing;
+    }
+
+    $reason =
+        (string)(
+            $timing[
+                'timing_reason'
+            ]
+            ?? ''
+        );
+
+    if (
+        $reason
+        ===
+        'already_allocated_at_cost_basis_snapshot'
+    ) {
+        throw new PoultrySlaughterException(
+            'This Shared expense was already allocated to this production cycle when the slaughter cost basis was frozen. Linking it again would double-count operating cost.'
+        );
+    }
+
+    if (
+        $reason
+        ===
+        'missing_pre_snapshot_revision_evidence'
+    ) {
+        throw new PoultrySlaughterException(
+            'This pre-existing Shared expense has no immutable allocation evidence at the slaughter cost-basis snapshot. Correct its allocation history before linking it.'
+        );
+    }
+
+    throw new PoultrySlaughterException(
+        'This Shared expense cannot be proven safe for post-snapshot slaughter processing cost.'
+    );
 }
 }

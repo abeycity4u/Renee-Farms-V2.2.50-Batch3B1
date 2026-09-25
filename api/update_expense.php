@@ -66,12 +66,16 @@ try {
             send_json(['success' => false, 'error' => 'You do not have permission to edit this expense record.'], 403);
         }
     }
-    $allowedManualCategories = ['salary','logistic','fuel','misc'];
-    $isLegacyFeedEdit = (($existing['category'] ?? '') === 'feeds' && $category === 'feeds');
-    $isLegacyMedicationEdit = (($existing['category'] ?? '') === 'medication' && $category === 'medication');
-    if (!in_array($category, $allowedManualCategories, true) && !$isLegacyFeedEdit && !$isLegacyMedicationEdit) {
-        send_json(['success' => false, 'error' => 'Stock purchases such as feed and medication are recorded through Inventory. Choose a non-stock expense category.'], 422);
-    }
+    /*
+     * Canonical category authority owns both normal edits and historical
+     * Inventory-owned category preservation.
+     */
+    $category =
+        expense_category_normalize_for_update(
+            $category,
+            $existing['category'] ?? ''
+        );
+
     $requestedProduction =
         $_POST['production_type']
         ?? ($existing['production_type'] ?? null);

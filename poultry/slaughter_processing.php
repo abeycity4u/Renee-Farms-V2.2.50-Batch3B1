@@ -122,6 +122,26 @@ if ($expenseRequestToken === '') {
 }
 
 
+$sharedExpenseRequestToken =
+    trim(
+        (string)(
+            $posted[
+                'shared_expense_request_token'
+            ]
+            ?? ''
+        )
+    );
+
+if ($sharedExpenseRequestToken === '') {
+    $sharedExpenseRequestToken =
+        bin2hex(
+            random_bytes(
+                16
+            )
+        );
+}
+
+
 if (
     $_SERVER[
         'REQUEST_METHOD'
@@ -348,6 +368,82 @@ if (
                     exit();
 
 
+                case 'link_shared_processing_expense':
+                    poultry_slaughter_require(
+                        'add_processing_expense'
+                    );
+
+                    $batchId =
+                        filter_var(
+                            $_POST[
+                                'batch_id'
+                            ]
+                            ?? 0,
+                            FILTER_VALIDATE_INT,
+                            [
+                                'options' => [
+                                    'min_range' => 1,
+                                ],
+                            ]
+                        )
+                        ?: 0;
+
+                    $sharedExpenseId =
+                        filter_var(
+                            $_POST[
+                                'shared_expense_id'
+                            ]
+                            ?? 0,
+                            FILTER_VALIDATE_INT,
+                            [
+                                'options' => [
+                                    'min_range' => 1,
+                                ],
+                            ]
+                        )
+                        ?: 0;
+
+                    $result =
+                        poultry_slaughter_processing_shared_expense_link(
+                            $pdo,
+                            $farmId,
+                            $batchId,
+                            $sharedExpenseId,
+                            $_POST[
+                                'shared_expense_amount'
+                            ]
+                            ?? '',
+                            $actorUserId,
+                            $sharedExpenseRequestToken
+                        );
+
+                    $wasIdempotent =
+                        (bool)(
+                            $result[
+                                'idempotent'
+                            ]
+                            ?? false
+                        );
+
+                    $_SESSION[
+                        'success'
+                    ] =
+                        $wasIdempotent
+                            ? 'This Shared processing allocation was already linked. The existing immutable slaughter snapshot was reused safely.'
+                            : 'Shared processing allocation linked to this slaughter batch without changing the canonical Shared Cost Allocation.';
+
+                    header(
+                        'Location: '
+                        .
+                        $workspaceUrl
+                        .
+                        '?batch_id='
+                        .
+                        $batchId
+                    );
+                    exit();
+
+
                 case 'finalize_cost_basis':
                     poultry_slaughter_require(
                         'finalize_cost_basis'
@@ -556,18 +652,6 @@ $outputs =
         )
         : [];
 
-$successMessage =
-    $_SESSION[
-        'success'
-    ]
-    ?? null;
-
-unset(
-    $_SESSION[
-        'success'
-    ]
-);
-
 $canCreateBatch =
     poultry_slaughter_can(
         'create_batch'
@@ -617,6 +701,46 @@ $selectedHasOutputs =
         ]
         > 0
     );
+
+$sharedProcessingExpenses =
+    (
+        $selectedBatch
+        &&
+        $selectedOpen
+        &&
+        !$selectedFinalized
+        &&
+        !$selectedHasOutputs
+        &&
+        $canAddExpense
+    )
+        ? poultry_slaughter_workspace_shared_processing_expenses(
+            $pdo,
+            $farmId,
+            $selectedBatchId
+        )
+        : [];
+
+/*
+ * navbar.php owns the platform-wide centered notification container.
+ *
+ * Redirect success messages already live in $_SESSION['success'].
+ * Same-page validation errors are promoted to $_SESSION['error']
+ * before navbar.php renders, while $posted remains available so the
+ * user's submitted values stay on the form.
+ */
+if (
+    $formError !== null
+    &&
+    trim(
+        (string)$formError
+    ) !== ''
+) {
+    $_SESSION[
+        'error'
+    ] =
+        (string)$formError;
+}
 ?>
 <!doctype html>
 <html lang="en">
@@ -651,26 +775,6 @@ $selectedHasOutputs =
             Processed Chicken Sales
         </a>
     </div>
-
-    <?php if ($successMessage): ?>
-        <?php
-        renderNotification(
-            'success',
-            $successMessage,
-            'Poultry slaughter updated'
-        );
-        ?>
-    <?php endif; ?>
-
-    <?php if ($formError): ?>
-        <?php
-        renderNotification(
-            'error',
-            $formError,
-            'Action not completed'
-        );
-        ?>
-    <?php endif; ?>
 
     <div class="alert alert-info slaughter-boundary-note">
         <strong>Workflow:</strong>
@@ -1041,16 +1145,25 @@ $selectedHasOutputs =
                                         Expense category
                                     </label>
 
-                                    <input
-                                        class="form-control"
+                                    <select
+                                        class="form-select"
                                         id="expenseCategory"
-                                        type="text"
                                         name="expense_category"
-                                        maxlength="100"
                                         required
-                                        placeholder="e.g. Processing labour"
-                                        value="<?= $h($posted['expense_category'] ?? '') ?>"
                                     >
+                                        <option value="">
+                                            Select processing expense category
+                                        </option>
+
+                                        <?php foreach (expense_category_options('slaughter_processing') as $expenseCategoryKey => $expenseCategoryLabel): ?>
+                                            <option
+                                                value="<?= $h($expenseCategoryKey) ?>"
+                                                <?= (($posted['expense_category'] ?? '') === $expenseCategoryKey) ? 'selected' : '' ?>
+                                            >
+                                                <?= $h($expenseCategoryLabel) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
                                 </div>
 
                                 <div class="row g-3">
@@ -1107,6 +1220,109 @@ $selectedHasOutputs =
                                     Add Processing Expense
                                 </button>
                             </form>
+
+                                <div class="mt-4 pt-4 border-top">
+                                    <h6 class="mb-1">
+                                        Use existing Shared Cost Allocation
+                                    </h6>
+
+                                    <p class="text-muted small mb-3">
+                                        Only Shared allocations proven to occur after this batch's frozen cost-basis snapshot are shown.
+                                        Linking here does not rewrite the original Shared Cost Allocation.
+                                    </p>
+
+                                    <?php if (!$sharedProcessingExpenses): ?>
+                                        <div class="alert alert-light border mb-0">
+                                            No eligible Shared processing allocation is available for this batch.
+                                        </div>
+                                    <?php else: ?>
+                                        <form method="post">
+                                            <?= csrf_field() ?>
+
+                                            <input
+                                                type="hidden"
+                                                name="slaughter_action"
+                                                value="link_shared_processing_expense"
+                                            >
+
+                                            <input
+                                                type="hidden"
+                                                name="batch_id"
+                                                value="<?= (int)$selectedBatch['id'] ?>"
+                                            >
+
+                                            <input
+                                                type="hidden"
+                                                name="shared_expense_request_token"
+                                                value="<?= $h($sharedExpenseRequestToken) ?>"
+                                            >
+
+                                            <div class="mb-3">
+                                                <label
+                                                    class="form-label"
+                                                    for="sharedExpenseId"
+                                                >
+                                                    Shared processing allocation
+                                                </label>
+
+                                                <select
+                                                    class="form-select"
+                                                    id="sharedExpenseId"
+                                                    name="shared_expense_id"
+                                                    required
+                                                >
+                                                    <option value="">
+                                                        Select eligible Shared allocation
+                                                    </option>
+
+                                                    <?php foreach ($sharedProcessingExpenses as $sharedExpense): ?>
+                                                        <option
+                                                            value="<?= (int)$sharedExpense['expense_id'] ?>"
+                                                            <?= ((int)($posted['shared_expense_id'] ?? 0) === (int)$sharedExpense['expense_id']) ? 'selected' : '' ?>
+                                                        >
+                                                            <?= $h($sharedExpense['public_reference'] ?: ('Expense #' . $sharedExpense['expense_id'])) ?>
+                                                            — <?= $h($sharedExpense['category_label']) ?>
+                                                            — <?= $h($sharedExpense['expense_date']) ?>
+                                                            — Remaining ₦<?= $money($sharedExpense['remaining_amount']) ?>
+                                                        </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label
+                                                    class="form-label"
+                                                    for="sharedExpenseAmount"
+                                                >
+                                                    Amount to link (₦)
+                                                </label>
+
+                                                <input
+                                                    class="form-control"
+                                                    id="sharedExpenseAmount"
+                                                    type="number"
+                                                    name="shared_expense_amount"
+                                                    min="0.01"
+                                                    step="0.01"
+                                                    required
+                                                    value="<?= $h($posted['shared_expense_amount'] ?? '') ?>"
+                                                >
+
+                                                <div class="form-text">
+                                                    Enter an amount no greater than the remaining allocation shown above.
+                                                    The server revalidates the allocation before linking.
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                class="btn btn-outline-primary"
+                                                type="submit"
+                                            >
+                                                Link Shared Processing Allocation
+                                            </button>
+                                        </form>
+                                    <?php endif; ?>
+                                </div>
                         <?php endif; ?>
                     </div>
                 </section>

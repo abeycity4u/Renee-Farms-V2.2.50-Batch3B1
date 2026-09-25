@@ -1308,14 +1308,14 @@ if ($pdfRequested) {
                                 <span class="badge text-bg-secondary">
                                     <?php
                                         echo htmlspecialchars(
-                                            ucfirst(
-                                                (string)(
-                                                    $expense[
-                                                        'category'
-                                                    ]
-                                                    ?? 'misc'
-                                                )
-                                            )
+
+                expense_category_label(
+                    (string)(
+                        $expense["category"]
+                        ?? "misc"
+                    )
+                )
+
                                         );
                                     ?>
                                 </span>
@@ -1707,12 +1707,11 @@ if ($pdfRequested) {
                             class="form-select"
                             required
                         >
-                            <option value="feeds">Feeds (legacy historical record)</option>
-                            <option value="medication">Medication (legacy historical record)</option>
-                            <option value="salary">Salary</option>
-                            <option value="logistic">Logistic</option>
-                            <option value="fuel">Fuel</option>
-                            <option value="misc">Miscellaneous</option>
+                            <?php foreach (expense_category_options('report') as $expenseCategoryKey => $expenseCategoryLabel): ?>
+                                <option value="<?php echo app_attr($expenseCategoryKey); ?>">
+                                    <?php echo htmlspecialchars($expenseCategoryLabel, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>
+                                </option>
+                            <?php endforeach; ?>
                         </select>
 
                         <div class="form-text">
@@ -2014,10 +2013,11 @@ if ($pdfRequested) {
                             class="form-select"
                             required
                         >
-                            <option value="salary">Salary</option>
-                            <option value="logistic">Logistic</option>
-                            <option value="fuel">Fuel</option>
-                            <option value="misc">Miscellaneous</option>
+                            <?php foreach (expense_category_options('manual') as $expenseCategoryKey => $expenseCategoryLabel): ?>
+                                <option value="<?php echo app_attr($expenseCategoryKey); ?>">
+                                    <?php echo htmlspecialchars($expenseCategoryLabel, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>
+                                </option>
+                            <?php endforeach; ?>
                         </select>
                     </div>
 

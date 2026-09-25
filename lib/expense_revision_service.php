@@ -1285,3 +1285,432 @@ function expense_revision_service_record_deleted(
     return $revision;
 }
 }
+
+
+/*
+ * Read one cycle's economic allocation from an immutable Expense Revision
+ * causal manifest.
+ *
+ * allocation_percent and projection-row identity are intentionally irrelevant.
+ * allocated_amount + cycle_id are the canonical causal authority.
+ */
+if (!function_exists(
+    'expense_revision_service_manifest_cycle_allocation'
+)) {
+function expense_revision_service_manifest_cycle_allocation(
+    array $manifest,
+    int $cycleId
+): float {
+    if ($cycleId < 1) {
+        throw new InvalidArgumentException(
+            'Expense revision cycle identity must be positive.'
+        );
+    }
+
+    if (
+        !array_key_exists(
+            'financial_allocations',
+            $manifest
+        )
+        ||
+        !is_array(
+            $manifest[
+                'financial_allocations'
+            ]
+        )
+    ) {
+        throw new RuntimeException(
+            'Expense revision causal manifest is missing financial allocation evidence.'
+        );
+    }
+
+    $total = 0.0;
+
+    foreach (
+        $manifest[
+            'financial_allocations'
+        ]
+        as $row
+    ) {
+        if (!is_array($row)) {
+            throw new RuntimeException(
+                'Expense revision financial allocation evidence is malformed.'
+            );
+        }
+
+        $rowCycleId =
+            (int)(
+                $row[
+                    'cycle_id'
+                ]
+                ?? 0
+            );
+
+        if ($rowCycleId !== $cycleId) {
+            continue;
+        }
+
+        $amount =
+            $row[
+                'allocated_amount'
+            ]
+            ?? null;
+
+        if (
+            $amount === null
+            ||
+            !is_numeric(
+                (string)$amount
+            )
+        ) {
+            throw new RuntimeException(
+                'Expense revision financial allocation amount is malformed.'
+            );
+        }
+
+        $amount =
+            round(
+                (float)$amount,
+                2
+            );
+
+        if ($amount < 0) {
+            throw new RuntimeException(
+                'Expense revision financial allocation cannot be negative.'
+            );
+        }
+
+        $total +=
+            $amount;
+    }
+
+    return
+        round(
+            $total,
+            2
+        );
+}
+}
+
+
+/*
+ * Read the last immutable Expense Revision that existed at or before an
+ * economic cutoff and report the allocation that revision assigned to one
+ * production cycle.
+ *
+ * This is deliberately historical evidence, not the current
+ * financial_allocations projection.
+ *
+ * It is read-only and does not require the caller to own a transaction.
+ */
+if (!function_exists(
+    'expense_revision_service_cycle_allocation_at_or_before'
+)) {
+function expense_revision_service_cycle_allocation_at_or_before(
+    PDO $pdo,
+    int $farmId,
+    int $expenseId,
+    int $cycleId,
+    string $cutoffAt
+): array {
+    if (
+        $farmId < 1
+        ||
+        $expenseId < 1
+        ||
+        $cycleId < 1
+    ) {
+        throw new InvalidArgumentException(
+            'Historical expense allocation requires a valid farm, expense and cycle.'
+        );
+    }
+
+    $cutoffAt =
+        trim(
+            $cutoffAt
+        );
+
+    if (
+        preg_match(
+            '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/',
+            $cutoffAt
+        ) !== 1
+    ) {
+        throw new InvalidArgumentException(
+            'Historical expense allocation cutoff timestamp is invalid.'
+        );
+    }
+
+    $stmt =
+        $pdo->prepare(
+            "SELECT
+                 id,
+                 revision_no,
+                 causal_manifest_json,
+                 created_at
+             FROM farm_expense_revisions
+             WHERE farm_id=?
+               AND expense_id=?
+               AND created_at<=?
+             ORDER BY
+                 created_at DESC,
+                 revision_no DESC,
+                 id DESC
+             LIMIT 1"
+        );
+
+    $stmt->execute([
+        $farmId,
+        $expenseId,
+        $cutoffAt,
+    ]);
+
+    $revision =
+        $stmt->fetch(
+            PDO::FETCH_ASSOC
+        );
+
+    if (!$revision) {
+        return [
+            'has_revision' =>
+                false,
+
+            'revision_id' =>
+                null,
+
+            'revision_no' =>
+                null,
+
+            'revision_created_at' =>
+                null,
+
+            'allocated_amount' =>
+                0.0,
+
+            'had_positive_allocation' =>
+                false,
+        ];
+    }
+
+    $manifest =
+        json_decode(
+            (string)$revision[
+                'causal_manifest_json'
+            ],
+            true
+        );
+
+    if (
+        !is_array($manifest)
+        ||
+        json_last_error() !== JSON_ERROR_NONE
+    ) {
+        throw new RuntimeException(
+            'Historical expense revision causal manifest could not be decoded.'
+        );
+    }
+
+    $allocatedAmount =
+        expense_revision_service_manifest_cycle_allocation(
+            $manifest,
+            $cycleId
+        );
+
+    return [
+        'has_revision' =>
+            true,
+
+        'revision_id' =>
+            (int)$revision[
+                'id'
+            ],
+
+        'revision_no' =>
+            (int)$revision[
+                'revision_no'
+            ],
+
+        'revision_created_at' =>
+            (string)$revision[
+                'created_at'
+            ],
+
+        'allocated_amount' =>
+            $allocatedAmount,
+
+        'had_positive_allocation' =>
+            $allocatedAmount > 0,
+    ];
+}
+}
+
+
+/*
+ * Interpret immutable historical allocation evidence against one frozen
+ * economic snapshot.
+ *
+ * This is pure policy. Mutation, Slaughter and read-model consumers must all
+ * use this same decision rather than inventing their own timestamp rules.
+ */
+if (!function_exists(
+    'expense_revision_service_cycle_allocation_timing_decision'
+)) {
+function expense_revision_service_cycle_allocation_timing_decision(
+    array $historical,
+    string $expenseCreatedAt,
+    string $cutoffAt
+): array {
+    $expenseCreatedAt =
+        trim(
+            $expenseCreatedAt
+        );
+
+    $cutoffAt =
+        trim(
+            $cutoffAt
+        );
+
+    $timestampPattern =
+        '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/';
+
+    if (
+        preg_match(
+            $timestampPattern,
+            $expenseCreatedAt
+        ) !== 1
+        ||
+        preg_match(
+            $timestampPattern,
+            $cutoffAt
+        ) !== 1
+    ) {
+        throw new InvalidArgumentException(
+            'Expense allocation timing evidence contains an invalid timestamp.'
+        );
+    }
+
+    $hasRevision =
+        !empty(
+            $historical[
+                'has_revision'
+            ]
+        );
+
+    $allocatedAmount =
+        round(
+            (float)(
+                $historical[
+                    'allocated_amount'
+                ]
+                ?? 0
+            ),
+            2
+        );
+
+    if ($allocatedAmount < 0) {
+        throw new RuntimeException(
+            'Historical expense allocation cannot be negative.'
+        );
+    }
+
+    $hadPositiveAllocation =
+        $allocatedAmount > 0;
+
+    if ($hadPositiveAllocation) {
+        /*
+         * This cycle already carried this Shared expense at the exact
+         * Slaughter cost-basis snapshot. Profitability could therefore
+         * already have embedded it into operating basis.
+         */
+        $eligible = false;
+
+        $reason =
+            'already_allocated_at_cost_basis_snapshot';
+
+    } elseif (
+        !$hasRevision
+        &&
+        $expenseCreatedAt <= $cutoffAt
+    ) {
+        /*
+         * The expense existed before the snapshot but immutable revision
+         * evidence does not tell us what its allocation state was then.
+         *
+         * Fail closed rather than risk duplicate operating cost.
+         */
+        $eligible = false;
+
+        $reason =
+            'missing_pre_snapshot_revision_evidence';
+
+    } else {
+        $eligible = true;
+
+        $reason =
+            $hasRevision
+                ? 'no_positive_cycle_allocation_at_cost_basis_snapshot'
+                : 'expense_created_after_cost_basis_snapshot';
+    }
+
+    return
+        array_merge(
+            $historical,
+            [
+                'expense_created_at' =>
+                    $expenseCreatedAt,
+
+                'cutoff_at' =>
+                    $cutoffAt,
+
+                'allocated_amount' =>
+                    $allocatedAmount,
+
+                'had_positive_allocation' =>
+                    $hadPositiveAllocation,
+
+                'eligible_as_post_snapshot_processing' =>
+                    $eligible,
+
+                'timing_reason' =>
+                    $reason,
+            ]
+        );
+}
+}
+
+
+/*
+ * Canonical DB-backed historical timing authority.
+ *
+ * The immutable revision ledger answers what allocation existed at the
+ * Slaughter cost-basis snapshot. financial_allocations remains only the
+ * current projection.
+ */
+if (!function_exists(
+    'expense_revision_service_cycle_allocation_timing'
+)) {
+function expense_revision_service_cycle_allocation_timing(
+    PDO $pdo,
+    int $farmId,
+    int $expenseId,
+    int $cycleId,
+    string $expenseCreatedAt,
+    string $costBasisSnapshotAt
+): array {
+    $historical =
+        expense_revision_service_cycle_allocation_at_or_before(
+            $pdo,
+            $farmId,
+            $expenseId,
+            $cycleId,
+            $costBasisSnapshotAt
+        );
+
+    return
+        expense_revision_service_cycle_allocation_timing_decision(
+            $historical,
+            $expenseCreatedAt,
+            $costBasisSnapshotAt
+        );
+}
+}

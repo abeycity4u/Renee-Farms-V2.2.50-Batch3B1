@@ -16,8 +16,9 @@ $init = is_file($initPath) ? file_get_contents($initPath) : '';
 
 $sales = file_get_contents($root . '/management/sales_records.php');
 $expenses = file_get_contents($root . '/management/expenses.php');
-$layerExpenses = file_get_contents($root . '/poultry/layer_expenses.php');
-$broilerExpenses = file_get_contents($root . '/poultry/broiler_expenses.php');
+$poultryExpenses = file_get_contents($root . '/poultry/expenses.php');
+$layerExpenseRoute = file_get_contents($root . '/poultry/layer_expenses.php');
+$broilerExpenseRoute = file_get_contents($root . '/poultry/broiler_expenses.php');
 $ruminantExpenses = file_get_contents($root . '/ruminant/ruminant_expenses.php');
 
 $layerFeeds = file_get_contents($root . '/poultry/layer_feeds.php');
@@ -131,26 +132,52 @@ $add(
 );
 
 $add(
-    'Layer expense text and actor attribution are HTML-escaped',
-    str_contains(
-        $layerExpenses,
-        "app_html(\$expense['description'])"
-    )
-    && str_contains(
-        $layerExpenses,
-        'app_html(transaction_recorded_by_label_from_row('
-    )
+    'Canonical Poultry expense text and actor attribution are HTML-escaped',
+    preg_match(
+        '/echo\s+app_html\s*\(\s*'
+        . '\(string\)\s*\$expense\s*'
+        . '\[\s*[\'"]description[\'"]\s*\]'
+        . '\s*\)/s',
+        $poultryExpenses
+    ) === 1
+    &&
+    preg_match(
+        '/echo\s+app_html\s*\(\s*'
+        . 'transaction_recorded_by_label_from_row\s*\(/s',
+        $poultryExpenses
+    ) === 1
 );
 
 $add(
-    'Broiler expense text and actor attribution are HTML-escaped',
+    'Legacy Layer/Broiler expense routes own no rendering surface',
     str_contains(
-        $broilerExpenses,
-        "app_html(\$expense['description'] ?: '--')"
+        $layerExpenseRoute,
+        'poultry_expense_compatibility_redirect('
     )
-    && str_contains(
-        $broilerExpenses,
-        'app_html(transaction_recorded_by_label_from_row('
+    &&
+    str_contains(
+        $broilerExpenseRoute,
+        'poultry_expense_compatibility_redirect('
+    )
+    &&
+    !str_contains(
+        $layerExpenseRoute,
+        '<html'
+    )
+    &&
+    !str_contains(
+        $broilerExpenseRoute,
+        '<html'
+    )
+    &&
+    !str_contains(
+        $layerExpenseRoute,
+        '<form'
+    )
+    &&
+    !str_contains(
+        $broilerExpenseRoute,
+        '<form'
     )
 );
 
@@ -404,9 +431,18 @@ $add(
 
 $add(
     'Inventory dynamic production options use DOM-safe external Option construction',
+    preg_match_all(
+        '/options\.forEach\s*\(\s*'
+        . '\(\[\s*value\s*,\s*label\s*\]\)\s*'
+        . '=>\s*select\.add\s*\(\s*'
+        . 'new Option\s*\(\s*label\s*,\s*value\s*\)'
+        . '\s*\)\s*\)/s',
+        $inventoryJs
+    ) >= 2
+    &&
     substr_count(
         $inventoryJs,
-        "options.forEach(([value,label]) => select.add(new Option(label, value)))"
+        'select.replaceChildren'
     ) >= 2
 );
 

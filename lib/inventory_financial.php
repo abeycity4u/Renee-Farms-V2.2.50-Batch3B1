@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/stock_reporting.php';
+require_once dirname(__DIR__)
+    . '/includes/expense_category_catalog.php';
 
 /**
  * Financial classification for stocked items.
@@ -288,37 +290,125 @@ function inventory_financial_receipt_category_totals(array $rows): array
  * for display. The resulting totals are spending intelligence only; they do not
  * change the profitability engine.
  */
-function inventory_financial_combined_spending_totals(array $manualTotals, array $inventoryTotals): array
-{
-    $combined = $manualTotals;
+/**
+ * Translate canonical farm-expense categories into the combined-spending
+ * display namespace.
+ *
+ * Inventory and farm_expenses deliberately have separate classification
+ * vocabularies. Only the two historical Inventory-owned expense categories
+ * need translation into their Inventory Financial Type equivalents.
+ * Current manual non-stock categories retain their canonical expense keys.
+ */
+function inventory_financial_manual_expense_spending_key(
+    string $category
+): string {
+    $category =
+        strtolower(
+            trim(
+                $category
+            )
+        );
 
-    // Manual category -> display category. Historical 'feeds' remains visible
-    // for audit, while new feed purchases originate from Inventory.
-    $map = [
-        'feeds' => 'feed',
-        'medication' => 'medication_vaccine',
-        'salary' => 'salary',
-        'logistic' => 'logistic',
-        'fuel' => 'fuel',
-        'misc' => 'misc',
-    ];
-    $normalized = [];
-    foreach ($combined as $key => $value) {
-        $target = $map[$key] ?? $key;
-        $normalized[$target] = ($normalized[$target] ?? 0.0) + (float)$value;
+    if (
+        !expense_category_exists(
+            $category
+        )
+        ||
+        !expense_category_is_historical(
+            $category
+        )
+    ) {
+        return
+            $category;
     }
-    foreach ($inventoryTotals as $key => $value) {
-        $normalized[$key] = ($normalized[$key] ?? 0.0) + (float)$value;
-    }
-    return $normalized;
+
+    return
+        match ($category) {
+            'feeds' =>
+                'feed',
+
+            'medication' =>
+                'medication_vaccine',
+
+            default =>
+                $category,
+        };
 }
 
-function inventory_financial_spending_label(string $key): string
-{
-    $labels = array_merge(inventory_financial_classifications(), [
-        'salary' => 'Salary / Wages',
-        'logistic' => 'Logistics / Transport',
-        'misc' => 'Miscellaneous',
-    ]);
-    return $labels[$key] ?? ucfirst(str_replace('_', ' ', $key));
+
+/**
+ * Merge manually-recorded non-stock expenses and inventory purchase spending
+ * for display. The resulting totals are spending intelligence only; they do not
+ * change the profitability engine.
+ */
+function inventory_financial_combined_spending_totals(
+    array $manualTotals,
+    array $inventoryTotals
+): array {
+    $normalized = [];
+
+    foreach ($manualTotals as $key => $value) {
+        $target =
+            inventory_financial_manual_expense_spending_key(
+                (string)$key
+            );
+
+        $normalized[$target] =
+            ($normalized[$target] ?? 0.0)
+            +
+            (float)$value;
+    }
+
+    foreach ($inventoryTotals as $key => $value) {
+        $normalized[$key] =
+            ($normalized[$key] ?? 0.0)
+            +
+            (float)$value;
+    }
+
+    return
+        $normalized;
+}
+
+
+function inventory_financial_spending_label(
+    string $key
+): string {
+    $key =
+        strtolower(
+            trim(
+                $key
+            )
+        );
+
+    if (
+        inventory_financial_classification_is_valid(
+            $key
+        )
+    ) {
+        return
+            inventory_financial_classification_label(
+                $key
+            );
+    }
+
+    if (
+        expense_category_exists(
+            $key
+        )
+    ) {
+        return
+            expense_category_label(
+                $key
+            );
+    }
+
+    return
+        ucfirst(
+            str_replace(
+                '_',
+                ' ',
+                $key
+            )
+        );
 }

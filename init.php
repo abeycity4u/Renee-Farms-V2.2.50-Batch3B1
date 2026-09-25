@@ -22,6 +22,11 @@ if (!isset($pdo)) {
     if (file_exists(__DIR__ . '/config.php')) require_once __DIR__ . '/config.php';
 }
 
+// Canonical farm-expense category authority.
+// Expense pages, edit APIs and slaughter-processing surfaces consume this
+// shared catalog instead of maintaining page-local category lists.
+require_once __DIR__ . '/includes/expense_category_catalog.php';
+
 // Canonical V2.3 subscription/module entitlement layer. Keep farm subscription,
 // user identity/roles and granular permissions as separate concerns.
 require_once __DIR__ . '/includes/farm_entitlements.php';
