@@ -1436,7 +1436,7 @@ if (
                     </a>
 
                 <?php else: ?>
-                    <form method="post" class="row g-3 align-items-end">
+                    <form method="post" class="row g-3 align-items-end slaughter-output-form">
                         <?= csrf_field() ?>
 
                         <input

@@ -829,7 +829,7 @@ $outputItems = $itemStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
                     <?php if ($canAddOutput): ?>
                         <?php if ($outputItems): ?>
-                            <form method="post" class="row g-2 align-items-end">
+                            <form method="post" class="row g-2 align-items-end slaughter-output-form">
                                 <?php echo csrf_field(); ?>
                                 <input
                                     type="hidden"
@@ -907,14 +907,7 @@ $outputItems = $itemStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
                                         step="0.0001"
                                         required
                                     >
-                                    <div class="form-text">
-                                        Allocate production cost, not selling price.
-                                        Remaining:
-                                        <?php echo number_format(
-                                            (float)($batch['unallocated_cost_percent'] ?? 100),
-                                            2
-                                        ); ?>%.
-                                    </div>
+
                                 </div>
 
                                 <div class="col-md-2">
@@ -924,6 +917,17 @@ $outputItems = $itemStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
                                     >
                                         Receive Output
                                     </button>
+                                </div>
+
+                                <div class="col-12">
+                                    <div class="form-text">
+                                        Allocate production cost, not selling price.
+                                        Remaining:
+                                        <?php echo number_format(
+                                            (float)($batch['unallocated_cost_percent'] ?? 100),
+                                            2
+                                        ); ?>%.
+                                    </div>
                                 </div>
                             </form>
                         <?php else: ?>
