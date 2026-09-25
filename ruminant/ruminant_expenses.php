@@ -7,6 +7,7 @@ require_once(__DIR__ . '/../lib/attribution.php');
 require_once(__DIR__ . '/../lib/transaction_actor_display.php');
 require_once(__DIR__ . '/../lib/inventory_financial.php');
 require_once(__DIR__ . '/../lib/ruminant_expense_allocation.php');
+require_once(__DIR__ . '/../lib/ruminant_expense_entry.php');
 require_once(__DIR__ . '/../lib/expense_revision_service.php');
 require_once(__DIR__ . '/../lib/record_reference_persistence.php');
 require_once(__DIR__ . '/../lib/financial_allocation_workspace.php');
@@ -66,192 +67,100 @@ $spendingCategoryTotals = inventory_financial_combined_spending_totals($category
 $totalSpending = round($manualExpenseTotal + $inventoryPurchaseTotal, 2);
 
 // Handle form submission
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_expense'])) {
-    if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST'
+    &&
+    isset($_POST['add_expense'])
+) {
+    if (
+        !verify_csrf_token(
+            $_POST['csrf_token']
+            ?? ''
+        )
+    ) {
         http_response_code(419);
         exit('Invalid request token.');
     }
-    $expenseDate = trim((string)($_POST['expense_date'] ?? ''));
-    $dateObject = DateTime::createFromFormat('Y-m-d', $expenseDate);
-    $amount = (float)($_POST['amount'] ?? 0);
-    $unit = (float)($_POST['unit'] ?? 1);
-    $expenseCategoryInput =
+
+    $expenseDate =
         trim(
             (string)(
-                $_POST[
-                    'category'
-                ]
+                $_POST['expense_date']
                 ?? ''
             )
         );
 
-    $expenseCategoryValid =
-        true;
-
-    try {
-        $expenseCategory =
-            expense_category_normalize(
-                $expenseCategoryInput,
-                'manual'
-            );
-
-    } catch (InvalidArgumentException $e) {
-        $expenseCategory =
-            $expenseCategoryInput;
-
-        $expenseCategoryValid =
-            false;
-    }
-
-    if (
-        !$dateObject
-        ||
-        $dateObject->format('Y-m-d') !== $expenseDate
-        ||
-        $amount <= 0
-        ||
-        $unit <= 0
-        ||
-        !$expenseCategoryValid
-    ) {
-        $_SESSION['error'] =
-            'Please provide a valid date, non-stock expense category, amount and quantity greater than zero.';
-
-        header(
-            "Location: ruminant_expenses.php?month="
-            .
-            date(
-                'Y-m',
-                strtotime(
-                    $expenseDate
-                    ?: 'now'
-                )
-            )
+    $redirectDate =
+        DateTime::createFromFormat(
+            'Y-m-d',
+            $expenseDate
         );
 
-        exit();
-    }
+    $redirectMonth =
+        $redirectDate
+        &&
+        $redirectDate->format('Y-m-d') === $expenseDate
+            ? $redirectDate->format('Y-m')
+            : date('Y-m');
 
-    $productionType = attribution_normalize_production_type('ruminant', $_POST['production_type'] ?? 'shared');
-    $cycleId = (int)($_POST['cycle_id'] ?? 0);
-    if ($cycleId > 0) {
-        try { attribution_validate_cycle($pdo, $tenantFarmId, $cycleId, 'ruminant', $productionType); }
-        catch (RuntimeException $e) {
-            $_SESSION['error']=$e->getMessage();
-            header("Location: ruminant_expenses.php?month=" . date('Y-m', strtotime($expenseDate)));
-            exit();
-        }
-    }
-    $scope = attribution_scope($cycleId > 0 ? $cycleId : null, 'ruminant', $productionType);
     try {
-        $animalAllocation = ruminant_expense_build_animal_allocations($pdo, $tenantFarmId, $productionType, round($amount * $unit, 2), $_POST);
-        $pdo->beginTransaction();
-        $expenseDescription =
-            trim(
-                (string)(
-                    $_POST[
-                        'description'
-                    ]
-                    ?? ''
-                )
+        if (!$canManageExpenses) {
+            throw new RuntimeException(
+                'You do not have permission to record Ruminant expenses.'
             );
+        }
 
-        $expenseUserId =
+        $actorUserId =
             (int)(
-                $_SESSION[
-                    'user_id'
-                ]
+                $_SESSION['user_id']
                 ?? 0
             );
 
-        $expenseId =
-            record_reference_persistence_insert_new(
-                $pdo,
-                'expense',
-                static function (
-                    string $publicReference,
-                    string $createdAt
-                ) use (
-                    $pdo,
-                    $tenantFarmId,
-                    $expenseDate,
-                    $productionType,
-                    $scope,
-                    $cycleId,
-                    $expenseCategory,
-                    $amount,
-                    $unit,
-                    $expenseDescription,
-                    $expenseUserId
-                ): int {
-                    $stmt =
-                        $pdo->prepare(
-                            "INSERT INTO farm_expenses
-                                (
-                                    public_reference,
-                                    farm_id,
-                                    expense_date,
-                                    farm_type,
-                                    production_type,
-                                    attribution_scope,
-                                    cycle_id,
-                                    category,
-                                    amount,
-                                    unit,
-                                    description,
-                                    user_id,
-                                    created_at
-                                )
-                             VALUES
-                                (
-                                    ?, ?, ?,
-                                    'ruminant',
-                                    ?, ?, ?, ?, ?, ?, ?, ?, ?
-                                )"
-                        );
-
-                    $stmt->execute([
-                        $publicReference,
-                        $tenantFarmId,
-                        $expenseDate,
-                        $productionType,
-                        $scope,
-                        $cycleId > 0
-                            ? $cycleId
-                            : null,
-                        $expenseCategory,
-                        $amount,
-                        $unit,
-                        $expenseDescription,
-                        $expenseUserId,
-                        $createdAt,
-                    ]);
-
-                    return
-                        (int)$pdo->lastInsertId();
-                }
+        if ($actorUserId < 1) {
+            throw new RuntimeException(
+                'Your user identity could not be resolved.'
             );
+        }
 
-        ruminant_expense_save_animal_allocations($pdo, $tenantFarmId, $expenseId, $animalAllocation, (int)$_SESSION['user_id']);
+        $pdo->beginTransaction();
 
-        expense_revision_service_record_created(
+        ruminant_expense_entry_create(
             $pdo,
             $tenantFarmId,
-            $expenseId,
-            (int)($_SESSION['user_id'] ?? 0)
+            $actorUserId,
+            $_POST,
+            'manual'
         );
 
         $pdo->commit();
+
     } catch (Throwable $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
-        $_SESSION['error'] = $e instanceof RuntimeException ? $e->getMessage() : 'The ruminant expense could not be recorded.';
-        header("Location: ruminant_expenses.php?month=" . date('Y-m', strtotime($expenseDate)));
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+
+        $_SESSION['error'] =
+            safeUserExceptionMessage(
+                $e,
+                'The ruminant expense could not be recorded.'
+            );
+
+        header(
+            'Location: ruminant_expenses.php?month='
+            .
+            $redirectMonth
+        );
         exit();
     }
 
-    $_SESSION['success'] = "Ruminant expense recorded successfully!";
-    $redirectMonth = date('Y-m', strtotime($expenseDate));
-    header("Location: ruminant_expenses.php?month=" . $redirectMonth);
+    $_SESSION['success'] =
+        'Ruminant expense recorded successfully!';
+
+    header(
+        'Location: ruminant_expenses.php?month='
+        .
+        $redirectMonth
+    );
     exit();
 }
 $pdfReportUrl = pdf_report_current_url();

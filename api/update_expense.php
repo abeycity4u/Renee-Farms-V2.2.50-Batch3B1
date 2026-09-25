@@ -7,6 +7,7 @@ require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/../includes/permission_catalog.php');
 require_once(__DIR__ . '/../lib/attribution.php');
 require_once(__DIR__ . '/../lib/financial_allocation_integrity.php');
+require_once(__DIR__ . '../lib/slaughter_expense_integrity.php');
 require_once(__DIR__ . '/../lib/ruminant_expense_allocation.php');
 require_once(__DIR__ . '/../lib/expense_revision_service.php');
 require_http_method('POST');
@@ -264,6 +265,12 @@ try {
         ],
         $animalAllocation
             ?? []
+    );
+
+    slaughter_expense_integrity_assert_mutable(
+        $pdo,
+        $farmId,
+        (int)$expenseId
     );
 
     expense_revision_service_prepare_existing_mutation(

@@ -3,66 +3,206 @@
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../lib/ruminant_slaughter_processing.php';
+require_once __DIR__ . '/../includes/ruminant_slaughter_permissions.php';
 
 requireLogin();
-ensureAllowed('ruminant_animals');
 
-$farmId = requireCurrentFarmId();
-$userType = getUserType();
+ruminant_slaughter_require(
+    'view'
+);
 
-$canProcess =
-    isPlatformOwner()
-    || hasRole('farm_admin')
-    || hasPermission(
-        $userType,
-        'ruminant_animals_exit'
+$farmId =
+    requireCurrentFarmId();
+
+$actorUserId =
+    (int)(
+        $_SESSION[
+            'user_id'
+        ]
+        ?? 0
     );
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+$canCreateBatch =
+    ruminant_slaughter_can(
+        'create_batch'
+    );
+
+$canAddProcessingExpense =
+    ruminant_slaughter_can(
+        'add_processing_expense'
+    );
+
+$canAddOutput =
+    ruminant_slaughter_can(
+        'add_output'
+    );
+
+$processingExpenseCategories =
+    expense_category_options(
+        'slaughter_processing'
+    );
+
+if (
+    $_SERVER[
+        'REQUEST_METHOD'
+    ]
+    ===
+    'POST'
+) {
     require_valid_csrf_post();
 
-    if (!$canProcess) {
-        http_response_code(403);
-        exit('Access denied.');
-    }
-
-    $action = (string)($_POST['action'] ?? '');
+    $action =
+        strtolower(
+            trim(
+                (string)(
+                    $_POST[
+                        'action'
+                    ]
+                    ?? ''
+                )
+            )
+        );
 
     try {
         if ($action === 'create_batch') {
-            $batchId =
-                ruminant_slaughter_processing_create_batch(
-                    $pdo,
-                    $farmId,
-                    (int)($_POST['exit_event_id'] ?? 0),
-                    trim((string)($_POST['notes'] ?? '')),
-                    isset($_SESSION['user_id'])
-                        ? (int)$_SESSION['user_id']
-                        : null
-                );
+            ruminant_slaughter_require(
+                'create_batch'
+            );
+
+            ruminant_slaughter_processing_create_batch(
+                $pdo,
+                $farmId,
+                (int)(
+                    $_POST[
+                        'exit_event_id'
+                    ]
+                    ?? 0
+                ),
+                trim(
+                    (string)(
+                        $_POST[
+                            'notes'
+                        ]
+                        ?? ''
+                    )
+                ),
+                $actorUserId > 0
+                    ? $actorUserId
+                    : null
+            );
 
             $_SESSION['success'] =
                 'Slaughter processing batch opened successfully.';
+
+        } elseif (
+            $action
+            ===
+            'add_processing_expense'
+        ) {
+            ruminant_slaughter_require(
+                'add_processing_expense'
+            );
+
+            $result =
+                ruminant_slaughter_processing_expense_add(
+                    $pdo,
+                    $farmId,
+                    (int)(
+                        $_POST[
+                            'batch_id'
+                        ]
+                        ?? 0
+                    ),
+                    trim(
+                        (string)(
+                            $_POST[
+                                'category'
+                            ]
+                            ?? ''
+                        )
+                    ),
+                    $_POST[
+                        'amount'
+                    ]
+                    ?? '',
+                    $_POST[
+                        'unit'
+                    ]
+                    ?? '',
+                    trim(
+                        (string)(
+                            $_POST[
+                                'description'
+                            ]
+                            ?? ''
+                        )
+                    ),
+                    $actorUserId,
+                    trim(
+                        (string)(
+                            $_POST[
+                                'processing_expense_request_token'
+                            ]
+                            ?? ''
+                        )
+                    )
+                );
+
+            $_SESSION['success'] =
+                !empty(
+                    $result[
+                        'idempotent'
+                    ]
+                )
+                    ? 'This processing expense was already recorded. The existing record was retained safely.'
+                    : 'Ruminant slaughter processing expense recorded successfully.';
+
         } elseif ($action === 'add_output') {
+            ruminant_slaughter_require(
+                'add_output'
+            );
+
             ruminant_slaughter_processing_add_output(
                 $pdo,
                 $farmId,
-                (int)($_POST['batch_id'] ?? 0),
-                (int)($_POST['stock_item_id'] ?? 0),
-                (float)($_POST['quantity'] ?? 0),
-                (float)($_POST['cost_share_percent'] ?? 0),
-                isset($_SESSION['user_id'])
-                    ? (int)$_SESSION['user_id']
+                (int)(
+                    $_POST[
+                        'batch_id'
+                    ]
+                    ?? 0
+                ),
+                (int)(
+                    $_POST[
+                        'stock_item_id'
+                    ]
+                    ?? 0
+                ),
+                (float)(
+                    $_POST[
+                        'quantity'
+                    ]
+                    ?? 0
+                ),
+                (float)(
+                    $_POST[
+                        'cost_share_percent'
+                    ]
+                    ?? 0
+                ),
+                $actorUserId > 0
+                    ? $actorUserId
                     : null
             );
 
             $_SESSION['success'] =
                 'Slaughter output received into Inventory.';
+
         } else {
             throw new RuntimeException(
                 'Choose a valid slaughter processing action.'
             );
         }
+
     } catch (Throwable $e) {
         $_SESSION['error'] =
             safeUserExceptionMessage(
@@ -71,7 +211,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
     }
 
-    header('Location: slaughter_processing.php');
+    header(
+        'Location: slaughter_processing.php'
+    );
     exit();
 }
 
@@ -211,7 +353,7 @@ $outputItems = $itemStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
                                     ); ?>
                                 </td>
                                 <td>
-                                    <?php if ($canProcess): ?>
+                                    <?php if ($canCreateBatch): ?>
                                         <form method="post" class="d-inline">
                                             <?php echo csrf_field(); ?>
                                             <input
@@ -342,6 +484,268 @@ $outputItems = $itemStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
                         <?php endif; ?>
                     </div>
 
+                    <div class="card border-0 bg-light mb-3">
+                        <div class="card-body">
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                                <div>
+                                    <strong>
+                                        Processing Expenses
+                                    </strong>
+                                    <div class="small text-muted">
+                                        Canonical slaughter-day expenses allocated directly
+                                        to this tagged animal before cost-basis freeze.
+                                    </div>
+                                </div>
+
+                                <div class="text-end">
+                                    <div class="small text-muted">
+                                        Linked total
+                                    </div>
+                                    <div class="fw-semibold">
+                                        ₦<?php echo number_format(
+                                            (float)(
+                                                $batch[
+                                                    'processing_expense_snapshot_total'
+                                                ]
+                                                ?? 0
+                                            ),
+                                            2
+                                        ); ?>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <?php if (!empty($batch['processing_expenses'])): ?>
+                                <div class="table-responsive mb-3">
+                                    <table class="table table-sm align-middle mb-0">
+                                        <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Reference</th>
+                                            <th>Category</th>
+                                            <th>Description</th>
+                                            <th class="text-end">
+                                                Snapshot
+                                            </th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        <?php foreach (
+                                            $batch['processing_expenses']
+                                            as $processingExpense
+                                        ): ?>
+                                            <tr>
+                                                <td>
+                                                    <?php echo htmlspecialchars(
+                                                        date(
+                                                            'd/m/Y',
+                                                            strtotime(
+                                                                (string)$processingExpense[
+                                                                    'expense_date'
+                                                                ]
+                                                            )
+                                                        )
+                                                    ); ?>
+                                                </td>
+                                                <td>
+                                                    <?php echo htmlspecialchars(
+                                                        (string)(
+                                                            $processingExpense[
+                                                                'public_reference'
+                                                            ]
+                                                            ?? '—'
+                                                        )
+                                                    ); ?>
+                                                </td>
+                                                <td>
+                                                    <?php echo htmlspecialchars(
+                                                        (string)(
+                                                            $processingExpense[
+                                                                'category_label'
+                                                            ]
+                                                            ?? $processingExpense[
+                                                                'category'
+                                                            ]
+                                                            ?? '—'
+                                                        )
+                                                    ); ?>
+                                                </td>
+                                                <td>
+                                                    <?php echo htmlspecialchars(
+                                                        (string)(
+                                                            $processingExpense[
+                                                                'description'
+                                                            ]
+                                                            ?? ''
+                                                        )
+                                                    ); ?>
+                                                </td>
+                                                <td class="text-end">
+                                                    ₦<?php echo number_format(
+                                                        (float)(
+                                                            $processingExpense[
+                                                                'amount_snapshot'
+                                                            ]
+                                                            ?? 0
+                                                        ),
+                                                        2
+                                                    ); ?>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php else: ?>
+                                <div class="small text-muted mb-3">
+                                    No processing expense has been linked to this batch yet.
+                                </div>
+                            <?php endif; ?>
+
+                            <?php
+                            $processingExpenseOpen =
+                                $canAddProcessingExpense
+                                &&
+                                (string)$batch['status'] === 'open'
+                                &&
+                                $batch['cost_basis_amount'] === null
+                                &&
+                                empty($batch['outputs']);
+                            ?>
+
+                            <?php if ($processingExpenseOpen): ?>
+                                <form method="post" class="row g-2 align-items-end">
+                                    <?php echo csrf_field(); ?>
+
+                                    <input
+                                        type="hidden"
+                                        name="action"
+                                        value="add_processing_expense"
+                                    >
+
+                                    <input
+                                        type="hidden"
+                                        name="batch_id"
+                                        value="<?php echo (int)$batch['id']; ?>"
+                                    >
+
+                                    <input
+                                        type="hidden"
+                                        name="processing_expense_request_token"
+                                        value="<?php echo htmlspecialchars(
+                                            bin2hex(
+                                                random_bytes(
+                                                    16
+                                                )
+                                            ),
+                                            ENT_QUOTES,
+                                            'UTF-8'
+                                        ); ?>"
+                                    >
+
+                                    <div class="col-md-3">
+                                        <label class="form-label">
+                                            Category
+                                        </label>
+
+                                        <select
+                                            class="form-select"
+                                            name="category"
+                                            required
+                                        >
+                                            <option value="">
+                                                Select category...
+                                            </option>
+
+                                            <?php foreach (
+                                                $processingExpenseCategories
+                                                as $categoryKey => $categoryLabel
+                                            ): ?>
+                                                <option
+                                                    value="<?php echo htmlspecialchars(
+                                                        (string)$categoryKey,
+                                                        ENT_QUOTES,
+                                                        'UTF-8'
+                                                    ); ?>"
+                                                >
+                                                    <?php echo htmlspecialchars(
+                                                        (string)$categoryLabel
+                                                    ); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-2">
+                                        <label class="form-label">
+                                            Amount per unit (₦)
+                                        </label>
+
+                                        <input
+                                            class="form-control"
+                                            type="number"
+                                            name="amount"
+                                            min="0.01"
+                                            step="0.01"
+                                            required
+                                        >
+                                    </div>
+
+                                    <div class="col-md-2">
+                                        <label class="form-label">
+                                            Units
+                                        </label>
+
+                                        <input
+                                            class="form-control"
+                                            type="number"
+                                            name="unit"
+                                            min="0.01"
+                                            step="0.01"
+                                            value="1"
+                                            required
+                                        >
+                                    </div>
+
+                                    <div class="col-md-3">
+                                        <label class="form-label">
+                                            Description
+                                        </label>
+
+                                        <input
+                                            class="form-control"
+                                            type="text"
+                                            name="description"
+                                            maxlength="255"
+                                            placeholder="Optional processing note"
+                                        >
+                                    </div>
+
+                                    <div class="col-md-2">
+                                        <button
+                                            class="btn btn-outline-primary w-100"
+                                            type="submit"
+                                        >
+                                            Add Expense
+                                        </button>
+                                    </div>
+                                </form>
+
+                                <div class="form-text mt-2">
+                                    Add all slaughter processing expenses before
+                                    receiving the first Inventory output. The first
+                                    output freezes this animal's cost basis.
+                                </div>
+
+                            <?php elseif ($canAddProcessingExpense): ?>
+                                <div class="small text-muted">
+                                    Processing expenses are locked because this batch
+                                    is no longer eligible for pre-output cost changes.
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
                     <div class="table-responsive mb-3">
                         <table class="table table-sm align-middle mb-0">
                             <thead>
@@ -423,7 +827,7 @@ $outputItems = $itemStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
                         </table>
                     </div>
 
-                    <?php if ($canProcess): ?>
+                    <?php if ($canAddOutput): ?>
                         <?php if ($outputItems): ?>
                             <form method="post" class="row g-2 align-items-end">
                                 <?php echo csrf_field(); ?>

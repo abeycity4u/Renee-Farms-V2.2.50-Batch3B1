@@ -4,6 +4,7 @@ require_once __DIR__ . '/stock_service.php';
 require_once __DIR__ . '/inventory_category_role.php';
 require_once __DIR__ . '/slaughter_output_inventory.php';
 require_once __DIR__ . '/ruminant_slaughter_costing.php';
+require_once __DIR__ . '/ruminant_slaughter_expense_service.php';
 
 /**
  * Ruminant slaughter processing.
@@ -604,9 +605,45 @@ function ruminant_slaughter_processing_batches(
         $outputMap[(int)$row['batch_id']][] = $row;
     }
 
+    $processingExpenseMap =
+        ruminant_slaughter_processing_expenses_for_batches(
+            $pdo,
+            $farmId,
+            $batchIds
+        );
+
     foreach ($batches as &$batch) {
         $batch['outputs'] =
             $outputMap[(int)$batch['id']] ?? [];
+
+        $processingExpenseEntry =
+            $processingExpenseMap[
+                (int)$batch['id']
+            ]
+            ?? [
+                'rows' => [],
+                'snapshot_total' => 0.0,
+            ];
+
+        $batch['processing_expenses'] =
+            $processingExpenseEntry[
+                'rows'
+            ];
+
+        $batch['processing_expense_count'] =
+            count(
+                $batch[
+                    'processing_expenses'
+                ]
+            );
+
+        $batch['processing_expense_snapshot_total'] =
+            round(
+                (float)$processingExpenseEntry[
+                    'snapshot_total'
+                ],
+                2
+            );
 
         $batch['allocated_cost_percent'] = 0.0;
         $batch['allocated_cost_amount'] = 0.0;

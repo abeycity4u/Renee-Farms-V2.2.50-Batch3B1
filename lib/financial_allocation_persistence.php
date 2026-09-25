@@ -6,6 +6,9 @@ require_once __DIR__
 require_once __DIR__
     . '/expense_revision_service.php';
 
+require_once __DIR__
+    . '/slaughter_expense_integrity.php';
+
 /*
  * V3.0.1 canonical farm-expense financial-allocation persistence.
  *
@@ -391,6 +394,12 @@ function financial_allocation_persistence_retain_shared(
      * The immutable expense revision ledger records that the cost was
      * deliberately retained at shared-operation level.
      */
+    slaughter_expense_integrity_assert_mutable(
+        $pdo,
+        $farmId,
+        $expenseId
+    );
+
     $parent =
         financial_allocation_service_parent(
             $pdo,
@@ -670,6 +679,12 @@ function financial_allocation_persistence_apply(
      * Lock parent/current allocation/animal state before target cycles.
      * This establishes one deterministic mutation boundary.
      */
+    slaughter_expense_integrity_assert_mutable(
+        $pdo,
+        $farmId,
+        $expenseId
+    );
+
     $parent =
         financial_allocation_service_parent(
             $pdo,
