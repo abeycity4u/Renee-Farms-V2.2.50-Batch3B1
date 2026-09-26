@@ -86,38 +86,210 @@ if (!function_exists('rate_limit_increment_guest_bucket')) {
         }
     }
 }
-if (!function_exists('require_rate_limit')) {
-    function require_rate_limit(string $key,int $maxRequests=60,int $windowSeconds=60): void {
-        if(session_status()!==PHP_SESSION_ACTIVE) return;
+if (!function_exists('rate_limit_attempt')) {
+    /**
+     * Shared non-terminating limiter decision.
+     *
+     * Browser and API callers use the same counter authority. Presentation
+     * policy remains with the caller: APIs may emit JSON/429 while browser
+     * routes may use PRG and an HTML-safe generic message.
+     *
+     * @return array{
+     *     allowed: bool,
+     *     count: int,
+     *     max_requests: int,
+     *     window_seconds: int,
+     *     scope: string
+     * }
+     */
+    function rate_limit_attempt(
+        string $key,
+        int $maxRequests = 60,
+        int $windowSeconds = 60
+    ): array {
+        $key = trim($key);
 
-        $ip = trim((string)($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
-        $userId = (int)($_SESSION['user_id'] ?? 0);
+        if ($key === '') {
+            throw new InvalidArgumentException(
+                'Rate-limit key is required.'
+            );
+        }
 
-        // Authenticated requests retain the inexpensive per-session limiter.
-        // Guest authentication attempts use a server-side IP bucket so clearing
-        // or replacing PHPSESSID does not reset the login/recovery throttle.
+        if ($maxRequests < 1 || $windowSeconds < 1) {
+            throw new InvalidArgumentException(
+                'Rate-limit policy must use positive limits.'
+            );
+        }
+
+        /*
+         * Preserve the historical contract: the application bootstrap starts
+         * the session before authentication/browser throttles are evaluated.
+         * A caller outside that bootstrap is not silently given a new session.
+         */
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            return [
+                'allowed' => true,
+                'count' => 0,
+                'max_requests' => $maxRequests,
+                'window_seconds' => $windowSeconds,
+                'scope' => 'inactive_session',
+            ];
+        }
+
+        $ip =
+            trim(
+                (string)($_SERVER['REMOTE_ADDR'] ?? 'unknown')
+            );
+
+        $userId =
+            (int)($_SESSION['user_id'] ?? 0);
+
+        /*
+         * Authenticated requests retain the inexpensive per-session limiter.
+         * Guest authentication attempts use the existing server-side IP
+         * bucket so replacing PHPSESSID does not reset login/recovery limits.
+         */
         if ($userId > 0) {
-            $identity=hash('sha256',$key.'|'.$ip.'|'.$userId);
-            $bucketKey='v2_rate_'.$identity;
-            $now=time(); $bucket=$_SESSION[$bucketKey]??['count'=>0,'start'=>$now];
-            if(!is_array($bucket)||($now-(int)$bucket['start'])>=$windowSeconds) $bucket=['count'=>0,'start'=>$now];
-            $bucket['count']++; $_SESSION[$bucketKey]=$bucket;
-            $count=(int)$bucket['count'];
+            $identity =
+                hash(
+                    'sha256',
+                    $key . '|' . $ip . '|' . $userId
+                );
+
+            $bucketKey =
+                'v2_rate_' . $identity;
+
+            $now = time();
+
+            $bucket =
+                $_SESSION[$bucketKey]
+                ?? [
+                    'count' => 0,
+                    'start' => $now,
+                ];
+
+            if (
+                !is_array($bucket)
+                || !isset($bucket['count'], $bucket['start'])
+                || ($now - (int)$bucket['start']) >= $windowSeconds
+            ) {
+                $bucket = [
+                    'count' => 0,
+                    'start' => $now,
+                ];
+            }
+
+            $bucket['count'] =
+                (int)$bucket['count'] + 1;
+
+            $_SESSION[$bucketKey] =
+                $bucket;
+
+            $count =
+                (int)$bucket['count'];
+
+            $scope =
+                'authenticated_session';
         } else {
-            $guestIdentity=$key.'|guest|'.$ip;
-            $count=rate_limit_increment_guest_bucket($guestIdentity,$windowSeconds);
+            $guestIdentity =
+                $key . '|guest|' . $ip;
+
+            $count =
+                rate_limit_increment_guest_bucket(
+                    $guestIdentity,
+                    $windowSeconds
+                );
+
+            $scope =
+                'guest_server';
+
             if ($count === null) {
-                // Availability fallback if the shared temp directory is not writable.
-                $identity=hash('sha256',$guestIdentity);
-                $bucketKey='v2_rate_'.$identity;
-                $now=time(); $bucket=$_SESSION[$bucketKey]??['count'=>0,'start'=>$now];
-                if(!is_array($bucket)||($now-(int)$bucket['start'])>=$windowSeconds) $bucket=['count'=>0,'start'=>$now];
-                $bucket['count']++; $_SESSION[$bucketKey]=$bucket;
-                $count=(int)$bucket['count'];
+                /*
+                 * Availability fallback if the shared temp directory is not
+                 * writable. This preserves the existing session fallback.
+                 */
+                $identity =
+                    hash(
+                        'sha256',
+                        $guestIdentity
+                    );
+
+                $bucketKey =
+                    'v2_rate_' . $identity;
+
+                $now =
+                    time();
+
+                $bucket =
+                    $_SESSION[$bucketKey]
+                    ?? [
+                        'count' => 0,
+                        'start' => $now,
+                    ];
+
+                if (
+                    !is_array($bucket)
+                    || !isset($bucket['count'], $bucket['start'])
+                    || ($now - (int)$bucket['start']) >= $windowSeconds
+                ) {
+                    $bucket = [
+                        'count' => 0,
+                        'start' => $now,
+                    ];
+                }
+
+                $bucket['count'] =
+                    (int)$bucket['count'] + 1;
+
+                $_SESSION[$bucketKey] =
+                    $bucket;
+
+                $count =
+                    (int)$bucket['count'];
+
+                $scope =
+                    'guest_session_fallback';
             }
         }
 
-        if($count>$maxRequests) send_json(['success'=>false,'error'=>'Too many requests. Please try again shortly.'],429);
+        return [
+            'allowed' =>
+                $count <= $maxRequests,
+            'count' =>
+                $count,
+            'max_requests' =>
+                $maxRequests,
+            'window_seconds' =>
+                $windowSeconds,
+            'scope' =>
+                $scope,
+        ];
+    }
+}
+
+if (!function_exists('require_rate_limit')) {
+    function require_rate_limit(
+        string $key,
+        int $maxRequests = 60,
+        int $windowSeconds = 60
+    ): void {
+        $result =
+            rate_limit_attempt(
+                $key,
+                $maxRequests,
+                $windowSeconds
+            );
+
+        if (($result['allowed'] ?? false) !== true) {
+            send_json(
+                [
+                    'success' => false,
+                    'error' =>
+                        'Too many requests. Please try again shortly.',
+                ],
+                429
+            );
+        }
     }
 }
 ?>
