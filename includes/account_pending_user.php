@@ -15,6 +15,7 @@ declare(strict_types=1);
  *
  * Explicit non-responsibilities:
  * - opening, committing, or rolling back caller transactions;
+ * - username/full-name/account-type domain validation;
  * - tenant role assignment;
  * - seat/capacity policy;
  * - farm creation/update policy;
@@ -66,69 +67,6 @@ if (!function_exists('account_pending_user_placeholder_hash')) {
     }
 }
 
-if (!function_exists('account_pending_user_normalize_username')) {
-    function account_pending_user_normalize_username(
-        string $username
-    ): string {
-        $username =
-            trim(
-                $username
-            );
-
-        if (
-            $username === ''
-            || strlen($username) > 120
-        ) {
-            throw new InvalidArgumentException(
-                'Enter a valid username.'
-            );
-        }
-
-        return $username;
-    }
-}
-
-if (!function_exists('account_pending_user_normalize_user_type')) {
-    function account_pending_user_normalize_user_type(
-        string $userType
-    ): string {
-        $userType =
-            trim(
-                $userType
-            );
-
-        if (
-            $userType === ''
-            || strlen($userType) > 80
-        ) {
-            throw new InvalidArgumentException(
-                'A valid account type is required.'
-            );
-        }
-
-        return $userType;
-    }
-}
-
-if (!function_exists('account_pending_user_normalize_full_name')) {
-    function account_pending_user_normalize_full_name(
-        string $fullName
-    ): string {
-        $fullName =
-            trim(
-                $fullName
-            );
-
-        if (strlen($fullName) > 180) {
-            throw new InvalidArgumentException(
-                'Account name is too long.'
-            );
-        }
-
-        return $fullName;
-    }
-}
-
 if (!function_exists('account_pending_user_create')) {
     function account_pending_user_create(
         PDO $pdo,
@@ -148,24 +86,9 @@ if (!function_exists('account_pending_user_create')) {
             );
         }
 
-        $username =
-            account_pending_user_normalize_username(
-                $username
-            );
-
         $email =
             account_credential_normalize_email(
                 $email
-            );
-
-        $userType =
-            account_pending_user_normalize_user_type(
-                $userType
-            );
-
-        $fullName =
-            account_pending_user_normalize_full_name(
-                $fullName
             );
 
         $placeholderHash =
