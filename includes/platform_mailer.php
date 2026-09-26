@@ -225,7 +225,11 @@ if (!function_exists('platform_mail_send')) {
             : platform_php_mail_send($to, $subject, $body);
 
         if (($result['sent'] ?? false) !== true) {
-            error_log('Platform mail transport rejected an outbound message for ' . $to . ' via ' . ($result['transport'] ?? 'unknown') . '.');
+            error_log(
+                'Platform mail transport rejected an outbound message via '
+                . ($result['transport'] ?? 'unknown')
+                . '.'
+            );
         }
 
         return $result;
