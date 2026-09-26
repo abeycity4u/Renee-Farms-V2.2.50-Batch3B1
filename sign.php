@@ -3,6 +3,7 @@
 require_once(__DIR__ . '/config.php');
 require_once(__DIR__ . '/includes/functions.php');
 require_once(__DIR__ . '/api/api_helpers.php');
+require_once(__DIR__ . '/includes/account_credential_lifecycle.php');
 
 function verifyLoginPassword(PDO $pdo, array $user, string $password): bool {
     return password_security_verify($password, (string)($user['password'] ?? ''));
@@ -70,7 +71,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
     $user = $stmt->fetch();
 
-    if ($user && ($accountType === 'platform' || !in_array($user['subscription_status'], ['suspended', 'cancelled'], true)) && verifyLoginPassword($pdo, $user, $password)) {
+    if ($user && ($accountType === 'platform' || !in_array($user['subscription_status'], ['suspended', 'cancelled'], true)) && verifyLoginPassword($pdo, $user, $password)
+        && account_credential_login_allowed($user)) {
         if ($accountType === 'platform') $user = ensurePlatformOwnerWorkspace($pdo, $user);
         $previousLogin = $user['last_login_at'] ?? null;
 
