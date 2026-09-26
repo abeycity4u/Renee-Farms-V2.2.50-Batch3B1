@@ -409,6 +409,248 @@ if (!function_exists('daily_population_continuity_enrich_records')) {
     }
 }
 
+
+if (!function_exists('daily_population_continuity_activity_records')) {
+    /**
+     * Merge operational Daily Record rows with display-only canonical
+     * population activity rows for dates that otherwise have no Daily Record.
+     *
+     * This is a read model only:
+     * - no Daily Record row is inserted;
+     * - no population movement is written;
+     * - operational rows keep ownership of feed, water, production, mortality,
+     *   edit/delete actions and monthly operational totals;
+     * - synthetic rows expose canonical population-only dates such as sale,
+     *   slaughter, cull, acquisition and transfer.
+     */
+    function daily_population_continuity_activity_records(
+        PDO $pdo,
+        int $farmId,
+        string $recordType,
+        string $yearMonth,
+        array $records,
+        ?int $selectedCycleId = null
+    ): array {
+        if ($farmId <= 0) {
+            throw new InvalidArgumentException(
+                'Select a valid farm.'
+            );
+        }
+
+        if (
+            !preg_match('/^\d{4}-\d{2}$/', $yearMonth)
+            || DateTimeImmutable::createFromFormat(
+                '!Y-m-d',
+                $yearMonth . '-01'
+            ) === false
+        ) {
+            throw new InvalidArgumentException(
+                'Select a valid Daily Record month.'
+            );
+        }
+
+        $config = daily_population_continuity_type($recordType);
+
+        $fromDate = $yearMonth . '-01';
+        $toDate = (new DateTimeImmutable($fromDate))
+            ->modify('last day of this month')
+            ->format('Y-m-d');
+
+        $displayRecords = [];
+        $existingKeys = [];
+
+        foreach ($records as $record) {
+            $record['is_population_activity_only'] = false;
+            $record['population_movement_summary_include_mortality'] = false;
+
+            $displayRecords[] = $record;
+
+            $cycleId = (int)($record['cycle_id'] ?? 0);
+            $recordDate = trim(
+                (string)($record['record_date'] ?? '')
+            );
+
+            if (
+                $cycleId > 0
+                && daily_population_continuity_valid_date($recordDate)
+            ) {
+                $existingKeys[$cycleId . '|' . $recordDate] = true;
+            }
+        }
+
+        $sql =
+            'SELECT id, production_type'
+            . ' FROM production_cycles'
+            . ' WHERE farm_id = ?'
+            . ' AND farm_type = ?';
+
+        $params = [
+            $farmId,
+            $config['farm_type'],
+        ];
+
+        if ($config['production_type'] !== null) {
+            $sql .= ' AND LOWER(production_type) = ?';
+            $params[] = $config['production_type'];
+        }
+
+        if ($selectedCycleId !== null && $selectedCycleId > 0) {
+            $sql .= ' AND id = ?';
+            $params[] = $selectedCycleId;
+        }
+
+        $sql .= ' ORDER BY start_date ASC, id ASC';
+
+        $cycleStmt = $pdo->prepare($sql);
+        $cycleStmt->execute($params);
+        $cycles = $cycleStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($cycles as $cycle) {
+            $cycleId = (int)$cycle['id'];
+
+            $movementByDate =
+                daily_population_boundary_active_movements(
+                    $pdo,
+                    $farmId,
+                    $cycleId,
+                    $fromDate,
+                    $toDate
+                );
+
+            if (!$movementByDate) {
+                continue;
+            }
+
+            $missingDates = [];
+
+            foreach (array_keys($movementByDate) as $movementDate) {
+                $key = $cycleId . '|' . $movementDate;
+
+                if (!isset($existingKeys[$key])) {
+                    $missingDates[] = $movementDate;
+                }
+            }
+
+            if (!$missingDates) {
+                continue;
+            }
+
+            $snapshots =
+                daily_population_boundary_snapshots(
+                    $pdo,
+                    $farmId,
+                    $cycleId,
+                    $missingDates
+                );
+
+            foreach ($missingDates as $movementDate) {
+                $snapshot = $snapshots[$movementDate] ?? null;
+
+                if ($snapshot === null) {
+                    continue;
+                }
+
+                $row = [
+                    'id' => 0,
+                    'farm_id' => $farmId,
+                    'cycle_id' => $cycleId,
+                    'record_date' => $movementDate,
+                    'opening_stock' =>
+                        (int)$snapshot['opening_quantity'],
+                    'mortality' => 0,
+                    'population_opening_stock' =>
+                        (int)$snapshot['opening_quantity'],
+                    'population_closing_stock' =>
+                        (int)$snapshot['closing_quantity'],
+                    'population_movement_totals' =>
+                        $snapshot['movement_totals'] ?? [],
+                    'population_tracking_status' => 'canonical',
+                    'population_source' => 'v3_population_ledger',
+                    'is_population_activity_only' => true,
+                    /*
+                     * Operational Daily Record mortality already owns its
+                     * normal column. A movement-only row has no such source
+                     * row, so canonical mortality must be visible in the
+                     * movement summary rather than silently disappearing.
+                     */
+                    'population_movement_summary_include_mortality' =>
+                        true,
+                ];
+
+                if ($config['key'] === 'layer') {
+                    $row += [
+                        'feed_consumption_bags' => 0,
+                        'feed_item_id' => null,
+                        'water_consumption_liters' => 0,
+                        'medications' => '',
+                        'egg_production' => 0,
+                        'crates_count' => 0,
+                        'laying_rate' => 0,
+                        'birds_age' => 0,
+                        'remarks' => '',
+                    ];
+                } elseif ($config['key'] === 'broiler') {
+                    $row += [
+                        'feed_consumption_bags' => 0,
+                        'feed_item_id' => null,
+                        'water_consumption_liters' => 0,
+                        'medications' => '',
+                        'birds_age' => 0,
+                        'remarks' => '',
+                    ];
+                } else {
+                    $row += [
+                        'animal_type' =>
+                            strtolower(
+                                (string)$cycle['production_type']
+                            ),
+                        'feed_consumption_kg' => 0,
+                        'feed_item_id' => null,
+                        'water_consumption_liters' => 0,
+                        'tag_no' => '',
+                        'medications' => '',
+                        'reproduction_details' => '',
+                        'other_details' => '',
+                        'remarks' => '',
+                    ];
+                }
+
+                $displayRecords[] = $row;
+                $existingKeys[
+                    $cycleId . '|' . $movementDate
+                ] = true;
+            }
+        }
+
+        usort(
+            $displayRecords,
+            static function (array $a, array $b): int {
+                $dateCompare = strcmp(
+                    (string)($a['record_date'] ?? ''),
+                    (string)($b['record_date'] ?? '')
+                );
+
+                if ($dateCompare !== 0) {
+                    return $dateCompare;
+                }
+
+                $cycleCompare =
+                    (int)($a['cycle_id'] ?? 0)
+                    <=> (int)($b['cycle_id'] ?? 0);
+
+                if ($cycleCompare !== 0) {
+                    return $cycleCompare;
+                }
+
+                return (int)($a['id'] ?? 0)
+                    <=> (int)($b['id'] ?? 0);
+            }
+        );
+
+        return $displayRecords;
+    }
+}
+
 if (!function_exists('daily_population_continuity_current_stock')) {
     /**
      * Current live population for active cycles on one Daily Record workspace.

@@ -127,6 +127,15 @@ $records = daily_population_continuity_enrich_records(
     $records
 );
 
+$displayRecords = daily_population_continuity_activity_records(
+    $pdo,
+    $tenantFarmId,
+    'ruminant',
+    $yearMonth,
+    $records,
+    $selectedCycleId > 0 ? $selectedCycleId : null
+);
+
 // V2.2.49 Batch 4B refinement: resolve the feed item saved on each historical
 // daily record. This is deliberately independent of the current active-feed
 // list so an inactive/changed item still remains visible in history.
@@ -150,7 +159,7 @@ foreach ($activeCycles as $cycle) {
 }
 
 $animalTypeTabs = [];
-foreach ($records as $record) {
+foreach ($displayRecords as $record) {
     $animalType = (string)$record['animal_type'];
     $cycleId = (int)($record['cycle_id'] ?? 0);
     $tabKey = strtolower($animalType);
@@ -775,6 +784,8 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!"
                                             <?php foreach ($typeRecords as $record):
                                                 $closingStock = $record['population_closing_stock']
                                                     ?? ($record['opening_stock'] - $record['mortality']);
+                                                $isPopulationActivityOnly =
+                                                    !empty($record['is_population_activity_only']);
                                             ?>
                                             <tr>
                                                 <td><?php echo date('d/m/Y', strtotime($record['record_date'])); ?></td>
@@ -787,7 +798,8 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!"
                                                     <?php
                                                     $populationMovementSummary =
                                                         daily_population_boundary_movement_summary(
-                                                            $record['population_movement_totals'] ?? []
+                                                            $record['population_movement_totals'] ?? [],
+                                                            !empty($record['population_movement_summary_include_mortality'])
                                                         );
                                                     ?>
                                                     <?php if ($populationMovementSummary !== ''): ?>
@@ -830,6 +842,11 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!"
                                                 </td>
                                                 <?php if ($canEditRecords && $isEditableType): ?>
                                                 <td>
+                                                      <?php if ($isPopulationActivityOnly): ?>
+                                                      <span class="badge bg-light text-dark border">
+                                                          Population activity
+                                                      </span>
+                                                      <?php else: ?>
                                                       <div class="d-flex flex-wrap gap-2">
                                                           <button class="btn btn-sm btn-outline-primary edit-record-btn"
                                                                   title="Edit Record"
@@ -857,6 +874,7 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!"
                                                         </form>
                                                         <?php endif; ?>
                                                     </div>
+                                                      <?php endif; ?>
                                                 </td>
                                                 <?php endif; ?>
                                             </tr>
