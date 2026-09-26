@@ -781,7 +781,7 @@ $_SESSION['success'] = "Broiler daily record saved successfully!"
                                        id="waterConsumption" step="0.1" min="0" required>
                             </div>
                             <div class="col-md-6 mb-3 d-none" id="soldStockContainer">
-                                <label class="invisible" aria-hidden="true">Sold Stock</label>
+                                <label class="invisible" aria-hidden="true">Population movements</label>
                                 <div class="fw-semibold py-2 px-0" id="soldStockDisplay"
                                      role="status" aria-live="polite"></div>
                             </div>

@@ -986,6 +986,13 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!"
                                     Culled
                                     <strong id="ruminantCulledStockValue">0</strong>
                                 </span>
+                                <span
+                                    id="ruminantSlaughteredStockRow"
+                                    class="d-none"
+                                >
+                                    Slaughtered
+                                    <strong id="ruminantSlaughteredStockValue">0</strong>
+                                </span>
                                 <span class="text-muted">
                                     · Read-only
                                 </span>

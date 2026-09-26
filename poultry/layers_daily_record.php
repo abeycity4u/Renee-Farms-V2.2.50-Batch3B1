@@ -858,7 +858,7 @@ $_SESSION['success'] = "Daily record saved successfully!"
                                 <small class="text-muted">Auto-calculated as Egg Production ÷ 30</small>
                             </div>
                             <div class="col-md-4 mb-3 ms-md-auto d-none" id="soldStockContainer">
-                                <label class="invisible" aria-hidden="true">Sold Stock</label>
+                                <label class="invisible" aria-hidden="true">Population movements</label>
                                 <div class="fw-semibold py-2 px-0" id="soldStockDisplay"
                                      role="status" aria-live="polite"></div>
                             </div>

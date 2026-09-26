@@ -45,21 +45,36 @@
                 return;
             }
 
-            const saleDelta = Number(
-                payload?.movement_totals?.sale ?? 0
-            );
-            const soldStock =
-                Number.isFinite(saleDelta) && saleDelta < 0
-                    ? Math.abs(saleDelta)
-                    : 0;
+            const totals = payload?.movement_totals || {};
 
-            if (soldStock <= 0) {
+            function removalQuantity(type) {
+                const delta = Number(totals[type] ?? 0);
+
+                return Number.isFinite(delta) && delta < 0
+                    ? Math.abs(delta)
+                    : 0;
+            }
+
+            const facts = [
+                ['Sold', removalQuantity('sale')],
+                ['Slaughtered', removalQuantity('slaughter')]
+            ].filter(([, quantity]) => quantity > 0);
+
+            if (facts.length === 0) {
                 clear();
                 return;
             }
 
             display.textContent =
-                `Sold Stock: ${soldStock.toLocaleString()}`;
+                'Population movements: '
+                + facts
+                    .map(
+                        ([label, quantity]) =>
+                            `${label} ${quantity.toLocaleString()}`
+                    )
+                    .join(' · ')
+                + ' · Read-only';
+
             container.classList.remove('d-none');
         }
 
@@ -125,6 +140,7 @@
         return Object.freeze({
             soldStock: removalQuantity('sale'),
             culledStock: removalQuantity('cull'),
+            slaughteredStock: removalQuantity('slaughter'),
             taggedMortality: Math.max(
                 0,
                 totalMortality - groupMortality
@@ -153,6 +169,12 @@
                         || 'ruminantCulledStockRow'
                 )
             ),
+            slaughteredStock: document.getElementById(
+                String(
+                    options.slaughteredRowId
+                        || 'ruminantSlaughteredStockRow'
+                )
+            ),
             taggedMortality: document.getElementById(
                 String(
                     options.taggedMortalityRowId
@@ -172,6 +194,12 @@
                 String(
                     options.culledValueId
                         || 'ruminantCulledStockValue'
+                )
+            ),
+            slaughteredStock: document.getElementById(
+                String(
+                    options.slaughteredValueId
+                        || 'ruminantSlaughteredStockValue'
                 )
             ),
             taggedMortality: document.getElementById(
