@@ -31,6 +31,38 @@
     moduleCheckboxes.forEach((checkbox) => checkbox.addEventListener('change', validateModules));
     if (logoInput) logoInput.addEventListener('change', validateLogo);
 
+    const farmAdminResendButton =
+        form.querySelector(
+            '[data-farm-admin-resend="1"]'
+        );
+
+    if (farmAdminResendButton) {
+        farmAdminResendButton.addEventListener(
+            'click',
+            function () {
+                AppConfirm.ask(
+                    'Queue new activation instructions for this pending Farm Admin?',
+                    {
+                        title: 'Resend Farm Admin activation?',
+                        confirmText: 'Resend activation'
+                    }
+                ).then(function (confirmed) {
+                    if (!confirmed) return;
+
+                    const action =
+                        document.createElement('input');
+
+                    action.type = 'hidden';
+                    action.name = 'resend_activation';
+                    action.value = '1';
+
+                    form.appendChild(action);
+                    form.submit();
+                });
+            }
+        );
+    }
+
     form.addEventListener('submit', function (event) {
         validateModules();
         validateLogo();

@@ -119,6 +119,93 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verify_csrf_token($_POST['csrf_token'] ?? '')) { http_response_code(419); exit('Invalid request token.'); }
     $farmId = validFarmId($_POST['farm_id'] ?? null);
     $recordedByUserId = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
+
+    if (isset($_POST['resend_activation'], $_POST['farm_id'])) {
+        $farm = editableFarm($pdo, $farmId);
+
+        if (!$farm) {
+            $_SESSION['error'] = 'That farm account cannot be changed.';
+            redirectFarms();
+        }
+
+        try {
+            $ownerId = findFarmAdminId($pdo, $farmId);
+
+            if ($ownerId < 1) {
+                throw new RuntimeException(
+                    'The Farm Admin account could not be found.'
+                );
+            }
+
+            $pdo->beginTransaction();
+
+            $ownerStmt = $pdo->prepare(
+                "SELECT
+                    id,
+                    email,
+                    credential_state
+                 FROM users
+                 WHERE id = ?
+                   AND farm_id = ?
+                 LIMIT 1
+                 FOR UPDATE"
+            );
+
+            $ownerStmt->execute([
+                $ownerId,
+                $farmId,
+            ]);
+
+            $ownerRow = $ownerStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+
+            if (!$ownerRow) {
+                throw new RuntimeException(
+                    'The Farm Admin account could not be found.'
+                );
+            }
+
+            if (
+                (string)($ownerRow['credential_state'] ?? '')
+                !== 'pending_activation'
+            ) {
+                throw new RuntimeException(
+                    'Activation can only be resent while the Farm Admin is pending activation.'
+                );
+            }
+
+            $resendResult =
+                account_pending_user_resend_activation(
+                    $pdo,
+                    $ownerId
+                );
+
+            $pdo->commit();
+
+            $_SESSION['success'] =
+                'Farm Admin activation instructions were queued for '
+                . (string)$resendResult['email']
+                . '.';
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            error_log(
+                'Farm Admin activation resend failed for farm '
+                . $farmId
+                . ': '
+                . $e->getMessage()
+            );
+
+            $_SESSION['error'] =
+                $e instanceof InvalidArgumentException
+                    ? $e->getMessage()
+                    : 'Unable to resend Farm Admin activation.';
+        }
+
+        redirectFarms();
+    }
+
     if (isset($_POST['suspend_farm'], $_POST['farm_id']) || isset($_POST['reactivate_farm'], $_POST['farm_id'])) {
         if (!editableFarm($pdo, $farmId)) { $_SESSION['error'] = 'That farm account cannot be changed.'; redirectFarms(); }
         $status = isset($_POST['suspend_farm']) ? 'suspended' : 'active';
@@ -185,17 +272,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $roleLimits = subscription_plan_is_valid($plan)
         ? subscription_plan_effective_role_limits($plan, $submittedModules, $seatAddOns)
         : normalize_role_limits_for_entitlements($_POST['role_limits'] ?? [], $submittedModules);
-    $repairOwnerNeeded = isset($_POST['update_farm']) && $farmId > 0 && findFarmAdminId($pdo, $farmId) === 0;
+    $existingOwnerId =
+        isset($_POST['update_farm']) && $farmId > 0
+            ? findFarmAdminId($pdo, $farmId)
+            : 0;
+
+    $repairOwnerNeeded =
+        isset($_POST['update_farm'])
+        && $farmId > 0
+        && $existingOwnerId === 0;
+
+    $existingOwnerCredentialState = null;
+
+    if ($existingOwnerId > 0) {
+        $credentialStateStmt = $pdo->prepare(
+            'SELECT credential_state
+             FROM users
+             WHERE id = ?
+               AND farm_id = ?
+             LIMIT 1'
+        );
+
+        $credentialStateStmt->execute([
+            $existingOwnerId,
+            $farmId,
+        ]);
+
+        $existingOwnerCredentialState =
+            $credentialStateStmt->fetchColumn();
+
+        if ($existingOwnerCredentialState !== false) {
+            $existingOwnerCredentialState =
+                (string)$existingOwnerCredentialState;
+        } else {
+            $existingOwnerCredentialState = null;
+        }
+    }
+
+    $existingOwnerPending =
+        $existingOwnerCredentialState
+        === 'pending_activation';
+
     if ($name === '' || !preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) || $slug === PLATFORM_WORKSPACE_SLUG || !preg_match('/^#[0-9a-fA-F]{6}$/', $color)) {
         $error = 'Enter the Farm Admin details and use a unique lowercase Farm Workspace ID.';
     } elseif ($identityError !== null) $error = $identityError;
     elseif (!$submittedModules) $error = 'Select Poultry, Ruminant, or both so the farm workspace has an active service entitlement.';
     elseif ($emailPairError !== null) $error = $emailPairError;
-    elseif ((isset($_POST['create_farm']) || $repairOwnerNeeded) && $rawOwnerEmail === '') $error = 'Farm Admin email is required so the account can be activated securely.';
+    elseif ((isset($_POST['create_farm']) || $repairOwnerNeeded || $existingOwnerPending) && $rawOwnerEmail === '') $error = 'Farm Admin email is required so the account can be activated securely.';
     elseif (!in_array($plan, ['starter', 'growth', 'pro'], true) || !in_array($status, ['trial', 'active', 'past_due', 'suspended'], true)) $error = 'Select a valid subscription plan and status.';
     elseif (($startDate !== '' && !validSubscriptionDate($startDate)) || ($endDate !== '' && !validSubscriptionDate($endDate))) $error = 'Subscription dates must be valid dates.';
     elseif ($startDate !== '' && $endDate !== '' && $endDate < $startDate) $error = 'Subscription end date cannot be before its start date.';
-    elseif (isset($_POST['update_farm']) && !$repairOwnerNeeded && $password !== '' && ($passwordError = password_security_validate($password)) !== null) $error = $passwordError;
+    elseif (isset($_POST['update_farm']) && !$repairOwnerNeeded && $existingOwnerPending && $password !== '') $error = 'Pending Farm Admin accounts choose their password from the activation link.';
+    elseif (isset($_POST['update_farm']) && !$repairOwnerNeeded && !$existingOwnerPending && $password !== '' && ($passwordError = password_security_validate($password)) !== null) $error = $passwordError;
     else try {
         if (isset($_POST['update_farm'])) {
             subscription_seat_assert_capacity($pdo, $farmId, $plan, $submittedModules, $seatAddOns);
@@ -230,6 +358,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (isset($_POST['update_farm'])) {
             $farm = editableFarm($pdo, $farmId); if (!$farm) throw new RuntimeException('That farm cannot be edited.');
             $ownerId = findFarmAdminId($pdo, $farmId);
+            $ownerCredentialState = null;
+
             if (!$ownerId) {
                 $pendingOwner = account_pending_user_create(
                     $pdo,
@@ -239,18 +369,145 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'farm_admin',
                     $ownerName
                 );
+
                 $ownerId = (int)$pendingOwner['user_id'];
-                $activationQueuedFor = (string)$pendingOwner['email'];
+                $ownerCredentialState =
+                    'pending_activation';
+                $activationQueuedFor =
+                    (string)$pendingOwner['email'];
+            } else {
+                $ownerLockStmt = $pdo->prepare(
+                    "SELECT
+                        id,
+                        credential_state
+                     FROM users
+                     WHERE id = ?
+                       AND farm_id = ?
+                     LIMIT 1
+                     FOR UPDATE"
+                );
+
+                $ownerLockStmt->execute([
+                    $ownerId,
+                    $farmId,
+                ]);
+
+                $ownerLocked =
+                    $ownerLockStmt->fetch(PDO::FETCH_ASSOC)
+                    ?: null;
+
+                if (!$ownerLocked) {
+                    throw new RuntimeException(
+                        'The Farm Admin account could not be found.'
+                    );
+                }
+
+                $ownerCredentialState =
+                    (string)(
+                        $ownerLocked['credential_state']
+                        ?? ''
+                    );
+
+                if (
+                    $ownerCredentialState !== 'active'
+                    && $ownerCredentialState
+                        !== 'pending_activation'
+                ) {
+                    throw new RuntimeException(
+                        'The Farm Admin account has an unsupported credential state.'
+                    );
+                }
             }
+
             $logoPath = saveFarmLogoUpload($_FILES['logo'] ?? null, $farmId, $farm['logo_path'], $logoExtension); $newLogoPath = ($logoPath !== ($farm['logo_path'] ?? null)) ? $logoPath : null;
             $pdo->prepare('UPDATE farms SET name = ?, slug = ?, primary_color = ?, contact_name = ?, contact_email = ?, subscription_plan = ?, subscription_status = ?, subscription_starts_at = ?, subscription_ends_at = ?, logo_path = ? WHERE id = ?')->execute([$name, $slug, $color, trim($_POST['contact_name'] ?? ''), $contactEmail, $plan, $status, $startDate ? "$startDate 00:00:00" : null, $endDate ? "$endDate 23:59:59" : null, $logoPath, $farmId]);
-            $allowExistingPasswordUpdate = !$repairOwnerNeeded && $password !== '';
-            $ownerSql = 'UPDATE users SET username = ?, email = ?, full_name = ?, user_type = ?' . ($allowExistingPasswordUpdate ? ', password = ?' : '') . ' WHERE id = ? AND farm_id = ?';
-            $params = [$username, $email, $ownerName, 'farm_admin'];
-            if ($allowExistingPasswordUpdate) $params[] = password_security_hash($password);
-            $params[] = $ownerId;
-            $params[] = $farmId;
-            $pdo->prepare($ownerSql)->execute($params);
+
+            if (
+                $ownerCredentialState
+                === 'pending_activation'
+            ) {
+                if ($password !== '') {
+                    throw new InvalidArgumentException(
+                        'Pending Farm Admin accounts choose their password from the activation link.'
+                    );
+                }
+
+                $pendingEmailResult =
+                    account_pending_user_update_email(
+                        $pdo,
+                        $ownerId,
+                        $rawOwnerEmail
+                    );
+
+                if (
+                    !empty(
+                        $pendingEmailResult[
+                            'email_changed'
+                        ]
+                    )
+                ) {
+                    $activationQueuedFor =
+                        (string)$pendingEmailResult[
+                            'email'
+                        ];
+                }
+
+                $ownerStmt = $pdo->prepare(
+                    "UPDATE users
+                     SET username = ?,
+                         full_name = ?,
+                         user_type = 'farm_admin'
+                     WHERE id = ?
+                       AND farm_id = ?
+                       AND credential_state =
+                           'pending_activation'"
+                );
+
+                $ownerStmt->execute([
+                    $username,
+                    $ownerName,
+                    $ownerId,
+                    $farmId,
+                ]);
+            } else {
+                $allowExistingPasswordUpdate =
+                    $password !== '';
+
+                $ownerSql =
+                    'UPDATE users
+                     SET username = ?,
+                         email = ?,
+                         full_name = ?,
+                         user_type = ?'
+                    . (
+                        $allowExistingPasswordUpdate
+                            ? ', password = ?'
+                            : ''
+                    )
+                    . ' WHERE id = ?
+                         AND farm_id = ?
+                         AND credential_state = \'active\'';
+
+                $params = [
+                    $username,
+                    $email,
+                    $ownerName,
+                    'farm_admin',
+                ];
+
+                if ($allowExistingPasswordUpdate) {
+                    $params[] =
+                        password_security_hash(
+                            $password
+                        );
+                }
+
+                $params[] = $ownerId;
+                $params[] = $farmId;
+
+                $pdo->prepare($ownerSql)
+                    ->execute($params);
+            }
             sync_farm_entitlements($pdo, $farmId, $submittedModules);
             assign_protected_farm_admin_role($pdo, $farmId, $ownerId);
             saveRoleLimits($pdo, $farmId, $roleLimits);
@@ -330,10 +587,24 @@ $moduleLabels = farm_entitlement_module_labels();
 <?php if (!empty($error)): ?><?php renderNotification('error', $error, 'Farm action could not be completed.'); ?><?php endif; ?>
 <?php if ($ownerNeedsRepair): ?><?php renderNotification('warning', 'This farm was only partially created and has no admin account. Complete the username, Farm Admin email, name, and subscribed modules below; saving will create the admin in pending activation and queue activation instructions.', 'Farm setup needs attention.'); ?><?php endif; ?>
 <div class="card my-3"><div class="card-body"><h2 class="h5"><?php echo $editFarm ? 'Edit Farm' : 'Add New Farm'; ?></h2><form method="post" enctype="multipart/form-data" class="row g-3" id="farmAccountForm" novalidate><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token()); ?>"><?php if ($editFarm): ?><input type="hidden" name="farm_id" value="<?php echo (int)$editFarm['id']; ?>"><?php endif; ?>
-<div class="col-md-4"><label class="form-label">Username</label><input class="form-control" name="owner_username" value="<?php echo htmlspecialchars($owner['username']); ?>" maxlength="<?php echo ACCOUNT_IDENTITY_USERNAME_MAX; ?>" required></div><?php if ($editFarm && !$ownerNeedsRepair): ?><div class="col-md-4"><label class="form-label">Password (leave blank to keep)</label><input class="form-control" type="password" name="owner_password" minlength="<?php echo password_security_min_length(); ?>"></div><?php endif; ?><div class="col-md-4"><label class="form-label">Farm Admin email</label><input class="form-control" type="email" name="owner_email" value="<?php echo htmlspecialchars($owner['email']); ?>" <?php echo !$editFarm || $ownerNeedsRepair ? 'required' : ''; ?>><div class="form-text">Used for account activation and password recovery. Required when creating or repairing a Farm Admin account.</div></div>
+<div class="col-md-4"><label class="form-label">Username</label><input class="form-control" name="owner_username" value="<?php echo htmlspecialchars($owner['username']); ?>" maxlength="<?php echo ACCOUNT_IDENTITY_USERNAME_MAX; ?>" required></div><?php if ($editFarm && !$ownerNeedsRepair && (($owner['credential_state'] ?? 'active') === 'active')): ?><div class="col-md-4"><label class="form-label">Password (leave blank to keep)</label><input class="form-control" type="password" name="owner_password" minlength="<?php echo password_security_min_length(); ?>"></div><?php endif; ?><div class="col-md-4"><label class="form-label">Farm Admin email</label><input class="form-control" type="email" name="owner_email" value="<?php echo htmlspecialchars($owner['email']); ?>" <?php echo (!$editFarm || $ownerNeedsRepair || (($owner['credential_state'] ?? '') === 'pending_activation')) ? 'required' : ''; ?>><div class="form-text">Used for account activation and password recovery. Required when creating or repairing a Farm Admin account.</div></div>
 <div class="col-md-6"><label class="form-label">Full Name</label><input class="form-control" name="owner_name" value="<?php echo htmlspecialchars($owner['full_name']); ?>" maxlength="<?php echo ACCOUNT_IDENTITY_FULL_NAME_MAX; ?>" required></div><div class="col-md-6"><label class="form-label">Farm name</label><input class="form-control" name="name" value="<?php echo htmlspecialchars($form['name']); ?>" required></div><div class="col-md-6"><label class="form-label">Farm Workspace ID</label><input class="form-control" name="slug" value="<?php echo htmlspecialchars($form['slug']); ?>" pattern="[a-z0-9]+(-[a-z0-9]+)*" required></div><div class="col-md-6"><label class="form-label">Logo upload</label><input class="form-control" type="file" name="logo" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"><?php if ($editFarm && !empty($editFarm['logo_path'])): ?><div class="form-text">Current logo is saved and will be kept unless you choose a replacement.</div><img src="<?php echo BASE_URL . htmlspecialchars($editFarm['logo_path']); ?>" alt="Current farm logo" class="img-thumbnail mt-2 app-farm-logo-preview"><?php endif; ?></div>
 <div class="col-md-4"><label class="form-label">Primary colour</label><input class="form-control form-control-color" type="color" name="primary_color" value="<?php echo htmlspecialchars($form['primary_color']); ?>"></div><div class="col-md-4"><label class="form-label">Contact name</label><input class="form-control" name="contact_name" value="<?php echo htmlspecialchars($form['contact_name']); ?>"></div><div class="col-md-4"><label class="form-label">Billing / contact email</label><input class="form-control" type="email" name="contact_email" value="<?php echo htmlspecialchars($form['contact_email']); ?>"><div class="form-text">Used for billing and commercial contact. Account activation is sent to the Farm Admin email above.</div></div>
 <div class="col-12"><div class="card border"><div class="card-body"><h3 class="h6 mb-1">Farm Admin</h3><p class="form-text mt-0 mb-0">Protected tenant administrator. Identity is always <strong>Farm Admin</strong>; operational access comes from the subscribed modules below, not specialist roles.</p></div></div></div>
+<?php if ($editFarm && !$ownerNeedsRepair && (($owner['credential_state'] ?? '') === 'pending_activation')): ?>
+<div class="col-12">
+    <div class="alert alert-warning mb-0">
+        <strong>Pending activation.</strong>
+        This Farm Admin chooses a password from the activation link.
+        Changing the credential email queues new activation instructions only when the email actually changes.
+        <button
+            type="button"
+            class="btn btn-sm btn-outline-warning ms-2"
+            data-farm-admin-resend="1"
+        >Resend activation</button>
+    </div>
+</div>
+<?php endif; ?>
 <div class="col-md-12"><label class="form-label d-block">Subscribed Modules</label><?php foreach ($moduleLabels as $value => $label): ?><div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="modules[]" value="<?php echo htmlspecialchars($value); ?>" data-module-entitlement="1" <?php echo in_array($value, $editModules, true) ? 'checked' : ''; ?>><label class="form-check-label"><?php echo htmlspecialchars($label); ?></label></div><?php endforeach; ?><div class="form-text">Disabling a module removes current operational access but preserves its historical farm records.</div></div>
 <div class="col-12"><div class="card border"><div class="card-body"><h3 class="h6 mb-1">User limits by role</h3><p class="form-text mt-0">Platform limit for how many login accounts this farm may create under each specialist role. Farm Admin is one protected account. Disabled modules force their specialist limit to 0 when saved.</p><div class="row g-2">
 <?php foreach (['poultry_manager'=>'Poultry users','ruminant_manager'=>'Ruminant users','sales_rep'=>'Sales users','viewer'=>'Viewer users'] as $limitRole=>$limitLabel): ?><div class="col-sm-6 col-lg-3"><label class="form-label"><?php echo $limitLabel; ?></label><input class="form-control" type="number" min="0" max="500" name="role_limits[<?php echo $limitRole; ?>]" value="<?php echo (int)($editRoleLimits[$limitRole] ?? 1); ?>"></div><?php endforeach; ?>
