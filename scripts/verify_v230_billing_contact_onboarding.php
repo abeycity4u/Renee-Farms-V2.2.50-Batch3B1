@@ -1,7 +1,7 @@
 <?php
 /**
  * Static contract verifier for Farm Admin billing-contact self-service and
- * Platform Owner farm onboarding email.
+ * Platform Owner Farm Admin activation handoff.
  */
 
 $root = dirname(__DIR__);
@@ -50,10 +50,46 @@ $assert(str_contains($billing, 'farm_contact_email_update('), 'billing workspace
 $assert(str_contains($billing, 'Save a valid billing contact email above to enable subscription checkout.'), 'missing email is recoverable by Farm Admin on billing page.');
 $assert(str_contains($billing, 'btn btn-success fw-semibold') && str_contains($billing, '>Save email</button>'), 'billing contact save button keeps solid theme-safe contrast.');
 $assert(str_contains($farms, 'farm_contact_email_pair($rawOwnerEmail, $rawContactEmail)'), 'Platform Owner create/edit uses the same email-pair contract.');
-$assert(str_contains($farms, "'contact_email' => \$contactEmail"), 'farm creation prepares canonical contact email for onboarding.');
-$assert(str_contains($farms, 'farm_onboarding_send_credentials($onboardingPayload)'), 'farm creation delegates credential email to onboarding service.');
-$assert(str_contains($farms, '$pdo->commit();') && strpos($farms, 'farm_onboarding_send_credentials($onboardingPayload)') > strpos($farms, '$pdo->commit();'), 'onboarding email is attempted only after farm transaction commit.');
-$assert(str_contains($farms, 'The farm was created, but the credential email could not be sent.'), 'mail failure does not roll back a successfully created farm.');
+$assert(
+    str_contains(
+        $farms,
+        "require_once dirname(__DIR__) . '/includes/account_pending_user.php';"
+    ),
+    'Platform Owner farm writer loads the shared pending-account service.'
+);
+$assert(
+    !str_contains(
+        $farms,
+        "require_once dirname(__DIR__) . '/includes/farm_onboarding_mail.php';"
+    ),
+    'Platform Owner farm writer no longer loads plaintext onboarding mail.'
+);
+$assert(
+    substr_count($farms, 'account_pending_user_create(') === 2,
+    'new and repaired Farm Admin accounts delegate to shared pending-account creation.'
+);
+$assert(
+    !str_contains($farms, 'farm_onboarding_send_credentials('),
+    'farm writer performs no synchronous credential mail.'
+);
+$assert(
+    !str_contains($farms, '$onboardingPayload'),
+    'farm writer no longer builds a plaintext onboarding payload.'
+);
+$assert(
+    str_contains(
+        $farms,
+        'Farm Admin activation instructions were queued for delivery to '
+    ),
+    'farm writer reports durable activation delivery as queued rather than sent.'
+);
+$assert(
+    str_contains(
+        $farms,
+        'Used for billing and commercial contact.'
+    ),
+    'commercial contact email remains clearly separated from credential delivery.'
+);
 $assert(str_contains($onboarding, "'password'") === false || !preg_match('/error_log\s*\([^;]*password/is', $onboarding), 'onboarding service never logs the password.');
 $assert(
     str_contains($onboarding, "require_once __DIR__ . '/platform_public_url.php';")
@@ -75,4 +111,4 @@ $assert(!preg_match('/error_log\s*\([^;]*password/is', $mailer), 'mail transport
 echo 'Checks: ' . $checks . PHP_EOL;
 echo 'Failures: ' . $failures . PHP_EOL;
 if ($failures > 0) exit(1);
-echo 'PASS: V2.3 billing contact self-service and farm onboarding mail contract is centralized.' . PHP_EOL;
+echo 'PASS: Billing contact self-service and Farm Admin activation handoff remain centralized.' . PHP_EOL;

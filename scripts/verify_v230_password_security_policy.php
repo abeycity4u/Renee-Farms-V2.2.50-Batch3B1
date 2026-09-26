@@ -4,6 +4,7 @@ $init = @file_get_contents($root . '/init.php') ?: '';
 $policy = @file_get_contents($root . '/includes/password_security.php') ?: '';
 $guard = @file_get_contents($root . '/includes/user_management_tenant_guard.php') ?: '';
 $farms = @file_get_contents($root . '/management/farms.php') ?: '';
+$pending = @file_get_contents($root . '/includes/account_pending_user.php') ?: '';
 $users = @file_get_contents($root . '/management/users.php') ?: '';
 $sign = @file_get_contents($root . '/sign.php') ?: '';
 $recovery = @file_get_contents($root . '/includes/subscription_recovery.php') ?: '';
@@ -27,12 +28,77 @@ $add('Team User password storage uses central hasher', substr_count($users, "pas
 $add('Team User page has no native password_hash call', !str_contains($users, 'password_hash('));
 $add('Team User password fields use central minimum length', substr_count($users, 'password_security_min_length()') >= 2);
 $add('Farm Admin duplicate password-length constant is removed', !str_contains($farms, 'FARM_OWNER_MIN_PASSWORD_LENGTH'));
-$add('Farm Admin create password uses central validator', str_contains($farms, "isset(\$_POST['create_farm'])") && str_contains($farms, 'password_security_validate($password)'));
-$add('Farm Admin repair password uses central validator', str_contains($farms, '$repairOwnerNeeded') && str_contains($farms, 'password_security_validate($password)'));
-$add('Farm Admin replacement password uses central validator', str_contains($farms, "isset(\$_POST['update_farm'])") && str_contains($farms, 'password_security_validate($password)'));
-$add('Farm Admin password storage uses central hasher', substr_count($farms, 'password_security_hash($password)') >= 3);
-$add('Farm Admin page has no native password_hash call', !str_contains($farms, 'password_hash('));
-$add('Farm Admin password field uses central minimum length', str_contains($farms, 'password_security_min_length()'));
+$add(
+    'New Farm Admin does not accept an initial password',
+    !str_contains(
+        $farms,
+        "isset(\$_POST['create_farm']) && (\$passwordError = password_security_validate(\$password))"
+    )
+);
+$add(
+    'Missing Farm Admin repair does not accept an initial password',
+    !str_contains(
+        $farms,
+        "\$repairOwnerNeeded && (\$passwordError = password_security_validate(\$password))"
+    )
+);
+$add(
+    'Existing Farm Admin replacement password uses central validator',
+    str_contains(
+        $farms,
+        "isset(\$_POST['update_farm']) && !\$repairOwnerNeeded && \$password !== ''"
+    )
+    && str_contains(
+        $farms,
+        'password_security_validate($password)'
+    )
+);
+$add(
+    'Existing Farm Admin replacement password uses central hasher',
+    substr_count(
+        $farms,
+        'password_security_hash($password)'
+    ) === 1
+);
+$add(
+    'Pending Farm Admin placeholder uses central hasher',
+    str_contains(
+        $pending,
+        'account_pending_user_placeholder_hash'
+    )
+    && str_contains(
+        $pending,
+        'password_security_hash('
+    )
+);
+$add(
+    'Pending Farm Admin service does not accept browser initial password',
+    !preg_match(
+        '/function\s+account_pending_user_create\s*\([^)]*(?:password|rawPassword|plainPassword)/i',
+        $pending
+    )
+);
+$add(
+    'Farm Admin page has no native password_hash call',
+    !str_contains(
+        $farms,
+        'password_hash('
+    )
+);
+$add(
+    'Pending account service has no native password_hash call',
+    !str_contains(
+        $pending,
+        'password_hash('
+    )
+);
+$add(
+    'Existing Farm Admin password field uses central minimum length',
+    str_contains(
+        $farms,
+        'password_security_min_length()'
+    )
+);
 $add('Normal login delegates to central hash-only verifier', str_contains($sign, "password_security_verify(\$password, (string)(\$user['password'] ?? ''))"));
 $add('Normal login no longer accepts plaintext compatibility credentials', !str_contains($sign, 'password_get_info(') && !str_contains($sign, "hash_equals((string) \$user['password']"));
 $add('Recovery login delegates to central hash-only verifier', str_contains($recovery, "password_security_verify(\$password, (string)(\$account['password'] ?? ''))"));

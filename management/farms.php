@@ -1,7 +1,7 @@
 <?php
 require_once dirname(__DIR__) . '/init.php';
 require_once dirname(__DIR__) . '/includes/farm_contact_email.php';
-require_once dirname(__DIR__) . '/includes/farm_onboarding_mail.php';
+require_once dirname(__DIR__) . '/includes/account_pending_user.php';
 requireLogin();
 requirePlatformOwner();
 
@@ -176,12 +176,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Enter the Farm Admin details and use a unique lowercase Farm Workspace ID.';
     } elseif (!$submittedModules) $error = 'Select Poultry, Ruminant, or both so the farm workspace has an active service entitlement.';
     elseif ($emailPairError !== null) $error = $emailPairError;
+    elseif ((isset($_POST['create_farm']) || $repairOwnerNeeded) && $rawOwnerEmail === '') $error = 'Farm Admin email is required so the account can be activated securely.';
     elseif (!in_array($plan, ['starter', 'growth', 'pro'], true) || !in_array($status, ['trial', 'active', 'past_due', 'suspended'], true)) $error = 'Select a valid subscription plan and status.';
     elseif (($startDate !== '' && !validSubscriptionDate($startDate)) || ($endDate !== '' && !validSubscriptionDate($endDate))) $error = 'Subscription dates must be valid dates.';
     elseif ($startDate !== '' && $endDate !== '' && $endDate < $startDate) $error = 'Subscription end date cannot be before its start date.';
-    elseif (isset($_POST['create_farm']) && ($passwordError = password_security_validate($password)) !== null) $error = $passwordError;
-    elseif ($repairOwnerNeeded && ($passwordError = password_security_validate($password)) !== null) $error = 'This incomplete farm has no admin account. ' . $passwordError;
-    elseif (isset($_POST['update_farm']) && $password !== '' && ($passwordError = password_security_validate($password)) !== null) $error = $passwordError;
+    elseif (isset($_POST['update_farm']) && !$repairOwnerNeeded && $password !== '' && ($passwordError = password_security_validate($password)) !== null) $error = $passwordError;
     else try {
         if (isset($_POST['update_farm'])) {
             subscription_seat_assert_capacity($pdo, $farmId, $plan, $submittedModules, $seatAddOns);
@@ -189,7 +188,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $logoExtension = detectFarmLogoExtension($_FILES['logo'] ?? null);
         $createdFarmId = 0;
         $newLogoPath = null;
-        $onboardingPayload = null;
+        $activationQueuedFor = '';
         $pdo->beginTransaction();
         ensureTenantRoles($pdo);
         if (isset($_POST['create_farm'])) {
@@ -197,34 +196,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$name, $slug, $color, trim($_POST['contact_name'] ?? ''), $contactEmail, $plan, $status, $startDate ? "$startDate 00:00:00" : null, $endDate ? "$endDate 23:59:59" : null]);
             $farmId = (int)$pdo->lastInsertId(); $createdFarmId = $farmId; $logoPath = saveFarmLogoUpload($_FILES['logo'] ?? null, $farmId, null, $logoExtension); $newLogoPath = $logoPath;
             if ($logoPath) $pdo->prepare('UPDATE farms SET logo_path = ? WHERE id = ?')->execute([$logoPath, $farmId]);
-            $owner = $pdo->prepare('INSERT INTO users (farm_id, username, password, email, user_type, full_name) VALUES (?, ?, ?, ?, ?, ?)');
             $ownerName = trim($_POST['owner_name'] ?? $username);
-            $owner->execute([$farmId, $username, password_security_hash($password), $email, 'farm_admin', $ownerName]); $ownerId = (int)$pdo->lastInsertId();
+            $pendingOwner = account_pending_user_create(
+                $pdo,
+                $farmId,
+                $username,
+                $email,
+                'farm_admin',
+                $ownerName
+            );
+            $ownerId = (int)$pendingOwner['user_id'];
+            $activationQueuedFor = (string)$pendingOwner['email'];
             sync_farm_entitlements($pdo, $farmId, $submittedModules);
             assign_protected_farm_admin_role($pdo, $farmId, $ownerId);
             saveRoleLimits($pdo, $farmId, $roleLimits);
             subscription_seat_save_addons($pdo, $farmId, $seatAddOns);
             subscription_record_capture($pdo, $farmId, 'tenant_created', $recordedByUserId);
-            $onboardingPayload = [
-                'contact_email' => $contactEmail,
-                'farm_name' => $name,
-                'workspace_id' => $slug,
-                'username' => $username,
-                'password' => $password,
-                'recipient_name' => trim($_POST['contact_name'] ?? '') ?: $ownerName,
-            ];
             $message = "Created {$name}.";
         } elseif (isset($_POST['update_farm'])) {
             $farm = editableFarm($pdo, $farmId); if (!$farm) throw new RuntimeException('That farm cannot be edited.');
             $ownerId = findFarmAdminId($pdo, $farmId);
             if (!$ownerId) {
-                $ownerStmt = $pdo->prepare('INSERT INTO users (farm_id, username, password, email, user_type, full_name) VALUES (?, ?, ?, ?, ?, ?)');
-                $ownerStmt->execute([$farmId, $username, password_security_hash($password), $email, 'farm_admin', trim($_POST['owner_name'] ?? $username)]);
-                $ownerId = (int)$pdo->lastInsertId();
+                $pendingOwner = account_pending_user_create(
+                    $pdo,
+                    $farmId,
+                    $username,
+                    $email,
+                    'farm_admin',
+                    trim($_POST['owner_name'] ?? $username)
+                );
+                $ownerId = (int)$pendingOwner['user_id'];
+                $activationQueuedFor = (string)$pendingOwner['email'];
             }
             $logoPath = saveFarmLogoUpload($_FILES['logo'] ?? null, $farmId, $farm['logo_path'], $logoExtension); $newLogoPath = ($logoPath !== ($farm['logo_path'] ?? null)) ? $logoPath : null;
             $pdo->prepare('UPDATE farms SET name = ?, slug = ?, primary_color = ?, contact_name = ?, contact_email = ?, subscription_plan = ?, subscription_status = ?, subscription_starts_at = ?, subscription_ends_at = ?, logo_path = ? WHERE id = ?')->execute([$name, $slug, $color, trim($_POST['contact_name'] ?? ''), $contactEmail, $plan, $status, $startDate ? "$startDate 00:00:00" : null, $endDate ? "$endDate 23:59:59" : null, $logoPath, $farmId]);
-            $ownerSql = 'UPDATE users SET username = ?, email = ?, full_name = ?, user_type = ?' . ($password !== '' ? ', password = ?' : '') . ' WHERE id = ? AND farm_id = ?'; $params = [$username, $email, trim($_POST['owner_name'] ?? $username), 'farm_admin']; if ($password !== '') $params[] = password_security_hash($password); $params[] = $ownerId; $params[] = $farmId; $pdo->prepare($ownerSql)->execute($params);
+            $allowExistingPasswordUpdate = !$repairOwnerNeeded && $password !== '';
+            $ownerSql = 'UPDATE users SET username = ?, email = ?, full_name = ?, user_type = ?' . ($allowExistingPasswordUpdate ? ', password = ?' : '') . ' WHERE id = ? AND farm_id = ?';
+            $params = [$username, $email, trim($_POST['owner_name'] ?? $username), 'farm_admin'];
+            if ($allowExistingPasswordUpdate) $params[] = password_security_hash($password);
+            $params[] = $ownerId;
+            $params[] = $farmId;
+            $pdo->prepare($ownerSql)->execute($params);
             sync_farm_entitlements($pdo, $farmId, $submittedModules);
             assign_protected_farm_admin_role($pdo, $farmId, $ownerId);
             saveRoleLimits($pdo, $farmId, $roleLimits);
@@ -236,22 +248,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->commit();
         $_SESSION['success'] = $message;
 
-        if ($createdFarmId > 0) {
-            if ($contactEmail !== '' && $onboardingPayload !== null) {
-                try {
-                    $mailResult = farm_onboarding_send_credentials($onboardingPayload);
-                    if (($mailResult['sent'] ?? false) === true) {
-                        $_SESSION['success'] .= ' Sign-in details were sent to ' . $contactEmail . '.';
-                    } else {
-                        $_SESSION['warning'] = 'The farm was created, but the credential email could not be accepted by the mail service. Share the credentials securely and check the outbound mail configuration.';
-                    }
-                } catch (Throwable $mailError) {
-                    error_log('Farm onboarding email failed for farm ' . $createdFarmId . ': ' . $mailError->getMessage());
-                    $_SESSION['warning'] = 'The farm was created, but the credential email could not be sent. Share the credentials securely and check the outbound mail configuration.';
-                }
-            } else {
-                $_SESSION['warning'] = 'The farm was created without a contact email, so no credential email was sent. The Farm Admin can add a billing contact email from Billing & Subscription after signing in.';
-            }
+        if ($activationQueuedFor !== '') {
+            $_SESSION['success'] .= ' Farm Admin activation instructions were queued for delivery to ' . $activationQueuedFor . '.';
         }
 
         redirectFarms();
@@ -316,11 +314,11 @@ $moduleLabels = farm_entitlement_module_labels();
 <!doctype html><html lang="en"><head><?php include dirname(__DIR__) . '/navbar_head.php'; ?><title>Farms &amp; Tenants</title></head><body><?php include dirname(__DIR__) . '/navbar.php'; ?>
 <main class="container py-4"><div class="d-flex justify-content-between app-responsive-toolbar"><h1 class="h3">Farms &amp; Tenants</h1><span class="badge bg-dark">Owner / Developer</span></div>
 <?php if (!empty($error)): ?><?php renderNotification('error', $error, 'Farm action could not be completed.'); ?><?php endif; ?>
-<?php if ($ownerNeedsRepair): ?><?php renderNotification('warning', 'This farm was only partially created and has no admin account. Complete the username, password, name, and subscribed modules below; saving will create and link its admin safely.', 'Farm setup needs attention.'); ?><?php endif; ?>
+<?php if ($ownerNeedsRepair): ?><?php renderNotification('warning', 'This farm was only partially created and has no admin account. Complete the username, Farm Admin email, name, and subscribed modules below; saving will create the admin in pending activation and queue activation instructions.', 'Farm setup needs attention.'); ?><?php endif; ?>
 <div class="card my-3"><div class="card-body"><h2 class="h5"><?php echo $editFarm ? 'Edit Farm' : 'Add New Farm'; ?></h2><form method="post" enctype="multipart/form-data" class="row g-3" id="farmAccountForm" novalidate><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token()); ?>"><?php if ($editFarm): ?><input type="hidden" name="farm_id" value="<?php echo (int)$editFarm['id']; ?>"><?php endif; ?>
-<div class="col-md-4"><label class="form-label">Username</label><input class="form-control" name="owner_username" value="<?php echo htmlspecialchars($owner['username']); ?>" required></div><div class="col-md-4"><label class="form-label">Password<?php echo $editFarm && !$ownerNeedsRepair ? ' (leave blank to keep)' : ''; ?></label><input class="form-control" type="password" name="owner_password" <?php echo !$editFarm || $ownerNeedsRepair ? 'minlength="' . password_security_min_length() . '" required' : ''; ?>></div><div class="col-md-4"><label class="form-label">Farm Admin email</label><input class="form-control" type="email" name="owner_email" value="<?php echo htmlspecialchars($owner['email']); ?>"><div class="form-text">If only one email is supplied, the farm contact email can use the same address.</div></div>
+<div class="col-md-4"><label class="form-label">Username</label><input class="form-control" name="owner_username" value="<?php echo htmlspecialchars($owner['username']); ?>" required></div><?php if ($editFarm && !$ownerNeedsRepair): ?><div class="col-md-4"><label class="form-label">Password (leave blank to keep)</label><input class="form-control" type="password" name="owner_password" minlength="<?php echo password_security_min_length(); ?>"></div><?php endif; ?><div class="col-md-4"><label class="form-label">Farm Admin email</label><input class="form-control" type="email" name="owner_email" value="<?php echo htmlspecialchars($owner['email']); ?>" <?php echo !$editFarm || $ownerNeedsRepair ? 'required' : ''; ?>><div class="form-text">Used for account activation and password recovery. Required when creating or repairing a Farm Admin account.</div></div>
 <div class="col-md-6"><label class="form-label">Full Name</label><input class="form-control" name="owner_name" value="<?php echo htmlspecialchars($owner['full_name']); ?>" required></div><div class="col-md-6"><label class="form-label">Farm name</label><input class="form-control" name="name" value="<?php echo htmlspecialchars($form['name']); ?>" required></div><div class="col-md-6"><label class="form-label">Farm Workspace ID</label><input class="form-control" name="slug" value="<?php echo htmlspecialchars($form['slug']); ?>" pattern="[a-z0-9]+(-[a-z0-9]+)*" required></div><div class="col-md-6"><label class="form-label">Logo upload</label><input class="form-control" type="file" name="logo" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"><?php if ($editFarm && !empty($editFarm['logo_path'])): ?><div class="form-text">Current logo is saved and will be kept unless you choose a replacement.</div><img src="<?php echo BASE_URL . htmlspecialchars($editFarm['logo_path']); ?>" alt="Current farm logo" class="img-thumbnail mt-2 app-farm-logo-preview"><?php endif; ?></div>
-<div class="col-md-4"><label class="form-label">Primary colour</label><input class="form-control form-control-color" type="color" name="primary_color" value="<?php echo htmlspecialchars($form['primary_color']); ?>"></div><div class="col-md-4"><label class="form-label">Contact name</label><input class="form-control" name="contact_name" value="<?php echo htmlspecialchars($form['contact_name']); ?>"></div><div class="col-md-4"><label class="form-label">Billing / contact email</label><input class="form-control" type="email" name="contact_email" value="<?php echo htmlspecialchars($form['contact_email']); ?>"><div class="form-text">Used for billing checkout. On new farms, sign-in credentials are emailed here when supplied.</div></div>
+<div class="col-md-4"><label class="form-label">Primary colour</label><input class="form-control form-control-color" type="color" name="primary_color" value="<?php echo htmlspecialchars($form['primary_color']); ?>"></div><div class="col-md-4"><label class="form-label">Contact name</label><input class="form-control" name="contact_name" value="<?php echo htmlspecialchars($form['contact_name']); ?>"></div><div class="col-md-4"><label class="form-label">Billing / contact email</label><input class="form-control" type="email" name="contact_email" value="<?php echo htmlspecialchars($form['contact_email']); ?>"><div class="form-text">Used for billing and commercial contact. Account activation is sent to the Farm Admin email above.</div></div>
 <div class="col-12"><div class="card border"><div class="card-body"><h3 class="h6 mb-1">Farm Admin</h3><p class="form-text mt-0 mb-0">Protected tenant administrator. Identity is always <strong>Farm Admin</strong>; operational access comes from the subscribed modules below, not specialist roles.</p></div></div></div>
 <div class="col-md-12"><label class="form-label d-block">Subscribed Modules</label><?php foreach ($moduleLabels as $value => $label): ?><div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="modules[]" value="<?php echo htmlspecialchars($value); ?>" data-module-entitlement="1" <?php echo in_array($value, $editModules, true) ? 'checked' : ''; ?>><label class="form-check-label"><?php echo htmlspecialchars($label); ?></label></div><?php endforeach; ?><div class="form-text">Disabling a module removes current operational access but preserves its historical farm records.</div></div>
 <div class="col-12"><div class="card border"><div class="card-body"><h3 class="h6 mb-1">User limits by role</h3><p class="form-text mt-0">Platform limit for how many login accounts this farm may create under each specialist role. Farm Admin is one protected account. Disabled modules force their specialist limit to 0 when saved.</p><div class="row g-2">
