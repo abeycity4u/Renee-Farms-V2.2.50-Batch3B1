@@ -105,6 +105,18 @@ check(
 );
 
 check(
+    str_contains($content, 'ACTION["$rel"]="NORMALIZE"')
+        && str_contains($content, 'DEPLOY_NORMALIZE_COUNT='),
+    'content-identical runtime files with policy drift are normalized centrally'
+);
+
+check(
+    str_contains($content, 'ACTION["$rel"]="NORMALIZE"')
+        && str_contains($content, 'DEPLOY_NORMALIZE_COUNT='),
+    'content-identical runtime files with policy drift are normalized centrally'
+);
+
+check(
     str_contains($content, 'ATOMIC_REPLACE_FAILED')
         && str_contains($content, 'mv -f -- "$tmp" "$dst"'),
     'same-directory atomic replacement path exists'

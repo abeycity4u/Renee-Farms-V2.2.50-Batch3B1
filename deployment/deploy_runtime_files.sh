@@ -289,9 +289,18 @@ for rel in "${FILES[@]}"; do
 
     if [ -f "$dst" ]; then
         LIVE_SHA["$rel"]="$(sha_file "$dst")"
+        live_mode="$(stat -c '%a' "$dst" 2>/dev/null || true)"
+        live_owner="$(stat -c '%U' "$dst" 2>/dev/null || true)"
+        live_group="$(stat -c '%G' "$dst" 2>/dev/null || true)"
 
         if [ "${LIVE_SHA[$rel]}" = "${SOURCE_SHA[$rel]}" ]; then
-            ACTION["$rel"]="NOOP"
+            if [ "$live_mode" != "644" ] ||
+               [ "$live_owner" != "$CURRENT_USER" ] ||
+               [ "$live_group" != "$CURRENT_GROUP" ]; then
+                ACTION["$rel"]="NORMALIZE"
+            else
+                ACTION["$rel"]="NOOP"
+            fi
         else
             if [ "${BASE_SHA[$rel]}" = "ABSENT" ]; then
                 die "LIVE_DRIFT_NEW_SOURCE_PATH:$rel"
@@ -321,18 +330,21 @@ say "DEPLOY_TARGET_COUNT=${#FILES[@]}"
 
 replace_count=0
 create_count=0
+normalize_count=0
 noop_count=0
 
 for rel in "${FILES[@]}"; do
     case "${ACTION[$rel]}" in
-        REPLACE) replace_count=$((replace_count + 1)) ;;
-        CREATE)  create_count=$((create_count + 1)) ;;
-        NOOP)    noop_count=$((noop_count + 1)) ;;
+        REPLACE)   replace_count=$((replace_count + 1)) ;;
+        CREATE)    create_count=$((create_count + 1)) ;;
+        NORMALIZE) normalize_count=$((normalize_count + 1)) ;;
+        NOOP)      noop_count=$((noop_count + 1)) ;;
     esac
 done
 
 say "DEPLOY_REPLACE_COUNT=$replace_count"
 say "DEPLOY_CREATE_COUNT=$create_count"
+say "DEPLOY_NORMALIZE_COUNT=$normalize_count"
 say "DEPLOY_NOOP_COUNT=$noop_count"
 
 if [ "$MODE" = "dry-run" ]; then
