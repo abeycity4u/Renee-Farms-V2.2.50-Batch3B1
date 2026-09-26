@@ -228,10 +228,17 @@ declare -A SOURCE_SHA=()
 declare -A LIVE_SHA=()
 declare -A BASE_SHA=()
 declare -A ACTION=()
+declare -A SEEN_TARGET=()
 
 for rel in "${FILES[@]}"; do
     validate_relative_path "$rel" \
         || die "INVALID_PATH:$rel"
+
+    if [ "${SEEN_TARGET[$rel]+present}" = "present" ]; then
+        die "DUPLICATE_TARGET:$rel"
+    fi
+
+    SEEN_TARGET["$rel"]=1
 
     if reject_non_runtime_path "$rel"; then
         die "NON_RUNTIME_OR_PROTECTED_PATH:$rel"

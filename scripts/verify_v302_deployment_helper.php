@@ -76,6 +76,12 @@ check(
 );
 
 check(
+    str_contains($content, 'declare -A SEEN_TARGET=()')
+        && str_contains($content, 'DUPLICATE_TARGET:$rel'),
+    'duplicate deployment targets are rejected explicitly'
+);
+
+check(
     str_contains($content, 'PHP_LINT_FAILED')
         && str_contains($content, 'php_lint_isolated')
         && str_contains($content, 'mktemp -d'),
