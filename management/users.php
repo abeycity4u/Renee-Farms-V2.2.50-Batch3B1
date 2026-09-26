@@ -2,6 +2,9 @@
 <?php
 require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/../includes/functions.php');
+require_once(__DIR__ . '/../includes/account_identity_policy.php');
+require_once(__DIR__ . '/../includes/account_credential_lifecycle.php');
+require_once(__DIR__ . '/../includes/account_pending_user.php');
 requireLogin();
 
 // User management is tenant-scoped. Farm Admin always has it; specialist roles
@@ -66,35 +69,143 @@ $tenantRoleLimits = tenantRoleLimits($pdo,$farmId);
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (!verify_csrf_token($_POST['csrf_token'] ?? '')) { http_response_code(419); exit('Invalid request token.'); }
     if (isset($_POST['add_user'])) {
-        $roles = array_values(array_intersect($_POST['roles'] ?? [], array_keys($availableRoles)));
-        $roles = array_values(array_filter($roles, static function ($role) use ($managedFarmHasModule, $managedFarmHasSales) {
-            if ($role === 'poultry_manager') return $managedFarmHasModule('poultry');
-            if ($role === 'ruminant_manager') return $managedFarmHasModule('ruminant');
-            if ($role === 'sales_rep') return $managedFarmHasSales;
-            return $role === 'viewer';
-        }));
-        if (!$roles) { $_SESSION['error'] = 'Select at least one role enabled by the platform owner.'; header('Location: ' . $userManagerUrl); exit(); }
-        try { enforceTenantRoleLimits($pdo,$farmId,$roles); } catch(RuntimeException $e) { $_SESSION['error']=$e->getMessage(); header('Location: ' . $userManagerUrl); exit(); }
-        $hashedPassword = password_security_hash($_POST['password']);
-        
-        $stmt = $pdo->prepare("INSERT INTO users (farm_id, username, password, user_type, full_name)
-                               VALUES (?, ?, ?, ?, ?)");
-        $stmt->execute([
-            $farmId,
-            $_POST['username'],
-            $hashedPassword,
-            $roles[0],
-            $_POST['full_name']
-        ]);
-        $userId = (int) $pdo->lastInsertId();
-        $roleStmt = $pdo->prepare('INSERT INTO user_roles (user_id, role_id) SELECT ?, id FROM roles WHERE code = ?');
-        foreach ($roles as $role) $roleStmt->execute([$userId, $role]);
-        
-        $_SESSION['success'] = "User added successfully!";
-        header('Location: ' . $userManagerUrl);
+        $roles = array_values(
+            array_intersect(
+                $_POST['roles'] ?? [],
+                array_keys($availableRoles)
+            )
+        );
+
+        $roles = array_values(
+            array_filter(
+                $roles,
+                static function ($role) use (
+                    $managedFarmHasModule,
+                    $managedFarmHasSales
+                ) {
+                    if ($role === 'poultry_manager') {
+                        return $managedFarmHasModule('poultry');
+                    }
+
+                    if ($role === 'ruminant_manager') {
+                        return $managedFarmHasModule('ruminant');
+                    }
+
+                    if ($role === 'sales_rep') {
+                        return $managedFarmHasSales;
+                    }
+
+                    return $role === 'viewer';
+                }
+            )
+        );
+
+        if (!$roles) {
+            $_SESSION['error'] =
+                'Select at least one role enabled by the platform owner.';
+
+            header(
+                'Location: '
+                . $userManagerUrl
+            );
+
+            exit();
+        }
+
+        try {
+            enforceTenantRoleLimits(
+                $pdo,
+                $farmId,
+                $roles
+            );
+
+            $username =
+                account_identity_normalize_username(
+                    (string)(
+                        $_POST['username']
+                        ?? ''
+                    )
+                );
+
+            $fullName =
+                account_identity_normalize_full_name(
+                    (string)(
+                        $_POST['full_name']
+                        ?? ''
+                    )
+                );
+
+            $email =
+                account_credential_normalize_email(
+                    (string)(
+                        $_POST['email']
+                        ?? ''
+                    )
+                );
+
+            $pdo->beginTransaction();
+
+            $pendingUser =
+                account_pending_user_create(
+                    $pdo,
+                    $farmId,
+                    $username,
+                    $email,
+                    $roles[0],
+                    $fullName
+                );
+
+            $userId =
+                (int)$pendingUser['user_id'];
+
+            $roleStmt =
+                $pdo->prepare(
+                    'INSERT INTO user_roles
+                        (user_id, role_id)
+                     SELECT ?, id
+                     FROM roles
+                     WHERE code = ?'
+                );
+
+            foreach ($roles as $role) {
+                $roleStmt->execute([
+                    $userId,
+                    $role,
+                ]);
+            }
+
+            $pdo->commit();
+
+            $_SESSION['success'] =
+                'User added. Activation instructions were queued for '
+                . (string)$pendingUser['email']
+                . '.';
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            error_log(
+                'Team User creation failed for farm '
+                . $farmId
+                . ': '
+                . $e->getMessage()
+            );
+
+            $_SESSION['error'] =
+                $e instanceof InvalidArgumentException
+                    ? $e->getMessage()
+                    : 'Unable to add this user. The username may already exist for this farm.';
+        }
+
+        header(
+            'Location: '
+            . $userManagerUrl
+        );
+
         exit();
     }
-    
+
     if (isset($_POST['delete_user'])) {
         $targetId = filter_var($_POST['user_id'] ?? 0, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: 0;
         $targetStmt = $pdo->prepare("SELECT id, user_type FROM users WHERE id = ? AND farm_id = ? LIMIT 1");
@@ -112,44 +223,435 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         exit();
     }
 
-    if (isset($_POST['edit_user'])) {
-        $editTargetId = filter_var($_POST['user_id'] ?? 0, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: 0;
-        $protectStmt = $pdo->prepare("SELECT user_type FROM users WHERE id = ? AND farm_id = ? LIMIT 1");
-        $protectStmt->execute([$editTargetId, $farmId]);
-        if ($protectStmt->fetchColumn() === 'farm_admin') { $_SESSION['error'] = 'The Farm Admin account is managed from the farm profile and is protected here.'; header('Location: ' . $userManagerUrl); exit(); }
-        $roles = array_values(array_intersect($_POST['roles'] ?? [], array_keys($availableRoles)));
-        $roles = array_values(array_filter($roles, static function ($role) use ($managedFarmHasModule, $managedFarmHasSales) {
-            if ($role === 'poultry_manager') return $managedFarmHasModule('poultry');
-            if ($role === 'ruminant_manager') return $managedFarmHasModule('ruminant');
-            if ($role === 'sales_rep') return $managedFarmHasSales;
-            return $role === 'viewer';
-        }));
-        if (!$roles) { $_SESSION['error'] = 'Select at least one role enabled by the platform owner.'; header('Location: ' . $userManagerUrl); exit(); }
-        try { enforceTenantRoleLimits($pdo,$farmId,$roles,$editTargetId); } catch(RuntimeException $e) { $_SESSION['error']=$e->getMessage(); header('Location: ' . $userManagerUrl); exit(); }
-        $updateQuery = "UPDATE users SET username = ?, user_type = ?, full_name = ?";
-        $params = [
-            $_POST['username'],
-            $roles[0],
-            $_POST['full_name']
-        ];
+    if (isset($_POST['resend_activation'])) {
+        $resendTargetId =
+            filter_var(
+                $_POST['user_id'] ?? 0,
+                FILTER_VALIDATE_INT,
+                [
+                    'options' => [
+                        'min_range' => 1,
+                    ],
+                ]
+            ) ?: 0;
 
-        if (!empty($_POST['password'])) {
-            $updateQuery .= ", password = ?";
-            $params[] = password_security_hash($_POST['password']);
+        try {
+            if ($resendTargetId < 1) {
+                throw new InvalidArgumentException(
+                    'A valid pending user is required.'
+                );
+            }
+
+            $pdo->beginTransaction();
+
+            $resendTargetStmt =
+                $pdo->prepare(
+                    "SELECT
+                        id,
+                        user_type,
+                        email,
+                        credential_state
+                     FROM users
+                     WHERE id = ?
+                       AND farm_id = ?
+                     LIMIT 1
+                     FOR UPDATE"
+                );
+
+            $resendTargetStmt->execute([
+                $resendTargetId,
+                $farmId,
+            ]);
+
+            $resendTarget =
+                $resendTargetStmt->fetch(
+                    PDO::FETCH_ASSOC
+                ) ?: null;
+
+            if (!$resendTarget) {
+                throw new RuntimeException(
+                    'Pending user could not be found for this farm.'
+                );
+            }
+
+            if (
+                (string)$resendTarget['user_type']
+                === 'farm_admin'
+            ) {
+                throw new RuntimeException(
+                    'The Farm Admin account is managed from the farm profile and is protected here.'
+                );
+            }
+
+            if (
+                (string)(
+                    $resendTarget['credential_state']
+                    ?? ''
+                )
+                !== 'pending_activation'
+            ) {
+                throw new RuntimeException(
+                    'Activation can only be resent while the user is pending activation.'
+                );
+            }
+
+            $resendResult =
+                account_pending_user_resend_activation(
+                    $pdo,
+                    $resendTargetId
+                );
+
+            $pdo->commit();
+
+            $_SESSION['success'] =
+                'Activation instructions were queued for '
+                . (string)$resendResult['email']
+                . '.';
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            error_log(
+                'Team User activation resend failed for farm '
+                . $farmId
+                . ', user '
+                . $resendTargetId
+                . ': '
+                . $e->getMessage()
+            );
+
+            $_SESSION['error'] =
+                $e instanceof InvalidArgumentException
+                    ? $e->getMessage()
+                    : 'Unable to resend activation for this user.';
         }
 
-        $updateQuery .= " WHERE id = ? AND farm_id = ?";
-        $params[] = $_POST['user_id'];
-        $params[] = $farmId;
+        header(
+            'Location: '
+            . $userManagerUrl
+        );
 
-        $stmt = $pdo->prepare($updateQuery);
-        $stmt->execute($params);
-        $pdo->prepare('DELETE ur FROM user_roles ur INNER JOIN users u ON u.id = ur.user_id WHERE ur.user_id = ? AND u.farm_id = ?')->execute([$_POST['user_id'], $farmId]);
-        $roleStmt = $pdo->prepare('INSERT INTO user_roles (user_id, role_id) SELECT ?, id FROM roles WHERE code = ?');
-        foreach ($roles as $role) $roleStmt->execute([$_POST['user_id'], $role]);
+        exit();
+    }
 
-        $_SESSION['success'] = "User updated successfully!";
-        header('Location: ' . $userManagerUrl);
+    if (isset($_POST['edit_user'])) {
+        $editTargetId =
+            filter_var(
+                $_POST['user_id'] ?? 0,
+                FILTER_VALIDATE_INT,
+                [
+                    'options' => [
+                        'min_range' => 1,
+                    ],
+                ]
+            ) ?: 0;
+
+        $roles = array_values(
+            array_intersect(
+                $_POST['roles'] ?? [],
+                array_keys($availableRoles)
+            )
+        );
+
+        $roles = array_values(
+            array_filter(
+                $roles,
+                static function ($role) use (
+                    $managedFarmHasModule,
+                    $managedFarmHasSales
+                ) {
+                    if ($role === 'poultry_manager') {
+                        return $managedFarmHasModule('poultry');
+                    }
+
+                    if ($role === 'ruminant_manager') {
+                        return $managedFarmHasModule('ruminant');
+                    }
+
+                    if ($role === 'sales_rep') {
+                        return $managedFarmHasSales;
+                    }
+
+                    return $role === 'viewer';
+                }
+            )
+        );
+
+        if (!$roles) {
+            $_SESSION['error'] =
+                'Select at least one role enabled by the platform owner.';
+
+            header(
+                'Location: '
+                . $userManagerUrl
+            );
+
+            exit();
+        }
+
+        try {
+            enforceTenantRoleLimits(
+                $pdo,
+                $farmId,
+                $roles,
+                $editTargetId
+            );
+
+            $username =
+                account_identity_normalize_username(
+                    (string)(
+                        $_POST['username']
+                        ?? ''
+                    )
+                );
+
+            $fullName =
+                account_identity_normalize_full_name(
+                    (string)(
+                        $_POST['full_name']
+                        ?? ''
+                    )
+                );
+
+            $rawEmail =
+                trim(
+                    (string)(
+                        $_POST['email']
+                        ?? ''
+                    )
+                );
+
+            $submittedPassword =
+                (string)(
+                    $_POST['password']
+                    ?? ''
+                );
+
+            $pdo->beginTransaction();
+
+            $targetStmt =
+                $pdo->prepare(
+                    "SELECT
+                        id,
+                        user_type,
+                        email,
+                        credential_state
+                     FROM users
+                     WHERE id = ?
+                       AND farm_id = ?
+                     LIMIT 1
+                     FOR UPDATE"
+                );
+
+            $targetStmt->execute([
+                $editTargetId,
+                $farmId,
+            ]);
+
+            $targetUser =
+                $targetStmt->fetch(
+                    PDO::FETCH_ASSOC
+                ) ?: null;
+
+            if (!$targetUser) {
+                throw new RuntimeException(
+                    'Team user could not be found.'
+                );
+            }
+
+            if (
+                (string)$targetUser['user_type']
+                === 'farm_admin'
+            ) {
+                throw new RuntimeException(
+                    'The Farm Admin account is managed from the farm profile and is protected here.'
+                );
+            }
+
+            $credentialState =
+                (string)(
+                    $targetUser['credential_state']
+                    ?? ''
+                );
+
+            if (
+                $credentialState !== 'active'
+                && $credentialState
+                    !== 'pending_activation'
+            ) {
+                throw new RuntimeException(
+                    'This account has an unsupported credential state.'
+                );
+            }
+
+            if (
+                $credentialState
+                === 'pending_activation'
+            ) {
+                if ($rawEmail === '') {
+                    throw new InvalidArgumentException(
+                        'Credential email is required while this account is pending activation.'
+                    );
+                }
+
+                if ($submittedPassword !== '') {
+                    throw new InvalidArgumentException(
+                        'Pending users choose their password from the activation link.'
+                    );
+                }
+
+                account_pending_user_update_email(
+                    $pdo,
+                    $editTargetId,
+                    $rawEmail
+                );
+
+                $updateStmt =
+                    $pdo->prepare(
+                        "UPDATE users
+                         SET username = ?,
+                             user_type = ?,
+                             full_name = ?
+                         WHERE id = ?
+                           AND farm_id = ?
+                           AND credential_state =
+                               'pending_activation'"
+                    );
+
+                $updateStmt->execute([
+                    $username,
+                    $roles[0],
+                    $fullName,
+                    $editTargetId,
+                    $farmId,
+                ]);
+            } else {
+                $activeEmail =
+                    $rawEmail === ''
+                        ? null
+                        : account_credential_normalize_email(
+                            $rawEmail
+                        );
+
+                $updateSql =
+                    "UPDATE users
+                     SET username = ?,
+                         user_type = ?,
+                         full_name = ?,
+                         email = ?";
+
+                $params = [
+                    $username,
+                    $roles[0],
+                    $fullName,
+                    $activeEmail,
+                ];
+
+                if (
+                    $submittedPassword !== ''
+                ) {
+                    $passwordError =
+                        password_security_validate(
+                            $submittedPassword
+                        );
+
+                    if (
+                        $passwordError !== null
+                    ) {
+                        throw new InvalidArgumentException(
+                            $passwordError
+                        );
+                    }
+
+                    $updateSql .=
+                        ', password = ?';
+
+                    $params[] =
+                        password_security_hash(
+                            $submittedPassword
+                        );
+                }
+
+                $updateSql .=
+                    " WHERE id = ?
+                       AND farm_id = ?
+                       AND credential_state =
+                           'active'";
+
+                $params[] =
+                    $editTargetId;
+
+                $params[] =
+                    $farmId;
+
+                $updateStmt =
+                    $pdo->prepare(
+                        $updateSql
+                    );
+
+                $updateStmt->execute(
+                    $params
+                );
+            }
+
+            $pdo->prepare(
+                'DELETE ur
+                 FROM user_roles ur
+                 INNER JOIN users u
+                    ON u.id = ur.user_id
+                 WHERE ur.user_id = ?
+                   AND u.farm_id = ?'
+            )->execute([
+                $editTargetId,
+                $farmId,
+            ]);
+
+            $roleStmt =
+                $pdo->prepare(
+                    'INSERT INTO user_roles
+                        (user_id, role_id)
+                     SELECT ?, id
+                     FROM roles
+                     WHERE code = ?'
+                );
+
+            foreach ($roles as $role) {
+                $roleStmt->execute([
+                    $editTargetId,
+                    $role,
+                ]);
+            }
+
+            $pdo->commit();
+
+            $_SESSION['success'] =
+                'User updated successfully!';
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            error_log(
+                'Team User update failed for farm '
+                . $farmId
+                . ', user '
+                . $editTargetId
+                . ': '
+                . $e->getMessage()
+            );
+
+            $_SESSION['error'] =
+                $e instanceof InvalidArgumentException
+                    ? $e->getMessage()
+                    : 'Unable to update this user. No changes were saved.';
+        }
+
+        header(
+            'Location: '
+            . $userManagerUrl
+        );
+
         exit();
     }
 }
@@ -283,10 +785,32 @@ foreach ($users as $existingUser) {
                                                     data-user-id="<?php echo $user['id']; ?>"
                                                     data-username="<?php echo htmlspecialchars($user['username'], ENT_QUOTES); ?>"
                                                     data-full-name="<?php echo htmlspecialchars($user['full_name'], ENT_QUOTES); ?>"
+                                                    data-email="<?php echo htmlspecialchars((string)($user['email'] ?? ''), ENT_QUOTES); ?>"
+                                                    data-credential-state="<?php echo htmlspecialchars((string)($user['credential_state'] ?? 'active'), ENT_QUOTES); ?>"
                                                     data-user-type="<?php echo $user['user_type']; ?>"
                                                     data-roles="<?php echo htmlspecialchars($user['role_codes'] ?? $user['user_type'], ENT_QUOTES); ?>">
                                                 <i class="bi bi-pencil-square me-1"></i>Edit
                                             </button>
+
+                                            <?php if ((string)($user['credential_state'] ?? 'active') === 'pending_activation'): ?>
+                                            <form
+                                                method="POST"
+                                                class="d-inline"
+                                                data-resend-activation-form
+                                                data-username="<?php echo app_attr($user['username']); ?>"
+                                            >
+                                                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token()); ?>">
+                                                <?php if (isPlatformOwner()): ?><input type="hidden" name="target_farm_id" value="<?php echo (int)$farmId; ?>"><?php endif; ?>
+                                                <input type="hidden" name="user_id" value="<?php echo (int)$user['id']; ?>">
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-sm btn-outline-secondary"
+                                                    data-resend-activation
+                                                >
+                                                    <i class="bi bi-envelope-arrow-up me-1"></i>Resend activation
+                                                </button>
+                                            </form>
+                                            <?php endif; ?>
 
                                             <?php if ($user['id'] != $_SESSION['user_id']): ?>
                                             <form method="POST" class="d-inline" data-confirm="Delete this user account? Their login access will be removed immediately.">
@@ -322,32 +846,94 @@ foreach ($users as $existingUser) {
                 <form method="POST">
                     <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token()); ?>">
                     <?php if (isPlatformOwner()): ?><input type="hidden" name="target_farm_id" value="<?php echo (int)$farmId; ?>"><?php endif; ?>
+
                     <div class="modal-header">
                         <h5 class="modal-title">Add New User</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
+
                     <div class="modal-body">
                         <div class="mb-3">
                             <label>Username</label>
-                            <input type="text" name="username" class="form-control" required>
+                            <input
+                                type="text"
+                                name="username"
+                                class="form-control"
+                                maxlength="<?php echo ACCOUNT_IDENTITY_USERNAME_MAX; ?>"
+                                required
+                            >
                         </div>
+
                         <div class="mb-3">
-                            <label>Password</label>
-                            <input type="password" name="password" class="form-control" minlength="<?php echo password_security_min_length(); ?>" required>
+                            <label>Credential Email</label>
+                            <input
+                                type="email"
+                                name="email"
+                                class="form-control"
+                                autocomplete="email"
+                                required
+                            >
+                            <div class="form-text">
+                                Activation instructions and future password recovery use this address.
+                            </div>
                         </div>
+
                         <div class="mb-3">
                             <label>Full Name</label>
-                            <input type="text" name="full_name" class="form-control" required>
+                            <input
+                                type="text"
+                                name="full_name"
+                                class="form-control"
+                                maxlength="<?php echo ACCOUNT_IDENTITY_FULL_NAME_MAX; ?>"
+                                required
+                            >
                         </div>
+
                         <div class="mb-3">
                             <label class="d-block">Roles</label>
+
                             <?php foreach ($availableRoles as $code => $label): $disabled = ($code === 'poultry_manager' && !$managedFarmHasModule('poultry')) || ($code === 'ruminant_manager' && !$managedFarmHasModule('ruminant')) || ($code === 'sales_rep' && !$managedFarmHasSales); ?>
-                            <div class="form-check"><input class="form-check-input" type="checkbox" name="roles[]" value="<?php echo $code; ?>" id="add-<?php echo $code; ?>" <?php echo $disabled ? 'disabled' : ''; ?>><label class="form-check-label" for="add-<?php echo $code; ?>"><?php echo $label; ?><?php if (isset($tenantRoleLimits[$code])): ?> <span class="small text-muted">(<?php echo tenantRoleCount($pdo,$farmId,$code); ?>/<?php echo (int)$tenantRoleLimits[$code]; ?> used)</span><?php endif; ?></label></div><?php endforeach; ?>
+                            <div class="form-check">
+                                <input
+                                    class="form-check-input"
+                                    type="checkbox"
+                                    name="roles[]"
+                                    value="<?php echo $code; ?>"
+                                    id="add-<?php echo $code; ?>"
+                                    <?php echo $disabled ? 'disabled' : ''; ?>
+                                >
+                                <label
+                                    class="form-check-label"
+                                    for="add-<?php echo $code; ?>"
+                                >
+                                    <?php echo $label; ?>
+                                    <?php if (isset($tenantRoleLimits[$code])): ?>
+                                    <span class="small text-muted">
+                                        (<?php echo tenantRoleCount($pdo,$farmId,$code); ?>/<?php echo (int)$tenantRoleLimits[$code]; ?> used)
+                                    </span>
+                                    <?php endif; ?>
+                                </label>
+                            </div>
+                            <?php endforeach; ?>
                         </div>
                     </div>
+
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" name="add_user" class="btn btn-primary">Add User</button>
+                        <button
+                            type="button"
+                            class="btn btn-secondary"
+                            data-bs-dismiss="modal"
+                        >
+                            Cancel
+                        </button>
+
+                        <button
+                            type="submit"
+                            name="add_user"
+                            class="btn btn-primary"
+                        >
+                            Add User
+                        </button>
                     </div>
                 </form>
             </div>
@@ -362,32 +948,114 @@ foreach ($users as $existingUser) {
                     <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token()); ?>">
                     <?php if (isPlatformOwner()): ?><input type="hidden" name="target_farm_id" value="<?php echo (int)$farmId; ?>"><?php endif; ?>
                     <input type="hidden" name="user_id">
+
                     <div class="modal-header">
                         <h5 class="modal-title">Edit User</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
+
                     <div class="modal-body">
                         <div class="mb-3">
                             <label>Username</label>
-                            <input type="text" name="username" class="form-control" required>
+                            <input
+                                type="text"
+                                name="username"
+                                class="form-control"
+                                maxlength="<?php echo ACCOUNT_IDENTITY_USERNAME_MAX; ?>"
+                                required
+                            >
                         </div>
+
                         <div class="mb-3">
                             <label>Full Name</label>
-                            <input type="text" name="full_name" class="form-control" required>
+                            <input
+                                type="text"
+                                name="full_name"
+                                class="form-control"
+                                maxlength="<?php echo ACCOUNT_IDENTITY_FULL_NAME_MAX; ?>"
+                                required
+                            >
                         </div>
+
+                        <div class="mb-3">
+                            <label>Credential Email</label>
+                            <input
+                                type="email"
+                                name="email"
+                                class="form-control"
+                                autocomplete="email"
+                            >
+                            <div class="form-text">
+                                Active legacy accounts may remain without an email. Pending accounts require one for activation.
+                            </div>
+                        </div>
+
                         <div class="mb-3">
                             <label class="d-block">Roles</label>
+
                             <?php foreach ($availableRoles as $code => $label): $disabled = ($code === 'poultry_manager' && !$managedFarmHasModule('poultry')) || ($code === 'ruminant_manager' && !$managedFarmHasModule('ruminant')) || ($code === 'sales_rep' && !$managedFarmHasSales); ?>
-                            <div class="form-check"><input class="form-check-input" type="checkbox" name="roles[]" value="<?php echo $code; ?>" id="edit-<?php echo $code; ?>" <?php echo $disabled ? 'disabled' : ''; ?>><label class="form-check-label" for="edit-<?php echo $code; ?>"><?php echo $label; ?></label></div><?php endforeach; ?>
+                            <div class="form-check">
+                                <input
+                                    class="form-check-input"
+                                    type="checkbox"
+                                    name="roles[]"
+                                    value="<?php echo $code; ?>"
+                                    id="edit-<?php echo $code; ?>"
+                                    <?php echo $disabled ? 'disabled' : ''; ?>
+                                >
+                                <label
+                                    class="form-check-label"
+                                    for="edit-<?php echo $code; ?>"
+                                >
+                                    <?php echo $label; ?>
+                                </label>
+                            </div>
+                            <?php endforeach; ?>
                         </div>
-                        <div class="mb-3">
-                            <label>New Password (leave blank to keep current)</label>
-                            <input type="password" name="password" class="form-control" minlength="<?php echo password_security_min_length(); ?>" autocomplete="new-password">
+
+                        <div
+                            class="mb-3"
+                            data-active-password-row
+                        >
+                            <label>
+                                New Password (leave blank to keep current)
+                            </label>
+                            <input
+                                type="password"
+                                name="password"
+                                class="form-control"
+                                minlength="<?php echo password_security_min_length(); ?>"
+                                autocomplete="new-password"
+                            >
+                            <div class="form-text">
+                                Available only for active accounts. Pending users choose their password from the activation link.
+                            </div>
+                        </div>
+
+                        <div
+                            class="alert alert-info py-2 mb-0 d-none"
+                            data-pending-activation-note
+                        >
+                            This account is pending activation. Changing its credential email queues a new activation delivery only when the normalized email actually changes.
                         </div>
                     </div>
+
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" name="edit_user" class="btn btn-primary">Save Changes</button>
+                        <button
+                            type="button"
+                            class="btn btn-secondary"
+                            data-bs-dismiss="modal"
+                        >
+                            Cancel
+                        </button>
+
+                        <button
+                            type="submit"
+                            name="edit_user"
+                            class="btn btn-primary"
+                        >
+                            Save Changes
+                        </button>
                     </div>
                 </form>
             </div>

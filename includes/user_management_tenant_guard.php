@@ -1,6 +1,6 @@
 <?php
 /**
- * Defense-in-depth tenant and password-policy guard for Team Users mutations.
+ * Defense-in-depth tenant and active-password-policy guard for Team Users mutations.
  *
  * management/users.php already scopes user row updates/deletes by farm_id, but
  * role assignment is stored in user_roles without a farm_id column. Reject an
@@ -18,12 +18,11 @@ function user_management_password_guard(): void
     if (!str_ends_with($path, '/management/users.php')) return;
     if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') return;
 
-    $isAdd = isset($_POST['add_user']);
     $isEdit = isset($_POST['edit_user']);
-    if (!$isAdd && !$isEdit) return;
+    if (!$isEdit) return;
 
     $password = (string)($_POST['password'] ?? '');
-    if ($isEdit && $password === '') return;
+    if ($password === '') return;
 
     $error = password_security_validate($password);
     if ($error === null) return;

@@ -22,11 +22,69 @@ $add('Central password hasher uses PASSWORD_DEFAULT', str_contains($policy, 'pas
 $add('Central verifier rejects non-hash stored values', str_contains($policy, "password_get_info(\$storedHash)['algo'] === 0"));
 $add('Bootstrap explicitly loads central password policy', str_contains($init, "require_once __DIR__ . '/includes/password_security.php'"));
 $add('Team User guard loads central password policy', str_contains($guard, "require_once __DIR__ . '/password_security.php'"));
-$add('Team User add password is server-side validated', str_contains($guard, "\$isAdd = isset(\$_POST['add_user'])") && str_contains($guard, 'password_security_validate($password)'));
-$add('Team User replacement password is server-side validated', str_contains($guard, "\$isEdit = isset(\$_POST['edit_user'])") && str_contains($guard, "if (\$isEdit && \$password === '') return;"));
-$add('Team User password storage uses central hasher', substr_count($users, "password_security_hash(\$_POST['password'])") >= 2);
-$add('Team User page has no native password_hash call', !str_contains($users, 'password_hash('));
-$add('Team User password fields use central minimum length', substr_count($users, 'password_security_min_length()') >= 2);
+$add(
+    'New Team User does not accept an admin-supplied initial password',
+    str_contains(
+        $users,
+        'account_pending_user_create('
+    )
+    && !preg_match(
+        '/if\s*\(isset\(\$_POST\[\'add_user\'\]\)\)[\s\S]{0,7000}password_security_hash\s*\(/',
+        $users
+    )
+    && !preg_match(
+        '/addUserModal[\s\S]{0,7000}name="password"/',
+        $users
+    )
+);
+$add(
+    'Team User replacement password is server-side validated',
+    str_contains(
+        $guard,
+        "\$isEdit = isset(\$_POST['edit_user']);"
+    )
+    && str_contains(
+        $guard,
+        "if (!\$isEdit) return;"
+    )
+    && str_contains(
+        $guard,
+        "if (\$password === '') return;"
+    )
+    && str_contains(
+        $guard,
+        'password_security_validate($password)'
+    )
+);
+$add(
+    'Active Team User password replacement uses central hasher',
+    str_contains(
+        $users,
+        'password_security_validate('
+    )
+    && str_contains(
+        $users,
+        'password_security_hash('
+    )
+);
+$add(
+    'Team User page has no native password_hash call',
+    !str_contains(
+        $users,
+        'password_hash('
+    )
+);
+$add(
+    'Team User replacement password field uses central minimum length',
+    preg_match(
+        '/editUserModal[\s\S]{0,7000}name="password"[\s\S]{0,1000}password_security_min_length\(\)/',
+        $users
+    ) === 1
+    || preg_match(
+        '/editUserModal[\s\S]{0,7000}password_security_min_length\(\)[\s\S]{0,1000}name="password"/',
+        $users
+    ) === 1
+);
 $add('Farm Admin duplicate password-length constant is removed', !str_contains($farms, 'FARM_OWNER_MIN_PASSWORD_LENGTH'));
 $add(
     'New Farm Admin does not accept an initial password',
