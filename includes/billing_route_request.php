@@ -4,53 +4,37 @@
  *
  * Browser checkout input is intentionally narrow. Billing amount/currency and
  * quote identities are never accepted from the browser; they are derived by the
- * server-side price book. Provider return URLs come from BILLING_PUBLIC_BASE_URL,
- * never from the request Host header.
+ * server-side price book. Provider return URLs use the canonical platform public URL authority,
+ * while legacy BILLING_PUBLIC_BASE_URL remains a compatibility fallback.
  */
+
+require_once __DIR__ . '/platform_public_url.php';
 
 if (!function_exists('billing_route_public_base_url')) {
     function billing_route_public_base_url(): string
     {
-        $raw = getenv('BILLING_PUBLIC_BASE_URL');
-        if ($raw === false && array_key_exists('BILLING_PUBLIC_BASE_URL', $_ENV)) $raw = $_ENV['BILLING_PUBLIC_BASE_URL'];
-        if ($raw === false && array_key_exists('BILLING_PUBLIC_BASE_URL', $_SERVER)) $raw = $_SERVER['BILLING_PUBLIC_BASE_URL'];
-        $raw = trim((string)($raw === false ? '' : $raw));
-        if ($raw === '') {
-            throw new RuntimeException('Billing public URL is not configured. Missing deployment environment: BILLING_PUBLIC_BASE_URL.');
-        }
-
-        $parts = parse_url($raw);
-        if ($parts === false
-            || strtolower((string)($parts['scheme'] ?? '')) !== 'https'
-            || trim((string)($parts['host'] ?? '')) === ''
-            || isset($parts['user'])
-            || isset($parts['pass'])
-            || isset($parts['query'])
-            || isset($parts['fragment'])) {
-            throw new RuntimeException('BILLING_PUBLIC_BASE_URL must be an absolute HTTPS application URL without credentials, query or fragment.');
-        }
-
-        $path = rtrim((string)($parts['path'] ?? ''), '/');
-        $port = isset($parts['port']) ? ':' . (int)$parts['port'] : '';
-        return 'https://' . strtolower((string)$parts['host']) . $port . $path;
+        /*
+         * V2.3 compatibility wrapper.
+         *
+         * Canonical origin validation now belongs to the shared platform
+         * public-URL authority. Existing deployments that configure only
+         * BILLING_PUBLIC_BASE_URL remain supported through its fallback.
+         */
+        return platform_public_base_url();
     }
 }
 
 if (!function_exists('billing_route_public_url')) {
-    function billing_route_public_url(string $relativePath, array $query = []): string
-    {
-        $relativePath = '/' . ltrim(trim($relativePath), '/');
-        if ($relativePath === '/' || str_contains($relativePath, "\0")) {
-            throw new InvalidArgumentException('A valid billing route path is required.');
-        }
-        $url = billing_route_public_base_url() . $relativePath;
-        if ($query) {
-            $url .= '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
-        }
-        return $url;
+    function billing_route_public_url(
+        string $relativePath,
+        array $query = []
+    ): string {
+        return platform_public_url(
+            $relativePath,
+            $query
+        );
     }
 }
-
 if (!function_exists('billing_route_allowed_checkout_keys')) {
     function billing_route_allowed_checkout_keys(): array
     {

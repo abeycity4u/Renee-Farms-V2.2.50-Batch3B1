@@ -55,7 +55,12 @@ $assert(str_contains($farms, 'farm_onboarding_send_credentials($onboardingPayloa
 $assert(str_contains($farms, '$pdo->commit();') && strpos($farms, 'farm_onboarding_send_credentials($onboardingPayload)') > strpos($farms, '$pdo->commit();'), 'onboarding email is attempted only after farm transaction commit.');
 $assert(str_contains($farms, 'The farm was created, but the credential email could not be sent.'), 'mail failure does not roll back a successfully created farm.');
 $assert(str_contains($onboarding, "'password'") === false || !preg_match('/error_log\s*\([^;]*password/is', $onboarding), 'onboarding service never logs the password.');
-$assert(str_contains($onboarding, "billing_route_public_url('/login.php')"), 'onboarding login URL uses configured canonical public base URL.');
+$assert(
+    str_contains($onboarding, "require_once __DIR__ . '/platform_public_url.php';")
+    && str_contains($onboarding, "platform_public_url('/login.php')")
+    && !str_contains($onboarding, "billing_route_public_url('/login.php')"),
+    'onboarding login URL uses neutral canonical platform public URL authority.'
+);
 $assert(str_contains($mailer, "return 'no-reply@reneefarms.com';"), 'mailer has a deterministic Renee Farms sender fallback.');
 $assert(str_contains($mailer, "PLATFORM_MAIL_TRANSPORT"), 'mailer transport selection is centralized.');
 $assert(str_contains($mailer, "PLATFORM_SMTP_HOST") && str_contains($mailer, "PLATFORM_SMTP_PORT"), 'SMTP endpoint is configuration-driven.');

@@ -10,7 +10,7 @@
 
 require_once __DIR__ . '/farm_contact_email.php';
 require_once __DIR__ . '/platform_mailer.php';
-require_once __DIR__ . '/billing_route_request.php';
+require_once __DIR__ . '/platform_public_url.php';
 
 if (!function_exists('farm_onboarding_text')) {
     function farm_onboarding_text($value, int $maxLength = 180): string
@@ -37,7 +37,7 @@ if (!function_exists('farm_onboarding_send_credentials')) {
             throw new InvalidArgumentException('Farm onboarding credentials are incomplete.');
         }
 
-        $loginUrl = billing_route_public_url('/login.php');
+        $loginUrl = platform_public_url('/login.php');
         $greeting = $recipientName !== '' ? 'Hello ' . $recipientName . ',' : 'Hello,';
 
         $body = $greeting . "\n\n"
