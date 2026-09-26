@@ -163,7 +163,9 @@ reject_non_runtime_path() {
     base="$(basename "$rel")"
 
     case "$rel" in
-        config.php|.htaccess)
+        includes/.htaccess|logs/.htaccess|vendor/.htaccess)
+            ;;
+        config.php|.htaccess|*/.htaccess)
             return 0
             ;;
         scripts/*|migrations/*|deployment/*|.github/*|tests/*|test/*)

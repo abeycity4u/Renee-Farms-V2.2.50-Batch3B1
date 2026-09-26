@@ -38,8 +38,16 @@ check(
 );
 
 check(
-    str_contains($content, 'config.php|.htaccess'),
-    'root config.php and root .htaccess are protected'
+    str_contains($content, 'config.php|.htaccess|*/.htaccess'),
+    'root config.php and arbitrary .htaccess targets are protected'
+);
+
+check(
+    str_contains(
+        $content,
+        'includes/.htaccess|logs/.htaccess|vendor/.htaccess'
+    ),
+    'approved runtime nested .htaccess security controls are allowlisted explicitly'
 );
 
 check(
