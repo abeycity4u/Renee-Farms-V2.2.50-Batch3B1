@@ -6,8 +6,79 @@ if (PHP_SAPI !== 'cli') {
     exit(1);
 }
 
-require_once dirname(__DIR__) . '/config.php';
-require_once dirname(__DIR__)
+require_once __DIR__
+    . '/v310_private_cli_bridge.php';
+
+$appRoot =
+    trim(
+        (string)(
+            getenv(
+                'RENEE_CREDENTIAL_APP_ROOT'
+            )
+            ?: ''
+        )
+    );
+
+if ($appRoot === '') {
+    $appRoot =
+        dirname(__DIR__);
+}
+
+$appRootReal =
+    realpath($appRoot);
+
+if (
+    $appRootReal === false
+    || !is_dir($appRootReal)
+) {
+    fwrite(
+        STDERR,
+        "FAIL: credential worker application root is unavailable.\n"
+    );
+    exit(1);
+}
+
+$authoritySource =
+    trim(
+        (string)(
+            getenv(
+                'RENEE_CREDENTIAL_ENV_SOURCE'
+            )
+            ?: ''
+        )
+    );
+
+if ($authoritySource !== '') {
+    try {
+        v310_private_cli_bridge_import(
+            $authoritySource
+        );
+    } catch (Throwable $bridgeError) {
+        /*
+         * Never emit authority values or source lines.
+         */
+        fwrite(
+            STDERR,
+            'FAIL: private credential worker authority import failed ['
+            . get_class($bridgeError)
+            . '].'
+            . PHP_EOL
+        );
+        exit(1);
+    }
+}
+
+/*
+ * CLI has no trustworthy web document root.
+ * Point application bootstrap at the certified runtime root.
+ */
+$_SERVER['DOCUMENT_ROOT'] =
+    $appRootReal;
+
+require_once $appRootReal
+    . '/config.php';
+
+require_once $appRootReal
     . '/includes/account_credential_outbox.php';
 
 $send =
@@ -34,6 +105,22 @@ if ($maxJobs < 1 || $maxJobs > 100) {
     fwrite(
         STDERR,
         "FAIL: --max must be between 1 and 100.\n"
+    );
+    exit(1);
+}
+
+/*
+ * SEND is fail-closed. A worker may only enter delivery mode when
+ * database, canonical HTTPS public URL, and explicit SMTP authorities
+ * are all present. Dry-run remains available without SEND authority.
+ */
+if (
+    $send
+    && !v310_private_cli_send_authority_ready()
+) {
+    fwrite(
+        STDERR,
+        "FAIL: credential worker SEND authority is incomplete.\n"
     );
     exit(1);
 }
