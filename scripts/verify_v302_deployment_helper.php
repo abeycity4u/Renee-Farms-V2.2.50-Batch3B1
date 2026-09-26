@@ -124,6 +124,14 @@ check(
 );
 
 check(
+    str_contains($content, '[ "$replace_count" -eq 0 ]')
+        && str_contains($content, '[ "$create_count" -eq 0 ]')
+        && str_contains($content, '[ "$normalize_count" -eq 0 ]')
+        && str_contains($content, 'DEPLOY_BACKUP_DIR=NONE'),
+    'all-NOOP apply exits before creating a deployment backup'
+);
+
+check(
     str_contains($content, 'ATOMIC_REPLACE_FAILED')
         && str_contains($content, 'mv -f -- "$tmp" "$dst"'),
     'same-directory atomic replacement path exists'

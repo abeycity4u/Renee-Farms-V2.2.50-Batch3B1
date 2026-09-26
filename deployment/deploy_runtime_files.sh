@@ -374,6 +374,18 @@ if [ "$MODE" = "dry-run" ]; then
     exit 0
 fi
 
+if [ "$replace_count" -eq 0 ] &&
+   [ "$create_count" -eq 0 ] &&
+   [ "$normalize_count" -eq 0 ]; then
+    say "DEPLOY_BACKUP_DIR=NONE"
+    say "DEPLOY_PERMISSION_POLICY=0644"
+    say "DEPLOY_UNRELATED_FILES_DELETED=0"
+    say "DEPLOY_ROLLBACK=NOT_REQUIRED"
+    say "DEPLOY_MUTATIONS=NONE"
+    say "DEPLOY_STATUS=PASS"
+    exit 0
+fi
+
 mkdir -p "$BACKUP_ROOT" \
     || die "BACKUP_ROOT_UNAVAILABLE"
 
