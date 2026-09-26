@@ -313,7 +313,7 @@ $check(
 $check(
     strpos(
         (string)$page,
-        'Current source-derived economics match the latest approved version.'
+        'Current source provenance and economics match the latest approved version.'
     ) !== false,
     'Manage Cycle retains approved-versus-current match state.'
 );

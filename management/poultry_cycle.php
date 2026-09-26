@@ -1412,7 +1412,20 @@ $confirmationText .=
           is_array($productionEntryApprovedClarity)
           && !empty($latestProductionEntrySnapshot)
       ): ?>
-        <?php if(!empty($productionEntryApprovedClarity['recorded'])): ?>
+        <?php
+        $approvedProvenanceMatchesCurrent =
+            !empty($productionEntryApprovedClarity['recorded'])
+            && $productionEntryComparison !== null
+            && (
+                ($productionEntryComparison['comparison_basis'] ?? '')
+                === 'provenance'
+            )
+            && empty($productionEntryComparison['changed']);
+        ?>
+        <?php if(
+            !empty($productionEntryApprovedClarity['recorded'])
+            && !$approvedProvenanceMatchesCurrent
+        ): ?>
           <div class="card mb-3">
             <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
               <strong>
@@ -1559,6 +1572,63 @@ $confirmationText .=
                   <?php endforeach; ?>
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+
+        <?php elseif(
+            !empty($productionEntryApprovedClarity['recorded'])
+            && $approvedProvenanceMatchesCurrent
+        ): ?>
+          <div class="card border-success mb-3">
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+              <strong>
+                Approved Provenance · V<?php echo (int)$productionEntryApprovedClarity['version_no']; ?>
+              </strong>
+              <span class="badge text-bg-success">
+                Matches current provenance
+              </span>
+            </div>
+
+            <div class="card-body">
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <div class="small text-muted">
+                    Approved source identity
+                  </div>
+                  <strong>
+                    <?php echo number_format(
+                        (int)$productionEntryApprovedClarity['source_count']
+                    ); ?>
+                    immutable source records
+                  </strong>
+                </div>
+
+                <div class="col-md-4">
+                  <div class="small text-muted">
+                    Approved version
+                  </div>
+                  <strong>
+                    V<?php echo (int)$productionEntryApprovedClarity['version_no']; ?>
+                  </strong>
+                </div>
+
+                <div class="col-md-4">
+                  <div class="small text-muted">
+                    Comparison
+                  </div>
+                  <strong class="text-success">
+                    Current source identity matches
+                  </strong>
+                </div>
+              </div>
+
+              <div class="small text-muted mt-3">
+                The approved provenance manifest remains immutable.
+                Its full source breakdown is not repeated here while
+                current and approved provenance are identical.
+                If the current source identity changes, the detailed
+                approved breakdown is shown again for comparison.
               </div>
             </div>
           </div>
@@ -1843,7 +1913,21 @@ $confirmationText .=
                         value="<?php echo (int)$cycleId; ?>"
                     >
 
-                    <div class="col-md-6">
+                    <div class="col-md-4">
+                        <label class="form-label">
+                            Cycle Start Date
+                        </label>
+
+                        <input
+                            class="form-control"
+                            type="date"
+                            value="<?php echo htmlspecialchars((string)$cycle['start_date'], ENT_QUOTES); ?>"
+                            readonly
+                            aria-readonly="true"
+                        >
+                    </div>
+
+                    <div class="col-md-5">
                         <label class="form-label">
                             Production End Date
                         </label>
