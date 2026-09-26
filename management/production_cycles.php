@@ -535,7 +535,7 @@ try {
         unset($cycle);
 
         $closedCycleStmt = $pdo->prepare(
-            "SELECT cycle_code, farm_type, production_type, opening_headcount, close_date, closing_headcount
+            "SELECT cycle_code, farm_type, production_type, start_date, opening_headcount, close_date, closing_headcount
              FROM production_cycles
              WHERE farm_id = ? AND status = 'closed'
              ORDER BY close_date DESC, created_at DESC
@@ -1262,6 +1262,7 @@ try {
                             <th>Cycle</th>
                             <th>Farm Type</th>
                             <th>Production Type</th>
+                            <th>Cycle Start Date</th>
                             <th class="text-end">Opening Headcount</th>
                             <th>Close Date</th>
                             <th class="text-end">Closing Headcount</th>
@@ -1269,13 +1270,14 @@ try {
                         </thead>
                         <tbody>
                         <?php if (empty($closedCycleDetails)): ?>
-                            <tr><td colspan="6" class="text-center text-muted py-4">No closed cycles yet. Close a cycle to see details here.</td></tr>
+                            <tr><td colspan="7" class="text-center text-muted py-4">No closed cycles yet. Close a cycle to see details here.</td></tr>
                         <?php else: ?>
                             <?php foreach ($closedCycleDetails as $cycle): ?>
                                 <tr>
                                     <td><?php echo htmlspecialchars($cycle['cycle_code']); ?></td>
                                     <td class="text-capitalize"><?php echo htmlspecialchars($cycle['farm_type']); ?></td>
                                     <td class="text-capitalize"><?php echo htmlspecialchars($cycle['production_type']); ?></td>
+                                    <td><?php echo htmlspecialchars($cycle['start_date'] ?? '-'); ?></td>
                                     <td class="text-end"><?php echo number_format(max(0, (int)($cycle['opening_headcount'] ?? 0))); ?></td>
                                     <td><?php echo htmlspecialchars($cycle['close_date'] ?? '-'); ?></td>
                                     <td class="text-end fw-bold"><?php echo number_format(max(0, (int)($cycle['closing_headcount'] ?? 0))); ?></td>
