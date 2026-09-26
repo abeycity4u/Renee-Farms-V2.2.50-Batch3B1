@@ -113,6 +113,20 @@ case "$BACKUP_ROOT" in
         ;;
 esac
 
+[ -d "$LIVE_ROOT" ] \
+    || die "LIVE_ROOT_UNAVAILABLE"
+
+[ ! -L "$LIVE_ROOT" ] \
+    || die "LIVE_ROOT_SYMLINK_REJECTED"
+
+if [ -e "$BACKUP_ROOT" ]; then
+    [ -d "$BACKUP_ROOT" ] \
+        || die "BACKUP_ROOT_NOT_DIRECTORY"
+
+    [ ! -L "$BACKUP_ROOT" ] \
+        || die "BACKUP_ROOT_SYMLINK_REJECTED"
+fi
+
 validate_relative_path() {
     local rel="$1"
     local part

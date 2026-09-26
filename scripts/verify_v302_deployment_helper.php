@@ -63,6 +63,13 @@ check(
 );
 
 check(
+    str_contains($content, 'LIVE_ROOT_SYMLINK_REJECTED')
+        && str_contains($content, 'BACKUP_ROOT_SYMLINK_REJECTED')
+        && str_contains($content, 'BACKUP_ROOT_NOT_DIRECTORY'),
+    'deployment roots reject symlink and invalid-directory configuration'
+);
+
+check(
     str_contains($content, 'git ls-files --error-unmatch'),
     'source targets must be tracked'
 );
