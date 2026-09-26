@@ -843,9 +843,15 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!"
                                                 <?php if ($canEditRecords && $isEditableType): ?>
                                                 <td>
                                                       <?php if ($isPopulationActivityOnly): ?>
-                                                      <span class="badge bg-light text-dark border">
-                                                          Population activity
-                                                      </span>
+                                                      <button
+                                                          type="button"
+                                                          class="btn btn-sm btn-outline-primary add-record-btn"
+                                                          title="Add Daily Record"
+                                                          data-record-date="<?php echo htmlspecialchars($record['record_date']); ?>"
+                                                          data-cycle-animal-type="<?php echo htmlspecialchars($record['animal_type']); ?>"
+                                                      >
+                                                          <i class="bi bi-pencil-square"></i>
+                                                      </button>
                                                       <?php else: ?>
                                                       <div class="d-flex flex-wrap gap-2">
                                                           <button class="btn btn-sm btn-outline-primary edit-record-btn"

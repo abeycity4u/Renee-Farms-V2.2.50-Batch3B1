@@ -652,9 +652,16 @@ $_SESSION['success'] = "Broiler daily record saved successfully!"
                                                     <?php if ($canEdit || $canDelete): ?>
                                                     <td>
                                                         <?php if ($isPopulationActivityOnly): ?>
-                                                        <span class="badge bg-light text-dark border">
-                                                            Population activity
-                                                        </span>
+                                                        <?php if ($canEdit): ?>
+                                                        <button
+                                                            type="button"
+                                                            class="btn btn-sm btn-outline-primary add-record-btn"
+                                                            title="Add Daily Record"
+                                                            data-record-date="<?php echo htmlspecialchars($record['record_date']); ?>"
+                                                        >
+                                                            <i class="bi bi-pencil-square"></i>
+                                                        </button>
+                                                        <?php endif; ?>
                                                         <?php else: ?>
                                                         <?php if ($canEdit): ?>
                                                         <button class="btn btn-sm btn-outline-primary edit-record-btn"

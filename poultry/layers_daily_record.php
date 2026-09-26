@@ -709,9 +709,14 @@ $_SESSION['success'] = "Daily record saved successfully!"
                                                 </td>
                                                   <td>
                                                       <?php if ($isPopulationActivityOnly): ?>
-                                                      <span class="badge bg-light text-dark border">
-                                                          Population activity
-                                                      </span>
+                                                      <button
+                                                          type="button"
+                                                          class="btn btn-sm btn-outline-primary add-record-btn"
+                                                          title="Add Daily Record"
+                                                          data-record-date="<?php echo htmlspecialchars($record['record_date']); ?>"
+                                                      >
+                                                          <i class="bi bi-pencil-square"></i>
+                                                      </button>
                                                       <?php else: ?>
                                                       <button class="btn btn-sm btn-outline-primary edit-record-btn"
                                                               title="Edit Record"
