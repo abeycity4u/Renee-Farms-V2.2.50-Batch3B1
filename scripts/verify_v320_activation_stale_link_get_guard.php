@@ -153,11 +153,20 @@ check_contract(
 );
 
 check_contract(
+    !str_contains(
+        $activate,
+        "$flashMessage =\n"
+        . "            'This activation link is invalid or has expired. '"
+    ),
+    'stale GET does not create a duplicate local flash error'
+);
+
+check_contract(
     str_contains(
         $activate,
-        "This activation link is invalid or has expired."
+        "This activation link is unavailable or has expired."
     ),
-    'stale token gets explicit invalid-link message'
+    'no-token branch owns stale or unavailable link presentation'
 );
 
 $lookupPos =

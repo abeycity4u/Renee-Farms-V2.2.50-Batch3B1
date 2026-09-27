@@ -183,11 +183,6 @@ if (
         );
 
         $hasActivationToken = false;
-
-        $flashType = 'error';
-        $flashMessage =
-            'This activation link is invalid or has expired. '
-            . 'Please contact your administrator for a new invitation.';
     }
 }
 
