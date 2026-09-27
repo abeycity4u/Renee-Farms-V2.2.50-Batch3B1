@@ -96,7 +96,7 @@
 
 .tenant-brand-name {
     display: inline-block;
-    max-width: 11rem;
+    max-width: 16rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
