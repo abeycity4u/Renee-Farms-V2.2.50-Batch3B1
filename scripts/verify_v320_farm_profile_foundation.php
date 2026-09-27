@@ -261,20 +261,40 @@ $management =
     );
 
 if (
-    str_contains(
+    !str_contains(
         $management,
         'function detectFarmLogoExtension'
     )
-    && str_contains(
+    && !str_contains(
         $management,
         'function saveFarmLogoUpload'
     )
+    && !str_contains(
+        $management,
+        'function editableFarm'
+    )
+    && str_contains(
+        $management,
+        "require_once dirname(__DIR__) . '/includes/farm_profile.php';"
+    )
+    && str_contains(
+        $management,
+        'farm_profile_detect_logo_extension'
+    )
+    && str_contains(
+        $management,
+        'farm_profile_save_logo_upload'
+    )
+    && str_contains(
+        $management,
+        'farm_profile_update_identity'
+    )
 ) {
     echo
-        "PASS: legacy Platform Owner helpers intentionally remain pending A3 integration\n";
+        "PASS: Platform Owner consumes shared Farm Profile authority\n";
 } else {
     $failures[] =
-        'A2 unexpectedly changed Platform Owner helper ownership';
+        'Platform Owner Farm Profile integration is incomplete';
 }
 
 if ($failures !== []) {

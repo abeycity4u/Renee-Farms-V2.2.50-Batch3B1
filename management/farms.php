@@ -1,6 +1,7 @@
 <?php
 require_once dirname(__DIR__) . '/init.php';
 require_once dirname(__DIR__) . '/includes/farm_contact_email.php';
+require_once dirname(__DIR__) . '/includes/farm_profile.php';
 require_once dirname(__DIR__) . '/includes/account_identity_policy.php';
 require_once dirname(__DIR__) . '/includes/account_pending_user.php';
 requireLogin();
@@ -13,34 +14,6 @@ function validFarmId($value): int { return filter_var($value, FILTER_VALIDATE_IN
 function validSubscriptionDate(string $value): bool {
     $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
     return $date !== false && $date->format('Y-m-d') === $value;
-}
-function editableFarm(PDO $pdo, int $farmId): ?array {
-    $stmt = $pdo->prepare("SELECT * FROM farms WHERE id = ? AND slug <> ? LIMIT 1");
-    $stmt->execute([$farmId, PLATFORM_WORKSPACE_SLUG]);
-    return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
-}
-function detectFarmLogoExtension(?array $file): ?string {
-    if (empty($file['tmp_name'])) return null;
-    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || ($file['size'] ?? 0) > 2 * 1024 * 1024) throw new RuntimeException('Logo upload must be an image smaller than 2 MB.');
-
-    $mime = function_exists('finfo_open') ? (new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']) : null;
-    $mimeExtensions = ['image/jpeg' => 'jpg', 'image/jpg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
-    $imageInfo = @getimagesize($file['tmp_name']);
-    $imageType = $imageInfo[2] ?? null;
-    $extensions = [IMAGETYPE_JPEG => 'jpg', IMAGETYPE_PNG => 'png', IMAGETYPE_WEBP => 'webp'];
-    $extension = $extensions[$imageType] ?? ($mimeExtensions[$mime] ?? null);
-    if ($extension === null) throw new RuntimeException('Logo must contain valid JPG, PNG, or WebP image data. Try re-exporting the image as JPG before uploading.');
-    return $extension;
-}
-function saveFarmLogoUpload(?array $file, int $farmId, ?string $existing = null, ?string $validatedExtension = null): ?string {
-    if (empty($file['tmp_name'])) return $existing;
-    $extension = $validatedExtension ?? detectFarmLogoExtension($file);
-
-    $directory = dirname(__DIR__) . '/uploads/farms';
-    if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) throw new RuntimeException('Unable to create the logo directory.');
-    $filename = $farmId . '-' . bin2hex(random_bytes(12)) . '.' . $extension;
-    if (!move_uploaded_file($file['tmp_name'], $directory . '/' . $filename)) throw new RuntimeException('Unable to save the logo.');
-    return '/uploads/farms/' . $filename;
 }
 function ensureTenantRoles(PDO $pdo): void {
     $stmt = $pdo->prepare("INSERT INTO roles (code, name, is_platform_role) VALUES ('farm_admin', 'Admin / Farm Owner', 0) ON DUPLICATE KEY UPDATE name = VALUES(name), is_platform_role = 0");
@@ -121,7 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $recordedByUserId = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
 
     if (isset($_POST['resend_activation'], $_POST['farm_id'])) {
-        $farm = editableFarm($pdo, $farmId);
+        $farm = farm_profile_load($pdo, $farmId);
 
         if (!$farm) {
             $_SESSION['error'] = 'That farm account cannot be changed.';
@@ -207,7 +180,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (isset($_POST['suspend_farm'], $_POST['farm_id']) || isset($_POST['reactivate_farm'], $_POST['farm_id'])) {
-        if (!editableFarm($pdo, $farmId)) { $_SESSION['error'] = 'That farm account cannot be changed.'; redirectFarms(); }
+        if (!farm_profile_load($pdo, $farmId)) { $_SESSION['error'] = 'That farm account cannot be changed.'; redirectFarms(); }
         $status = isset($_POST['suspend_farm']) ? 'suspended' : 'active';
         $reason = $status === 'suspended' ? 'platform_owner_suspend' : 'platform_owner_reactivate';
         try {
@@ -224,7 +197,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirectFarms();
     }
     if (isset($_POST['delete_farm'], $_POST['farm_id'])) {
-        $farm = editableFarm($pdo, $farmId);
+        $farm = farm_profile_load($pdo, $farmId);
         if (!$farm) { $_SESSION['error'] = 'The platform workspace cannot be deleted.'; redirectFarms(); }
         if (farmHasProtectedCommercialHistory($pdo, $farmId)) {
             $_SESSION['error'] = 'This farm has commercial subscription or billing/payment history and cannot be permanently deleted. Suspend the farm instead to preserve the commercial audit trail.';
@@ -238,7 +211,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirectFarms();
     }
 
-    $name = trim($_POST['name'] ?? ''); $slug = strtolower(trim($_POST['slug'] ?? '')); $color = trim($_POST['primary_color'] ?? '#198754');
+    $profileInputError = null;
+
+    try {
+        $profileIdentity =
+            farm_profile_normalize_identity([
+                'name' =>
+                    (string)($_POST['name'] ?? ''),
+
+                'slug' =>
+                    (string)($_POST['slug'] ?? ''),
+
+                'primary_color' =>
+                    (string)(
+                        $_POST['primary_color']
+                        ?? '#198754'
+                    ),
+            ]);
+
+        $name =
+            $profileIdentity['name'];
+
+        $slug =
+            $profileIdentity['slug'];
+
+        $color =
+            $profileIdentity['primary_color'];
+    } catch (InvalidArgumentException $profileException) {
+        $name =
+            trim(
+                (string)($_POST['name'] ?? '')
+            );
+
+        $slug =
+            strtolower(
+                trim(
+                    (string)($_POST['slug'] ?? '')
+                )
+            );
+
+        $color =
+            trim(
+                (string)(
+                    $_POST['primary_color']
+                    ?? '#198754'
+                )
+            );
+
+        $profileInputError =
+            $profileException->getMessage();
+    }
     $submittedModules = farm_entitlement_normalize_modules($_POST['modules'] ?? []);
     $seatAddOns = subscription_seat_normalize_addons(is_array($_POST['seat_addons'] ?? null) ? $_POST['seat_addons'] : []);
     $identityError = null;
@@ -313,8 +335,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $existingOwnerCredentialState
         === 'pending_activation';
 
-    if ($name === '' || !preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) || $slug === PLATFORM_WORKSPACE_SLUG || !preg_match('/^#[0-9a-fA-F]{6}$/', $color)) {
-        $error = 'Enter the Farm Admin details and use a unique lowercase Farm Workspace ID.';
+    if ($profileInputError !== null) {
+        $error = $profileInputError;
     } elseif ($identityError !== null) $error = $identityError;
     elseif (!$submittedModules) $error = 'Select Poultry, Ruminant, or both so the farm workspace has an active service entitlement.';
     elseif ($emailPairError !== null) $error = $emailPairError;
@@ -325,10 +347,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif (isset($_POST['update_farm']) && !$repairOwnerNeeded && $existingOwnerPending && $password !== '') $error = 'Pending Farm Admin accounts choose their password from the activation link.';
     elseif (isset($_POST['update_farm']) && !$repairOwnerNeeded && !$existingOwnerPending && $password !== '' && ($passwordError = password_security_validate($password)) !== null) $error = $passwordError;
     else try {
+        farm_profile_assert_workspace_id_available(
+            $pdo,
+            $slug,
+            isset($_POST['update_farm'])
+                ? $farmId
+                : 0
+        );
+
         if (isset($_POST['update_farm'])) {
             subscription_seat_assert_capacity($pdo, $farmId, $plan, $submittedModules, $seatAddOns);
         }
-        $logoExtension = detectFarmLogoExtension($_FILES['logo'] ?? null);
+        $logoExtension = farm_profile_detect_logo_extension($_FILES['logo'] ?? null);
         $createdFarmId = 0;
         $newLogoPath = null;
         $activationQueuedFor = '';
@@ -337,7 +367,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (isset($_POST['create_farm'])) {
             $stmt = $pdo->prepare('INSERT INTO farms (name, slug, primary_color, contact_name, contact_email, subscription_plan, subscription_status, subscription_starts_at, subscription_ends_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
             $stmt->execute([$name, $slug, $color, trim($_POST['contact_name'] ?? ''), $contactEmail, $plan, $status, $startDate ? "$startDate 00:00:00" : null, $endDate ? "$endDate 23:59:59" : null]);
-            $farmId = (int)$pdo->lastInsertId(); $createdFarmId = $farmId; $logoPath = saveFarmLogoUpload($_FILES['logo'] ?? null, $farmId, null, $logoExtension); $newLogoPath = $logoPath;
+            $farmId = (int)$pdo->lastInsertId(); $createdFarmId = $farmId; $logoPath = farm_profile_save_logo_upload($_FILES['logo'] ?? null, $farmId, null, $logoExtension); $newLogoPath = $logoPath;
             if ($logoPath) $pdo->prepare('UPDATE farms SET logo_path = ? WHERE id = ?')->execute([$logoPath, $farmId]);
             $pendingOwner = account_pending_user_create(
                 $pdo,
@@ -356,7 +386,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             subscription_record_capture($pdo, $farmId, 'tenant_created', $recordedByUserId);
             $message = "Created {$name}.";
         } elseif (isset($_POST['update_farm'])) {
-            $farm = editableFarm($pdo, $farmId); if (!$farm) throw new RuntimeException('That farm cannot be edited.');
+            $farm = farm_profile_load($pdo, $farmId); if (!$farm) throw new RuntimeException('That farm cannot be edited.');
             $ownerId = findFarmAdminId($pdo, $farmId);
             $ownerCredentialState = null;
 
@@ -419,8 +449,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
-            $logoPath = saveFarmLogoUpload($_FILES['logo'] ?? null, $farmId, $farm['logo_path'], $logoExtension); $newLogoPath = ($logoPath !== ($farm['logo_path'] ?? null)) ? $logoPath : null;
-            $pdo->prepare('UPDATE farms SET name = ?, slug = ?, primary_color = ?, contact_name = ?, contact_email = ?, subscription_plan = ?, subscription_status = ?, subscription_starts_at = ?, subscription_ends_at = ?, logo_path = ? WHERE id = ?')->execute([$name, $slug, $color, trim($_POST['contact_name'] ?? ''), $contactEmail, $plan, $status, $startDate ? "$startDate 00:00:00" : null, $endDate ? "$endDate 23:59:59" : null, $logoPath, $farmId]);
+            $logoPath =
+                farm_profile_save_logo_upload(
+                    $_FILES['logo'] ?? null,
+                    $farmId,
+                    $farm['logo_path'],
+                    $logoExtension
+                );
+
+            $newLogoPath =
+                (
+                    $logoPath
+                    !== ($farm['logo_path'] ?? null)
+                )
+                    ? $logoPath
+                    : null;
+
+            farm_profile_update_identity(
+                $pdo,
+                $farmId,
+                [
+                    'name' => $name,
+                    'slug' => $slug,
+                    'primary_color' => $color,
+                ],
+                $logoPath
+            );
+
+            $pdo->prepare(
+                'UPDATE farms
+                 SET
+                    contact_name = ?,
+                    contact_email = ?,
+                    subscription_plan = ?,
+                    subscription_status = ?,
+                    subscription_starts_at = ?,
+                    subscription_ends_at = ?
+                 WHERE id = ?'
+            )->execute([
+                trim(
+                    $_POST['contact_name']
+                    ?? ''
+                ),
+                $contactEmail,
+                $plan,
+                $status,
+                $startDate
+                    ? "$startDate 00:00:00"
+                    : null,
+                $endDate
+                    ? "$endDate 23:59:59"
+                    : null,
+                $farmId,
+            ]);
 
             if (
                 $ownerCredentialState
@@ -526,17 +607,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirectFarms();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
-        if (!empty($createdFarmId) && editableFarm($pdo, $createdFarmId)) {
+        if (!empty($createdFarmId) && farm_profile_load($pdo, $createdFarmId)) {
             try { deleteFarmData($pdo, $createdFarmId); } catch (Throwable $cleanupError) { error_log('Incomplete farm cleanup failed: ' . $cleanupError->getMessage()); }
         }
         if (!empty($newLogoPath) && preg_match('#^/uploads/farms/[a-zA-Z0-9._-]+$#', $newLogoPath)) @unlink(dirname(__DIR__) . $newLogoPath);
-        $error = $e instanceof RuntimeException ? $e->getMessage() : 'Unable to save this farm. Its workspace ID or owner username may already exist.';
+        $error =
+            (
+                $e instanceof RuntimeException
+                || $e instanceof InvalidArgumentException
+            )
+                ? $e->getMessage()
+                : 'Unable to save this farm. Its workspace ID or owner username may already exist.';
     }
 }
 
 $editFarm = null; $editOwner = null; $editModules = [];
 if (isset($_GET['edit'])) {
-    $editFarm = editableFarm($pdo, validFarmId($_GET['edit']));
+    $editFarm = farm_profile_load($pdo, validFarmId($_GET['edit']));
     if ($editFarm) {
         $ownerId = findFarmAdminId($pdo, (int)$editFarm['id']);
         if ($ownerId) { $stmt = $pdo->prepare('SELECT * FROM users WHERE id = ? AND farm_id = ?'); $stmt->execute([$ownerId, $editFarm['id']]); $editOwner = $stmt->fetch(PDO::FETCH_ASSOC); }
