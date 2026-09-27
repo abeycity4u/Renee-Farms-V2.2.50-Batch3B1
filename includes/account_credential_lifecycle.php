@@ -296,11 +296,22 @@ if (!function_exists('account_credential_issue_token')) {
     }
 }
 
-if (!function_exists('account_credential_lock_token')) {
-    function account_credential_lock_token(
+if (!function_exists('account_credential_lookup_token')) {
+    /**
+     * Resolve one currently usable credential token.
+     *
+     * The shared lifecycle owns token validity so public routes do not
+     * duplicate token-hash, expiry, consumed-state or credential-state
+     * policy.
+     *
+     * $forUpdate is reserved for mutation paths that already own a
+     * transaction. Read-only GET/render checks must leave it false.
+     */
+    function account_credential_lookup_token(
         PDO $pdo,
         string $rawToken,
-        string $purpose
+        string $purpose,
+        bool $forUpdate = false
     ): ?array {
         $purpose =
             account_credential_normalize_purpose($purpose);
@@ -308,7 +319,7 @@ if (!function_exists('account_credential_lock_token')) {
         $tokenHash =
             account_credential_token_hash($rawToken);
 
-        $stmt = $pdo->prepare(
+        $sql =
             "SELECT
                 t.id,
                 t.user_id,
@@ -325,9 +336,13 @@ if (!function_exists('account_credential_lock_token')) {
              WHERE t.token_hash = ?
                AND t.purpose = ?
                AND t.expires_at > NOW()
-             LIMIT 1
-             FOR UPDATE"
-        );
+             LIMIT 1";
+
+        if ($forUpdate) {
+            $sql .= ' FOR UPDATE';
+        }
+
+        $stmt = $pdo->prepare($sql);
 
         $stmt->execute([
             $tokenHash,
@@ -344,8 +359,39 @@ if (!function_exists('account_credential_lock_token')) {
             return null;
         }
 
+        $credentialState =
+            (string)($token['credential_state'] ?? '');
+
+        if (
+            $purpose === 'activation'
+            && $credentialState !== 'pending_activation'
+        ) {
+            return null;
+        }
+
+        if (
+            $purpose === 'password_reset'
+            && $credentialState !== 'active'
+        ) {
+            return null;
+        }
 
         return $token;
+    }
+}
+
+if (!function_exists('account_credential_lock_token')) {
+    function account_credential_lock_token(
+        PDO $pdo,
+        string $rawToken,
+        string $purpose
+    ): ?array {
+        return account_credential_lookup_token(
+            $pdo,
+            $rawToken,
+            $purpose,
+            true
+        );
     }
 }
 

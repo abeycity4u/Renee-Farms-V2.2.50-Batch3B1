@@ -148,6 +148,49 @@ $hasActivationToken =
         ACCOUNT_CREDENTIAL_ACTIVATION_TOKEN_SESSION_KEY
     ] !== '';
 
+/*
+ * A raw token being present in the anonymous session is not enough to
+ * render a password form. It may already have expired, been consumed,
+ * or been superseded by a later activation invitation.
+ *
+ * Keep the GET/render route thin by delegating validity to the shared
+ * credential lifecycle. The lookup is read-only; the POST mutation path
+ * still uses the transaction-locking consume flow below.
+ */
+if (
+    $hasActivationToken
+    && strtoupper(
+        (string)($_SERVER['REQUEST_METHOD'] ?? 'GET')
+    ) === 'GET'
+) {
+    $rawActivationToken =
+        $_SESSION[
+            ACCOUNT_CREDENTIAL_ACTIVATION_TOKEN_SESSION_KEY
+        ];
+
+    $usableActivationToken =
+        account_credential_lookup_token(
+            $pdo,
+            $rawActivationToken,
+            'activation'
+        );
+
+    if ($usableActivationToken === null) {
+        unset(
+            $_SESSION[
+                ACCOUNT_CREDENTIAL_ACTIVATION_TOKEN_SESSION_KEY
+            ]
+        );
+
+        $hasActivationToken = false;
+
+        $flashType = 'error';
+        $flashMessage =
+            'This activation link is invalid or has expired. '
+            . 'Please contact your administrator for a new invitation.';
+    }
+}
+
 if (
     strtoupper(
         (string)($_SERVER['REQUEST_METHOD'] ?? 'GET')
