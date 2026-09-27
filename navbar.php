@@ -14,6 +14,7 @@ if (!isLoggedIn()) {
 require_once __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/notifications.php';
 require_once __DIR__ . '/includes/subscription_renewal_notice.php';
+require_once __DIR__ . '/includes/platform_brand.php';
 
 $subscriptionNotice = null;
 if (!isPlatformOwner() && hasRole('farm_admin')) {
@@ -82,9 +83,14 @@ $showManagementMenu = $canViewSales || $canViewExpenseReport || $canViewReports 
   <div class="container-fluid">
     <a class="navbar-brand farm-brand" href="<?php echo BASE_URL; ?>/dashboard.php">
       <span class="brand-logo-badge">
-        <img src="<?php echo htmlspecialchars(farmLogoUrl(), ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars(farmBrandName(), ENT_QUOTES, 'UTF-8'); ?> logo" height="30" class="brand-logo-img">
+        <img
+          src="<?php echo BASE_URL; ?>/assets/images/logo.jpg?v=2024.06.01"
+          alt="<?php echo htmlspecialchars(platform_brand_plain_lockup(), ENT_QUOTES, 'UTF-8'); ?> logo"
+          height="30"
+          class="brand-logo-img"
+        >
       </span>
-      <span class="brand-text"><?php echo htmlspecialchars(farmBrandName(), ENT_QUOTES, 'UTF-8'); ?></span>
+      <?php echo platform_brand_html('platform-brand-navbar'); ?>
     </a>
     <button class="navbar-toggler collapsed" type="button" data-app-navbar-toggle aria-controls="navbarMenu" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
