@@ -31,72 +31,10 @@ $accessDeniedDashboardUrl =
 <head>
     <?php include __DIR__ . '/navbar_head.php'; ?>
     <title><?php echo htmlspecialchars($accessDeniedTitle, ENT_QUOTES, 'UTF-8'); ?></title>
-
-    <style>
-        .access-denied-shell {
-            display: flex;
-            justify-content: center;
-            padding: clamp(4.5rem, 11vh, 8rem) 1rem 3rem;
-        }
-
-        .access-denied-card {
-            width: min(100%, 720px);
-            text-align: center;
-            border: 1px solid var(--bs-border-color);
-            border-radius: 1.25rem;
-            background: var(--bs-body-bg);
-            box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, .12);
-            overflow: hidden;
-        }
-
-        .access-denied-card-body {
-            padding: clamp(2rem, 5vw, 3.25rem);
-        }
-
-        .access-denied-icon {
-            width: 4rem;
-            height: 4rem;
-            margin: 0 auto 1.25rem;
-            display: grid;
-            place-items: center;
-            border-radius: 50%;
-            font-size: 1.8rem;
-            background: var(--bs-danger-bg-subtle);
-            color: var(--bs-danger-text-emphasis);
-        }
-
-        .access-denied-eyebrow {
-            margin-bottom: .65rem;
-            font-size: .78rem;
-            font-weight: 700;
-            letter-spacing: .12em;
-            text-transform: uppercase;
-            color: var(--bs-secondary-color);
-        }
-
-        .access-denied-title {
-            margin-bottom: 1rem;
-            font-weight: 750;
-        }
-
-        .access-denied-message {
-            margin: 0 auto .7rem;
-            max-width: 560px;
-            font-size: 1.08rem;
-            color: var(--bs-body-color);
-        }
-
-        .access-denied-help {
-            margin: 0 auto 1.75rem;
-            max-width: 560px;
-            color: var(--bs-secondary-color);
-        }
-
-        .access-denied-actions {
-            display: flex;
-            justify-content: center;
-        }
-    </style>
+    <link
+        rel="stylesheet"
+        href="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/css/access-denied.css'); ?>"
+    >
 </head>
 
 <body>

@@ -14,6 +14,14 @@ $page =
         $root . '/no_access.php'
     );
 
+$cssPath =
+    $root . '/assets/css/access-denied.css';
+
+$css =
+    is_file($cssPath)
+        ? (string)file_get_contents($cssPath)
+        : '';
+
 $fail = 0;
 
 function verify_access_ui(
@@ -64,7 +72,7 @@ verify_access_ui(
         $actor,
         "exit('Farm Admin access is required for subscription billing.')"
     ),
-    'billing actor no longer emits raw plain-text denial'
+    'billing actor does not emit raw plain-text denial'
 );
 
 verify_access_ui(
@@ -76,23 +84,64 @@ verify_access_ui(
 );
 
 verify_access_ui(
-    str_contains(
+    !str_contains(
         $page,
-        'access-denied-shell'
-    )
-    && str_contains(
-        $page,
-        'justify-content: center'
+        '<style>'
     ),
-    'access-denied content is centered horizontally'
+    'shared no-access surface contains no inline style block'
 );
 
 verify_access_ui(
     str_contains(
         $page,
+        "versioned_asset('/assets/css/access-denied.css')"
+    ),
+    'shared no-access surface loads versioned external stylesheet'
+);
+
+verify_access_ui(
+    is_file($cssPath),
+    'shared access-denied stylesheet exists'
+);
+
+verify_access_ui(
+    str_contains(
+        $css,
+        '.access-denied-shell'
+    )
+    && str_contains(
+        $css,
+        'justify-content: center'
+    )
+    && str_contains(
+        $css,
+        'width: 100%'
+    ),
+    'external stylesheet centers access-denied surface'
+);
+
+verify_access_ui(
+    str_contains(
+        $css,
         'padding: clamp(4.5rem, 11vh, 8rem)'
     ),
-    'access-denied card is positioned toward upper-middle viewport'
+    'external stylesheet positions card toward upper-middle viewport'
+);
+
+verify_access_ui(
+    str_contains(
+        $css,
+        '.access-denied-card'
+    )
+    && str_contains(
+        $css,
+        'width: min(100%, 720px)'
+    )
+    && str_contains(
+        $css,
+        'border-radius: 1.25rem'
+    ),
+    'external stylesheet defines centered access card'
 );
 
 verify_access_ui(
@@ -105,14 +154,14 @@ verify_access_ui(
 
 verify_access_ui(
     str_contains(
-        $page,
+        $css,
         'var(--bs-body-bg)'
     )
     && str_contains(
-        $page,
+        $css,
         'var(--bs-body-color)'
     ),
-    'shared denial surface follows active theme variables'
+    'external stylesheet follows active theme variables'
 );
 
 echo $fail === 0
