@@ -246,6 +246,42 @@ if (!function_exists('billing_provider_normalize_payment_status')) {
     }
 }
 
+if (!function_exists('billing_provider_normalize_optional_decimal')) {
+    function billing_provider_normalize_optional_decimal($amount, bool $allowZero = true): ?string
+    {
+        if ($amount === null) return null;
+        if (is_int($amount)) $amount = (string)$amount;
+        if (!is_string($amount)) {
+            throw new RuntimeException('Provider returned an invalid optional decimal amount.');
+        }
+
+        $amount = trim($amount);
+        if ($amount === '') return null;
+
+        if (!preg_match('/^(\\d{1,10})(?:\\.(\\d{1,2}))?$/', $amount, $match)) {
+            throw new RuntimeException('Provider returned an invalid optional decimal amount.');
+        }
+
+        $whole = ltrim($match[1], '0');
+        if ($whole === '') $whole = '0';
+
+        $fraction = str_pad(
+            (string)($match[2] ?? ''),
+            2,
+            '0',
+            STR_PAD_RIGHT
+        );
+
+        $normalized = $whole . '.' . $fraction;
+
+        if (!$allowZero && $normalized === '0.00') {
+            throw new RuntimeException('Provider returned a zero amount where a positive amount is required.');
+        }
+
+        return $normalized;
+    }
+}
+
 if (!function_exists('billing_provider_normalize_payment_result')) {
     function billing_provider_normalize_payment_result(string $provider, array $result): array
     {
@@ -264,6 +300,14 @@ if (!function_exists('billing_provider_normalize_payment_result')) {
             'status' => $status,
             'provider_reference' => billing_provider_normalize_reference((string)($result['provider_reference'] ?? '')),
             'amount' => billing_provider_normalize_amount($result['amount'] ?? null),
+            'requested_amount' => billing_provider_normalize_optional_decimal(
+                $result['requested_amount'] ?? null,
+                false
+            ),
+            'provider_fee' => billing_provider_normalize_optional_decimal(
+                $result['provider_fee'] ?? null,
+                true
+            ),
             'currency' => billing_provider_normalize_currency((string)($result['currency'] ?? '')),
             'provider_transaction_id' => billing_provider_optional_identifier($result['provider_transaction_id'] ?? null),
             'provider_subscription_id' => billing_provider_optional_identifier($result['provider_subscription_id'] ?? null),

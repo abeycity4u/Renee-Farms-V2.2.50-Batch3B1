@@ -193,6 +193,16 @@ if (!class_exists('PaystackBillingProviderAdapter')) {
                 'status' => $status,
                 'provider_reference' => (string)($data['reference'] ?? $providerReference),
                 'amount' => billing_adapter_minor_to_decimal($data['amount'] ?? null),
+                'requested_amount' =>
+                    array_key_exists('requested_amount', $data)
+                    && is_numeric($data['requested_amount'])
+                        ? billing_adapter_minor_to_decimal($data['requested_amount'])
+                        : null,
+                'provider_fee' =>
+                    array_key_exists('fees', $data)
+                    && is_numeric($data['fees'])
+                        ? billing_adapter_minor_to_decimal($data['fees'])
+                        : null,
                 'currency' => strtoupper(trim((string)($data['currency'] ?? ''))),
                 'provider_transaction_id' => $providerId === '' ? null : $providerId,
                 'provider_subscription_id' => $this->subscriptionId($data),

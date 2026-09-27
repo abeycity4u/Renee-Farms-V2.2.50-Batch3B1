@@ -75,6 +75,17 @@ if (!function_exists('billing_audit_datetime')) {
     }
 }
 
+if (!function_exists('billing_audit_decimal_minor')) {
+    function billing_audit_decimal_minor(string $amount): int
+    {
+        if (!preg_match('/^(\\d{1,10})\\.(\\d{2})$/', $amount, $match)) {
+            throw new RuntimeException('Verified billing amount is not a normalized decimal value.');
+        }
+
+        return ((int)$match[1] * 100) + (int)$match[2];
+    }
+}
+
 if (!function_exists('billing_audit_assert_provider_identity')) {
     function billing_audit_assert_provider_identity(array $attempt, array $verification): void
     {
@@ -93,11 +104,62 @@ if (!function_exists('billing_audit_assert_provider_identity')) {
         $attemptAmount = function_exists('billing_payment_normalize_amount')
             ? billing_payment_normalize_amount((string)($attempt['amount'] ?? ''))
             : trim((string)($attempt['amount'] ?? ''));
+
         $resultAmount = function_exists('billing_payment_normalize_amount')
             ? billing_payment_normalize_amount($verification['amount'] ?? null)
             : trim((string)($verification['amount'] ?? ''));
-        if (!hash_equals($attemptAmount, $resultAmount)) {
-            throw new RuntimeException('Verified provider amount does not match the frozen billing attempt.');
+
+        $requestedAmountRaw = $verification['requested_amount'] ?? null;
+        $providerFeeRaw = $verification['provider_fee'] ?? null;
+
+        if ($requestedAmountRaw !== null) {
+            $requestedAmount = function_exists('billing_provider_normalize_optional_decimal')
+                ? billing_provider_normalize_optional_decimal($requestedAmountRaw, false)
+                : trim((string)$requestedAmountRaw);
+
+            if ($requestedAmount === null
+                || !hash_equals($attemptAmount, $requestedAmount)) {
+                throw new RuntimeException(
+                    'Verified provider requested amount does not match the frozen billing attempt.'
+                );
+            }
+
+            $chargedMinor = billing_audit_decimal_minor($resultAmount);
+            $requestedMinor = billing_audit_decimal_minor($requestedAmount);
+
+            if ($chargedMinor < $requestedMinor) {
+                throw new RuntimeException(
+                    'Verified provider charged amount is lower than the frozen billing attempt.'
+                );
+            }
+
+            if ($providerFeeRaw !== null) {
+                $providerFee = function_exists('billing_provider_normalize_optional_decimal')
+                    ? billing_provider_normalize_optional_decimal($providerFeeRaw, true)
+                    : trim((string)$providerFeeRaw);
+
+                if ($providerFee === null) {
+                    throw new RuntimeException(
+                        'Verified provider fee could not be normalized.'
+                    );
+                }
+
+                $feeMinor = billing_audit_decimal_minor($providerFee);
+
+                if ($chargedMinor !== $requestedMinor + $feeMinor) {
+                    throw new RuntimeException(
+                        'Verified provider charged amount does not equal requested amount plus provider fee.'
+                    );
+                }
+            } elseif (!hash_equals($requestedAmount, $resultAmount)) {
+                throw new RuntimeException(
+                    'Verified provider surcharge cannot be validated without an authoritative provider fee.'
+                );
+            }
+        } elseif (!hash_equals($attemptAmount, $resultAmount)) {
+            throw new RuntimeException(
+                'Verified provider amount does not match the frozen billing attempt.'
+            );
         }
 
         $attemptCurrency = strtoupper(trim((string)($attempt['currency'] ?? '')));
