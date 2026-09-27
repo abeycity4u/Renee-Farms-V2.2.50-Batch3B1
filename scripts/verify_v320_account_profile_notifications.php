@@ -12,6 +12,14 @@ $notifications = (string)file_get_contents(
     $root . '/includes/notifications.php'
 );
 
+$navbar = (string)file_get_contents(
+    $root . '/navbar.php'
+);
+
+$notificationCss = (string)file_get_contents(
+    $root . '/assets/css/notifications.css'
+);
+
 $failures = [];
 
 $contracts = [
@@ -21,14 +29,16 @@ $contracts = [
             "require_once dirname(__DIR__) . '/includes/notifications.php';"
         ),
 
-    'Farm Profile error uses shared notification renderer'
+    'Farm Profile errors use shared notification redirect'
         => str_contains(
             $account,
-            "renderNotification("
-        )
-        && str_contains(
+            'redirectWithNotification('
+        ),
+
+    'Farm Profile shared redirect returns to Account'
+        => str_contains(
             $account,
-            "'Farm Profile could not be updated.'"
+            "'/billing/account.php'"
         ),
 
     'Farm Profile raw Bootstrap error alert retired'
@@ -37,28 +47,50 @@ $contracts = [
             '<div class="alert alert-danger"><?= htmlspecialchars($profileFormError'
         ),
 
-    'Farm Profile error variable remains intact'
+    'Shared notification redirect signature remains authoritative'
         => str_contains(
-            $account,
-            '$profileFormError ='
+            $notifications,
+            'function redirectWithNotification('
         ),
 
-    'Shared renderer signature remains authoritative'
+    'Shared notification renderer remains authoritative'
         => str_contains(
             $notifications,
             'function renderNotification(string $type, string $message, ?string $title = null, ?string $tip = null): void'
         ),
 
-    'Shared renderer still owns error notification class'
+    'Session notifications render in navbar notification container'
         => str_contains(
-            $notifications,
-            'app-notification-error'
+            $navbar,
+            'id="appNotifications"'
+        )
+        && str_contains(
+            $navbar,
+            'renderSessionNotifications'
+        ),
+
+    'Shared notification container remains fixed top-center'
+        => str_contains(
+            $notificationCss,
+            'position: fixed;'
+        )
+        && str_contains(
+            $notificationCss,
+            'top: 72px;'
+        )
+        && str_contains(
+            $notificationCss,
+            'left: 50%;'
+        )
+        && str_contains(
+            $notificationCss,
+            'transform: translateX(-50%);'
         ),
 
     'Farm Profile form value preservation remains'
         => str_contains(
             $account,
-            '$profileFormValue'
+            "\$_SESSION['farm_profile_form_value']"
         ),
 
     'Farm Profile shared service remains loaded'

@@ -25,6 +25,19 @@ $emailFormValue = null;
 $profileFormError = null;
 $profileFormValue = null;
 
+if (
+    $_SERVER['REQUEST_METHOD'] !== 'POST'
+    && isset($_SESSION['farm_profile_form_value'])
+    && is_array($_SESSION['farm_profile_form_value'])
+) {
+    $profileFormValue =
+        $_SESSION['farm_profile_form_value'];
+
+    unset(
+        $_SESSION['farm_profile_form_value']
+    );
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_valid_csrf_post();
 
@@ -244,8 +257,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 );
             }
 
-            $profileFormError =
-                $e->getMessage();
+            $_SESSION['farm_profile_form_value'] =
+                $profileFormValue;
+
+            redirectWithNotification(
+                'error',
+                $e->getMessage(),
+                '/billing/account.php'
+            );
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
@@ -271,8 +290,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 . $e->getMessage()
             );
 
-            $profileFormError =
-                'Unable to update the Farm Profile right now. Please try again.';
+            $_SESSION['farm_profile_form_value'] =
+                $profileFormValue;
+
+            redirectWithNotification(
+                'error',
+                'Unable to update the Farm Profile right now. Please try again.',
+                '/billing/account.php'
+            );
         }
     } else {
         http_response_code(422);
@@ -331,7 +356,7 @@ $profileDisplay =
 
 $farmName =
     (string)(
-        $profileDisplay['name']
+        $profile['name']
         ?? $farm['name']
         ?? farmBrandName()
     );
@@ -478,16 +503,6 @@ $decodeModules = static function ($json): string {
             </div>
         </div>
     </div>
-
-    <?php
-    if ($profileFormError !== null) {
-        renderNotification(
-            'error',
-            $profileFormError,
-            'Farm Profile could not be updated.'
-        );
-    }
-    ?>
 
     <div class="card billing-card mb-4">
         <div class="card-header bg-transparent border-0 pt-3 px-3">
