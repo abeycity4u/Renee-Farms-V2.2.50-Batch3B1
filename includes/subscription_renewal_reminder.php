@@ -7,6 +7,7 @@
  */
 require_once __DIR__ . '/subscription_renewal_notice.php';
 require_once __DIR__ . '/farm_contact_email.php';
+require_once __DIR__ . '/platform_brand.php';
 
 if (!function_exists('subscription_renewal_reminder_days')) {
     function subscription_renewal_reminder_days(): array
@@ -43,7 +44,8 @@ if (!function_exists('subscription_renewal_reminder_candidate')) {
         $body = "Hello,\n\n" . $notice['message'] . "\n\n"
             . "Farm: " . $farmName . "\n"
             . "Manage billing: https://reneefarms.com/billing/account.php\n\n"
-            . "Regards,\nRenee Farms Platform";
+            . "Regards,\n"
+            . platform_brand_plain_lockup();
 
         return [
             'farm_id' => (int)($farm['id'] ?? 0),

@@ -30,6 +30,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/account_credential_lifecycle.php';
 require_once __DIR__ . '/platform_public_url.php';
 require_once __DIR__ . '/platform_mailer.php';
+require_once __DIR__ . '/platform_brand.php';
 
 if (!function_exists('account_credential_activation_ttl_seconds')) {
     function account_credential_activation_ttl_seconds(): int
@@ -306,11 +307,15 @@ if (!function_exists('account_credential_delivery_message')) {
 
         if ($purpose === 'activation') {
             $subject =
-                'Activate your Renee Farms account';
+                'Activate your '
+                . platform_brand_product_text()
+                . ' account';
 
             $body =
                 $greeting . "\n\n"
-                . "Your Renee Farms account is ready.\n\n"
+                . 'Your '
+                . platform_brand_product_text()
+                . " account is ready.\n\n"
                 . $workspaceLines
                 . 'Username: ' . $username . "\n\n"
                 . "Create your password and activate your account:\n"
@@ -319,7 +324,8 @@ if (!function_exists('account_credential_delivery_message')) {
                 . $expiresText
                 . ".\n"
                 . "If you were not expecting this account, you can ignore this message.\n\n"
-                . "Renee Farms Platform\n";
+                . platform_brand_plain_lockup()
+            . "\n";
 
             return [
                 'subject' => $subject,
@@ -328,11 +334,15 @@ if (!function_exists('account_credential_delivery_message')) {
         }
 
         $subject =
-            'Reset your Renee Farms password';
+            'Reset your '
+            . platform_brand_product_text()
+            . ' password';
 
         $body =
             $greeting . "\n\n"
-            . "A password reset was requested for your Renee Farms account.\n\n"
+            . 'A password reset was requested for your '
+            . platform_brand_product_text()
+            . " account.\n\n"
             . $workspaceLines
             . 'Username: ' . $username . "\n\n"
             . "Choose a new password:\n"
@@ -342,7 +352,8 @@ if (!function_exists('account_credential_delivery_message')) {
             . ".\n"
             . "If you did not request this change, you can ignore this message. "
             . "Your existing password remains unchanged.\n\n"
-            . "Renee Farms Platform\n";
+            . platform_brand_plain_lockup()
+            . "\n";
 
         return [
             'subject' => $subject,

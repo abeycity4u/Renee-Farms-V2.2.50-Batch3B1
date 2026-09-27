@@ -7,6 +7,8 @@
  * never written to application logs.
  */
 
+require_once __DIR__ . '/platform_brand.php';
+
 if (!function_exists('platform_mail_env')) {
     function platform_mail_env(string $name): string
     {
@@ -41,7 +43,9 @@ if (!function_exists('platform_mail_from_name')) {
     function platform_mail_from_name(): string
     {
         $configured = platform_mail_clean_header_text(platform_mail_env('PLATFORM_MAIL_FROM_NAME'));
-        return $configured !== '' ? $configured : 'Renee Farms Platform';
+        return $configured !== ''
+            ? $configured
+            : platform_brand_mail_sender_name();
     }
 }
 

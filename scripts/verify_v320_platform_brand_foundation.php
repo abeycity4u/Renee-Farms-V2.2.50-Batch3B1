@@ -30,6 +30,10 @@ if ($failures === []) {
             => platform_brand_product_name()
                 === 'RENEE AGRISUITE',
 
+        'natural-language product name'
+            => platform_brand_product_text()
+                === 'Renee AgriSuite',
+
         'parent name'
             => platform_brand_parent_name()
                 === 'Renee Farms',

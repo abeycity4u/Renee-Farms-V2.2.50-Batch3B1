@@ -11,6 +11,7 @@
 require_once __DIR__ . '/farm_contact_email.php';
 require_once __DIR__ . '/platform_mailer.php';
 require_once __DIR__ . '/platform_public_url.php';
+require_once __DIR__ . '/platform_brand.php';
 
 if (!function_exists('farm_onboarding_text')) {
     function farm_onboarding_text($value, int $maxLength = 180): string
@@ -41,7 +42,11 @@ if (!function_exists('farm_onboarding_send_credentials')) {
         $greeting = $recipientName !== '' ? 'Hello ' . $recipientName . ',' : 'Hello,';
 
         $body = $greeting . "\n\n"
-            . 'Your ' . $farmName . " workspace has been created on Renee Farms Platform.\n\n"
+            . 'Your '
+            . $farmName
+            . ' workspace has been created on '
+            . platform_brand_product_text()
+            . ".\n\n"
             . "Sign-in details\n"
             . "---------------\n"
             . 'Farm Workspace ID: ' . $workspaceId . "\n"
@@ -50,11 +55,14 @@ if (!function_exists('farm_onboarding_send_credentials')) {
             . 'Sign in: ' . $loginUrl . "\n\n"
             . "Please keep this message private. The password is included only in this initial setup email. "
             . "If the credential must be changed later, contact the platform owner for a secure reset.\n\n"
-            . "Renee Farms Platform\n";
+            . platform_brand_plain_lockup()
+            . "\n";
 
         return platform_mail_send(
             $email,
-            'Your Renee Farms workspace is ready',
+            'Your '
+            . platform_brand_product_text()
+            . ' workspace is ready',
             $body
         );
     }

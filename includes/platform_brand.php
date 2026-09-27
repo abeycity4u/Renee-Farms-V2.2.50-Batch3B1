@@ -23,6 +23,13 @@ if (!function_exists('platform_brand_product_name')) {
     }
 }
 
+if (!function_exists('platform_brand_product_text')) {
+    function platform_brand_product_text(): string
+    {
+        return 'Renee AgriSuite';
+    }
+}
+
 if (!function_exists('platform_brand_parent_name')) {
     function platform_brand_parent_name(): string
     {
