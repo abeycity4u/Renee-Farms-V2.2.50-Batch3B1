@@ -174,13 +174,25 @@ check_v310_delivery(
 check_v310_delivery(
     str_contains(
         $source,
-        "'Activate your Renee Farms account'"
+        "'Activate your '"
     )
     && str_contains(
         $source,
-        "'Reset your Renee Farms password'"
+        "'Reset your '"
+    )
+    && substr_count(
+        $source,
+        'platform_brand_product_text()'
+    ) >= 2
+    && str_contains(
+        $source,
+        ". ' account'"
+    )
+    && str_contains(
+        $source,
+        ". ' password'"
     ),
-    'activation and reset message subjects are purpose specific'
+    'activation and reset message subjects are purpose specific and use central platform branding'
 );
 
 check_v310_delivery(
