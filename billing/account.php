@@ -15,6 +15,7 @@ require_once dirname(__DIR__) . '/includes/billing_provider_selection.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_readiness.php';
 require_once dirname(__DIR__) . '/includes/farm_contact_email.php';
 require_once dirname(__DIR__) . '/includes/farm_profile.php';
+require_once dirname(__DIR__) . '/includes/notifications.php';
 
 $actor = billing_require_farm_admin_actor($pdo, false);
 $farmId = (int)$actor['farm_id'];
@@ -478,9 +479,15 @@ $decodeModules = static function ($json): string {
         </div>
     </div>
 
-    <?php if ($profileFormError !== null): ?>
-        <div class="alert alert-danger"><?= htmlspecialchars($profileFormError, ENT_QUOTES, 'UTF-8') ?></div>
-    <?php endif; ?>
+    <?php
+    if ($profileFormError !== null) {
+        renderNotification(
+            'error',
+            $profileFormError,
+            'Farm Profile could not be updated.'
+        );
+    }
+    ?>
 
     <div class="card billing-card mb-4">
         <div class="card-header bg-transparent border-0 pt-3 px-3">
