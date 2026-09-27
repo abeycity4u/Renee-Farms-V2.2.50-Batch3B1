@@ -259,6 +259,15 @@ $showManagementMenu = $canViewSales || $canViewExpenseReport || $canViewReports 
         <li class="nav-item dropdown">
           <button class="nav-link dropdown-toggle btn btn-link" type="button" data-nav-dropdown-toggle="dropdown" aria-expanded="false"><i class="bi bi-person-circle"></i> Account</button>
           <ul class="dropdown-menu dropdown-menu-end">
+            <?php if (!isPlatformOwner() && hasRole('farm_admin')): ?>
+            <li>
+              <a class="dropdown-item" href="<?php echo BASE_URL; ?>/billing/account.php">
+                <i class="bi bi-gear menu-icon me-2"></i>
+                Account &amp; Settings
+              </a>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <?php endif; ?>
             <li><button type="button" class="dropdown-item" id="themeToggle"><i class="bi bi-moon-stars menu-icon me-2"></i><span>Dark mode</span></button></li>
             <!-- <li><a class="dropdown-item" href="#"><i class="bi bi-person"></i> Profile</a></li> -->
             <!-- <li><a class="dropdown-item" href="#"><i class="bi bi-gear"></i> Settings</a></li> -->

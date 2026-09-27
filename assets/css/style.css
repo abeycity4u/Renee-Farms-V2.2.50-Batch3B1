@@ -198,9 +198,18 @@ body {
     font-size: 1rem;
 }
 
-/* Navbar spacing tweaks */
+/* Navbar spacing tweaks.
+ * Keep useful separation from the tenant brand without consuming the
+ * horizontal room needed by the theme and Account controls.
+ */
 .main-nav-spacing {
-    margin-left: 10rem;
+    margin-left: clamp(1rem, 2.5vw, 3rem);
+}
+
+@media (min-width: 992px) {
+    #appNavbar .navbar-nav.ms-auto {
+        margin-right: 1.25rem;
+    }
 }
 
 /* Advanced navbar / dropdown interactions */
