@@ -1,4 +1,7 @@
-<?php require_once(__DIR__ . '/init.php'); ?>
+<?php
+require_once(__DIR__ . '/init.php');
+require_once(__DIR__ . '/includes/platform_brand.php');
+?>
 <?php
 // navbar_head.php - Head assets only
 // Temporary V2.3 permission bridge: the large Daily Record pages still define

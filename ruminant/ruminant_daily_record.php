@@ -482,7 +482,7 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!"
     <?php include(__DIR__ . '/../navbar_head.php'); ?>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ruminant Daily Record - Renee Farms</title>
+    <title><?php echo htmlspecialchars(platform_brand_document_title('Ruminant Daily Record'), ENT_QUOTES, 'UTF-8'); ?></title>
 </head>
 <body class="ruminant-page">
     <?php include(__DIR__ . '/../navbar.php'); ?>

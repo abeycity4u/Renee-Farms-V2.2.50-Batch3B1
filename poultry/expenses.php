@@ -588,7 +588,7 @@ if ($pdfRequested) {
 <html lang="en">
 <head>
     <?php include __DIR__ . '/../navbar_head.php'; ?>
-    <title>Poultry Expenses - Renee Farms</title>
+    <title><?php echo htmlspecialchars(platform_brand_document_title('Poultry Expenses'), ENT_QUOTES, 'UTF-8'); ?></title>
 </head>
 
 <body class="poultry-page">

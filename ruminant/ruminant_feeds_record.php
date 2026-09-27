@@ -171,7 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_transaction']) &
     <?php include(__DIR__ . '/../navbar_head.php'); ?>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ruminant Feeds Record - Renee Farms</title>
+    <title><?php echo htmlspecialchars(platform_brand_document_title('Ruminant Feeds Record'), ENT_QUOTES, 'UTF-8'); ?></title>
     <link rel="stylesheet" href="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/datatables/css/dataTables.bootstrap5.min.css'); ?>">
     <link rel="stylesheet" href="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/vendor/datatables-responsive-2.2.9/css/responsive.bootstrap5.min.css'); ?>">
     <link rel="stylesheet" href="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/css/feeds-ledger.css'); ?>">

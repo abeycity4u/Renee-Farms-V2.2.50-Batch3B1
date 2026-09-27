@@ -67,6 +67,22 @@ if (!function_exists('platform_brand_mail_sender_name')) {
     }
 }
 
+if (!function_exists('platform_brand_document_title')) {
+    function platform_brand_document_title(
+        string $pageTitle
+    ): string {
+        $pageTitle = trim($pageTitle);
+
+        if ($pageTitle === '') {
+            return platform_brand_product_text();
+        }
+
+        return $pageTitle
+            . ' - '
+            . platform_brand_product_text();
+    }
+}
+
 if (!function_exists('platform_brand_html')) {
     function platform_brand_html(
         string $extraClass = ''

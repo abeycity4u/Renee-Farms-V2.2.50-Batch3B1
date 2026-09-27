@@ -251,7 +251,7 @@ $pdfReportUrl = pdf_report_current_url();
 <html lang="en">
 <head>
     <?php include(__DIR__ . '/../navbar_head.php'); ?>
-    <title>Poultry & Ruminant Report - Renee Farms</title>
+    <title><?php echo htmlspecialchars(platform_brand_document_title('Poultry & Ruminant Report'), ENT_QUOTES, 'UTF-8'); ?></title>
 </head>
 <body>
 <?php include(__DIR__ . '/../navbar.php'); ?>

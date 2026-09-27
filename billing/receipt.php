@@ -1,4 +1,5 @@
 <?php
+require_once dirname(__DIR__) . '/includes/platform_brand.php';
 /**
  * V2.3 tenant-facing paid billing receipt.
  *
@@ -182,7 +183,7 @@ $escape = static function ($value): string {
     );
 };
 
-$receiptPlatformName = 'Renee AgriSuite';
+$receiptPlatformName = platform_brand_product_text();
 $receiptIssuerName = 'Renee Farms Limited';
 $receiptIssuerBrand = $receiptPlatformName;
 

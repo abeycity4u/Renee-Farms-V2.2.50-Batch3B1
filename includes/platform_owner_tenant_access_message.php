@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/platform_brand.php';
+
 /**
  * Friendly access-denied presentation for the Platform Owner Tenant View.
  *
@@ -19,7 +21,15 @@ http_response_code(403);
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Access Restricted - Renee Farms Platform</title>
+    <title><?php
+        echo htmlspecialchars(
+            platform_brand_document_title(
+                'Access Restricted'
+            ),
+            ENT_QUOTES,
+            'UTF-8'
+        );
+    ?></title>
     <link href="<?php echo BASE_URL; ?>/assets/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link href="<?php echo BASE_URL; ?>/assets/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
 </head>

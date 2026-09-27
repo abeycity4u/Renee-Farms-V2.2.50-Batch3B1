@@ -922,7 +922,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventory - Renee Farms</title>
+    <title><?php echo htmlspecialchars(platform_brand_document_title('Inventory'), ENT_QUOTES, 'UTF-8'); ?></title>
     
     <!-- Include CSS -->
     <?php include(__DIR__ . '/navbar_head.php'); ?>

@@ -99,7 +99,7 @@ if ($tenantId > 0) {
 <html lang="en">
 <head>
     <?php include dirname(__DIR__) . '/navbar_head.php'; ?>
-    <title>Tenant View - Renee Farms Platform</title>
+    <title><?php echo htmlspecialchars(platform_brand_document_title('Tenant View'), ENT_QUOTES, 'UTF-8'); ?></title>
     <link rel="stylesheet" href="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/css/management-workspaces.css'); ?>">
 </head>
 <body>

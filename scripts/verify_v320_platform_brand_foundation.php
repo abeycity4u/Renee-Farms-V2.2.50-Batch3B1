@@ -53,6 +53,10 @@ if ($failures === []) {
         'mail sender identity'
             => platform_brand_mail_sender_name()
                 === 'RENEE AGRISUITE by Renee Farms',
+
+        'document title identity'
+            => platform_brand_document_title('Dashboard')
+                === 'Dashboard - Renee AgriSuite',
     ];
 
     foreach ($contracts as $name => $pass) {

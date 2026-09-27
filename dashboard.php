@@ -365,7 +365,7 @@ $pageTitle = "Dashboard";
 <html lang="en">
 <head>
     <?php include(__DIR__ . '/navbar_head.php'); ?>
-    <title>Dashboard - Renee Farms</title>
+    <title><?php echo htmlspecialchars(platform_brand_document_title('Dashboard'), ENT_QUOTES, 'UTF-8'); ?></title>
 
     <!-- Chart.js with fallback to local stub to keep page functional when CDN is blocked -->
     <script

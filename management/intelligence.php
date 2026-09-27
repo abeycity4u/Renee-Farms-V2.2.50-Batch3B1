@@ -27,7 +27,7 @@ function intel_href(string $path): string { return rtrim(BASE_URL, '/') . '/' . 
 <html lang="en">
 <head>
     <?php include(__DIR__ . '/../navbar_head.php'); ?>
-    <title>Farm Intelligence - Renee Farms</title>
+    <title><?php echo htmlspecialchars(platform_brand_document_title('Farm Intelligence'), ENT_QUOTES, 'UTF-8'); ?></title>
     <link rel="stylesheet" href="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/css/management-workspaces.css'); ?>">
 </head>
 <body>

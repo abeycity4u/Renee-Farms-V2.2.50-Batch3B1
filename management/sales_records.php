@@ -1106,7 +1106,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
     <?php include(__DIR__ . '/../navbar_head.php'); ?>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sales Records - Renee Farms</title>
+    <title><?php echo htmlspecialchars(platform_brand_document_title('Sales Records'), ENT_QUOTES, 'UTF-8'); ?></title>
 </head>
 <body>
     <?php include(__DIR__ . '/../navbar.php'); ?>
