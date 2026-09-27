@@ -104,6 +104,30 @@ foreach ($files as $relative) {
             . $relative
             . PHP_EOL;
     }
+
+    if (
+        !str_contains(
+            $content,
+            'class="auth-brand-copy"'
+        )
+        || !str_contains(
+            $content,
+            'class="auth-workspace-label"'
+        )
+        || !str_contains(
+            $content,
+            '>Farm Operations Workspace</span>'
+        )
+    ) {
+        $failures[] =
+            $relative
+            . ' does not separate workspace label from platform lockup';
+    } else {
+        echo
+            'PASS: workspace label is a dedicated second-line element | '
+            . $relative
+            . PHP_EOL;
+    }
 }
 
 /*

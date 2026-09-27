@@ -247,13 +247,13 @@ if (
                     decoding="async"
                 >
 
-                <div>
+                <div class="auth-brand-copy">
                     <?php
                         echo platform_brand_html(
                             'platform-brand-auth'
                         );
                     ?>
-                    <span>Farm Operations Workspace</span>
+                    <span class="auth-workspace-label">Farm Operations Workspace</span>
                 </div>
             </div>
 

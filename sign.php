@@ -121,9 +121,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <div>
                 <div class="brand">
                     <img src="assets/images/logo.jpg?v=2024.06.01" alt="<?php echo htmlspecialchars(platform_brand_plain_lockup(), ENT_QUOTES, 'UTF-8'); ?> logo" width="46" height="46" decoding="async">
-                    <div>
+                    <div class="auth-brand-copy">
                         <?php echo platform_brand_html('platform-brand-auth'); ?>
-                        <span>Farm Operations Workspace</span>
+                        <span class="auth-workspace-label">Farm Operations Workspace</span>
                     </div>
                 </div>
                 <h1>Welcome back to your agricultural command center.</h1>

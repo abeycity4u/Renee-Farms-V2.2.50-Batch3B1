@@ -136,17 +136,41 @@ if ($failures === []) {
         }
     }
 
+    $lockupBlocks = [];
+
+    preg_match_all(
+        '/\\.platform-brand-lockup\\s*\\{([^}]*)\\}/s',
+        (string)$css,
+        $lockupBlocks
+    );
+
     if (
-        strpos(
-            (string)$css,
-            'flex-direction: column'
-        ) !== false
+        empty($lockupBlocks[1])
     ) {
         $failures[] =
-            'Brand lockup must not become stacked';
+            'Platform brand lockup CSS block is missing';
     } else {
-        echo
-            "PASS: brand lockup remains horizontal\n";
+        $stackedLockup = false;
+
+        foreach ($lockupBlocks[1] as $lockupBlock) {
+            if (
+                preg_match(
+                    '/flex-direction\\s*:\\s*column/i',
+                    (string)$lockupBlock
+                ) === 1
+            ) {
+                $stackedLockup = true;
+                break;
+            }
+        }
+
+        if ($stackedLockup) {
+            $failures[] =
+                'Brand lockup must not become stacked';
+        } else {
+            echo
+                "PASS: brand lockup remains horizontal\n";
+        }
     }
 }
 

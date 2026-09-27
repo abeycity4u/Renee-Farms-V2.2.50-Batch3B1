@@ -81,16 +81,61 @@ $showManagementMenu = $canViewSales || $canViewExpenseReport || $canViewReports 
 <?php endif; ?>
 <nav id="appNavbar" class="navbar navbar-expand-lg navbar-dark bg-success shadow-sm no-print">
   <div class="container-fluid">
-    <a class="navbar-brand farm-brand" href="<?php echo BASE_URL; ?>/dashboard.php">
-      <span class="brand-logo-badge">
-        <img
-          src="<?php echo BASE_URL; ?>/assets/images/logo.jpg?v=2024.06.01"
-          alt="<?php echo htmlspecialchars(platform_brand_plain_lockup(), ENT_QUOTES, 'UTF-8'); ?> logo"
-          height="30"
-          class="brand-logo-img"
-        >
+    <a
+      class="navbar-brand farm-brand"
+      href="<?php echo BASE_URL; ?>/dashboard.php"
+      aria-label="<?php
+        echo htmlspecialchars(
+            platform_brand_product_text()
+            . ' — '
+            . farmBrandName()
+            . ' workspace',
+            ENT_QUOTES,
+            'UTF-8'
+        );
+      ?>"
+    >
+      <span class="platform-navbar-identity">
+        <?php echo platform_brand_html('platform-brand-navbar'); ?>
       </span>
-      <?php echo platform_brand_html('platform-brand-navbar'); ?>
+
+      <span
+        class="navbar-brand-identity-separator"
+        aria-hidden="true"
+      ></span>
+
+      <span class="tenant-brand-lockup">
+        <span class="brand-logo-badge">
+          <img
+            src="<?php
+              echo htmlspecialchars(
+                  farmLogoUrl(),
+                  ENT_QUOTES,
+                  'UTF-8'
+              );
+            ?>"
+            alt="<?php
+              echo htmlspecialchars(
+                  farmBrandName(),
+                  ENT_QUOTES,
+                  'UTF-8'
+              );
+            ?> logo"
+            height="30"
+            class="brand-logo-img"
+          >
+        </span>
+
+        <span class="tenant-brand-name">
+          <?php
+            echo htmlspecialchars(
+                farmBrandName(),
+                ENT_QUOTES,
+                'UTF-8'
+            );
+          ?>
+        </span>
+      </span>
     </a>
     <button class="navbar-toggler collapsed" type="button" data-app-navbar-toggle aria-controls="navbarMenu" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>

@@ -63,3 +63,89 @@
         font-size: 0.5em;
     }
 }
+
+/*
+ * Platform + tenant identity composition.
+ *
+ * Product identity and tenant identity are intentionally separate:
+ *   RENEE AGRISUITE by Renee Farms | [tenant logo] Tenant Farm
+ *
+ * The tenant logo/name always come from farmLogoUrl()/farmBrandName().
+ */
+.platform-navbar-identity {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 1 auto;
+    min-width: 0;
+}
+
+.navbar-brand-identity-separator {
+    display: inline-block;
+    flex: 0 0 1px;
+    width: 1px;
+    height: 1.8rem;
+    background: rgba(15, 61, 46, 0.22);
+}
+
+.tenant-brand-lockup {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.42rem;
+    min-width: 0;
+}
+
+.tenant-brand-name {
+    display: inline-block;
+    max-width: 11rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #0f3d2e;
+    font-size: 0.82rem;
+    font-weight: 700;
+    line-height: 1.05;
+}
+
+.platform-brand-navbar {
+    flex: 0 0 auto;
+}
+
+.auth-brand-copy {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.32rem;
+    min-width: 0;
+}
+
+.auth-brand-copy .platform-brand-auth {
+    display: inline-flex;
+}
+
+.auth-brand-copy .auth-workspace-label {
+    display: block;
+    color: rgba(234, 255, 241, 0.86);
+    font-size: 0.76rem;
+    font-weight: 400;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+@media (max-width: 575.98px) {
+    .navbar .farm-brand {
+        max-width: calc(100vw - 78px);
+    }
+
+    .platform-brand-navbar {
+        font-size: 0.88rem;
+    }
+
+    .tenant-brand-name {
+        max-width: 7rem;
+        font-size: 0.76rem;
+    }
+
+    .navbar-brand-identity-separator {
+        height: 1.55rem;
+    }
+}

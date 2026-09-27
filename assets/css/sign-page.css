@@ -75,7 +75,7 @@
             font-size: 0.93rem;
         }
 
-        .brand span {
+        .brand .auth-workspace-label {
             color: rgba(234, 255, 241, 0.86);
             font-size: 0.76rem;
         }
