@@ -20,8 +20,19 @@ if (!function_exists('billing_require_farm_admin_actor')) {
             requireLogin();
             $farmId = requireCurrentFarmId();
             if (isPlatformOwner() || !hasRole('farm_admin')) {
-                http_response_code(403);
-                exit('Farm Admin access is required for subscription billing.');
+                $accessDeniedTitle =
+                    'Oops! Access restricted';
+
+                $accessDeniedMessage =
+                    'Farm Admin access is required for subscription billing.';
+
+                $accessDeniedHelp =
+                    'Please contact your Farm Admin or return to your dashboard.';
+
+                require dirname(__DIR__)
+                    . '/no_access.php';
+
+                exit();
             }
             return [
                 'mode' => 'session',
