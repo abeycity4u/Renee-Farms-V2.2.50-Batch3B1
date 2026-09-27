@@ -14,43 +14,270 @@ require_once dirname(__DIR__) . '/includes/billing_account_overview.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_selection.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_readiness.php';
 require_once dirname(__DIR__) . '/includes/farm_contact_email.php';
+require_once dirname(__DIR__) . '/includes/farm_profile.php';
 
 $actor = billing_require_farm_admin_actor($pdo, false);
 $farmId = (int)$actor['farm_id'];
 $emailFormError = null;
 $emailFormValue = null;
 
+$profileFormError = null;
+$profileFormValue = null;
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_valid_csrf_post();
 
-    $allowedEmailKeys = ['csrf_token', 'contact_email', 'save_contact_email'];
-    foreach (array_keys($_POST) as $key) {
-        if (!in_array((string)$key, $allowedEmailKeys, true)) {
-            http_response_code(422);
-            exit('Invalid billing contact update request.');
-        }
-    }
-    if (!isset($_POST['save_contact_email'])) {
-        http_response_code(422);
-        exit('Invalid billing contact update request.');
-    }
+    if (isset($_POST['save_contact_email'])) {
+        $allowedEmailKeys = [
+            'csrf_token',
+            'contact_email',
+            'save_contact_email',
+        ];
 
-    $emailFormValue = trim((string)($_POST['contact_email'] ?? ''));
-    try {
-        $updated = farm_contact_email_update(
-            $pdo,
-            $farmId,
-            (int)$actor['user_id'],
-            $emailFormValue
+        foreach (array_keys($_POST) as $key) {
+            if (
+                !in_array(
+                    (string)$key,
+                    $allowedEmailKeys,
+                    true
+                )
+            ) {
+                http_response_code(422);
+                exit(
+                    'Invalid billing contact update request.'
+                );
+            }
+        }
+
+        $emailFormValue =
+            trim(
+                (string)(
+                    $_POST['contact_email']
+                    ?? ''
+                )
+            );
+
+        try {
+            $updated =
+                farm_contact_email_update(
+                    $pdo,
+                    $farmId,
+                    (int)$actor['user_id'],
+                    $emailFormValue
+                );
+
+            $_SESSION['success'] =
+                'Billing contact email updated to '
+                . $updated['contact_email']
+                . '.';
+
+            header(
+                'Location: '
+                . BASE_URL
+                . '/billing/account.php',
+                true,
+                303
+            );
+            exit();
+        } catch (InvalidArgumentException $e) {
+            $emailFormError =
+                $e->getMessage();
+        } catch (Throwable $e) {
+            error_log(
+                'Farm billing contact email update failed for farm '
+                . $farmId
+                . ': '
+                . $e->getMessage()
+            );
+
+            $emailFormError =
+                'Unable to update the billing contact email right now. Please try again.';
+        }
+    } elseif (isset($_POST['save_farm_profile'])) {
+        $allowedProfileKeys = [
+            'csrf_token',
+            'name',
+            'slug',
+            'primary_color',
+            'save_farm_profile',
+        ];
+
+        foreach (array_keys($_POST) as $key) {
+            if (
+                !in_array(
+                    (string)$key,
+                    $allowedProfileKeys,
+                    true
+                )
+            ) {
+                http_response_code(422);
+                exit(
+                    'Invalid Farm Profile update request.'
+                );
+            }
+        }
+
+        foreach (array_keys($_FILES) as $key) {
+            if ((string)$key !== 'logo') {
+                http_response_code(422);
+                exit(
+                    'Invalid Farm Profile upload request.'
+                );
+            }
+        }
+
+        $profileFormValue = [
+            'name' =>
+                (string)(
+                    $_POST['name']
+                    ?? ''
+                ),
+
+            'slug' =>
+                (string)(
+                    $_POST['slug']
+                    ?? ''
+                ),
+
+            'primary_color' =>
+                (string)(
+                    $_POST['primary_color']
+                    ?? '#198754'
+                ),
+        ];
+
+        $newLogoPath = null;
+
+        try {
+            $existingProfile =
+                farm_profile_load(
+                    $pdo,
+                    $farmId
+                );
+
+            if ($existingProfile === null) {
+                throw new RuntimeException(
+                    'Farm Profile could not be loaded.'
+                );
+            }
+
+            $profileIdentity =
+                farm_profile_normalize_identity(
+                    $profileFormValue
+                );
+
+            farm_profile_assert_workspace_id_available(
+                $pdo,
+                $profileIdentity['slug'],
+                $farmId
+            );
+
+            $logoExtension =
+                farm_profile_detect_logo_extension(
+                    $_FILES['logo']
+                    ?? null
+                );
+
+            $pdo->beginTransaction();
+
+            $logoPath =
+                farm_profile_save_logo_upload(
+                    $_FILES['logo']
+                    ?? null,
+                    $farmId,
+                    $existingProfile['logo_path']
+                        ?? null,
+                    $logoExtension
+                );
+
+            if (
+                $logoPath
+                !== (
+                    $existingProfile['logo_path']
+                    ?? null
+                )
+            ) {
+                $newLogoPath =
+                    $logoPath;
+            }
+
+            farm_profile_update_identity(
+                $pdo,
+                $farmId,
+                $profileIdentity,
+                $logoPath
+            );
+
+            $pdo->commit();
+
+            $_SESSION['success'] =
+                'Farm Profile updated successfully.';
+
+            header(
+                'Location: '
+                . BASE_URL
+                . '/billing/account.php',
+                true,
+                303
+            );
+            exit();
+        } catch (
+            InvalidArgumentException
+            | RuntimeException
+            $e
+        ) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            if (
+                $newLogoPath
+                && preg_match(
+                    '#^/uploads/farms/[a-zA-Z0-9._-]+$#',
+                    $newLogoPath
+                )
+            ) {
+                @unlink(
+                    dirname(__DIR__)
+                    . $newLogoPath
+                );
+            }
+
+            $profileFormError =
+                $e->getMessage();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            if (
+                $newLogoPath
+                && preg_match(
+                    '#^/uploads/farms/[a-zA-Z0-9._-]+$#',
+                    $newLogoPath
+                )
+            ) {
+                @unlink(
+                    dirname(__DIR__)
+                    . $newLogoPath
+                );
+            }
+
+            error_log(
+                'Farm Profile update failed for farm '
+                . $farmId
+                . ': '
+                . $e->getMessage()
+            );
+
+            $profileFormError =
+                'Unable to update the Farm Profile right now. Please try again.';
+        }
+    } else {
+        http_response_code(422);
+        exit(
+            'Invalid Account & Settings request.'
         );
-        $_SESSION['success'] = 'Billing contact email updated to ' . $updated['contact_email'] . '.';
-        header('Location: ' . BASE_URL . '/billing/account.php', true, 303);
-        exit();
-    } catch (InvalidArgumentException $e) {
-        $emailFormError = $e->getMessage();
-    } catch (Throwable $e) {
-        error_log('Farm billing contact email update failed for farm ' . $farmId . ': ' . $e->getMessage());
-        $emailFormError = 'Unable to update the billing contact email right now. Please try again.';
     }
 }
 
@@ -80,7 +307,33 @@ try {
 }
 
 $farm = $overview['farm'] ?? currentFarm();
-$farmName = (string)($farm['name'] ?? farmBrandName());
+
+$profile =
+    farm_profile_load(
+        $pdo,
+        $farmId
+    );
+
+if ($profile === null) {
+    $profile = is_array($farm)
+        ? $farm
+        : [];
+}
+
+$profileDisplay =
+    $profileFormValue !== null
+        ? array_merge(
+            $profile,
+            $profileFormValue
+        )
+        : $profile;
+
+$farmName =
+    (string)(
+        $profileDisplay['name']
+        ?? $farm['name']
+        ?? farmBrandName()
+    );
 $status = strtolower(trim((string)($farm['subscription_status'] ?? 'unknown')));
 $statusLabel = ucwords(str_replace('_', ' ', $status));
 $pricing = $overview['pricing'] ?? null;
@@ -205,7 +458,7 @@ $decodeModules = static function ($json): string {
     <?php include dirname(__DIR__) . '/navbar_head.php'; ?>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Billing &amp; Subscription | <?= htmlspecialchars($farmName, ENT_QUOTES, 'UTF-8') ?></title>
+    <title>Account &amp; Settings | <?= htmlspecialchars($farmName, ENT_QUOTES, 'UTF-8') ?></title>
     <link rel="stylesheet" href="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/css/billing-account-page.css'); ?>">
 </head>
 <body>
@@ -216,18 +469,156 @@ $decodeModules = static function ($json): string {
         <div class="card-body p-4">
             <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
                 <div>
-                    <div class="text-uppercase small fw-semibold opacity-75 mb-1">Farm Admin · Billing</div>
-                    <h1 class="h3 mb-2">Billing &amp; Subscription</h1>
-                    <p class="mb-0 opacity-75">Review <?= htmlspecialchars($farmName, ENT_QUOTES, 'UTF-8') ?> subscription, seat allowance and payment history.</p>
+                    <div class="text-uppercase small fw-semibold opacity-75 mb-1">Farm Admin · Account</div>
+                    <h1 class="h3 mb-2">Account &amp; Settings</h1>
+                    <p class="mb-0 opacity-75">Manage <?= htmlspecialchars($farmName, ENT_QUOTES, 'UTF-8') ?> profile, team access, subscription and billing.</p>
                 </div>
                 <a class="btn btn-light fw-semibold" href="<?= htmlspecialchars(BASE_URL . '/dashboard.php', ENT_QUOTES, 'UTF-8') ?>"><i class="bi bi-arrow-left me-1"></i> Back to dashboard</a>
             </div>
         </div>
     </div>
 
+    <?php if ($profileFormError !== null): ?>
+        <div class="alert alert-danger"><?= htmlspecialchars($profileFormError, ENT_QUOTES, 'UTF-8') ?></div>
+    <?php endif; ?>
+
+    <div class="card billing-card mb-4">
+        <div class="card-header bg-transparent border-0 pt-3 px-3">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                <div>
+                    <h2 class="h5 mb-1">Farm Profile</h2>
+                    <div class="small text-muted">
+                        These details identify your farm across its Renee AgriSuite workspace.
+                    </div>
+                </div>
+                <a
+                    class="btn btn-sm btn-outline-secondary"
+                    href="<?= htmlspecialchars(BASE_URL . '/management/users.php', ENT_QUOTES, 'UTF-8') ?>"
+                >
+                    <i class="bi bi-people me-1"></i>
+                    Manage Team Users
+                </a>
+            </div>
+        </div>
+
+        <div class="card-body pt-2">
+            <form
+                method="post"
+                action="<?= htmlspecialchars(BASE_URL . '/billing/account.php', ENT_QUOTES, 'UTF-8') ?>"
+                enctype="multipart/form-data"
+            >
+                <?= csrf_field() ?>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold" for="farmProfileName">
+                            Farm name
+                        </label>
+                        <input
+                            id="farmProfileName"
+                            class="form-control"
+                            name="name"
+                            maxlength="150"
+                            value="<?= htmlspecialchars((string)($profileDisplay['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                            required
+                        >
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold" for="farmProfileWorkspace">
+                            Farm Workspace ID
+                        </label>
+                        <input
+                            id="farmProfileWorkspace"
+                            class="form-control"
+                            name="slug"
+                            maxlength="100"
+                            pattern="[a-z0-9]+(-[a-z0-9]+)*"
+                            value="<?= htmlspecialchars((string)($profileDisplay['slug'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                            required
+                        >
+                        <div class="form-text">
+                            Unique workspace identifier. Changing this does not change or recreate your farm data.
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold" for="farmProfileLogo">
+                            Farm logo
+                        </label>
+                        <input
+                            id="farmProfileLogo"
+                            class="form-control"
+                            type="file"
+                            name="logo"
+                            accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                        >
+                        <div class="form-text">
+                            JPG, PNG or WebP. Maximum 2 MB. Leave empty to keep the current logo.
+                        </div>
+
+                        <?php if (!empty($profile['logo_path'])): ?>
+                            <div class="mt-2">
+                                <img
+                                    src="<?= htmlspecialchars(BASE_URL . (string)$profile['logo_path'], ENT_QUOTES, 'UTF-8') ?>"
+                                    alt="Current farm logo"
+                                    class="img-thumbnail"
+                                    style="max-height: 72px; max-width: 160px;"
+                                >
+                            </div>
+                        <?php endif; ?>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold" for="farmProfileColor">
+                            Primary colour
+                        </label>
+                        <div class="d-flex align-items-center gap-3">
+                            <input
+                                id="farmProfileColor"
+                                class="form-control form-control-color"
+                                type="color"
+                                name="primary_color"
+                                value="<?= htmlspecialchars((string)($profileDisplay['primary_color'] ?? '#198754'), ENT_QUOTES, 'UTF-8') ?>"
+                                title="Choose farm primary colour"
+                            >
+                            <span class="small text-muted">
+                                Used for tenant branding where farm colour is supported.
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-4">
+                    <div class="small text-muted">
+                        Farm identity updates keep the same internal tenant record and existing farm data.
+                    </div>
+
+                    <button
+                        class="btn btn-success fw-semibold"
+                        type="submit"
+                        name="save_farm_profile"
+                        value="1"
+                    >
+                        Save Farm Profile
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <?php if ($pageError !== null): ?>
         <div class="alert alert-danger"><?= htmlspecialchars($pageError, ENT_QUOTES, 'UTF-8') ?></div>
     <?php else: ?>
+
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div>
+                <h2 class="h4 mb-1">Subscription &amp; Billing</h2>
+                <div class="text-muted small">
+                    Current plan, seats, payments and subscription history.
+                </div>
+            </div>
+        </div>
         <div class="row g-3 mb-4">
             <div class="col-md-6 col-xl-3"><div class="card billing-card h-100"><div class="card-body"><div class="metric-label">Status</div><div class="metric-value mt-1"><span class="badge text-bg-<?= htmlspecialchars($statusClass($status), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($statusLabel, ENT_QUOTES, 'UTF-8') ?></span></div></div></div></div>
             <div class="col-md-6 col-xl-3"><div class="card billing-card h-100"><div class="card-body"><div class="metric-label">Plan</div><div class="metric-value mt-1"><?= htmlspecialchars((string)$overview['plan_label'], ENT_QUOTES, 'UTF-8') ?></div></div></div></div>
