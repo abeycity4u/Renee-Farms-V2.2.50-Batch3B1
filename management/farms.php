@@ -4,6 +4,7 @@ require_once dirname(__DIR__) . '/includes/farm_contact_email.php';
 require_once dirname(__DIR__) . '/includes/farm_profile.php';
 require_once dirname(__DIR__) . '/includes/account_identity_policy.php';
 require_once dirname(__DIR__) . '/includes/account_pending_user.php';
+require_once dirname(__DIR__) . '/includes/tenant_provisioning.php';
 requireLogin();
 requirePlatformOwner();
 
@@ -14,10 +15,6 @@ function validFarmId($value): int { return filter_var($value, FILTER_VALIDATE_IN
 function validSubscriptionDate(string $value): bool {
     $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
     return $date !== false && $date->format('Y-m-d') === $value;
-}
-function ensureTenantRoles(PDO $pdo): void {
-    $stmt = $pdo->prepare("INSERT INTO roles (code, name, is_platform_role) VALUES ('farm_admin', 'Admin / Farm Owner', 0) ON DUPLICATE KEY UPDATE name = VALUES(name), is_platform_role = 0");
-    $stmt->execute();
 }
 function findFarmAdminId(PDO $pdo, int $farmId): int {
     $stmt = $pdo->prepare("SELECT u.id FROM users u LEFT JOIN user_roles ur ON ur.user_id = u.id LEFT JOIN roles r ON r.id = ur.role_id WHERE u.farm_id = ? AND (r.code = 'farm_admin' OR u.user_type = 'farm_admin') ORDER BY (r.code = 'farm_admin') DESC, u.id LIMIT 1");
@@ -49,11 +46,6 @@ function farmHasSubscriptionHistory(PDO $pdo, int $farmId): bool {
 function farmHasProtectedCommercialHistory(PDO $pdo, int $farmId): bool {
     return farmHasBillingPaymentHistory($pdo, $farmId)
         || farmHasSubscriptionHistory($pdo, $farmId);
-}
-function saveRoleLimits(PDO $pdo, int $farmId, array $limits): void {
-    if (!tableExists($pdo, 'farm_role_limits')) return;
-    $stmt=$pdo->prepare('INSERT INTO farm_role_limits (farm_id,role_code,max_users) VALUES (?,?,?) ON DUPLICATE KEY UPDATE max_users=VALUES(max_users)');
-    foreach ($limits as $role=>$max) $stmt->execute([$farmId,$role,(int)$max]);
 }
 function loadRoleLimits(PDO $pdo, int $farmId): array {
     $limits=['poultry_manager'=>1,'ruminant_manager'=>1,'sales_rep'=>1,'viewer'=>1];
@@ -363,29 +355,114 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $newLogoPath = null;
         $activationQueuedFor = '';
         $pdo->beginTransaction();
-        ensureTenantRoles($pdo);
         if (isset($_POST['create_farm'])) {
-            $stmt = $pdo->prepare('INSERT INTO farms (name, slug, primary_color, contact_name, contact_email, subscription_plan, subscription_status, subscription_starts_at, subscription_ends_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
-            $stmt->execute([$name, $slug, $color, trim($_POST['contact_name'] ?? ''), $contactEmail, $plan, $status, $startDate ? "$startDate 00:00:00" : null, $endDate ? "$endDate 23:59:59" : null]);
-            $farmId = (int)$pdo->lastInsertId(); $createdFarmId = $farmId; $logoPath = farm_profile_save_logo_upload($_FILES['logo'] ?? null, $farmId, null, $logoExtension); $newLogoPath = $logoPath;
-            if ($logoPath) $pdo->prepare('UPDATE farms SET logo_path = ? WHERE id = ?')->execute([$logoPath, $farmId]);
-            $pendingOwner = account_pending_user_create(
-                $pdo,
-                $farmId,
-                $username,
-                $email,
-                'farm_admin',
-                $ownerName
-            );
-            $ownerId = (int)$pendingOwner['user_id'];
-            $activationQueuedFor = (string)$pendingOwner['email'];
-            sync_farm_entitlements($pdo, $farmId, $submittedModules);
-            assign_protected_farm_admin_role($pdo, $farmId, $ownerId);
-            saveRoleLimits($pdo, $farmId, $roleLimits);
-            subscription_seat_save_addons($pdo, $farmId, $seatAddOns);
-            subscription_record_capture($pdo, $farmId, 'tenant_created', $recordedByUserId);
-            $message = "Created {$name}.";
+            $provisionedTenant =
+                tenant_provisioning_create(
+                    $pdo,
+                    [
+                        'name' => $name,
+                        'slug' => $slug,
+                        'primary_color' => $color,
+
+                        'contact_name' =>
+                            trim(
+                                (string)(
+                                    $_POST['contact_name']
+                                    ?? ''
+                                )
+                            ),
+
+                        'contact_email' =>
+                            $rawContactEmail,
+
+                        'admin_username' =>
+                            $username,
+
+                        'admin_full_name' =>
+                            $ownerName,
+
+                        'admin_email' =>
+                            $rawOwnerEmail,
+
+                        'plan_code' =>
+                            $plan,
+
+                        'subscription_status' =>
+                            $status,
+
+                        'subscription_starts_at' =>
+                            $startDate
+                                ? "$startDate 00:00:00"
+                                : null,
+
+                        'trial_ends_at' =>
+                            null,
+
+                        'subscription_ends_at' =>
+                            $endDate
+                                ? "$endDate 23:59:59"
+                                : null,
+
+                        'modules' =>
+                            $submittedModules,
+
+                        'seat_addons' =>
+                            $seatAddOns,
+
+                        'recorded_by_user_id' =>
+                            $recordedByUserId,
+
+                        'history_reason' =>
+                            'tenant_created',
+                    ]
+                );
+
+            $farmId =
+                (int)$provisionedTenant[
+                    'farm_id'
+                ];
+
+            $createdFarmId =
+                $farmId;
+
+            $ownerId =
+                (int)$provisionedTenant[
+                    'farm_admin_user_id'
+                ];
+
+            $activationQueuedFor =
+                (string)$provisionedTenant[
+                    'activation_email'
+                ];
+
+            $logoPath =
+                farm_profile_save_logo_upload(
+                    $_FILES['logo'] ?? null,
+                    $farmId,
+                    null,
+                    $logoExtension
+                );
+
+            $newLogoPath =
+                $logoPath;
+
+            if ($logoPath) {
+                $pdo->prepare(
+                    'UPDATE farms
+                     SET logo_path = ?
+                     WHERE id = ?'
+                )->execute([
+                    $logoPath,
+                    $farmId,
+                ]);
+            }
+
+            $message =
+                "Created {$name}.";
         } elseif (isset($_POST['update_farm'])) {
+            tenant_provisioning_ensure_farm_admin_role(
+                $pdo
+            );
             $farm = farm_profile_load($pdo, $farmId); if (!$farm) throw new RuntimeException('That farm cannot be edited.');
             $ownerId = findFarmAdminId($pdo, $farmId);
             $ownerCredentialState = null;
@@ -591,7 +668,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             sync_farm_entitlements($pdo, $farmId, $submittedModules);
             assign_protected_farm_admin_role($pdo, $farmId, $ownerId);
-            saveRoleLimits($pdo, $farmId, $roleLimits);
+            tenant_provisioning_save_role_limits($pdo, $farmId, $roleLimits);
             subscription_seat_save_addons($pdo, $farmId, $seatAddOns);
             subscription_record_capture($pdo, $farmId, 'platform_owner_update', $recordedByUserId);
             $message = "Updated {$name}.";
