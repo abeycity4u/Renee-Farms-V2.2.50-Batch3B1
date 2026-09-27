@@ -135,9 +135,13 @@ verify_v310_activation_route(
 verify_v310_activation_route(
     str_contains(
         $source,
-        'account_credential_consume_activation('
+        'account_activation_complete('
+    )
+    && str_contains(
+        $source,
+        '/includes/account_activation_completion.php'
     ),
-    'activation delegates pending-to-active transition centrally'
+    'activation delegates account completion centrally'
 );
 
 verify_v310_activation_route(

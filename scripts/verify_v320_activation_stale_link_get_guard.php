@@ -191,9 +191,9 @@ check_contract(
 check_contract(
     str_contains(
         $activate,
-        'account_credential_consume_activation('
+        'account_activation_complete('
     ),
-    'POST activation still uses central consume lifecycle'
+    'POST activation uses shared completion authority'
 );
 
 if ($fail) {

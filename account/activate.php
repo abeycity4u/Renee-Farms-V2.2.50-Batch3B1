@@ -30,6 +30,8 @@ require_once dirname(__DIR__) . '/init.php';
 require_once dirname(__DIR__) . '/api/api_helpers.php';
 require_once dirname(__DIR__)
     . '/includes/account_credential_lifecycle.php';
+require_once dirname(__DIR__)
+    . '/includes/account_activation_completion.php';
 require_once dirname(__DIR__) . '/includes/platform_brand.php';
 
 header('Cache-Control: no-store, max-age=0');
@@ -280,7 +282,7 @@ if (
     }
 
     try {
-        account_credential_consume_activation(
+        account_activation_complete(
             $pdo,
             $rawToken,
             $newPassword
