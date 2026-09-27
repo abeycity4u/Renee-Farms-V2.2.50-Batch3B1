@@ -409,3 +409,22 @@ V2.3 Commercial Hardening Checkpoint — 2026-09-10
 - No unsafe-inline or unsafe-eval relaxation was introduced.
 - No financial, profitability, receivables, inventory-costing, lifecycle, acquisition, mortality or payment formula was changed by these runtime refinements.
 - Payments remain TEST only.
+
+V3.1 Account Credential Lifecycle Closure — 2026-09-27
+--------------------------------------------------------
+- Added a centralized account credential lifecycle for secure account activation and password reset.
+- Added public Forgot Password, Reset Password and Account Activation routes using shared lifecycle services rather than page-local credential logic.
+- Sign-in now enforces credential state so pending accounts cannot bypass activation requirements.
+- Farm Admin and Team User creation now use pending activation instead of assigning operator-known initial passwords.
+- Added centralized account identity policy and pending-account writer services.
+- Added asynchronous credential-delivery outbox processing through migrations 085 and 086.
+- Added a bounded private production credential worker with a certified every-minute cron schedule.
+- Centralized platform public URL authority and shared outbound mail transport used by credential delivery.
+- Removed recipient details from outbound-mail failure logs.
+- Completed root runtime hardening with directory autoindex disabled while preserving existing runtime authority.
+- Removed historical public backup artifacts and error logs from the public runtime.
+- Historical public migrations remain intentionally retained because they are a live CLI dependency and remain protected from HTTP access.
+- Rotated the previously exposed SMTP credential privately and certified the replacement through authentication-only SMTP verification without sending a message.
+- Credential-worker, security-housekeeping and SMTP-rotation stages are closed.
+- No unfinished V3.1 product objective remains evidenced in the repository at release-closure review.
+- V3.1 release implementation scope is Account Credential Lifecycle.
