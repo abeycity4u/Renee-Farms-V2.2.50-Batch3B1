@@ -4,6 +4,7 @@ require_once(__DIR__ . '/config.php');
 require_once(__DIR__ . '/includes/functions.php');
 require_once(__DIR__ . '/api/api_helpers.php');
 require_once(__DIR__ . '/includes/account_credential_lifecycle.php');
+require_once(__DIR__ . '/includes/platform_brand.php');
 
 function verifyLoginPassword(PDO $pdo, array $user, string $password): bool {
     return password_security_verify($password, (string)($user['password'] ?? ''));
@@ -104,23 +105,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Sign In | Renee Farms Workspace</title>
+    <title>Secure Sign In | <?php echo htmlspecialchars(platform_brand_page_name(), ENT_QUOTES, 'UTF-8'); ?></title>
     <meta name="theme-color" content="#1b4332">
-    <meta name="description" content="Secure access to Renee Farms operational workspace.">
+    <meta name="description" content="Secure access to the Renee AgriSuite operational workspace.">
 
     <link rel="icon" href="assets/images/favicon.ico?v=2024.06.01" type="image/x-icon" sizes="any">
     <link rel="apple-touch-icon" href="assets/images/favicon.ico?v=2024.06.01">
 
     <link rel="stylesheet" href="assets/css/sign-page.css">
+    <link rel="stylesheet" href="assets/css/platform-brand.css">
 </head>
 <body>
-    <main class="auth-shell" aria-label="Renee Farms secure sign in layout">
+    <main class="auth-shell" aria-label="Renee AgriSuite secure sign in layout">
         <section class="auth-hero">
             <div>
                 <div class="brand">
-                    <img src="assets/images/logo.jpg?v=2024.06.01" alt="Renee Farms logo" width="46" height="46" decoding="async">
+                    <img src="assets/images/logo.jpg?v=2024.06.01" alt="<?php echo htmlspecialchars(platform_brand_plain_lockup(), ENT_QUOTES, 'UTF-8'); ?> logo" width="46" height="46" decoding="async">
                     <div>
-                        <strong>RENEE FARMS LTD</strong>
+                        <?php echo platform_brand_html('platform-brand-auth'); ?>
                         <span>Farm Operations Workspace</span>
                     </div>
                 </div>
@@ -140,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <section class="auth-card">
             <span class="chip">Protected Access</span>
             <h2>Sign in to continue</h2>
-            <p>Use your official credentials to open the Renee Farms dashboard.</p>
+            <p>Use your official credentials to open the Renee AgriSuite dashboard.</p>
 
             <?php if (isset($error)): ?>
                 <div class="error"><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></div>

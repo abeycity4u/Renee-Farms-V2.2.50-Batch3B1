@@ -21,6 +21,7 @@ require_once dirname(__DIR__) . '/init.php';
 require_once dirname(__DIR__) . '/api/api_helpers.php';
 require_once dirname(__DIR__)
     . '/includes/account_credential_request.php';
+require_once dirname(__DIR__) . '/includes/platform_brand.php';
 
 header('Cache-Control: no-store, max-age=0');
 
@@ -159,7 +160,13 @@ if (
     >
 
     <title>
-        Reset Password | Renee Farms Workspace
+        Reset Password | <?php
+            echo htmlspecialchars(
+                platform_brand_page_name(),
+                ENT_QUOTES,
+                'UTF-8'
+            );
+        ?>
     </title>
 
     <meta
@@ -169,7 +176,7 @@ if (
 
     <meta
         name="description"
-        content="Request a secure password reset link for your Renee Farms account."
+        content="Request a secure password reset link for your Renee AgriSuite account."
     >
 
     <link
@@ -197,12 +204,24 @@ if (
             );
         ?>"
     >
+
+    <link
+        rel="stylesheet"
+        href="<?php
+            echo htmlspecialchars(
+                BASE_URL
+                . versioned_asset('/assets/css/platform-brand.css'),
+                ENT_QUOTES,
+                'UTF-8'
+            );
+        ?>"
+    >
 </head>
 
 <body>
 <main
     class="auth-shell"
-    aria-label="Renee Farms password reset request"
+    aria-label="Renee AgriSuite password reset request"
 >
     <section class="auth-hero">
         <div>
@@ -216,14 +235,24 @@ if (
                             'UTF-8'
                         );
                     ?>"
-                    alt="Renee Farms logo"
+                    alt="<?php
+                        echo htmlspecialchars(
+                            platform_brand_plain_lockup(),
+                            ENT_QUOTES,
+                            'UTF-8'
+                        );
+                    ?> logo"
                     width="46"
                     height="46"
                     decoding="async"
                 >
 
                 <div>
-                    <strong>RENEE FARMS LTD</strong>
+                    <?php
+                        echo platform_brand_html(
+                            'platform-brand-auth'
+                        );
+                    ?>
                     <span>Farm Operations Workspace</span>
                 </div>
             </div>
