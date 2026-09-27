@@ -95,6 +95,74 @@ $check(
 $check(
     str_contains(
         $service,
+        "require_once dirname(__DIR__) . '/platform_brand.php';"
+    ),
+    'central PDF service loads shared platform-brand authority'
+);
+
+$check(
+    str_contains(
+        $service,
+        'platform_brand_product_name()'
+    )
+    && str_contains(
+        $service,
+        'platform_brand_parent_byline()'
+    ),
+    'PDF software identity delegates to shared platform-brand authority'
+);
+
+$check(
+    str_contains(
+        $service,
+        '$platformProductSize = 7.5;'
+    )
+    && str_contains(
+        $service,
+        '$platformBylineSize = 4.5;'
+    ),
+    'PDF platform byline is intentionally smaller than product name'
+);
+
+$check(
+    str_contains(
+        $service,
+        '$platformY = 17.0;'
+    )
+    && substr_count(
+        $service,
+        '$platformY,'
+    ) >= 2,
+    'PDF product and parent byline share one horizontal visual line'
+);
+
+$check(
+    str_contains(
+        $service,
+        "$fontMetrics->getFont('DejaVu Serif', 'italic')"
+    ),
+    'PDF parent byline uses readable italic serif fallback'
+);
+
+$check(
+    str_contains(
+        $service,
+        '$platformX'
+    )
+    && str_contains(
+        $service,
+        '$farmHeaderWidth'
+    )
+    && str_contains(
+        $service,
+        '$platformY = 33.0;'
+    ),
+    'PDF software lockup avoids collision with long tenant names'
+);
+
+$check(
+    str_contains(
+        $service,
         '@page { size: A4 {$orientation}; margin: 16mm 9mm 14mm; }'
     ),
     'PDF reserves sufficient top space for prominent branding'

@@ -9,6 +9,8 @@
 use Dompdf\Dompdf;
 use Dompdf\Options;
 
+require_once dirname(__DIR__) . '/platform_brand.php';
+
 function pdf_report_is_requested(): bool
 {
     return isset($_GET['pdf']) && (string) $_GET['pdf'] === '1';
@@ -139,6 +141,75 @@ final class PdfReportService
         $fontMetrics = $dompdf->getFontMetrics();
         $font = $fontMetrics->getFont('DejaVu Sans', 'normal');
         $fontBold = $fontMetrics->getFont('DejaVu Sans', 'bold');
+        $fontByline = $fontMetrics->getFont('DejaVu Serif', 'italic');
+
+        /*
+         * Platform/software identity is secondary to the tenant farm.
+         * Both values come from the central platform-brand authority.
+         *
+         * The product and parent byline are drawn separately so the
+         * "by Renee Farms" portion can remain tiny but readable while
+         * staying on the same visual line as RENEe AGRISUITE.
+         */
+        $platformProduct =
+            platform_brand_product_name();
+
+        $platformByline =
+            platform_brand_parent_byline();
+
+        $platformProductSize = 7.5;
+        $platformBylineSize = 4.5;
+        $platformGap = 4.0;
+
+        $platformProductWidth =
+            $fontMetrics->getTextWidth(
+                $platformProduct,
+                $fontBold,
+                $platformProductSize
+            );
+
+        $platformBylineWidth =
+            $fontMetrics->getTextWidth(
+                $platformByline,
+                $fontByline,
+                $platformBylineSize
+            );
+
+        $platformTotalWidth =
+            $platformProductWidth
+            + $platformGap
+            + $platformBylineWidth;
+
+        $platformX = max(
+            28.0,
+            $canvas->get_width()
+            - 28.0
+            - $platformTotalWidth
+        );
+
+        /*
+         * Keep long tenant names from colliding with the software lockup.
+         * If necessary, the complete platform lockup moves lower within the
+         * reserved page-header margin; its own product/byline relationship
+         * remains horizontal.
+         */
+        $farmHeaderWidth =
+            $fontMetrics->getTextWidth(
+                $farmName,
+                $fontBold,
+                16
+            );
+
+        $platformY = 17.0;
+
+        if (
+            $platformX
+            < 28.0
+                + $farmHeaderWidth
+                + 14.0
+        ) {
+            $platformY = 33.0;
+        }
 
         // Tenant identity is repeated on every page as the report's primary brand.
         $canvas->page_text(
@@ -148,6 +219,32 @@ final class PdfReportService
             $fontBold,
             16,
             [0.12, 0.18, 0.15]
+        );
+
+        /*
+         * Shared Renee AgriSuite software identity.
+         *
+         * These two page_text calls intentionally share the same Y
+         * coordinate so the lockup remains one horizontal line.
+         */
+        $canvas->page_text(
+            $platformX,
+            $platformY,
+            $platformProduct,
+            $fontBold,
+            $platformProductSize,
+            [0.25, 0.25, 0.25]
+        );
+
+        $canvas->page_text(
+            $platformX
+                + $platformProductWidth
+                + $platformGap,
+            $platformY,
+            $platformByline,
+            $fontByline,
+            $platformBylineSize,
+            [0.35, 0.35, 0.35]
         );
 
         $canvas->page_text(
