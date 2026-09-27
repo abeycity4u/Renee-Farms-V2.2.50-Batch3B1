@@ -1,0 +1,65 @@
+/*
+ * Renee AgriSuite shared platform-brand lockup.
+ *
+ * Visual contract:
+ * RENEe AGRISUITE by Renee Farms
+ *
+ * - single horizontal line
+ * - product name dominant
+ * - parent byline intentionally tiny but readable
+ * - tenant/farm branding remains separate
+ *
+ * The project currently does not bundle the Tiscali font.
+ * If a licensed local Tiscali webfont is added later, this
+ * existing font-family authority will pick it up globally.
+ */
+
+.platform-brand-lockup {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.34em;
+    white-space: nowrap;
+    line-height: 1;
+    vertical-align: baseline;
+}
+
+.platform-brand-product {
+    display: inline-block;
+    font-family:
+        "Segoe UI",
+        Arial,
+        Helvetica,
+        sans-serif;
+    font-size: 1em;
+    font-weight: 800;
+    letter-spacing: 0.035em;
+    line-height: 1;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.platform-brand-parent {
+    display: inline-block;
+    font-family:
+        "Tiscali",
+        Georgia,
+        "Times New Roman",
+        serif;
+    font-size: 0.52em;
+    font-style: italic;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    line-height: 1;
+    opacity: 0.88;
+    white-space: nowrap;
+}
+
+@media (max-width: 575.98px) {
+    .platform-brand-lockup {
+        gap: 0.28em;
+    }
+
+    .platform-brand-parent {
+        font-size: 0.5em;
+    }
+}
