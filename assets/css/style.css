@@ -208,7 +208,11 @@ body {
 
 @media (min-width: 992px) {
     #appNavbar .navbar-nav.ms-auto {
-        margin-right: 1.25rem;
+        margin-right: clamp(3rem, 5vw, 4.5rem);
+    }
+
+    #appNavbar .navbar-nav.ms-auto .dropdown-menu-end {
+        min-width: 13.5rem;
     }
 }
 

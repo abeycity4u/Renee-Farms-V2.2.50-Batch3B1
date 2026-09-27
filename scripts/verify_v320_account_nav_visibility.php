@@ -36,7 +36,17 @@ $contracts = [
         )
         && str_contains(
             $style,
-            'margin-right: 1.25rem;'
+            'margin-right: clamp(3rem, 5vw, 4.5rem);'
+        ),
+
+    'Account dropdown has readable desktop width'
+        => str_contains(
+            $style,
+            '#appNavbar .navbar-nav.ms-auto .dropdown-menu-end'
+        )
+        && str_contains(
+            $style,
+            'min-width: 13.5rem;'
         ),
 
     'Account dropdown remains end-aligned'
