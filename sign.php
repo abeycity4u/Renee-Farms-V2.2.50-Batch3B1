@@ -112,8 +112,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <link rel="icon" href="assets/images/favicon.ico?v=2024.06.01" type="image/x-icon" sizes="any">
     <link rel="apple-touch-icon" href="assets/images/favicon.ico?v=2024.06.01">
 
-    <link rel="stylesheet" href="assets/css/sign-page.css">
-    <link rel="stylesheet" href="assets/css/platform-brand.css">
+    <link
+        rel="stylesheet"
+        href="<?php
+            echo htmlspecialchars(
+                BASE_URL
+                . versioned_asset('/assets/css/sign-page.css'),
+                ENT_QUOTES,
+                'UTF-8'
+            );
+        ?>"
+    >
+    <link
+        rel="stylesheet"
+        href="<?php
+            echo htmlspecialchars(
+                BASE_URL
+                . versioned_asset('/assets/css/platform-brand.css'),
+                ENT_QUOTES,
+                'UTF-8'
+            );
+        ?>"
+    >
 </head>
 <body>
     <main class="auth-shell" aria-label="Renee AgriSuite secure sign in layout">
