@@ -257,6 +257,30 @@ route_check(
 route_check(
     str_contains(
         $source,
+        "versioned_asset(\n                    '/assets/css/trial-page.css'"
+    ),
+    'trial page loads dedicated external stylesheet'
+);
+
+route_check(
+    !str_contains(
+        $source,
+        'app_csp_nonce'
+    ),
+    'trial route does not depend on nonexistent CSP nonce helper'
+);
+
+route_check(
+    !preg_match(
+        '/<style\\b/i',
+        $source
+    ),
+    'trial route contains no inline style block'
+);
+
+route_check(
+    str_contains(
+        $source,
         'log_app_error('
     )
     && !str_contains(
