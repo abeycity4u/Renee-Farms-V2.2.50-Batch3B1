@@ -550,3 +550,228 @@ if (!function_exists(
         }
     }
 }
+
+if (!function_exists(
+    'trial_onboarding_review_existing_rejection'
+)) {
+    function trial_onboarding_review_existing_rejection(
+        array $request
+    ): array {
+        return [
+            'request_id' =>
+                (int)$request['id'],
+
+            'request_reference' =>
+                (string)$request[
+                    'request_reference'
+                ],
+
+            'status' =>
+                (string)$request['status'],
+
+            'rejection_reason_code' =>
+                $request[
+                    'rejection_reason_code'
+                ] ?? null,
+
+            'rejected_by_user_id' =>
+                isset(
+                    $request[
+                        'rejected_by_user_id'
+                    ]
+                )
+                    ? (int)$request[
+                        'rejected_by_user_id'
+                    ]
+                    : null,
+
+            'already_rejected' =>
+                true,
+        ];
+    }
+}
+
+if (!function_exists(
+    'trial_onboarding_review_reject'
+)) {
+    function trial_onboarding_review_reject(
+        PDO $pdo,
+        int $requestId,
+        int $rejectedByUserId,
+        string $rejectionReasonCode
+    ): array {
+        if ($requestId < 1) {
+            throw new InvalidArgumentException(
+                'A valid trial request is required.'
+            );
+        }
+
+        if ($rejectedByUserId < 1) {
+            throw new InvalidArgumentException(
+                'Rejecting Platform Owner is invalid.'
+            );
+        }
+
+        $rejectionReasonCode =
+            trial_onboarding_review_normalize_reason_code(
+                $rejectionReasonCode
+            );
+
+        if ($rejectionReasonCode === null) {
+            throw new InvalidArgumentException(
+                'A rejection reason code is required.'
+            );
+        }
+
+        if ($pdo->inTransaction()) {
+            throw new RuntimeException(
+                'Trial onboarding review owns its database transaction.'
+            );
+        }
+
+        try {
+            $pdo->beginTransaction();
+
+            $stmt =
+                $pdo->prepare(
+                    "SELECT *
+                     FROM trial_onboarding_requests
+                     WHERE id = ?
+                     LIMIT 1
+                     FOR UPDATE"
+                );
+
+            $stmt->execute([
+                $requestId,
+            ]);
+
+            $request =
+                $stmt->fetch(
+                    PDO::FETCH_ASSOC
+                )
+                ?: null;
+
+            if (!$request) {
+                throw new RuntimeException(
+                    'Trial onboarding request was not found.'
+                );
+            }
+
+            $status =
+                trial_onboarding_request_normalize_status(
+                    (string)$request['status']
+                );
+
+            if ($status === 'rejected') {
+                $existing =
+                    trial_onboarding_review_existing_rejection(
+                        $request
+                    );
+
+                $pdo->commit();
+
+                return $existing;
+            }
+
+            if ($status !== 'pending_review') {
+                throw new RuntimeException(
+                    'Only a pending trial request can be rejected.'
+                );
+            }
+
+            /*
+             * A pending request must not carry provisioning or approval
+             * state. Fail closed rather than converting a malformed row
+             * into a terminal rejection and hiding inconsistent history.
+             */
+            if (
+                $request['farm_id'] !== null
+                || $request['farm_admin_user_id'] !== null
+                || $request['approved_plan_code'] !== null
+                || $request['approved_modules_snapshot'] !== null
+                || $request['approved_role_limits_snapshot'] !== null
+                || $request['approved_trial_days'] !== null
+                || $request['approved_by_user_id'] !== null
+                || $request['approved_at'] !== null
+                || $request['provisioning_started_at'] !== null
+                || $request['provisioned_at'] !== null
+                || $request['activated_at'] !== null
+            ) {
+                throw new RuntimeException(
+                    'Pending trial request contains incompatible approval or provisioning state.'
+                );
+            }
+
+            trial_onboarding_request_assert_transition(
+                $status,
+                'rejected'
+            );
+
+            $update =
+                $pdo->prepare(
+                    "UPDATE trial_onboarding_requests
+                     SET
+                        status = 'rejected',
+                        rejection_reason_code = ?,
+                        rejected_by_user_id = ?,
+                        rejected_at = NOW()
+                     WHERE id = ?
+                       AND status = 'pending_review'
+                       AND farm_id IS NULL
+                       AND farm_admin_user_id IS NULL
+                       AND approved_plan_code IS NULL
+                       AND approved_modules_snapshot IS NULL
+                       AND approved_role_limits_snapshot IS NULL
+                       AND approved_trial_days IS NULL
+                       AND approved_by_user_id IS NULL
+                       AND approved_at IS NULL
+                       AND provisioning_started_at IS NULL
+                       AND provisioned_at IS NULL
+                       AND activated_at IS NULL"
+                );
+
+            $update->execute([
+                $rejectionReasonCode,
+                $rejectedByUserId,
+                $requestId,
+            ]);
+
+            if ($update->rowCount() !== 1) {
+                throw new RuntimeException(
+                    'Trial onboarding request could not be rejected.'
+                );
+            }
+
+            $pdo->commit();
+
+            return [
+                'request_id' =>
+                    $requestId,
+
+                'request_reference' =>
+                    (string)$request[
+                        'request_reference'
+                    ],
+
+                'status' =>
+                    'rejected',
+
+                'rejection_reason_code' =>
+                    $rejectionReasonCode,
+
+                'rejected_by_user_id' =>
+                    $rejectedByUserId,
+
+                'already_rejected' =>
+                    false,
+            ];
+
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            throw $e;
+        }
+    }
+}
