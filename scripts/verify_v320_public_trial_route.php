@@ -387,6 +387,126 @@ route_check(
 );
 
 
+
+route_check(
+    str_contains(
+        $source,
+        'TrialOnboardingIntakeConflict $exception'
+    ),
+    'typed intake conflicts have a dedicated public catch'
+);
+
+foreach ([
+    'workspace_request_in_progress' =>
+        'A trial request for that Farm Workspace ID is already in progress.',
+
+    'admin_email_request_in_progress' =>
+        'We cannot use this Farm Admin email for a new trial request.',
+
+    'open_request_exists' =>
+        'A trial request with these details is already in progress.',
+] as $reasonCode => $publicMessage) {
+    route_check(
+        str_contains(
+            $source,
+            "'" . $reasonCode . "'"
+        )
+        && str_contains(
+            $source,
+            $publicMessage
+        ),
+        'public route maps safe conflict '
+        . $reasonCode
+    );
+}
+
+$typedCatchStart =
+    strpos(
+        $source,
+        'TrialOnboardingIntakeConflict $exception'
+    );
+
+$domainCatchStart =
+    strpos(
+        $source,
+        'catch (DomainException $exception)',
+        $typedCatchStart === false
+            ? 0
+            : $typedCatchStart
+    );
+
+$typedCatch =
+    $typedCatchStart !== false
+    && $domainCatchStart !== false
+    && $domainCatchStart > $typedCatchStart
+        ? substr(
+            $source,
+            $typedCatchStart,
+            $domainCatchStart - $typedCatchStart
+        )
+        : '';
+
+route_check(
+    $typedCatch !== ''
+    && !str_contains(
+        $typedCatch,
+        '$exception->getMessage()'
+    ),
+    'typed public conflict does not expose exception text'
+);
+
+$typedLogStart =
+    strpos(
+        $typedCatch,
+        'log_app_error('
+    );
+
+$typedFlashStart =
+    strpos(
+        $typedCatch,
+        "\$_SESSION['trial_request_flash_type']",
+        $typedLogStart === false
+            ? 0
+            : $typedLogStart
+    );
+
+$typedLog =
+    $typedLogStart !== false
+    && $typedFlashStart !== false
+    && $typedFlashStart > $typedLogStart
+        ? substr(
+            $typedCatch,
+            $typedLogStart,
+            $typedFlashStart - $typedLogStart
+        )
+        : '';
+
+route_check(
+    $typedLog !== ''
+    && str_contains(
+        $typedLog,
+        "'reason_code'"
+    )
+    && !str_contains(
+        $typedLog,
+        "'admin_email' =>"
+    )
+    && !str_contains(
+        $typedLog,
+        "'requested_workspace_id' =>"
+    )
+    && !str_contains(
+        $typedLog,
+        "'source_fingerprint' =>"
+    )
+    && !str_contains(
+        $typedLog,
+        '$exception->getMessage()'
+    ),
+    'typed conflict logging records reason code without request identity'
+);
+
+
 exit(
     $failures === 0
         ? 0

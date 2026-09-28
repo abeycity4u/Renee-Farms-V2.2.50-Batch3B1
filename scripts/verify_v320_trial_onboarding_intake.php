@@ -262,6 +262,63 @@ verify_pass(
     'intake supports caller-owned transactions'
 );
 
+
+verify_pass(
+    str_contains(
+        $source,
+        'final class TrialOnboardingIntakeConflict'
+    )
+    && str_contains(
+        $source,
+        'extends DomainException'
+    )
+    && str_contains(
+        $source,
+        'function reasonCode()'
+    ),
+    'intake exposes typed open-request conflicts'
+);
+
+foreach ([
+    'workspace_request_in_progress',
+    'admin_email_request_in_progress',
+    'open_request_exists',
+] as $reasonCode) {
+    verify_pass(
+        str_contains(
+            $source,
+            "'" . $reasonCode . "'"
+        ),
+        'intake supports conflict reason '
+        . $reasonCode
+    );
+}
+
+verify_pass(
+    str_contains(
+        $source,
+        '$workspaceMatched'
+    )
+    && str_contains(
+        $source,
+        '$emailMatched'
+    )
+    && str_contains(
+        $source,
+        '$fingerprintMatched'
+    ),
+    'intake classifies matching open-request signals centrally'
+);
+
+verify_pass(
+    !str_contains(
+        $source,
+        'A matching trial request is already being processed.'
+    ),
+    'legacy undifferentiated conflict message is retired'
+);
+
+
 exit(
     $failures === 0
         ? 0

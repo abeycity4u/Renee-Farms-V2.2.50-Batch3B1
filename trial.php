@@ -244,6 +244,45 @@ if (
         $_SESSION['trial_request_flash_message'] =
             $exception->getMessage();
 
+    } catch (
+        TrialOnboardingIntakeConflict $exception
+    ) {
+        $reasonCode =
+            $exception->reasonCode();
+
+        $conflictMessages = [
+            'workspace_request_in_progress' =>
+                'A trial request for that Farm Workspace ID is already in progress. You do not need to submit another request.',
+
+            'admin_email_request_in_progress' =>
+                'We cannot use this Farm Admin email for a new trial request. If this email belongs to you, a trial request may already be in progress. Try signing in or contact support.',
+
+            'open_request_exists' =>
+                'A trial request with these details is already in progress. You do not need to submit another request.',
+        ];
+
+        if (function_exists('log_app_error')) {
+            log_app_error(
+                'public_trial_request_conflict',
+                [
+                    'exception' =>
+                        get_class($exception),
+
+                    'reason_code' =>
+                        $reasonCode,
+                ]
+            );
+        }
+
+        $_SESSION['trial_request_flash_type'] =
+            'error';
+
+        $_SESSION['trial_request_flash_message'] =
+            $conflictMessages[$reasonCode]
+            ?? $conflictMessages[
+                'open_request_exists'
+            ];
+
     } catch (DomainException $exception) {
         /*
          * Availability and duplicate-open-request conflicts must not

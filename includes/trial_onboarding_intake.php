@@ -36,6 +36,49 @@ require_once __DIR__ . '/account_credential_lifecycle.php';
 require_once __DIR__ . '/farm_contact_email.php';
 require_once __DIR__ . '/farm_entitlements.php';
 
+if (!class_exists(
+    'TrialOnboardingIntakeConflict'
+)) {
+    final class TrialOnboardingIntakeConflict
+        extends DomainException
+    {
+        private string $reasonCode;
+
+        public function __construct(
+            string $reasonCode
+        ) {
+            $allowed = [
+                'workspace_request_in_progress',
+                'admin_email_request_in_progress',
+                'open_request_exists',
+            ];
+
+            if (
+                !in_array(
+                    $reasonCode,
+                    $allowed,
+                    true
+                )
+            ) {
+                $reasonCode =
+                    'open_request_exists';
+            }
+
+            $this->reasonCode =
+                $reasonCode;
+
+            parent::__construct(
+                'Trial onboarding request conflicts with an existing open request.'
+            );
+        }
+
+        public function reasonCode(): string
+        {
+            return $this->reasonCode;
+        }
+    }
+}
+
 if (!function_exists('trial_onboarding_intake_text')) {
     function trial_onboarding_intake_text(
         string $value,
@@ -284,7 +327,12 @@ if (!function_exists('trial_onboarding_intake_assert_available')) {
          * No status-specific duplicate logic belongs in the public route.
          */
         $stmt = $pdo->prepare(
-            "SELECT id
+            "SELECT
+                id,
+                admin_email,
+                requested_workspace_id,
+                source_fingerprint,
+                status
              FROM trial_onboarding_requests
              WHERE (
                     admin_email = ?
@@ -293,7 +341,6 @@ if (!function_exists('trial_onboarding_intake_assert_available')) {
                    )
                AND status IN ($placeholders)
              ORDER BY id DESC
-             LIMIT 1
              FOR UPDATE"
         );
 
@@ -308,11 +355,103 @@ if (!function_exists('trial_onboarding_intake_assert_available')) {
             )
         );
 
-        if ($stmt->fetchColumn() !== false) {
-            throw new DomainException(
-                'A matching trial request is already being processed.'
+        $matches =
+            $stmt->fetchAll(
+                PDO::FETCH_ASSOC
+            )
+            ?: [];
+
+        if ($matches === []) {
+            return;
+        }
+
+        $workspaceMatched = false;
+        $emailMatched = false;
+        $fingerprintMatched = false;
+
+        foreach ($matches as $match) {
+            if (
+                hash_equals(
+                    (string)$contract[
+                        'requested_workspace_id'
+                    ],
+                    (string)(
+                        $match[
+                            'requested_workspace_id'
+                        ]
+                        ?? ''
+                    )
+                )
+            ) {
+                $workspaceMatched = true;
+            }
+
+            if (
+                hash_equals(
+                    (string)$contract[
+                        'admin_email'
+                    ],
+                    (string)(
+                        $match['admin_email']
+                        ?? ''
+                    )
+                )
+            ) {
+                $emailMatched = true;
+            }
+
+            if (
+                hash_equals(
+                    (string)$contract[
+                        'source_fingerprint'
+                    ],
+                    (string)(
+                        $match[
+                            'source_fingerprint'
+                        ]
+                        ?? ''
+                    )
+                )
+            ) {
+                $fingerprintMatched = true;
+            }
+        }
+
+        /*
+         * Do not expose which identity field matched when multiple
+         * signals point to an existing request.
+         */
+        if (
+            $workspaceMatched
+            && !$emailMatched
+        ) {
+            throw new TrialOnboardingIntakeConflict(
+                'workspace_request_in_progress'
             );
         }
+
+        if (
+            $emailMatched
+            && !$workspaceMatched
+        ) {
+            throw new TrialOnboardingIntakeConflict(
+                'admin_email_request_in_progress'
+            );
+        }
+
+        if (
+            $workspaceMatched
+            || $emailMatched
+            || $fingerprintMatched
+        ) {
+            throw new TrialOnboardingIntakeConflict(
+                'open_request_exists'
+            );
+        }
+
+        throw new TrialOnboardingIntakeConflict(
+            'open_request_exists'
+        );
     }
 }
 
