@@ -32,7 +32,10 @@ $homepageSlideshowVersion = is_file($homepageSlideshowFile)
                     <small>Eat Healthy With Renee Farms</small>
                 </div>
             </a>
-            <a class="btn btn-primary" href="sign.php">Launch farm portal</a>
+            <div class="nav-actions">
+                <a class="btn btn-secondary" href="trial.php">Start 14-day trial</a>
+                <a class="btn btn-primary" href="sign.php">Launch farm portal</a>
+            </div>
         </div>
     </header>
 
@@ -46,7 +49,13 @@ $homepageSlideshowVersion = is_file($homepageSlideshowFile)
                     Renee Farms delivers a modern agricultural ecosystem built for productivity, transparency,
                     and long-term ecological stewardship.
                 </p>
-                <p class="portal-launch-note">Use <strong>Launch farm portal</strong> in the top navigation to access your workspace.</p>
+                <p class="portal-launch-note">
+                    New to Renee AgriSuite?
+                    <a href="trial.php">Request a 14-day trial</a>.
+                    Existing farm users can use
+                    <strong>Launch farm portal</strong>
+                    to access their workspace.
+                </p>
                 <div class="metrics" role="list" aria-label="Farm highlights">
                     <article class="metric" role="listitem"><strong>24/7</strong><span>Operational visibility</span></article>
                     <article class="metric" role="listitem"><strong>Data-first</strong><span>Production decisions</span></article>

@@ -350,3 +350,32 @@
         }
 
 .portal-launch-note{margin-top:1.25rem;color:#365446;font-weight:500;}
+
+/* V3.2 public trial entry */
+.nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.btn-secondary {
+    background: transparent;
+    border: 1px solid currentColor;
+}
+
+.portal-launch-note a {
+    font-weight: 700;
+}
+
+@media (max-width: 640px) {
+    .nav-actions {
+        width: 100%;
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .nav-actions .btn {
+        width: 100%;
+        text-align: center;
+    }
+}
