@@ -7,6 +7,7 @@ require_once dirname(__DIR__) . '/config.php';
 require_once dirname(__DIR__) . '/includes/functions.php';
 require_once dirname(__DIR__) . '/includes/trial_onboarding_review.php';
 require_once dirname(__DIR__) . '/includes/trial_onboarding_provisioning.php';
+require_once dirname(__DIR__) . '/includes/platform_owner_tenant_workspace.php';
 
 requireLogin();
 requirePlatformOwner();
@@ -342,7 +343,7 @@ $statusLabel =
     };
 
 $pageTitle =
-    'Trial Onboarding Reviews';
+    'Trial Requests';
 ?>
 <!doctype html>
 <html lang="en">
@@ -384,13 +385,20 @@ include dirname(__DIR__)
 <div class="container-fluid py-3">
 <div class="tenant-view-shell">
 
+    <?php
+        platform_owner_tenant_workspace_render(
+            $pdo,
+            'trial_requests'
+        );
+    ?>
+
     <div
         class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3"
     >
         <div>
             <h3 class="mb-1">
                 <i class="bi bi-person-check"></i>
-                Trial Onboarding Reviews
+                Trial Requests
             </h3>
 
             <div class="text-muted">
@@ -401,18 +409,6 @@ include dirname(__DIR__)
             </div>
         </div>
 
-        <a
-            class="btn btn-outline-secondary"
-            href="<?php
-                echo $h(
-                    BASE_URL
-                    . '/management/farms.php'
-                );
-            ?>"
-        >
-            <i class="bi bi-arrow-left"></i>
-            Farm Accounts
-        </a>
     </div>
 
     <div
