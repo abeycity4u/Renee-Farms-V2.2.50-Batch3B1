@@ -231,15 +231,75 @@ ui_check(
 );
 
 ui_check(
-    !str_contains(
+    str_contains(
         $source,
-        'reject_request'
+        'isset($_POST[\'reject_request\'])'
+    )
+    && str_contains(
+        $source,
+        '(string)$_POST[\'reject_request\'] === \'1\''
+    ),
+    'POST requires explicit reject_request action'
+);
+
+ui_check(
+    str_contains(
+        $source,
+        '$approveRequested === $rejectRequested'
+    ),
+    'approval and rejection actions are mutually exclusive'
+);
+
+ui_check(
+    str_contains(
+        $source,
+        'trial_onboarding_review_reject('
+    ),
+    'page delegates rejection to shared authority'
+);
+
+ui_check(
+    str_contains(
+        $source,
+        'rejection_reason_code'
+    )
+    && str_contains(
+        $source,
+        'maxlength="80"'
+    )
+    && str_contains(
+        $source,
+        'required'
+    ),
+    'rejection form requires bounded reason code'
+);
+
+ui_check(
+    str_contains(
+        $source,
+        'name="reject_request"'
+    )
+    && str_contains(
+        $source,
+        'value="1"'
+    ),
+    'rejection form submits explicit reject action'
+);
+
+ui_check(
+    !preg_match(
+        '/\bUPDATE\s+trial_onboarding_requests\b/i',
+        $source
     )
     && !preg_match(
-        '/status\s*=\s*[\'"]rejected[\'"]/i',
+        '/\bINSERT\s+INTO\s+trial_onboarding_requests\b/i',
+        $source
+    )
+    && !preg_match(
+        '/\bDELETE\s+FROM\s+trial_onboarding_requests\b/i',
         $source
     ),
-    'page does not invent rejection mutation'
+    'page owns no onboarding lifecycle SQL'
 );
 
 exit(

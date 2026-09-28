@@ -38,7 +38,11 @@ if ($requestMethod === 'POST') {
         isset($_POST['approve_request'])
         && (string)$_POST['approve_request'] === '1';
 
-    if (!$approveRequested) {
+    $rejectRequested =
+        isset($_POST['reject_request'])
+        && (string)$_POST['reject_request'] === '1';
+
+    if ($approveRequested === $rejectRequested) {
         $_SESSION['error'] =
             'Unsupported trial review action.';
 
@@ -74,15 +78,25 @@ if ($requestMethod === 'POST') {
             ? $_POST['approved_modules']
             : [];
 
-    $approvedByUserId =
+    $reviewedByUserId =
         (int)(
             $_SESSION['user_id']
             ?? 0
         );
 
+    $rejectionReasonCode =
+        strtolower(
+            trim(
+                (string)(
+                    $_POST['rejection_reason_code']
+                    ?? ''
+                )
+            )
+        );
+
     if (
         $requestId === false
-        || $approvedByUserId < 1
+        || $reviewedByUserId < 1
     ) {
         $_SESSION['error'] =
             'The trial review request is invalid.';
@@ -91,27 +105,49 @@ if ($requestMethod === 'POST') {
     }
 
     try {
-        $result =
-            trial_onboarding_review_approve(
-                $pdo,
-                (int)$requestId,
-                'manual',
-                $planCode,
-                $approvedModules,
-                $approvedByUserId,
-                'manual_review'
-            );
+        if ($rejectRequested) {
+            $result =
+                trial_onboarding_review_reject(
+                    $pdo,
+                    (int)$requestId,
+                    $reviewedByUserId,
+                    $rejectionReasonCode
+                );
 
-        if (
-            !empty(
-                $result['already_approved']
-            )
-        ) {
-            $_SESSION['success'] =
-                'This trial request was already approved. Its approved commercial snapshot was left unchanged.';
+            if (
+                !empty(
+                    $result['already_rejected']
+                )
+            ) {
+                $_SESSION['success'] =
+                    'This trial request was already rejected. Its rejection decision was left unchanged.';
+            } else {
+                $_SESSION['success'] =
+                    'Trial request rejected. No tenant was provisioned and no trial clock was started.';
+            }
         } else {
-            $_SESSION['success'] =
-                'Trial request approved. The commercial snapshot is now frozen and ready for the separate provisioning step.';
+            $result =
+                trial_onboarding_review_approve(
+                    $pdo,
+                    (int)$requestId,
+                    'manual',
+                    $planCode,
+                    $approvedModules,
+                    $reviewedByUserId,
+                    'manual_review'
+                );
+
+            if (
+                !empty(
+                    $result['already_approved']
+                )
+            ) {
+                $_SESSION['success'] =
+                    'This trial request was already approved. Its approved commercial snapshot was left unchanged.';
+            } else {
+                $_SESSION['success'] =
+                    'Trial request approved. The commercial snapshot is now frozen and ready for the separate provisioning step.';
+            }
         }
 
     } catch (InvalidArgumentException $e) {
@@ -120,25 +156,25 @@ if ($requestMethod === 'POST') {
 
     } catch (RuntimeException $e) {
         error_log(
-            'Platform Owner trial approval failed for request '
+            'Platform Owner trial review failed for request '
             . (int)$requestId
             . ': '
             . $e->getMessage()
         );
 
         $_SESSION['error'] =
-            'Unable to approve this trial request. No tenant was provisioned and no trial clock was started.';
+            'Unable to complete this trial review action. No tenant was provisioned and no trial clock was started.';
 
     } catch (Throwable $e) {
         error_log(
-            'Unexpected Platform Owner trial approval failure for request '
+            'Unexpected Platform Owner trial review failure for request '
             . (int)$requestId
             . ': '
             . get_class($e)
         );
 
         $_SESSION['error'] =
-            'Unable to approve this trial request. No tenant was provisioned and no trial clock was started.';
+            'Unable to complete this trial review action. No tenant was provisioned and no trial clock was started.';
     }
 
     redirectTrialOnboardingReviews();
@@ -170,6 +206,7 @@ $stmt =
             review_reason_code,
             rejection_reason_code,
             approved_by_user_id,
+            rejected_by_user_id,
             approved_at,
             provisioning_started_at,
             provisioned_at,
@@ -352,8 +389,10 @@ include dirname(__DIR__)
         class="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2"
     >
         <div>
-            <strong>Manual approval only.</strong>
-            This workspace delegates approval to the shared onboarding-review authority.
+            <strong>Manual review.</strong>
+            This workspace delegates approval and rejection to the shared onboarding-review authority.
+            Approval freezes the commercial trial snapshot.
+            Rejection records a terminal decision with the rejecting Platform Owner and reason code.
             Provisioning remains a separate controlled action after approval.
         </div>
 
@@ -756,6 +795,65 @@ include dirname(__DIR__)
                                         >
                                             <i class="bi bi-check2-circle"></i>
                                             Approve request
+                                        </button>
+                                    </form>
+
+                                    <form
+                                        method="post"
+                                        action="<?php
+                                            echo $h(
+                                                BASE_URL
+                                                . '/management/trial_onboarding_reviews.php'
+                                            );
+                                        ?>"
+                                        class="d-flex flex-column gap-2 mt-3"
+                                        data-confirm="Reject this trial request? Rejection is terminal and does not provision a tenant or start a trial."
+                                        data-confirm-title="Reject trial request?"
+                                        data-confirm-button="Reject Request"
+                                        data-confirm-tone="danger"
+                                    >
+                                        <?php
+                                        echo csrf_field();
+                                        ?>
+
+                                        <input
+                                            type="hidden"
+                                            name="request_id"
+                                            value="<?php
+                                                echo $requestId;
+                                            ?>"
+                                        >
+
+                                        <label
+                                            class="form-label small mb-0"
+                                            for="trialRejectReason<?php
+                                                echo $requestId;
+                                            ?>"
+                                        >
+                                            Rejection reason code
+                                        </label>
+
+                                        <input
+                                            type="text"
+                                            class="form-control form-control-sm"
+                                            id="trialRejectReason<?php
+                                                echo $requestId;
+                                            ?>"
+                                            name="rejection_reason_code"
+                                            maxlength="80"
+                                            pattern="[A-Za-z0-9][A-Za-z0-9_-]*"
+                                            required
+                                            placeholder="e.g. unsupported_request"
+                                        >
+
+                                        <button
+                                            type="submit"
+                                            class="btn btn-sm btn-outline-danger"
+                                            name="reject_request"
+                                            value="1"
+                                        >
+                                            <i class="bi bi-x-circle"></i>
+                                            Reject request
                                         </button>
                                     </form>
 
