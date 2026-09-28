@@ -94,15 +94,36 @@ $check(
     'seat-topup refunded and incomplete outcomes use purpose-appropriate copy'
 );
 
-$promotion = strpos(
-    $return,
-    'subscription_recovery_promote_to_login($pdo);'
-);
+/*
+ * Match the recovery guard and promotion call semantically while allowing
+ * ordinary formatting whitespace. The contract is ordering and purpose
+ * restriction, not a particular line-wrap style.
+ */
+$promotionMatches = [];
 
-$promotionGuard = strpos(
+$promotionFound = preg_match(
+    '/subscription_recovery_promote_to_login\s*\(\s*\$pdo\s*\)\s*;/',
     $return,
-    "if (\$purpose === 'subscription' && \$recoveryMode)"
-);
+    $promotionMatches,
+    PREG_OFFSET_CAPTURE
+) === 1;
+
+$promotion = $promotionFound
+    ? (int)$promotionMatches[0][1]
+    : false;
+
+$promotionGuardMatches = [];
+
+$promotionGuardFound = preg_match(
+    '/if\s*\(\s*\$purpose\s*===\s*\'subscription\'\s*&&\s*\$recoveryMode\s*\)/',
+    $return,
+    $promotionGuardMatches,
+    PREG_OFFSET_CAPTURE
+) === 1;
+
+$promotionGuard = $promotionGuardFound
+    ? (int)$promotionGuardMatches[0][1]
+    : false;
 
 $check(
     $promotion !== false
