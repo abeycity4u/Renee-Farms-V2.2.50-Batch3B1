@@ -290,6 +290,103 @@ route_check(
     'unexpected exception logging does not copy raw exception message'
 );
 
+
+route_check(
+    preg_match(
+        '/catch\s*\(\s*InvalidArgumentException\s+\$exception\s*\)/s',
+        $source
+    ) === 1,
+    'validation exceptions have a dedicated public catch'
+);
+
+route_check(
+    preg_match(
+        '/catch\s*\(\s*DomainException\s+\$exception\s*\)/s',
+        $source
+    ) === 1,
+    'domain conflicts have a dedicated public catch'
+);
+
+route_check(
+    preg_match(
+        '/InvalidArgumentException\s*\|\s*DomainException|DomainException\s*\|\s*InvalidArgumentException/s',
+        $source
+    ) !== 1,
+    'validation and domain conflicts are not combined'
+);
+
+$domainCatchStart =
+    strpos(
+        $source,
+        'catch (DomainException $exception)'
+    );
+
+$throwableCatchStart =
+    strpos(
+        $source,
+        'catch (Throwable $exception)',
+        $domainCatchStart === false
+            ? 0
+            : $domainCatchStart
+    );
+
+$domainCatch =
+    $domainCatchStart !== false
+    && $throwableCatchStart !== false
+    && $throwableCatchStart > $domainCatchStart
+        ? substr(
+            $source,
+            $domainCatchStart,
+            $throwableCatchStart - $domainCatchStart
+        )
+        : '';
+
+route_check(
+    $domainCatch !== ''
+    && !str_contains(
+        $domainCatch,
+        '$exception->getMessage()'
+    ),
+    'domain conflict does not expose raw exception message'
+);
+
+route_check(
+    str_contains(
+        $domainCatch,
+        'Your trial request could not be submitted with those details.'
+    ),
+    'domain conflict renders neutral public feedback'
+);
+
+route_check(
+    str_contains(
+        $domainCatch,
+        "'public_trial_request_conflict'"
+    )
+    && str_contains(
+        $domainCatch,
+        'get_class($exception)'
+    ),
+    'domain conflict logs only non-sensitive exception classification'
+);
+
+route_check(
+    !str_contains(
+        $domainCatch,
+        'admin_email'
+    )
+    && !str_contains(
+        $domainCatch,
+        'requested_workspace_id'
+    )
+    && !str_contains(
+        $domainCatch,
+        'source_fingerprint'
+    ),
+    'domain conflict logging contains no request identity or fingerprint'
+);
+
+
 exit(
     $failures === 0
         ? 0

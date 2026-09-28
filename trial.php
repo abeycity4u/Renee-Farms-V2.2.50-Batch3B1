@@ -233,15 +233,38 @@ if (
         $_SESSION['trial_request_flash_message'] =
             'Your trial request has been received. We will review your farm details and send account activation instructions when your workspace is ready. Your 14-day trial begins only after successful account activation.';
 
-    } catch (
-        InvalidArgumentException
-        | DomainException $exception
-    ) {
+    } catch (InvalidArgumentException $exception) {
+        /*
+         * Field-format and required-value validation is safe and useful
+         * to return to the visitor.
+         */
         $_SESSION['trial_request_flash_type'] =
             'error';
 
         $_SESSION['trial_request_flash_message'] =
             $exception->getMessage();
+
+    } catch (DomainException $exception) {
+        /*
+         * Availability and duplicate-open-request conflicts must not
+         * disclose whether a particular email, workspace or request
+         * fingerprint already exists.
+         */
+        if (function_exists('log_app_error')) {
+            log_app_error(
+                'public_trial_request_conflict',
+                [
+                    'exception' =>
+                        get_class($exception),
+                ]
+            );
+        }
+
+        $_SESSION['trial_request_flash_type'] =
+            'error';
+
+        $_SESSION['trial_request_flash_message'] =
+            'Your trial request could not be submitted with those details. Please try again later or contact support if you need help.';
 
     } catch (Throwable $exception) {
         if (function_exists('log_app_error')) {
