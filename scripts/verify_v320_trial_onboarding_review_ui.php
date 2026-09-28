@@ -175,15 +175,87 @@ ui_check(
 );
 
 ui_check(
-    !str_contains(
+    str_contains(
+        $source,
+        "includes/trial_onboarding_provisioning.php"
+    ),
+    'review page loads shared provisioning authority'
+);
+
+ui_check(
+    str_contains(
+        $source,
+        'isset($_POST[\'provision_request\'])'
+    )
+    && str_contains(
+        $source,
+        '(string)$_POST[\'provision_request\'] === \'1\''
+    ),
+    'POST requires explicit provision action'
+);
+
+ui_check(
+    str_contains(
+        $source,
+        '$requestedActionCount'
+    )
+    && str_contains(
+        $source,
+        '$requestedActionCount !== 1'
+    ),
+    'review page requires exactly one explicit action'
+);
+
+ui_check(
+    substr_count(
         $source,
         'trial_onboarding_provision_approved_request('
-    )
-    && !str_contains(
+    ) === 1,
+    'page delegates provisioning exactly once to shared authority'
+);
+
+ui_check(
+    !str_contains(
         $source,
         'tenant_provisioning_create('
     ),
-    'page cannot provision tenants'
+    'page never calls tenant provisioner directly'
+);
+
+ui_check(
+    str_contains(
+        $source,
+        'name="provision_request"'
+    )
+    && str_contains(
+        $source,
+        'value="1"'
+    )
+    && str_contains(
+        $source,
+        'Provision Tenant'
+    ),
+    'approved request UI exposes explicit provision action'
+);
+
+ui_check(
+    str_contains(
+        $source,
+        '$status === \'approved\''
+    ),
+    'provision control is scoped to approved requests'
+);
+
+ui_check(
+    str_contains(
+        $source,
+        '14-day trial will start only after successful activation.'
+    )
+    && str_contains(
+        $source,
+        'Trial time starts only after Farm Admin activation.'
+    ),
+    'provision UI preserves activation-triggered trial timing'
 );
 
 ui_check(
@@ -245,9 +317,13 @@ ui_check(
 ui_check(
     str_contains(
         $source,
-        '$approveRequested === $rejectRequested'
+        '$requestedActionCount'
+    )
+    && str_contains(
+        $source,
+        '$requestedActionCount !== 1'
     ),
-    'approval and rejection actions are mutually exclusive'
+    'approval rejection and provisioning actions are mutually exclusive'
 );
 
 ui_check(

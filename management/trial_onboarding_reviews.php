@@ -6,6 +6,7 @@ require_once dirname(__DIR__) . '/init.php';
 require_once dirname(__DIR__) . '/config.php';
 require_once dirname(__DIR__) . '/includes/functions.php';
 require_once dirname(__DIR__) . '/includes/trial_onboarding_review.php';
+require_once dirname(__DIR__) . '/includes/trial_onboarding_provisioning.php';
 
 requireLogin();
 requirePlatformOwner();
@@ -42,7 +43,16 @@ if ($requestMethod === 'POST') {
         isset($_POST['reject_request'])
         && (string)$_POST['reject_request'] === '1';
 
-    if ($approveRequested === $rejectRequested) {
+    $provisionRequested =
+        isset($_POST['provision_request'])
+        && (string)$_POST['provision_request'] === '1';
+
+    $requestedActionCount =
+        (int)$approveRequested
+        + (int)$rejectRequested
+        + (int)$provisionRequested;
+
+    if ($requestedActionCount !== 1) {
         $_SESSION['error'] =
             'Unsupported trial review action.';
 
@@ -125,6 +135,26 @@ if ($requestMethod === 'POST') {
                 $_SESSION['success'] =
                     'Trial request rejected. No tenant was provisioned and no trial clock was started.';
             }
+
+        } elseif ($provisionRequested) {
+            $result =
+                trial_onboarding_provision_approved_request(
+                    $pdo,
+                    (int)$requestId
+                );
+
+            if (
+                !empty(
+                    $result['already_provisioned']
+                )
+            ) {
+                $_SESSION['success'] =
+                    'This approved trial request was already provisioned. Its existing tenant binding was left unchanged.';
+            } else {
+                $_SESSION['success'] =
+                    'Trial tenant provisioned. The Farm Admin activation invitation is queued. The 14-day trial will start only after successful activation.';
+            }
+
         } else {
             $result =
                 trial_onboarding_review_approve(
@@ -651,6 +681,56 @@ include dirname(__DIR__)
                             </td>
 
                             <td>
+                                <?php if ($status === 'approved'): ?>
+
+                                    <form
+                                        method="post"
+                                        action="<?php
+                                            echo $h(
+                                                BASE_URL
+                                                . '/management/trial_onboarding_reviews.php'
+                                            );
+                                        ?>"
+                                        class="d-flex flex-column gap-2"
+                                        data-confirm="Provision this approved trial request now? This creates the tenant and pending Farm Admin account, queues the activation invitation, and keeps the 14-day trial clock stopped until activation."
+                                        data-confirm-title="Provision trial tenant?"
+                                        data-confirm-button="Provision Tenant"
+                                        data-confirm-tone="primary"
+                                    >
+                                        <?php
+                                        echo csrf_field();
+                                        ?>
+
+                                        <input
+                                            type="hidden"
+                                            name="request_id"
+                                            value="<?php
+                                                echo $requestId;
+                                            ?>"
+                                        >
+
+                                        <input
+                                            type="hidden"
+                                            name="provision_request"
+                                            value="1"
+                                        >
+
+                                        <button
+                                            type="submit"
+                                            class="btn btn-primary btn-sm"
+                                        >
+                                            <i class="bi bi-building-add"></i>
+                                            Provision Tenant
+                                        </button>
+
+                                        <div class="small text-muted">
+                                            Creates the tenant and pending Farm Admin.
+                                            Trial time starts only after Farm Admin activation.
+                                        </div>
+                                    </form>
+
+                                <?php endif; ?>
+
                                 <?php if ($isPending): ?>
 
                                     <form
