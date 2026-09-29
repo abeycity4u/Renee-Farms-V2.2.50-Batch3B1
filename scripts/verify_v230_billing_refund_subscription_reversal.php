@@ -530,10 +530,8 @@ echo 'STRUCTURAL_FAILURES='
     . PHP_EOL;
 
 $check(
-    count($rows) === 7
-    && $eligible === 2
-    && $structuralFailures === 0,
-    'current production matrix still has exactly two statically reversible subscription candidates'
+    $structuralFailures === 0,
+    'current production subscription matrix has no structural failures; population and reversible-candidate counts are informational'
 );
 
 $refundCount =

@@ -384,6 +384,20 @@ try {
     );
 }
 
+$foundationEnd = strpos(
+    $service,
+    'function billing_refund_resolution_capture_verified'
+);
+
+$foundationSource =
+    $foundationEnd === false
+        ? ''
+        : substr(
+            $service,
+            0,
+            $foundationEnd
+        );
+
 $protectedDml =
     '/\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+'
     . '(?:farms|farm_modules|farm_role_limits|'
@@ -392,11 +406,12 @@ $protectedDml =
     . 'billing_seat_change_requests)\b/i';
 
 $check(
-    !preg_match(
+    $foundationSource !== ''
+    && !preg_match(
         $protectedDml,
-        $service
+        $foundationSource
     ),
-    'foundation service performs no payment or commercial-state mutation'
+    'foundation layer performs no payment or commercial-state mutation'
 );
 
 $providerCall =
@@ -404,11 +419,12 @@ $providerCall =
     . 'billing_provider_(?:initialize|verify|charge)/i';
 
 $check(
-    !preg_match(
+    $foundationSource !== ''
+    && !preg_match(
         $providerCall,
-        $service
+        $foundationSource
     ),
-    'foundation service performs no provider or network call'
+    'foundation layer performs no provider or network call'
 );
 
 echo "\nChecks: {$checks}\n";

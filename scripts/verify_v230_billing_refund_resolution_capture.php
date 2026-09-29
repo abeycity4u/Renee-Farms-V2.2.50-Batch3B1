@@ -69,15 +69,27 @@ $check(
     'shared verified-refund capture function exists'
 );
 
-$captureStart = strpos(
-    $service,
-    'function billing_refund_resolution_capture_verified'
-);
+$serviceLines =
+    file($servicePath);
+
+$captureReflection =
+    new ReflectionFunction(
+        'billing_refund_resolution_capture_verified'
+    );
 
 $capture =
-    $captureStart === false
-        ? ''
-        : substr($service, $captureStart);
+    is_array($serviceLines)
+        ? implode(
+            '',
+            array_slice(
+                $serviceLines,
+                $captureReflection->getStartLine() - 1,
+                $captureReflection->getEndLine()
+                    - $captureReflection->getStartLine()
+                    + 1
+            )
+        )
+        : '';
 
 $check(
     strpos(

@@ -50,48 +50,43 @@ $check = static function (
     }
 };
 
-$helperMarker =
-    'function billing_refund_resolution_assert_locked_lineage';
+$serviceLines =
+    file($servicePath);
 
-$resolverMarker =
-    'function billing_refund_resolution_resolve_preserve';
+$extractFunction =
+    static function (
+        string $functionName
+    ) use ($serviceLines): string {
+        if (!is_array($serviceLines)) {
+            return '';
+        }
 
-$helperStart =
-    strpos($service, $helperMarker);
+        $reflection =
+            new ReflectionFunction(
+                $functionName
+            );
 
-$resolverStart =
-    strpos($service, $resolverMarker);
-
-$check(
-    function_exists(
-        'billing_refund_resolution_assert_locked_lineage'
-    ),
-    'shared locked-lineage validator exists'
-);
-
-$check(
-    function_exists(
-        'billing_refund_resolution_resolve_preserve'
-    ),
-    'shared preserve-entitlement resolver exists'
-);
+        return implode(
+            '',
+            array_slice(
+                $serviceLines,
+                $reflection->getStartLine() - 1,
+                $reflection->getEndLine()
+                    - $reflection->getStartLine()
+                    + 1
+            )
+        );
+    };
 
 $helper =
-    $helperStart === false
-        ? ''
-        : substr(
-            $service,
-            $helperStart,
-            $resolverStart !== false
-                && $resolverStart > $helperStart
-                ? $resolverStart - $helperStart
-                : null
-        );
+    $extractFunction(
+        'billing_refund_resolution_assert_locked_lineage'
+    );
 
 $resolver =
-    $resolverStart === false
-        ? ''
-        : substr($service, $resolverStart);
+    $extractFunction(
+        'billing_refund_resolution_resolve_preserve'
+    );
 
 $check(
     strpos(
