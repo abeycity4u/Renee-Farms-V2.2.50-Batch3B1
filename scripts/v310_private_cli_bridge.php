@@ -47,6 +47,11 @@ if (!function_exists('v310_private_cli_bridge_optional_names')) {
             'PLATFORM_MAIL_ENABLED',
             'PLATFORM_MAIL_FROM_NAME',
             'PLATFORM_MAIL_REPLY_TO',
+
+            'PLATFORM_MAIL_FROM_BILLING',
+            'PLATFORM_MAIL_FROM_ONBOARDING',
+            'PLATFORM_MAIL_FROM_SECURITY',
+            'PLATFORM_MAIL_FROM_NOTIFICATIONS',
         ];
     }
 }

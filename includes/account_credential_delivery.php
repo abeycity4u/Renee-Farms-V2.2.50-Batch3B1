@@ -423,11 +423,19 @@ if (!function_exists('account_credential_send')) {
                 $ttlSeconds
             );
 
+        $senderRole =
+            $purpose === 'password_reset'
+                ? 'security'
+                : 'onboarding';
+
         $mail =
             platform_mail_send(
                 (string)$issued['email'],
                 (string)$message['subject'],
-                (string)$message['body']
+                (string)$message['body'],
+                [
+                    'sender' => $senderRole,
+                ]
             );
 
         /*

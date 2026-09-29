@@ -63,7 +63,10 @@ if (!function_exists('farm_onboarding_send_credentials')) {
             'Your '
             . platform_brand_product_text()
             . ' workspace is ready',
-            $body
+            $body,
+            [
+                'sender' => 'onboarding',
+            ]
         );
     }
 }

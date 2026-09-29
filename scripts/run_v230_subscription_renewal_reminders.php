@@ -68,7 +68,10 @@ foreach ($farms as $farm) {
     $result = platform_mail_send(
         $candidate['recipient'],
         $candidate['subject'],
-        $candidate['body']
+        $candidate['body'],
+        [
+            'sender' => 'billing',
+        ]
     );
 
     if (($result['sent'] ?? false) !== true) {

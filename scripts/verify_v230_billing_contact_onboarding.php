@@ -44,7 +44,16 @@ $assert(str_contains($contact, "WHERE id = ? AND slug <> 'owner'"), 'contact ema
 $assert(str_contains($contact, 'WHERE id = ? AND farm_id = ?'), 'Farm Admin user backfill is tenant-pinned.');
 $assert(str_contains($billing, 'billing_require_farm_admin_actor($pdo, false)'), 'billing contact edit requires canonical Farm Admin actor.');
 $assert(str_contains($billing, 'require_valid_csrf_post()'), 'billing contact edit requires CSRF.');
-$assert(str_contains($billing, "\$allowedEmailKeys = ['csrf_token', 'contact_email', 'save_contact_email']"), 'billing contact edit accepts only narrow form keys.');
+$assert(
+    str_contains($billing, '$allowedEmailKeys = [')
+    && str_contains($billing, "'csrf_token'")
+    && str_contains($billing, "'contact_email'")
+    && str_contains($billing, "'save_contact_email'")
+    && str_contains($billing, 'foreach (array_keys($_POST) as $key)')
+    && str_contains($billing, '$allowedEmailKeys')
+    && str_contains($billing, 'Invalid billing contact update request.'),
+    'billing contact edit accepts only narrow form keys.'
+);
 $assert(!str_contains($billing, "\$_POST['farm_id']"), 'billing contact edit never accepts browser farm id.');
 $assert(str_contains($billing, 'farm_contact_email_update('), 'billing workspace delegates email mutation to central service.');
 $assert(str_contains($billing, 'Save a valid billing contact email above to enable subscription checkout.'), 'missing email is recoverable by Farm Admin on billing page.');
@@ -65,8 +74,15 @@ $assert(
     'Platform Owner farm writer no longer loads plaintext onboarding mail.'
 );
 $assert(
-    substr_count($farms, 'account_pending_user_create(') === 2,
-    'new and repaired Farm Admin accounts delegate to shared pending-account creation.'
+    str_contains(
+        $farms,
+        'tenant_provisioning_create('
+    )
+    && substr_count(
+        $farms,
+        'account_pending_user_create('
+    ) === 1,
+    'new Farm Admin creation delegates to tenant provisioning and repair delegates to shared pending-account creation.'
 );
 $assert(
     !str_contains($farms, 'farm_onboarding_send_credentials('),

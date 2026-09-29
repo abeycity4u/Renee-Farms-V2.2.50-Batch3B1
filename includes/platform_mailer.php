@@ -28,13 +28,102 @@ if (!function_exists('platform_mail_clean_header_text')) {
     }
 }
 
-if (!function_exists('platform_mail_from_address')) {
-    function platform_mail_from_address(): string
+if (!function_exists('platform_mail_sender_env_keys')) {
+    function platform_mail_sender_env_keys(): array
     {
-        $configured = strtolower(platform_mail_env('PLATFORM_MAIL_FROM'));
-        if ($configured !== '' && filter_var($configured, FILTER_VALIDATE_EMAIL)) {
+        return [
+            'billing' =>
+                'PLATFORM_MAIL_FROM_BILLING',
+
+            'onboarding' =>
+                'PLATFORM_MAIL_FROM_ONBOARDING',
+
+            'security' =>
+                'PLATFORM_MAIL_FROM_SECURITY',
+
+            'notifications' =>
+                'PLATFORM_MAIL_FROM_NOTIFICATIONS',
+        ];
+    }
+}
+
+if (!function_exists('platform_mail_sender_role')) {
+    function platform_mail_sender_role(
+        $value = null
+    ): string {
+        $role =
+            strtolower(
+                trim((string)$value)
+            );
+
+        if (
+            $role === ''
+            || $role === 'default'
+        ) {
+            return 'default';
+        }
+
+        if (!array_key_exists(
+            $role,
+            platform_mail_sender_env_keys()
+        )) {
+            throw new InvalidArgumentException(
+                'Unsupported platform mail sender role.'
+            );
+        }
+
+        return $role;
+    }
+}
+
+if (!function_exists('platform_mail_from_address')) {
+    function platform_mail_from_address(
+        $senderRole = null
+    ): string {
+        $senderRole =
+            platform_mail_sender_role(
+                $senderRole
+            );
+
+        if ($senderRole !== 'default') {
+            $keys =
+                platform_mail_sender_env_keys();
+
+            $configured =
+                strtolower(
+                    platform_mail_env(
+                        $keys[$senderRole]
+                    )
+                );
+
+            if (
+                $configured !== ''
+                && filter_var(
+                    $configured,
+                    FILTER_VALIDATE_EMAIL
+                )
+            ) {
+                return $configured;
+            }
+        }
+
+        $configured =
+            strtolower(
+                platform_mail_env(
+                    'PLATFORM_MAIL_FROM'
+                )
+            );
+
+        if (
+            $configured !== ''
+            && filter_var(
+                $configured,
+                FILTER_VALIDATE_EMAIL
+            )
+        ) {
             return $configured;
         }
+
         return 'no-reply@reneefarms.com';
     }
 }
@@ -102,14 +191,21 @@ if (!function_exists('platform_smtp_command')) {
 }
 
 if (!function_exists('platform_smtp_send')) {
-    function platform_smtp_send(string $to, string $subject, string $body): array
-    {
+    function platform_smtp_send(
+        string $to,
+        string $subject,
+        string $body,
+        array $options = []
+    ): array {
         $host = platform_mail_env('PLATFORM_SMTP_HOST');
         $port = (int)platform_mail_env('PLATFORM_SMTP_PORT');
         $encryption = strtolower(platform_mail_env('PLATFORM_SMTP_ENCRYPTION'));
         $username = platform_mail_env('PLATFORM_SMTP_USERNAME');
         $password = platform_mail_env('PLATFORM_SMTP_PASSWORD');
-        $fromAddress = platform_mail_from_address();
+        $fromAddress =
+            platform_mail_from_address(
+                $options['sender'] ?? null
+            );
         $fromName = platform_mail_from_name();
         $replyTo = platform_mail_reply_to();
 
@@ -177,9 +273,16 @@ if (!function_exists('platform_smtp_send')) {
 }
 
 if (!function_exists('platform_php_mail_send')) {
-    function platform_php_mail_send(string $to, string $subject, string $body): array
-    {
-        $fromAddress = platform_mail_from_address();
+    function platform_php_mail_send(
+        string $to,
+        string $subject,
+        string $body,
+        array $options = []
+    ): array {
+        $fromAddress =
+            platform_mail_from_address(
+                $options['sender'] ?? null
+            );
         $fromName = platform_mail_from_name();
         $headers = [
             'MIME-Version: 1.0',
@@ -219,14 +322,29 @@ if (!function_exists('platform_mail_send')) {
         $subject = platform_mail_clean_header_text($subject, 180);
         if ($subject === '') throw new InvalidArgumentException('An email subject is required.');
 
+        $options['sender'] =
+            platform_mail_sender_role(
+                $options['sender'] ?? null
+            );
+
         $enabled = strtolower(platform_mail_env('PLATFORM_MAIL_ENABLED'));
         if (in_array($enabled, ['0', 'false', 'off', 'disabled'], true)) {
             return ['sent' => false, 'transport' => platform_mail_transport(), 'reason' => 'disabled'];
         }
 
         $result = platform_mail_transport() === 'smtp'
-            ? platform_smtp_send($to, $subject, $body)
-            : platform_php_mail_send($to, $subject, $body);
+            ? platform_smtp_send(
+                $to,
+                $subject,
+                $body,
+                $options
+            )
+            : platform_php_mail_send(
+                $to,
+                $subject,
+                $body,
+                $options
+            );
 
         if (($result['sent'] ?? false) !== true) {
             error_log(
