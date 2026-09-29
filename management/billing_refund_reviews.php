@@ -253,7 +253,7 @@ $pageTitle =
             href="<?php echo $h(BASE_URL . '/management/farms.php'); ?>"
         >
             <i class="bi bi-arrow-left"></i>
-            Farm Accounts
+            Farms & Tenants
         </a>
     </div>
 
