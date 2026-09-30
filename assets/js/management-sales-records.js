@@ -38,6 +38,10 @@
             configElement.dataset.ruminantSaleExitMap,
             {}
         ),
+        generalSaleInventoryItems: parseJson(
+            configElement.dataset.generalSaleInventoryItems,
+            []
+        ),
         salePopulationEffectMap: parseJson(
             configElement.dataset.salePopulationEffectMap,
             {}
@@ -115,6 +119,8 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
     const ruminantSaleAnimals = salesRecordsConfig.ruminantSaleAnimals;
     const ruminantSaleAllocationMap = salesRecordsConfig.ruminantSaleAllocationMap;
     const ruminantSaleExitMap = salesRecordsConfig.ruminantSaleExitMap;
+    const generalSaleInventoryItems =
+        salesRecordsConfig.generalSaleInventoryItems;
     const salePopulationEffectMap = salesRecordsConfig.salePopulationEffectMap;
     const slaughterSaleLots = salesRecordsConfig.slaughterSaleLots;
     const slaughterSaleHistoryMap = salesRecordsConfig.slaughterSaleHistoryMap;
@@ -199,6 +205,247 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
         const mode = rows.length ? String(rows[0].allocation_method || 'equal') : 'shared';
         $('#editSaleAnimalAllocationMode').val(mode);
         refreshRuminantSaleAnimalChoices('edit', rows);
+    }
+
+    function generalInventorySaleSelectors(prefix) {
+        const edit = prefix === 'edit';
+
+        return {
+            source: edit
+                ? '#editSaleStockSource'
+                : '#addSaleStockSource',
+
+            panel: edit
+                ? '#editGeneralInventoryPanel'
+                : '#addGeneralInventoryPanel',
+
+            item: edit
+                ? '#editGeneralInventoryItem'
+                : '#addGeneralInventoryItem',
+
+            summary: edit
+                ? '#editGeneralInventorySummary'
+                : '#addGeneralInventorySummary',
+
+            farm: edit
+                ? '#editSaleFarmType'
+                : '#addFarmType',
+
+            production: edit
+                ? '#editSaleProductionType'
+                : '#addProductionType',
+
+            cycle: edit
+                ? '#editSaleCycleId'
+                : '#addCycleId',
+
+            product: edit
+                ? '#editSaleProduct'
+                : '#addProductType',
+
+            unitPreset: edit
+                ? '#editSaleUnitPreset'
+                : '#addUnitPreset',
+
+            unitCustom: edit
+                ? '#editSaleUnitCustom'
+                : '#addUnitCustom'
+        };
+    }
+
+    function generalInventorySaleItem(itemId) {
+        const id =
+            Number(
+                itemId
+                || 0
+            );
+
+        return (
+            generalSaleInventoryItems.find(
+                item =>
+                    Number(item.id) === id
+            )
+            || null
+        );
+    }
+
+    function setGeneralInventoryUnit(
+        prefix,
+        unit
+    ) {
+        const ids =
+            generalInventorySaleSelectors(
+                prefix
+            );
+
+        unit =
+            String(
+                unit
+                || ''
+            ).trim();
+
+        if (
+            saleUnitPresets.includes(
+                unit
+            )
+        ) {
+            $(ids.unitPreset)
+                .val(unit);
+
+            $(ids.unitCustom)
+                .val('')
+                .addClass('d-none')
+                .prop('required', false);
+
+            return;
+        }
+
+        $(ids.unitPreset)
+            .val('__custom__');
+
+        $(ids.unitCustom)
+            .val(unit)
+            .removeClass('d-none')
+            .prop('required', true);
+    }
+
+    function refreshGeneralInventorySale(
+        prefix
+    ) {
+        const ids =
+            generalInventorySaleSelectors(
+                prefix
+            );
+
+        const selected =
+            generalInventorySaleItem(
+                $(ids.item).val()
+            );
+
+        if (!selected) {
+            $(ids.summary)
+                .removeClass(
+                    'text-success text-danger'
+                )
+                .addClass(
+                    'text-muted'
+                )
+                .text(
+                    'Select the exact General Inventory item being sold.'
+                );
+
+            return;
+        }
+
+        $(ids.farm)
+            .val('general');
+
+        refreshSaleAttribution(
+            prefix,
+            'general',
+            0
+        );
+
+        $(ids.product)
+            .val(
+                String(
+                    selected.item_name
+                    || ''
+                )
+            )
+            .prop(
+                'readonly',
+                true
+            );
+
+        setGeneralInventoryUnit(
+            prefix,
+            selected.unit
+            || ''
+        );
+
+        $(ids.summary)
+            .removeClass(
+                'text-muted text-danger'
+            )
+            .addClass(
+                'text-success'
+            )
+            .text(
+                'Available: '
+                + Number(
+                    selected.current_stock
+                    || 0
+                ).toFixed(2)
+                + ' '
+                + String(
+                    selected.unit
+                    || ''
+                )
+                + '. Saving this sale deducts Inventory through the stock ledger.'
+            );
+    }
+
+    function setGeneralInventorySaleMode(
+        prefix,
+        enabled,
+        selectedItemId = 0
+    ) {
+        const ids =
+            generalInventorySaleSelectors(
+                prefix
+            );
+
+        $(ids.panel)
+            .toggleClass(
+                'd-none',
+                !enabled
+            );
+
+        $(ids.item)
+            .prop(
+                'required',
+                enabled
+            );
+
+        if (!enabled) {
+            $(ids.item)
+                .val('');
+
+            $(ids.summary)
+                .text('')
+                .removeClass(
+                    'text-success text-danger'
+                );
+
+            $(ids.product)
+                .prop(
+                    'readonly',
+                    false
+                );
+
+            return;
+        }
+
+        if (
+            Number(
+                selectedItemId
+                || 0
+            ) > 0
+        ) {
+            $(ids.item)
+                .val(
+                    String(
+                        Number(
+                            selectedItemId
+                        )
+                    )
+                );
+        }
+
+        refreshGeneralInventorySale(
+            prefix
+        );
     }
 
     function slaughterSaleSelectors(prefix) {
@@ -1620,12 +1867,20 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
         $('#addSaleStockSource').on(
             'change',
             function () {
-                setSlaughterSaleMode(
-                    'add',
+                const source =
                     String(
                         $(this).val()
                         || ''
-                    ) === 'slaughter_output'
+                    );
+
+                setSlaughterSaleMode(
+                    'add',
+                    source === 'slaughter_output'
+                );
+
+                setGeneralInventorySaleMode(
+                    'add',
+                    source === 'general_inventory'
                 );
             }
         );
@@ -1633,14 +1888,32 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
         $('#editSaleStockSource').on(
             'change',
             function () {
-                setSlaughterSaleMode(
-                    'edit',
+                const source =
                     String(
                         $(this).val()
                         || ''
-                    ) === 'slaughter_output'
+                    );
+
+                setSlaughterSaleMode(
+                    'edit',
+                    source === 'slaughter_output'
+                );
+
+                setGeneralInventorySaleMode(
+                    'edit',
+                    source === 'general_inventory'
                 );
             }
+        );
+
+        $('#addGeneralInventoryItem').on(
+            'change',
+            () => refreshGeneralInventorySale('add')
+        );
+
+        $('#editGeneralInventoryItem').on(
+            'change',
+            () => refreshGeneralInventorySale('edit')
         );
 
         $('#addSlaughterLotAddRow').on(
@@ -1932,6 +2205,36 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
             loadEditSaleAnimalAllocation(Number(data.id || 0));
             loadEditSalePopulationEffect(Number(data.id || 0));
             loadEditSlaughterSale(Number(data.id || 0));
+
+            const stockItemId =
+                Number(
+                    data.stockItem
+                    || 0
+                );
+
+            if (stockItemId > 0) {
+                $('#editSaleStockSource')
+                    .val(
+                        'general_inventory'
+                    );
+
+                setSlaughterSaleMode(
+                    'edit',
+                    false
+                );
+
+                setGeneralInventorySaleMode(
+                    'edit',
+                    true,
+                    stockItemId
+                );
+            } else {
+                setGeneralInventorySaleMode(
+                    'edit',
+                    false
+                );
+            }
+
             updateTotalField('#editSaleQuantity', '#editSalePrice', '#editTotalAmount');
         }
     });

@@ -194,6 +194,9 @@ function inventory_default_production_types(string $farmType): array
     if ($farmType === 'ruminant') {
         return ['cattle' => 'Cattle', 'goat' => 'Goat', 'sheep' => 'Sheep', 'other' => 'Other', 'shared' => 'Shared Ruminant'];
     }
+    if ($farmType === 'general') {
+        return ['general' => 'General / Sales'];
+    }
     return ['shared' => 'Shared / Farm-wide'];
 }
 
@@ -203,6 +206,7 @@ function inventory_normalize_default_production_type(string $farmType, string $f
     if ($feedCategory === 'layer') return 'layer';
     if ($feedCategory === 'broiler') return 'broiler';
     if ($feedCategory === 'ruminant') return 'shared';
+    if ($farmType === 'general') return 'general';
 
     $allowed = inventory_default_production_types($farmType);
     $value = strtolower(trim((string)$value));

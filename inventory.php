@@ -21,8 +21,16 @@ if (!$canAccessInventory) {
     header('Location: ' . BASE_URL . '/no_access.php');
     exit();
 }
-if ($isOwnerOrAdmin) {
-    $farmType = getUserFarmType();
+if (isPlatformOwner()) {
+    $farmType = 'all';
+} elseif (hasRole('farm_admin')) {
+    $inventoryFarmTypes =
+        allowedInventoryFarmTypes(false);
+
+    $farmType =
+        count($inventoryFarmTypes) > 1
+            ? 'all'
+            : ($inventoryFarmTypes[0] ?? 'all');
 } elseif (hasRole('poultry_manager') && !hasRole('ruminant_manager')) {
     $farmType = 'poultry';
 } elseif (hasRole('ruminant_manager') && !hasRole('poultry_manager')) {
@@ -191,8 +199,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             exit();
         }
 
-        if (!in_array($farmType, allowedFarmTypes(), true)) {
-            $farmType = allowedFarmTypes()[0] ?? '';
+        if (!in_array($farmType, allowedInventoryFarmTypes(), true)) {
+            $farmType = allowedInventoryFarmTypes()[0] ?? '';
         }
         if (!inventory_financial_classification_is_valid($financialType)) {
             $_SESSION['error'] = 'Please choose a valid Financial Type for the category.';
@@ -556,7 +564,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $feedCategory,
             $_POST['default_production_type'] ?? 'shared'
         );
-        if (!in_array($feedCategory, allowedFeedCategories(), true) || !in_array($farmType, allowedFarmTypes(), true)) {
+        if (!in_array($feedCategory, allowedFeedCategories(), true) || !in_array($farmType, allowedInventoryFarmTypes(), true)) {
             $_SESSION['error'] = 'That farm or usage classification is not enabled for this farm.';
             header('Location: inventory.php');
             exit();
@@ -1285,7 +1293,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                     <div class="mb-3">
                                         <label>Farm Type</label>
                                         <select name="category_farm_type" class="form-select" required>
-                                            <?php foreach (allowedFarmTypes() as $type): ?><option value="<?php echo $type; ?>" <?php echo $type === 'both' ? 'selected' : ''; ?>><?php echo ucfirst($type); ?></option><?php endforeach; ?>
+                                            <?php foreach (allowedInventoryFarmTypes() as $type): ?><option value="<?php echo $type; ?>" <?php echo $type === 'both' ? 'selected' : ''; ?>><?php echo ucfirst($type); ?></option><?php endforeach; ?>
                                         </select>
                                     </div>
                                     <div class="mb-3">
@@ -1454,7 +1462,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                     <label>Farm Type</label>
                                     <select name="farm_type" id="addItemFarmType" class="form-select" required disabled>
                                         <option value="">Select Farm Type</option>
-                                        <?php foreach (allowedFarmTypes() as $type): ?>
+                                        <?php foreach (allowedInventoryFarmTypes() as $type): ?>
                                             <option value="<?php echo $type; ?>">
                                                 <?php echo ucfirst($type); ?>
                                             </option>

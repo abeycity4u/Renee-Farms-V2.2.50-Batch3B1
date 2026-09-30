@@ -8,6 +8,7 @@ require_once(__DIR__ . '/../lib/sales_receivables.php');
 require_once(__DIR__ . '/../lib/ruminant_animal_exit.php');
 require_once(__DIR__ . '/../lib/sale_population_effects.php');
 require_once(__DIR__ . '/../lib/slaughter_output_sale_dispatch.php');
+require_once(__DIR__ . '/../lib/general_sale_inventory.php');
 requireLogin(); require_http_method('POST'); require_csrf_token(); require_rate_limit('delete_sale',20,60);
 if (!isPlatformOwner() && !hasRole('farm_admin') && (!hasPermission(getUserType(), 'sales') || !hasPermission(getUserType(), 'sales_delete'))) send_json(['success'=>false,'error'=>'You do not have permission to delete sale records.'],403);
 $id=$_POST['id']??null;
@@ -22,6 +23,12 @@ try {
  receivable_assert_sale_deletable($pdo,$farmId,(int)$id);
  sale_population_effect_assert_deletable($pdo,$farmId,(int)$id);
  slaughter_output_sale_assert_deletable($pdo,$farmId,(int)$id);
+ general_sale_inventory_reverse_for_delete(
+     $pdo,
+     $farmId,
+     $row,
+     (int)($_SESSION['user_id'] ?? 0)
+ );
  if (($row['farm_type'] ?? '') === 'ruminant') { ruminant_sale_reverse_exit_events($pdo,$farmId,(int)$id); }
  $pdo->prepare("DELETE FROM customer_ledger_entries WHERE farm_id=? AND sale_id=?")->execute([$farmId,(int)$id]);
  audit_log_event('delete','sale',$id,['before'=>$row]);

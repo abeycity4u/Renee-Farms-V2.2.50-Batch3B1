@@ -286,6 +286,31 @@ function allowedSalesFarmTypes(): array {
     return $types;
 }
 
+/**
+ * Inventory farm types available under the current tenant's entitlements.
+ *
+ * General inventory belongs to the Sales capability and must not require a
+ * Poultry or Ruminant subscription. Livestock inventory continues to use the
+ * existing livestock entitlement boundary.
+ */
+function allowedInventoryFarmTypes(bool $includeBoth = true): array {
+    $types = allowedFarmTypes($includeBoth);
+
+    $hasSalesEntitlement =
+        function_exists('current_farm_has_entitlement')
+            ? current_farm_has_entitlement('sales')
+            : farmHasModule('sales');
+
+    if (
+        $hasSalesEntitlement
+        && !in_array('general', $types, true)
+    ) {
+        $types[] = 'general';
+    }
+
+    return array_values(array_unique($types));
+}
+
 /** Constrain a URL/form farm type to the current farm's subscriptions. */
 function normalizeFarmType(?string $farmType, bool $allowAll = false, bool $includeBoth = true, bool $fallback = true): string {
     $allowed = allowedFarmTypes($includeBoth);

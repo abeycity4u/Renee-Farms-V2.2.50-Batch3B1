@@ -19,6 +19,7 @@ require_once(__DIR__ . '/../lib/sales_units.php');
 require_once(__DIR__ . '/../lib/transaction_actor_display.php');
 require_once(__DIR__ . '/../lib/record_reference_persistence.php');
 require_once(__DIR__ . '/../lib/slaughter_output_sale_dispatch.php');
+require_once(__DIR__ . '/../lib/general_sale_inventory.php');
 $tenantFarmId = requireCurrentFarmId();
 
 $userType = getUserType();
@@ -83,6 +84,11 @@ $saleFarmTypeLabel = static function (string $type): string {
     return ucfirst($type);
 };
 
+$generalSaleInventoryItems =
+    general_sale_inventory_available_items(
+        $pdo,
+        $tenantFarmId
+    );
 
 $prepareSlaughterSaleInput =
     static function (
@@ -422,6 +428,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             );
             exit();
         }
+
+        try {
+            $generalInventorySelection =
+                general_sale_inventory_selection_from_post(
+                    $pdo,
+                    $tenantFarmId,
+                    $_POST
+                );
+        } catch (RuntimeException $e) {
+            $_SESSION['error'] =
+                $e->getMessage();
+
+            header(
+                "Location: sales_records.php?report_mode={$reportMode}&month={$month}&year={$year}&farm_type={$farmType}"
+            );
+            exit();
+        }
+
         $quantity = (float)($_POST['quantity'] ?? 0);
         $unitPrice = (float)($_POST['unit_price'] ?? 0);
         $totalAmount = $quantity * $unitPrice;
@@ -536,6 +560,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 ?? 0
             );
 
+        $saleStockItemId =
+            (
+                ($generalInventorySelection['mode'] ?? '')
+                === 'general_inventory'
+            )
+                ? (int)$generalInventorySelection['stock_item_id']
+                : null;
+
         $saleId =
             record_reference_persistence_insert_new(
                 $pdo,
@@ -551,6 +583,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $productionType,
                     $scope,
                     $cycleId,
+                    $saleStockItemId,
                     $saleProductType,
                     $quantity,
                     $unitOfMeasure,
@@ -571,6 +604,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                     production_type,
                                     attribution_scope,
                                     cycle_id,
+                                    stock_item_id,
                                     product_type,
                                     quantity,
                                     unit_of_measure,
@@ -584,7 +618,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                              VALUES
                                 (
                                     ?, ?, ?, ?, ?, ?, ?, ?,
-                                    ?, ?, ?, ?, ?, ?, ?, ?
+                                    ?, ?, ?, ?, ?, ?, ?, ?, ?
                                 )"
                         );
 
@@ -598,6 +632,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $cycleId > 0
                             ? $cycleId
                             : null,
+                        $saleStockItemId,
                         $saleProductType,
                         $quantity,
                         $unitOfMeasure,
@@ -615,6 +650,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         (int)$pdo->lastInsertId();
                 }
             );
+
+        if ($saleStockItemId !== null) {
+            general_sale_inventory_sync(
+                $pdo,
+                $tenantFarmId,
+                $saleId,
+                null,
+                $saleStockItemId,
+                $quantity,
+                $saleDate,
+                $saleUserId
+            );
+        }
 
         slaughter_output_sale_sync(
             $pdo,
@@ -899,6 +947,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             exit();
         }
 
+        try {
+            $generalInventorySelection =
+                general_sale_inventory_selection_from_post(
+                    $pdo,
+                    $tenantFarmId,
+                    $_POST
+                );
+        } catch (RuntimeException $e) {
+            $_SESSION['error'] =
+                $e->getMessage();
+
+            header(
+                "Location: sales_records.php?report_mode={$reportMode}&month={$month}&year={$year}&farm_type={$farmType}"
+            );
+            exit();
+        }
+
         $saleFarmType = $_POST['farm_type'] ?? '';
         if (!in_array($saleFarmType, $saleFarmTypes, true)) {
             $_SESSION['error'] = "That farm type is not enabled for this farm.";
@@ -1013,16 +1078,38 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 )
             );
 
+        $desiredStockItemId =
+            (
+                ($generalInventorySelection['mode'] ?? '')
+                === 'general_inventory'
+            )
+                ? (int)$generalInventorySelection['stock_item_id']
+                : null;
+
+        general_sale_inventory_sync(
+            $pdo,
+            $tenantFarmId,
+            (int)$_POST['sale_id'],
+            !empty($beforeSale['stock_item_id'])
+                ? (int)$beforeSale['stock_item_id']
+                : null,
+            $desiredStockItemId,
+            (float)$_POST['quantity'],
+            (string)$_POST['sale_date'],
+            (int)$_SESSION['user_id']
+        );
+
         $postedUpfront = isset($_POST['edit_payment_received']) ? (float)$_POST['edit_payment_received'] : null;
         receivable_sync_sale_edit($pdo,$tenantFarmId,(int)$_POST['sale_id'],$newTotal,trim((string)$_POST['customer_name']),(string)$_POST['sale_date'],(string)$_POST['product_type'],(float)$_POST['quantity'],(int)$_SESSION['user_id'],$postedUpfront);
 
         $stmt = $pdo->prepare("UPDATE sales_records
-            SET sale_date=?, farm_type=?, production_type=?, attribution_scope=?, cycle_id=?,
+            SET sale_date=?, farm_type=?, production_type=?, attribution_scope=?, cycle_id=?, stock_item_id=?,
                 product_type=?, quantity=?, unit_of_measure=?, unit_price=?, customer_name=?, remarks=?
             WHERE id=? AND farm_id=?");
         $stmt->execute([
             $_POST['sale_date'], $saleFarmType, $productionType, $scope,
-            $cycleId > 0 ? $cycleId : null, $_POST['product_type'], $_POST['quantity'], $unitOfMeasure,
+            $cycleId > 0 ? $cycleId : null, $desiredStockItemId,
+            $_POST['product_type'], $_POST['quantity'], $unitOfMeasure,
             $_POST['unit_price'], $_POST['customer_name'], $_POST['remarks'],
             $_POST['sale_id'], $tenantFarmId
         ]);
@@ -1533,6 +1620,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                                         data-farm="<?php echo htmlspecialchars($sale['farm_type'], ENT_QUOTES); ?>"
                                                         data-production="<?php echo htmlspecialchars($sale['production_type'] ?? '', ENT_QUOTES); ?>"
                                                         data-cycle="<?php echo (int)($sale['cycle_id'] ?? 0); ?>"
+                                                        data-stock-item="<?php echo (int)($sale['stock_item_id'] ?? 0); ?>"
                                                         data-product="<?php echo htmlspecialchars($sale['product_type'], ENT_QUOTES); ?>"
                                                         data-quantity="<?php echo htmlspecialchars($sale['quantity'], ENT_QUOTES); ?>"
                                                         data-unit="<?php echo htmlspecialchars((string)($sale['unit_of_measure'] ?? ''), ENT_QUOTES); ?>"
@@ -1601,6 +1689,12 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                     Financial only — no Inventory movement
                                 </option>
                                 <option
+                                    value="general_inventory"
+                                    <?php echo empty($generalSaleInventoryItems) ? 'disabled' : ''; ?>
+                                >
+                                    General Inventory — deduct selected stock item
+                                </option>
+                                <option
                                     value="slaughter_output"
                                     <?php echo empty($slaughterSaleLots) ? 'disabled' : ''; ?>
                                 >
@@ -1616,6 +1710,48 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                             <small class="text-muted">
                                 Use Slaughter Output Inventory only when this sale physically consumes a recorded Poultry or Ruminant slaughter output.
                             </small>
+                        </div>
+
+                        <div
+                            class="card mb-3 d-none"
+                            id="addGeneralInventoryPanel"
+                        >
+                            <div class="card-body py-3">
+                                <label
+                                    for="addGeneralInventoryItem"
+                                    class="form-label fw-semibold"
+                                >
+                                    General Inventory Item
+                                </label>
+                                <select
+                                    name="stock_item_id"
+                                    id="addGeneralInventoryItem"
+                                    class="form-select"
+                                >
+                                    <option value="">
+                                        Select inventory item...
+                                    </option>
+                                    <?php foreach ($generalSaleInventoryItems as $item): ?>
+                                    <option value="<?php echo (int)$item['id']; ?>">
+                                        <?php echo htmlspecialchars(
+                                            (string)$item['category_name']
+                                            . ' — '
+                                            . (string)$item['item_name']
+                                            . ' — Available '
+                                            . number_format((float)$item['current_stock'], 2)
+                                            . ' '
+                                            . (string)$item['unit'],
+                                            ENT_QUOTES,
+                                            'UTF-8'
+                                        ); ?>
+                                    </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <div
+                                    id="addGeneralInventorySummary"
+                                    class="small text-muted mt-2"
+                                ></div>
+                            </div>
                         </div>
 
                         <div
@@ -1873,7 +2009,13 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 class="form-select"
                             >
                                 <option value="financial_only">
-                                    Financial only — no active slaughter-output consumption
+                                    Financial only — no active Inventory consumption
+                                </option>
+                                <option
+                                    value="general_inventory"
+                                    <?php echo empty($generalSaleInventoryItems) ? 'disabled' : ''; ?>
+                                >
+                                    General Inventory — deduct selected stock item
                                 </option>
                                 <option value="slaughter_output">
                                     Slaughter Output Inventory — explicit lot
@@ -1888,6 +2030,48 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                             <small class="text-muted">
                                 Corrections keep prior Poultry or Ruminant slaughter-output Inventory history auditable.
                             </small>
+                        </div>
+
+                        <div
+                            class="card mb-3 d-none"
+                            id="editGeneralInventoryPanel"
+                        >
+                            <div class="card-body py-3">
+                                <label
+                                    for="editGeneralInventoryItem"
+                                    class="form-label fw-semibold"
+                                >
+                                    General Inventory Item
+                                </label>
+                                <select
+                                    name="stock_item_id"
+                                    id="editGeneralInventoryItem"
+                                    class="form-select"
+                                >
+                                    <option value="">
+                                        Select inventory item...
+                                    </option>
+                                    <?php foreach ($generalSaleInventoryItems as $item): ?>
+                                    <option value="<?php echo (int)$item['id']; ?>">
+                                        <?php echo htmlspecialchars(
+                                            (string)$item['category_name']
+                                            . ' — '
+                                            . (string)$item['item_name']
+                                            . ' — Available '
+                                            . number_format((float)$item['current_stock'], 2)
+                                            . ' '
+                                            . (string)$item['unit'],
+                                            ENT_QUOTES,
+                                            'UTF-8'
+                                        ); ?>
+                                    </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <div
+                                    id="editGeneralInventorySummary"
+                                    class="small text-muted mt-2"
+                                ></div>
+                            </div>
                         </div>
 
                         <div
@@ -2061,6 +2245,11 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
         ); ?>"
         data-ruminant-sale-exit-map="<?php echo htmlspecialchars(
             app_json_script($ruminantSaleExitEvents),
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        ); ?>"
+        data-general-sale-inventory-items="<?php echo htmlspecialchars(
+            app_json_script($generalSaleInventoryItems),
             ENT_QUOTES | ENT_SUBSTITUTE,
             'UTF-8'
         ); ?>"
