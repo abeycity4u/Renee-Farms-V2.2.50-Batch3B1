@@ -12,3 +12,29 @@ error_log
 Thumbs.db
 *.swp
 *.swo
+
+# Renee AgriSuite portability/runtime policy
+
+# Real production environment authority.
+# Keep scripts/.htaccess and migrations/.htaccess trackable.
+# Only the repository-root .htaccess is private.
+/.htaccess
+
+# User-generated runtime uploads.
+# Preserve the directory itself but not production contents.
+/uploads/*
+!/uploads/.gitkeep
+
+# Common PHP/server runtime output.
+error_log
+*.log
+
+# Local secret/environment files.
+.env
+.env.*
+!.env.example
+
+# NOTE:
+# Do NOT globally ignore *.lock.
+# composer.lock is a source dependency lock and must remain tracked.
+# Worker runtime locks live outside the repository.

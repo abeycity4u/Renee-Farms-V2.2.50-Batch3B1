@@ -1,0 +1,24 @@
+RENEE AGRISUITE — CREDENTIAL PRIVATE WORKER SOURCE MAP
+=====================================================
+
+The production credential worker is installed outside public_html.
+
+Canonical GitHub source:
+
+scripts/run_v310_account_credential_outbox.php
+  -> private:
+     v310-credential-worker/run_v310_account_credential_outbox.php
+
+scripts/run_v310_credential_worker_production.sh
+  -> private:
+     v310-credential-worker/run_v310_credential_worker_production.sh
+
+scripts/v310_private_cli_bridge.php
+  -> private:
+     v310-credential-worker/v310_private_cli_bridge.php
+
+These source/private pairs were certified byte-for-byte identical
+during T14-B17B/B17E.
+
+Do not duplicate the PHP/business authority here.
+The portability installer must copy the canonical scripts above.

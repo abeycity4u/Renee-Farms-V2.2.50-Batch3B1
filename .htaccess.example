@@ -1,0 +1,91 @@
+# ============================================================
+# Renee AgriSuite production .htaccess template
+# ============================================================
+#
+# Generated from the certified live hardened structure.
+#
+# Copy to .htaccess on the target host and replace every
+# xxxxxx placeholder with the appropriate production value.
+#
+# NEVER commit the real production .htaccess.
+# ============================================================
+
+# V2.3 commercial hardening: canonical HTTPS + non-www host
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    RewriteCond %{HTTPS} !=on [OR]
+    RewriteCond %{HTTP_HOST} !^reneefarms\.com$ [NC]
+    RewriteRule ^ https://reneefarms.com%{REQUEST_URI} [R=301,L]
+</IfModule>
+
+#DB DATA
+SetEnv DB_HOST xxxxxx
+SetEnv DB_USER xxxxxx
+SetEnv DB_PASS xxxxxx
+SetEnv DB_NAME xxxxxx
+SetEnv APP_ENV xxxxxx
+
+# BILL DETAILS
+SetEnv BILLING_PAYMENT_MODE xxxxxx
+SetEnv BILLING_PUBLIC_BASE_URL xxxxxx
+
+# PAYSTACK
+SetEnv PAYSTACK_TEST_SECRET_KEY xxxxxx
+
+# FLUTTERWAVE
+SetEnv FLUTTERWAVE_TEST_SECRET_KEY xxxxxx
+SetEnv FLUTTERWAVE_TEST_WEBHOOK_HASH xxxxxx
+
+# MAIL SERVER
+
+SetEnv PLATFORM_MAIL_TRANSPORT smtp
+SetEnv PLATFORM_SMTP_HOST xxxxxx
+SetEnv PLATFORM_SMTP_PORT 587
+SetEnv PLATFORM_SMTP_ENCRYPTION tls
+SetEnv PLATFORM_SMTP_USERNAME xxxxxx
+SetEnv PLATFORM_SMTP_PASSWORD xxxxxx
+SetEnv PLATFORM_MAIL_FROM xxxxxx
+SetEnv PLATFORM_MAIL_FROM_NAME xxxxxx
+SetEnv PLATFORM_MAIL_REPLY_TO xxxxxx
+
+# V2.3 commercial hardening: block internal deployment/source artifacts
+<FilesMatch "^(BATCH_NOTES\.txt|RELEASE_NOTES\.txt|database_schema\.sql)$">
+    Require all denied
+</FilesMatch>
+
+# V2.3 commercial hardening: baseline HTTP security headers
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+</IfModule>
+
+# V2.3 commercial hardening: reduce technology fingerprinting
+<IfModule mod_headers.c>
+    Header always unset X-Powered-By
+</IfModule>
+
+# V2.3 commercial hardening: reject unsupported HTTP methods
+<IfModule mod_rewrite.c>
+    RewriteCond %{REQUEST_METHOD} ^(TRACE|TRACK|PUT|DELETE|PATCH)$ [NC]
+    RewriteRule ^ - [R=405,L]
+</IfModule>
+
+# V2.3 commercial hardening: app-controlled error pages
+ErrorDocument 403 /errors/403.php
+ErrorDocument 404 /errors/404.php
+
+# BEGIN RENEE ROOT DIRECTORY HARDENING
+Options -Indexes
+# END RENEE ROOT DIRECTORY HARDENING
+
+# BEGIN RENEE PLATFORM MAIL AUTHORITY
+SetEnv PLATFORM_MAIL_ENABLED xxxxxx
+SetEnv PLATFORM_MAIL_FROM_BILLING billing@reneefarms.com
+SetEnv PLATFORM_MAIL_FROM_ONBOARDING onboarding@reneefarms.com
+SetEnv PLATFORM_MAIL_FROM_SECURITY no-reply@reneefarms.com
+SetEnv PLATFORM_MAIL_FROM_NOTIFICATIONS notifications@reneefarms.com
+# END RENEE PLATFORM MAIL AUTHORITY
