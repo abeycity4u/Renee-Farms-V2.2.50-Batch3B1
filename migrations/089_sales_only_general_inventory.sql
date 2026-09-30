@@ -18,7 +18,12 @@ ALTER TABLE stock_items
     MODIFY COLUMN farm_type
         ENUM('poultry','ruminant','both','general')
         NOT NULL
-        DEFAULT 'both';
+        DEFAULT 'both',
+
+    ADD UNIQUE KEY uniq_stock_item_farm_identity (
+        farm_id,
+        id
+    );
 
 ALTER TABLE stock_transactions
     MODIFY COLUMN farm_type
@@ -36,9 +41,13 @@ ALTER TABLE sales_records
 
     ADD CONSTRAINT fk_sales_stock_item
         FOREIGN KEY (
+            farm_id,
             stock_item_id
         )
-        REFERENCES stock_items(id)
+        REFERENCES stock_items(
+            farm_id,
+            id
+        )
         ON DELETE RESTRICT;
 
 INSERT INTO schema_migrations (

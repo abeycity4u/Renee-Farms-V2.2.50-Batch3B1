@@ -131,6 +131,20 @@ try {
         'fresh Sales schema indexes tenant-scoped stock item link'
     );
 
+    $stockItemsBlock =
+        schema_table_block(
+            $schema,
+            'stock_items'
+        );
+
+    pass_contract(
+        str_contains(
+            $stockItemsBlock,
+            'UNIQUE KEY `uniq_stock_item_farm_identity` (`farm_id`,`id`)'
+        ),
+        'fresh Inventory schema exposes tenant-scoped stock identity'
+    );
+
     pass_contract(
         str_contains(
             $salesBlock,
@@ -138,9 +152,13 @@ try {
         )
         && str_contains(
             $salesBlock,
-            'REFERENCES `stock_items` (`id`) ON DELETE RESTRICT'
+            'FOREIGN KEY (`farm_id`,`stock_item_id`)'
+        )
+        && str_contains(
+            $salesBlock,
+            'REFERENCES `stock_items` (`farm_id`,`id`) ON DELETE RESTRICT'
         ),
-        'fresh Sales schema protects durable Inventory provenance'
+        'fresh Sales schema enforces tenant-scoped Inventory provenance'
     );
 
     pass_contract(
@@ -150,9 +168,25 @@ try {
         )
         && str_contains(
             $migration,
+            'ADD UNIQUE KEY uniq_stock_item_farm_identity'
+        )
+        && str_contains(
+            $migration,
             'ADD CONSTRAINT fk_sales_stock_item'
+        )
+        && str_contains(
+            $migration,
+            'FOREIGN KEY ('
+        )
+        && str_contains(
+            $migration,
+            'farm_id,'
+        )
+        && str_contains(
+            $migration,
+            'stock_item_id'
         ),
-        'migration 089 creates durable General-sale stock item link'
+        'migration 089 creates tenant-scoped General-sale stock item link'
     );
 
     pass_contract(

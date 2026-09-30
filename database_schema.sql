@@ -1585,7 +1585,7 @@ CREATE TABLE `sales_records` (
   KEY `idx_sales_stock_item` (`farm_id`,`stock_item_id`),
   CONSTRAINT `fk_sales_cycle` FOREIGN KEY (`cycle_id`) REFERENCES `production_cycles` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_sales_farm` FOREIGN KEY (`farm_id`) REFERENCES `farms` (`id`),
-  CONSTRAINT `fk_sales_stock_item` FOREIGN KEY (`stock_item_id`) REFERENCES `stock_items` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_sales_stock_item` FOREIGN KEY (`farm_id`,`stock_item_id`) REFERENCES `stock_items` (`farm_id`,`id`) ON DELETE RESTRICT,
   CONSTRAINT `fk_sales_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -1718,6 +1718,7 @@ CREATE TABLE `stock_items` (
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_stock_item_farm_identity` (`farm_id`,`id`),
   KEY `idx_stock_items_farm` (`farm_id`),
   KEY `fk_stock_items_category` (`category_id`),
   KEY `idx_stock_items_financial_classification` (`farm_id`,`financial_classification`,`is_active`),
