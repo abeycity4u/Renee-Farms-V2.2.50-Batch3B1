@@ -318,6 +318,44 @@ if (!function_exists('general_expense_entry_create')) {
                 }
             );
 
+        /*
+         * Fail closed if database storage silently coerces an application-
+         * validated category. This protects environments where MySQL strict
+         * mode is disabled and prevents invalid ENUM-style coercion from
+         * reaching immutable expense revision provenance.
+         */
+        $storedStmt =
+            $pdo->prepare(
+                "SELECT category
+                 FROM farm_expenses
+                 WHERE id=?
+                   AND farm_id=?
+                 LIMIT 1"
+            );
+
+        $storedStmt->execute([
+            $expenseId,
+            $farmId,
+        ]);
+
+        $storedCategory =
+            $storedStmt->fetchColumn();
+
+        if (
+            !is_string(
+                $storedCategory
+            )
+            ||
+            !hash_equals(
+                $category,
+                $storedCategory
+            )
+        ) {
+            throw new RuntimeException(
+                'General expense category storage contract is inconsistent.'
+            );
+        }
+
         expense_revision_service_record_created(
             $pdo,
             $farmId,

@@ -11,6 +11,9 @@ $tenantFarmId = requireCurrentFarmId();
 $userFarmType = getUserFarmType();
 $canChooseFarmType = isPlatformOwner() || hasRole('farm_admin', 'sales_rep');
 
+$salesOnlyWorkspace =
+    current_farm_is_sales_only();
+
 $reportMode = ($_GET['report_mode'] ?? 'monthly') === 'yearly' ? 'yearly' : 'monthly';
 $month = $_GET['month'] ?? date('Y-m');
 $year = $_GET['year'] ?? date('Y');
@@ -25,13 +28,65 @@ if ($reportMode === 'yearly') {
     $endDate = date('Y-m-t', strtotime($selectedMonth . '-01'));
     $periodLabel = date('F Y', strtotime($selectedMonth));
 }
-$requestedFarmType = $canChooseFarmType ? ($_GET['farm_type'] ?? null) : $userFarmType;
-if ($requestedFarmType === 'both' && count(accessibleFarmTypes()) === 2) $requestedFarmType = 'all';
-if ($requestedFarmType === 'general') $farmType='general';
-else $farmType = normalizeFarmType($requestedFarmType, true, false, $canChooseFarmType);
-$productionType = strtolower(trim((string)($_GET['production_type'] ?? 'all')));
-$productionOptions = $farmType === 'all' ? [] : attribution_production_types($farmType);
-if ($productionType !== 'all' && !isset($productionOptions[$productionType])) $productionType='all';
+if ($salesOnlyWorkspace) {
+    $farmType = 'general';
+    $productionType = 'all';
+    $productionOptions = [];
+} else {
+    $requestedFarmType =
+        $canChooseFarmType
+            ? ($_GET['farm_type'] ?? null)
+            : $userFarmType;
+
+    if (
+        $requestedFarmType === 'both'
+        &&
+        count(accessibleFarmTypes()) === 2
+    ) {
+        $requestedFarmType = 'all';
+    }
+
+    if ($requestedFarmType === 'general') {
+        $farmType = 'general';
+    } else {
+        $farmType =
+            normalizeFarmType(
+                $requestedFarmType,
+                true,
+                false,
+                $canChooseFarmType
+            );
+    }
+
+    $productionType =
+        strtolower(
+            trim(
+                (string)(
+                    $_GET['production_type']
+                    ?? 'all'
+                )
+            )
+        );
+
+    $productionOptions =
+        $farmType === 'all'
+            ? []
+            : attribution_production_types(
+                $farmType
+            );
+
+    if (
+        $productionType !== 'all'
+        &&
+        !isset(
+            $productionOptions[
+                $productionType
+            ]
+        )
+    ) {
+        $productionType = 'all';
+    }
+}
 $category = $_GET['category'] ?? 'all';
 
 $where = "WHERE e.farm_id=? AND e.expense_date BETWEEN ? AND ?";

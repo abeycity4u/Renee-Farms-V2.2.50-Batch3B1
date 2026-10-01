@@ -53,15 +53,69 @@ if ($reportMode === 'yearly') {
     $periodLabel = date('F Y', strtotime($selectedMonth));
 }
 
-$requestedFarmType = $canChooseFarmType ? ($_GET['farm_type'] ?? null) : $userFarmType;
-if ($requestedFarmType === 'both' && count(accessibleFarmTypes()) === 2) {
-    $requestedFarmType = 'all';
+if ($salesOnlyWorkspace) {
+    /*
+     * Sales-only has no livestock farm type to normalize.
+     * Its Expense Report is canonically General and has no production filter.
+     */
+    $farmType = 'general';
+    $productionType = 'all';
+    $productionOptions = [];
+} else {
+    $requestedFarmType =
+        $canChooseFarmType
+            ? ($_GET['farm_type'] ?? null)
+            : $userFarmType;
+
+    if (
+        $requestedFarmType === 'both'
+        &&
+        count(accessibleFarmTypes()) === 2
+    ) {
+        $requestedFarmType = 'all';
+    }
+
+    if ($requestedFarmType === 'general') {
+        $farmType = 'general';
+    } else {
+        $farmType =
+            normalizeFarmType(
+                $requestedFarmType,
+                true,
+                false,
+                $canChooseFarmType
+            );
+    }
+
+    $productionType =
+        strtolower(
+            trim(
+                (string)(
+                    $_GET['production_type']
+                    ?? 'all'
+                )
+            )
+        );
+
+    $productionOptions =
+        $farmType === 'all'
+            ? []
+            : attribution_production_types(
+                $farmType
+            );
+
+    if (
+        $productionType !== 'all'
+        &&
+        !isset(
+            $productionOptions[
+                $productionType
+            ]
+        )
+    ) {
+        $productionType = 'all';
+    }
 }
-if ($requestedFarmType === 'general') $farmType='general';
-else $farmType = normalizeFarmType($requestedFarmType, true, false, $canChooseFarmType);
-$productionType = strtolower(trim((string)($_GET['production_type'] ?? 'all')));
-$productionOptions = $farmType === 'all' ? [] : attribution_production_types($farmType);
-if ($productionType !== 'all' && !isset($productionOptions[$productionType])) $productionType='all';
 $categoryOptions =
     expense_category_options(
         'report'
@@ -139,7 +193,31 @@ foreach ($expenses as $expense) {
     $categoryTotals[$expense['category']] = ($categoryTotals[$expense['category']] ?? 0) + $lineTotal;
     $farmTypeTotals[$expense['farm_type']] = ($farmTypeTotals[$expense['farm_type']] ?? 0) + $lineTotal;
 }
-$pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expense_report_pdf.php?' . http_build_query($pdfReportParams);
+$pdfReportParams = $_GET;
+unset($pdfReportParams['pdf']);
+
+if ($salesOnlyWorkspace) {
+    $pdfReportParams['farm_type'] =
+        'general';
+
+    unset(
+        $pdfReportParams[
+            'production_type'
+        ]
+    );
+}
+
+$pdfReportUrl =
+    'expense_report_pdf.php?'
+    .
+    http_build_query(
+        $pdfReportParams
+    );
+
+$expenseTableColumnCount =
+    ($salesOnlyWorkspace ? 8 : 10)
+    +
+    ($canManageExpenses ? 1 : 0);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -174,6 +252,18 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                             </button>
                             <?php endif; ?>
 
+                            <?php if ($salesOnlyWorkspace): ?>
+                            <input
+                                type="hidden"
+                                id="farmTypeFilter"
+                                value="general"
+                            >
+                            <input
+                                type="hidden"
+                                id="productionTypeFilter"
+                                value="all"
+                            >
+                            <?php else: ?>
                             <select class="form-select app-width-150" id="farmTypeFilter">
                                 <?php if ($canChooseFarmType): ?>
                                 <?php if (count(accessibleFarmTypes()) === 2): ?><option value="all" <?php echo $farmType == 'all' ? 'selected' : ''; ?>>All Farms</option><?php endif; ?>
@@ -187,6 +277,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                 <option value="all">All Production Types</option>
                                 <?php foreach($productionOptions as $value=>$label): ?><option value="<?php echo htmlspecialchars($value); ?>" <?php echo $productionType===$value?'selected':''; ?>><?php echo htmlspecialchars($label); ?></option><?php endforeach; ?>
                             </select>
+                            <?php endif; ?>
                             <select class="form-select app-width-150" id="categoryFilter">
                                 <option
                                     value="all"
@@ -336,8 +427,10 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                     <tr>
                                         <th>Date</th>
                                         <th>Reference</th>
+                                        <?php if (!$salesOnlyWorkspace): ?>
                                         <th>Farm Type</th>
                                         <th>Production Type</th>
+                                        <?php endif; ?>
                                         <th>Category</th>
                                         <th>Unit</th>
                                         <th>Amount</th>
@@ -352,7 +445,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                 <tbody>
                                     <?php if (empty($expenses)): ?>
                                     <tr>
-                                        <td colspan="<?php echo $canManageExpenses ? '11' : '10'; ?>" class="text-center text-muted py-4">
+                                        <td colspan="<?php echo $expenseTableColumnCount; ?>" class="text-center text-muted py-4">
                                             <i class="bi bi-receipt display-4 d-block mb-2"></i>
                                             No expenses recorded for this period
                                         </td>
@@ -370,6 +463,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                                 <strong><?php echo date('d/m/Y', strtotime($expense['expense_date'])); ?></strong>
                                             </td>
                                             <td class="text-nowrap"><code><?php echo htmlspecialchars((string)($expense['public_reference'] ?? '—')); ?></code></td>
+                                            <?php if (!$salesOnlyWorkspace): ?>
                                             <td>
                                                 <span class="badge bg-<?php
                                                     echo $expense['farm_type'] == 'poultry' ? 'info' :
@@ -379,6 +473,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                                 </span>
                                             </td>
                                             <td><span class="badge bg-light text-dark border"><?php echo htmlspecialchars(attribution_label($expense['production_type'] ?? null)); ?></span></td>
+                                            <?php endif; ?>
                                             <td>
                                                 <span class="badge bg-<?php
                                                     switch($expense['category']) {
