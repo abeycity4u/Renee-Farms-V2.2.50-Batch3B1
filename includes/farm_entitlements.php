@@ -186,6 +186,50 @@ if (!function_exists('require_entitled_module')) {
     }
 }
 
+/**
+ * True only for a standalone Sales tenant.
+ *
+ * Poultry/Ruminant tenants may also use shared Sales; that must never
+ * classify them as a Sales-only workspace.
+ */
+if (!function_exists('farm_entitlement_modules_are_sales_only')) {
+    function farm_entitlement_modules_are_sales_only(array $modules): bool
+    {
+        $modules = farm_entitlement_normalize_modules($modules);
+
+        return in_array('sales', $modules, true)
+            && !in_array('poultry', $modules, true)
+            && !in_array('ruminant', $modules, true);
+    }
+}
+
+if (!function_exists('farm_entitlement_is_sales_only')) {
+    function farm_entitlement_is_sales_only(PDO $pdo, int $farmId): bool
+    {
+        if ($farmId < 1) return false;
+
+        return farm_entitlement_modules_are_sales_only(
+            farm_entitlement_modules($pdo, $farmId)
+        );
+    }
+}
+
+if (!function_exists('current_farm_is_sales_only')) {
+    function current_farm_is_sales_only(): bool
+    {
+        global $pdo;
+
+        if (!($pdo instanceof PDO) || !function_exists('getCurrentFarmId')) {
+            return false;
+        }
+
+        return farm_entitlement_is_sales_only(
+            $pdo,
+            (int)getCurrentFarmId()
+        );
+    }
+}
+
 if (!function_exists('farm_entitlement_reporting_farm_types')) {
     function farm_entitlement_reporting_farm_types(
         PDO $pdo,
