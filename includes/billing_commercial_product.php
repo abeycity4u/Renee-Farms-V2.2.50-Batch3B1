@@ -146,3 +146,38 @@ if (!function_exists('billing_commercial_product_is_sales_only')) {
             === ['sales'];
     }
 }
+
+if (!function_exists('billing_commercial_product_label')) {
+    function billing_commercial_product_label(
+        array $modules
+    ): string {
+        $modules =
+            billing_commercial_product_modules(
+                $modules
+            );
+
+        if ($modules === ['sales']) {
+            return 'Sales';
+        }
+
+        if ($modules === ['poultry']) {
+            return 'Poultry';
+        }
+
+        if ($modules === ['ruminant']) {
+            return 'Ruminant';
+        }
+
+        if (
+            $modules
+            === [
+                'poultry',
+                'ruminant',
+            ]
+        ) {
+            return 'Poultry + Ruminant';
+        }
+
+        return '—';
+    }
+}

@@ -11,6 +11,7 @@
 require_once dirname(__DIR__) . '/init.php';
 require_once dirname(__DIR__) . '/includes/billing_tenant_actor.php';
 require_once dirname(__DIR__) . '/includes/billing_account_overview.php';
+require_once dirname(__DIR__) . '/includes/billing_commercial_product.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_selection.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_readiness.php';
 require_once dirname(__DIR__) . '/includes/farm_contact_email.php';
@@ -364,7 +365,12 @@ $status = strtolower(trim((string)($farm['subscription_status'] ?? 'unknown')));
 $statusLabel = ucwords(str_replace('_', ' ', $status));
 $pricing = $overview['pricing'] ?? null;
 $modules = $overview['modules'] ?? [];
-$moduleLabel = $modules ? implode(' + ', array_map(static fn(string $m): string => ucfirst($m), $modules)) : '—';
+$productLabel =
+    billing_commercial_product_label(
+        is_array($modules)
+            ? $modules
+            : []
+    );
 $subscriptionEndsAt = $farm['subscription_ends_at'] ?? null;
 $contactEmail = $emailFormValue !== null
     ? strtolower(trim($emailFormValue))
@@ -472,10 +478,19 @@ $formatDate = static function ($value): string {
 };
 
 $decodeModules = static function ($json): string {
-    $decoded = json_decode((string)$json, true);
-    if (!is_array($decoded)) return '—';
-    $clean = array_values(array_intersect(['poultry', 'ruminant'], array_map('strtolower', $decoded)));
-    return $clean ? implode(' + ', array_map('ucfirst', $clean)) : '—';
+    $decoded =
+        json_decode(
+            (string)$json,
+            true
+        );
+
+    if (!is_array($decoded)) {
+        return '—';
+    }
+
+    return billing_commercial_product_label(
+        $decoded
+    );
 };
 ?>
 <!doctype html>
@@ -644,7 +659,7 @@ $decodeModules = static function ($json): string {
         <div class="row g-3 mb-4">
             <div class="col-md-6 col-xl-3"><div class="card billing-card h-100"><div class="card-body"><div class="metric-label">Status</div><div class="metric-value mt-1"><span class="badge text-bg-<?= htmlspecialchars($statusClass($status), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($statusLabel, ENT_QUOTES, 'UTF-8') ?></span></div></div></div></div>
             <div class="col-md-6 col-xl-3"><div class="card billing-card h-100"><div class="card-body"><div class="metric-label">Plan</div><div class="metric-value mt-1"><?= htmlspecialchars((string)$overview['plan_label'], ENT_QUOTES, 'UTF-8') ?></div></div></div></div>
-            <div class="col-md-6 col-xl-3"><div class="card billing-card h-100"><div class="card-body"><div class="metric-label">Livestock bundle</div><div class="metric-value mt-1"><?= htmlspecialchars($moduleLabel, ENT_QUOTES, 'UTF-8') ?></div></div></div></div>
+            <div class="col-md-6 col-xl-3"><div class="card billing-card h-100"><div class="card-body"><div class="metric-label">Commercial product</div><div class="metric-value mt-1"><?= htmlspecialchars($productLabel, ENT_QUOTES, 'UTF-8') ?></div></div></div></div>
             <div class="col-md-6 col-xl-3"><div class="card billing-card h-100"><div class="card-body"><div class="metric-label">Current period ends</div><div class="metric-value mt-1"><?= htmlspecialchars($formatDate($subscriptionEndsAt), ENT_QUOTES, 'UTF-8') ?></div></div></div></div>
         </div>
 
@@ -658,7 +673,7 @@ $decodeModules = static function ($json): string {
                             <div class="col-sm-6"><div class="metric-label">Current renewal price</div><div class="metric-value mt-1"><?= htmlspecialchars((string)$pricing['currency'], ENT_QUOTES, 'UTF-8') ?> <?= number_format((float)$pricing['amount'], 2) ?></div></div>
                         </div>
                         <div class="billing-note mt-3">The renewal price is calculated from the current server-side price book. This page never sends an amount, currency or tenant id to checkout.</div>
-                        <div class="mt-3 small text-muted">Need a different plan, livestock bundle or seat package? Contact support before renewing. This first self-service screen renews the product currently assigned to your farm.</div>
+                        <div class="mt-3 small text-muted">Need a different plan, commercial product or seat package? Contact support before renewing. This first self-service screen renews the product currently assigned to your farm.</div>
                     </div>
                 </div>
             </div>
@@ -775,7 +790,7 @@ $decodeModules = static function ($json): string {
                         </div>
                     <?php elseif (empty($overview['seat_summary'])): ?>
                         <div class="alert alert-info mb-0">
-                            No additional seat roles are available for the current livestock bundle.
+                            No additional seat roles are available for the current commercial product.
                         </div>
                     <?php else: ?>
                         <form
@@ -1034,7 +1049,7 @@ $decodeModules = static function ($json): string {
             <div class="card-header bg-transparent border-0 pt-3 px-3"><h2 class="h5 mb-0">Subscription history</h2><div class="small text-muted">Recent immutable commercial snapshots for this farm.</div></div>
             <div class="table-responsive">
                 <table class="table table-hover mb-0">
-                    <thead><tr><th>Date</th><th>Plan</th><th>Status</th><th>Interval</th><th>Modules</th><th>Subscription end</th><th>Paid period end</th></tr></thead>
+                    <thead><tr><th>Date</th><th>Plan</th><th>Status</th><th>Interval</th><th>Product</th><th>Subscription end</th><th>Paid period end</th></tr></thead>
                     <tbody>
                     <?php if (!$overview['subscription_history']): ?><tr><td colspan="7" class="empty-state">No commercial subscription history has been recorded yet.</td></tr><?php endif; ?>
                     <?php foreach ($overview['subscription_history'] as $history): $historyStatus = strtolower((string)($history['status'] ?? '')); ?>
