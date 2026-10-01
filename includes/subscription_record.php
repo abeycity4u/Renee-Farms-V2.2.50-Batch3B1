@@ -1,4 +1,7 @@
 <?php
+
+require_once __DIR__ . '/billing_commercial_product.php';
+
 /**
  * Canonical V2.3 commercial subscription record service.
  *
@@ -69,12 +72,19 @@ if (!function_exists('subscription_record_commercial_modules')) {
     function subscription_record_commercial_modules(PDO $pdo, int $farmId): array
     {
         if ($farmId < 1) return [];
-        $modules = function_exists('farm_entitlement_modules')
-            ? farm_entitlement_modules($pdo, $farmId)
-            : [];
-        $modules = array_values(array_intersect(['poultry', 'ruminant'], $modules));
-        sort($modules, SORT_STRING);
-        return $modules;
+        $modules =
+            function_exists(
+                'farm_entitlement_modules'
+            )
+                ? farm_entitlement_modules(
+                    $pdo,
+                    $farmId
+                )
+                : [];
+
+        return billing_commercial_product_modules(
+            $modules
+        );
     }
 }
 

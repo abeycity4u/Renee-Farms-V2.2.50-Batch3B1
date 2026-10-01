@@ -229,9 +229,20 @@ if (!function_exists('billing_subscription_term')) {
         $paidAt = billing_subscription_parse_datetime($contract['paid_at'] ?? null);
         if (!$paidAt) throw new RuntimeException('Paid subscription timestamp is invalid.');
 
-        $currentModules = array_values(array_intersect(['poultry', 'ruminant'], $currentModules));
-        sort($currentModules, SORT_STRING);
-        $newModules = $contract['modules'];
+        $currentModules =
+            billing_commercial_product_modules(
+                $currentModules
+            );
+
+        $newModules =
+            billing_commercial_product_require_modules(
+                is_array(
+                    $contract['modules']
+                    ?? null
+                )
+                    ? $contract['modules']
+                    : []
+            );
         $sameProduct = strtolower(trim((string)($farm['subscription_plan'] ?? ''))) === $contract['plan_code']
             && $currentModules === $newModules;
 

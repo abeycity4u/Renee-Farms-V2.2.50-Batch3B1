@@ -1,4 +1,7 @@
 <?php
+
+require_once __DIR__ . '/billing_commercial_product.php';
+
 /**
  * V2.3 provider-neutral billing/payment audit foundation.
  *
@@ -239,19 +242,12 @@ if (!function_exists('billing_payment_normalize_amount')) {
 }
 
 if (!function_exists('billing_payment_normalize_modules')) {
-    function billing_payment_normalize_modules(array $modules): array
-    {
-        $normalized = [];
-        foreach ($modules as $module) {
-            $module = strtolower(trim((string)$module));
-            if (in_array($module, ['poultry', 'ruminant'], true)) $normalized[$module] = true;
-        }
-        $normalized = array_keys($normalized);
-        sort($normalized, SORT_STRING);
-        if (!$normalized) {
-            throw new InvalidArgumentException('A billing quote requires Poultry, Ruminant, or both.');
-        }
-        return $normalized;
+    function billing_payment_normalize_modules(
+        array $modules
+    ): array {
+        return billing_commercial_product_require_modules(
+            $modules
+        );
     }
 }
 

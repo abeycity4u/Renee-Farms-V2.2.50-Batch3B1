@@ -93,8 +93,13 @@ $check(!preg_match('/\bALTER\s+TABLE\s+(?:farms|subscriptions|farm_modules|farm_
 
 $check(strpos($service, 'subscription_plan_is_valid') !== false,
     'quote builder validates plan codes against the canonical plan catalog');
-$check(strpos($service, "['poultry', 'ruminant']") !== false,
-    'quote modules are restricted to commercial Poultry/Ruminant modules');
+$check(
+    strpos(
+        $service,
+        'billing_commercial_product_require_modules'
+    ) !== false,
+    'quote modules use the canonical commercial-product normalization contract'
+);
 $check(strpos($service, "['monthly', 'annual']") !== false,
     'billing interval is restricted to monthly or annual');
 $check(strpos($service, "'/^[A-Z]{3}$/'") !== false,

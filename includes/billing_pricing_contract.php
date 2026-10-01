@@ -1,4 +1,7 @@
 <?php
+
+require_once __DIR__ . '/billing_commercial_product.php';
+
 /**
  * V2.3 server-authoritative billing pricing contract.
  *
@@ -46,33 +49,34 @@ if (!function_exists('billing_pricing_normalize_interval')) {
 }
 
 if (!function_exists('billing_pricing_normalize_modules')) {
-    function billing_pricing_normalize_modules(array $modules): array
-    {
-        if (function_exists('billing_payment_normalize_modules')) {
-            return billing_payment_normalize_modules($modules);
+    function billing_pricing_normalize_modules(
+        array $modules
+    ): array {
+        if (
+            function_exists(
+                'billing_payment_normalize_modules'
+            )
+        ) {
+            return billing_payment_normalize_modules(
+                $modules
+            );
         }
-        $normalized = [];
-        foreach ($modules as $module) {
-            $module = strtolower(trim((string)$module));
-            if (in_array($module, ['poultry', 'ruminant'], true)) $normalized[$module] = true;
-        }
-        $normalized = array_keys($normalized);
-        sort($normalized, SORT_STRING);
-        if (!$normalized) {
-            throw new InvalidArgumentException('A billing quote requires Poultry, Ruminant, or both.');
-        }
-        return $normalized;
+
+        return billing_commercial_product_require_modules(
+            $modules
+        );
     }
 }
 
 if (!function_exists('billing_pricing_bundle_key')) {
-    function billing_pricing_bundle_key(array $modules): string
-    {
-        $modules = billing_pricing_normalize_modules($modules);
-        if ($modules === ['poultry']) return 'poultry';
-        if ($modules === ['ruminant']) return 'ruminant';
-        if ($modules === ['poultry', 'ruminant']) return 'poultry+ruminant';
-        throw new InvalidArgumentException('Unsupported commercial module bundle.');
+    function billing_pricing_bundle_key(
+        array $modules
+    ): string {
+        return billing_commercial_product_bundle_key(
+            billing_pricing_normalize_modules(
+                $modules
+            )
+        );
     }
 }
 

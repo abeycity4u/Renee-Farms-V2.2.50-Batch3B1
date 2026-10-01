@@ -79,7 +79,9 @@ if (!function_exists('billing_current_product')) {
         $allowSnapshotFallback = in_array($status, ['suspended', 'cancelled'], true);
         $modules = billing_current_product_modules($pdo, $farmId, $latest, $allowSnapshotFallback);
         if (!$modules) {
-            throw new RuntimeException('The current livestock subscription bundle needs administrator review.');
+            throw new RuntimeException(
+                'The current commercial subscription product needs administrator review.'
+            );
         }
 
         $billingInterval = strtolower(trim((string)($latest['billing_interval'] ?? 'monthly')));
