@@ -6,7 +6,7 @@ require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/../includes/permission_catalog.php');
 require_once(__DIR__ . '/../includes/audit_helpers.php');
 require_once(__DIR__ . '/../lib/expense_revision_service.php');
-require_once(__DIR__ . '../lib/slaughter_expense_integrity.php');
+require_once(__DIR__ . '/../lib/slaughter_expense_integrity.php');
 requireLogin(); require_http_method('POST'); require_csrf_token(); require_rate_limit('delete_expense',20,60);
 $id=$_POST['id']??null;
 if(!$id || !ctype_digit((string)$id)) send_json(['success'=>false,'error'=>'A valid record ID is required.'],400);
