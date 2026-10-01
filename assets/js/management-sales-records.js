@@ -18,6 +18,9 @@
     };
 
     const salesRecordsConfig = {
+        salesOnlyWorkspace:
+            configElement.dataset.salesOnlyWorkspace === '1',
+
         saleUnitPresets: parseJson(
             configElement.dataset.saleUnitPresets,
             []
@@ -1859,9 +1862,19 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
 
 
     $(document).ready(function() {
-        refreshSaleAttribution('add');
-        refreshRuminantSaleAnimalChoices('add');
-        refreshSalePopulationEffect('add');
+        if (salesRecordsConfig.salesOnlyWorkspace) {
+            $('#addSaleStockSource')
+                .val('general_inventory');
+
+            setGeneralInventorySaleMode(
+                'add',
+                true
+            );
+        } else {
+            refreshSaleAttribution('add');
+            refreshRuminantSaleAnimalChoices('add');
+            refreshSalePopulationEffect('add');
+        }
 
 
         $('#addSaleStockSource').on(
@@ -2128,7 +2141,21 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
             $('#editSaleUpfront').val(upfront.toFixed(2));
             $('#editSaleSettlements').val('₦'+settlements.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})).data('amount',settlements);
             $('#editSaleLegacyHint').text(String(button.data('cash-snapshot'))==='1' ? 'Preserved sale-time cash snapshot.' : 'Legacy sale: verify this upfront cash once; saving will preserve it as the canonical cash snapshot.');
-            setTimeout(() => { refreshSaleAttribution('edit', String(button.data('production') || ''), Number(button.data('cycle') || 0)); loadEditSaleAnimalAllocation(Number(button.data('id') || 0)); refreshEditReceivablePosition(); }, 0);
+            setTimeout(() => {
+                if (!salesRecordsConfig.salesOnlyWorkspace) {
+                    refreshSaleAttribution(
+                        'edit',
+                        String(button.data('production') || ''),
+                        Number(button.data('cycle') || 0)
+                    );
+
+                    loadEditSaleAnimalAllocation(
+                        Number(button.data('id') || 0)
+                    );
+                }
+
+                refreshEditReceivablePosition();
+            }, 0);
         });
         $('#editSaleQuantity,#editSalePrice,#editSaleUpfront').on('input',refreshEditReceivablePosition);
 
@@ -2200,11 +2227,29 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
             remarks: '#editSaleRemarks'
         },
         onShow: ({data}) => {
-            refreshSaleAttribution('edit', String(data.production || ''), Number(data.cycle || 0));
-            setEditSaleUnit(String(data.unit || ''));
-            loadEditSaleAnimalAllocation(Number(data.id || 0));
-            loadEditSalePopulationEffect(Number(data.id || 0));
-            loadEditSlaughterSale(Number(data.id || 0));
+            if (!salesRecordsConfig.salesOnlyWorkspace) {
+                refreshSaleAttribution(
+                    'edit',
+                    String(data.production || ''),
+                    Number(data.cycle || 0)
+                );
+
+                setEditSaleUnit(
+                    String(data.unit || '')
+                );
+
+                loadEditSaleAnimalAllocation(
+                    Number(data.id || 0)
+                );
+
+                loadEditSalePopulationEffect(
+                    Number(data.id || 0)
+                );
+
+                loadEditSlaughterSale(
+                    Number(data.id || 0)
+                );
+            }
 
             const stockItemId =
                 Number(
@@ -2212,7 +2257,16 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
                     || 0
                 );
 
-            if (stockItemId > 0) {
+            if (salesRecordsConfig.salesOnlyWorkspace) {
+                $('#editSaleStockSource')
+                    .val('general_inventory');
+
+                setGeneralInventorySaleMode(
+                    'edit',
+                    true,
+                    stockItemId
+                );
+            } else if (stockItemId > 0) {
                 $('#editSaleStockSource')
                     .val(
                         'general_inventory'

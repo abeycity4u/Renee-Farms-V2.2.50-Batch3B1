@@ -31,14 +31,29 @@ if ($reportMode === 'yearly') {
     $periodLabel = date('F Y', strtotime($startDate));
 }
 
-$salesOnlyScope = enabledFarmTypes() === [] && farmHasModule('sales') && (isPlatformOwner() || hasRole('farm_admin', 'sales_rep', 'viewer'));
+$salesOnlyWorkspace =
+    current_farm_is_sales_only();
+
+$salesOnlyScope =
+    $salesOnlyWorkspace;
 $requestedFarmType = $canChooseFarmType ? ($_GET['farm_type'] ?? null) : $userFarmType;
 if ($requestedFarmType === 'both' && count(accessibleFarmTypes()) === 2) $requestedFarmType = 'all';
 if ($salesOnlyScope) $farmType = 'general';
 elseif ($requestedFarmType === 'general' && in_array('general', allowedSalesFarmTypes(), true)) $farmType = 'general';
 else $farmType = normalizeFarmType($requestedFarmType, true, false, $canChooseFarmType);
 
-$productionType = strtolower(trim((string)($_GET['production_type'] ?? 'all')));
+$productionType =
+    $salesOnlyWorkspace
+        ? 'all'
+        : strtolower(
+            trim(
+                (string)(
+                    $_GET['production_type']
+                    ?? 'all'
+                )
+            )
+        );
+
 if ($farmType !== 'all') {
     $opts = attribution_production_types($farmType);
     if ($productionType !== 'all' && !isset($opts[$productionType])) $productionType = 'all';
@@ -158,6 +173,10 @@ ob_start();
 <!doctype html><html lang="en"><head><meta charset="UTF-8"><title>Sales Records - Renee Farms</title></head><body>
 <h2>Sales Records - <?php echo htmlspecialchars($periodLabel); ?></h2>
 <table class="table" style="margin-bottom:12px">
+<?php if ($salesOnlyWorkspace): ?>
+<thead><tr><th>Total Sales</th><th>Transactions</th></tr></thead>
+<tbody><tr><td>₦<?php echo number_format($totalSales,2); ?></td><td><?php echo $transactionCount; ?></td></tr></tbody>
+<?php else: ?>
 <thead><tr><th>Total Sales</th><th>Transactions</th><th>Farm Scope</th><th>Production Type</th></tr></thead>
 <tbody><tr><td>₦<?php echo number_format($totalSales,2); ?></td><td><?php echo $transactionCount; ?></td><td><?php echo htmlspecialchars($farmType==='all'?'All Farms':ucfirst($farmType)); ?></td><td><?php echo htmlspecialchars(
     $productionType === 'all'
@@ -167,6 +186,7 @@ ob_start();
             $productionType
         )
 ); ?></td></tr></tbody>
+<?php endif; ?>
 </table>
 <?php if ($selectedCustomer !== ''): ?>
 <h3>Customer Debt Management — <?php echo htmlspecialchars($selectedCustomer); ?></h3>
@@ -187,10 +207,10 @@ ob_start();
 <?php endforeach; endif; ?></tbody></table>
 <?php endif; ?>
 <h3>Sales Records</h3>
-<table class="table"><thead><tr><th>Date</th><th>Reference</th><th>Farm Type</th><th>Production Type</th><th>Cycle</th><th>Product</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>Total Amount</th><th>Customer</th><th>Remarks</th><th>Recorded By</th></tr></thead><tbody>
-<?php if (!$sales): ?><tr><td colspan="13">No sales records for this period.</td></tr>
+<table class="table"><thead><tr><th>Date</th><th>Reference</th><?php if (!$salesOnlyWorkspace): ?><th>Farm Type</th><th>Production Type</th><th>Cycle</th><?php endif; ?><th>Product</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>Total Amount</th><th>Customer</th><th>Remarks</th><th>Recorded By</th></tr></thead><tbody>
+<?php if (!$sales): ?><tr><td colspan="<?php echo $salesOnlyWorkspace ? '10' : '13'; ?>">No sales records for this period.</td></tr>
 <?php else: foreach($sales as $sale): $rowTotal=(float)($sale['total_amount'] ?? ((float)$sale['quantity']*(float)$sale['unit_price'])); ?>
-<tr><td><?php echo htmlspecialchars(date('d/m/Y',strtotime((string)$sale['sale_date']))); ?></td><td><?php echo htmlspecialchars((string)($sale['public_reference'] ?? '—')); ?></td><td><?php echo htmlspecialchars(ucfirst((string)$sale['farm_type'])); ?></td><td><?php echo htmlspecialchars($saleProductionLabel($sale)); ?></td><td><?php echo htmlspecialchars($saleCycleLabel($sale)); ?></td><td><?php echo htmlspecialchars((string)$sale['product_type']); ?></td><td><?php echo number_format((float)$sale['quantity'],2); ?></td><td><?php echo htmlspecialchars(sales_unit_label($sale['unit_of_measure'] ?? null)); ?></td><td>₦<?php echo number_format((float)$sale['unit_price'],2); ?></td><td>₦<?php echo number_format($rowTotal,2); ?></td><td><?php echo htmlspecialchars((string)($sale['customer_name']?:'--')); ?></td><td><?php echo htmlspecialchars((string)($sale['remarks']?:'--')); ?></td><td><?php echo htmlspecialchars(transaction_recorded_by_label(
+<tr><td><?php echo htmlspecialchars(date('d/m/Y',strtotime((string)$sale['sale_date']))); ?></td><td><?php echo htmlspecialchars((string)($sale['public_reference'] ?? '—')); ?></td><?php if (!$salesOnlyWorkspace): ?><td><?php echo htmlspecialchars(ucfirst((string)$sale['farm_type'])); ?></td><td><?php echo htmlspecialchars($saleProductionLabel($sale)); ?></td><td><?php echo htmlspecialchars($saleCycleLabel($sale)); ?></td><?php endif; ?><td><?php echo htmlspecialchars((string)$sale['product_type']); ?></td><td><?php echo number_format((float)$sale['quantity'],2); ?></td><td><?php echo htmlspecialchars(sales_unit_label($sale['unit_of_measure'] ?? null)); ?></td><td>₦<?php echo number_format((float)$sale['unit_price'],2); ?></td><td>₦<?php echo number_format($rowTotal,2); ?></td><td><?php echo htmlspecialchars((string)($sale['customer_name']?:'--')); ?></td><td><?php echo htmlspecialchars((string)($sale['remarks']?:'--')); ?></td><td><?php echo htmlspecialchars(transaction_recorded_by_label(
         transaction_actor_farm_name(
             $pdo,
             $tenantFarmId

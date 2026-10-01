@@ -49,9 +49,11 @@ if ($reportMode === 'yearly') {
     $periodLabel = date('F Y', strtotime($month));
 }
 
-$salesOnlyScope = enabledFarmTypes() === []
-    && farmHasModule('sales')
-    && (isPlatformOwner() || hasRole('farm_admin', 'sales_rep', 'viewer'));
+$salesOnlyWorkspace =
+    current_farm_is_sales_only();
+
+$salesOnlyScope =
+    $salesOnlyWorkspace;
 // A sales-only workspace has no livestock scope to normalize. Use the neutral
 // classification explicitly so its ledger can see general sales without also
 // exposing historical poultry or ruminant records.
@@ -414,12 +416,51 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['add_sale'])) {
         if (!$canAddSales) { http_response_code(403); exit('You do not have permission to add sales.'); }
 
-        try {
-            $slaughterSaleSelection =
-                $prepareSlaughterSaleInput(
-                    $_POST
-                );
-        } catch (SlaughterOutputSaleException $e) {
+        /*
+         * Standalone Sales-only tenants use General Inventory as the physical
+         * source of truth. Livestock source controls are not authoritative and
+         * cannot be activated by forged POST data.
+         */
+        if ($salesOnlyWorkspace) {
+            $_POST['sale_stock_source'] =
+                'general_inventory';
+
+            $_POST['farm_type'] =
+                'general';
+
+            $_POST['production_type'] =
+                'general';
+
+            $_POST['cycle_id'] =
+                '0';
+
+            $_POST['population_effect_mode'] =
+                'financial_only';
+
+            $_POST['sale_animal_allocation_mode'] =
+                'shared';
+
+            unset(
+                $_POST['population_cycle_ids'],
+                $_POST['population_quantities'],
+                $_POST['sale_animal_ids'],
+                $_POST['sale_animal_amounts'],
+                $_POST['sale_animal_exit_outcomes'],
+                $_POST['slaughter_output_ids'],
+                $_POST['slaughter_output_quantities'],
+                $_POST['slaughter_output_domain']
+            );
+
+            $slaughterSaleSelection = [
+                'mode' => 'financial_only',
+            ];
+        } else {
+            try {
+                $slaughterSaleSelection =
+                    $prepareSlaughterSaleInput(
+                        $_POST
+                    );
+            } catch (SlaughterOutputSaleException $e) {
             $_SESSION['error'] =
                 $e->getMessage();
 
@@ -427,6 +468,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 "Location: sales_records.php?report_mode={$reportMode}&month={$month}&year={$year}&farm_type={$farmType}"
             );
             exit();
+            }
         }
 
         try {
@@ -486,12 +528,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             exit();
         }
         $scope = attribution_scope($cycleId > 0 ? $cycleId : null, $saleFarmType, $productionType);
-        try {
-            $populationEffectRows = sale_population_effect_rows_from_post($_POST);
-        } catch (InvalidArgumentException $e) {
-            $_SESSION['error'] = $e->getMessage();
-            header("Location: sales_records.php?report_mode={$reportMode}&month={$month}&year={$year}&farm_type={$farmType}");
-            exit();
+        if ($salesOnlyWorkspace) {
+            $populationEffectRows = [];
+        } else {
+            try {
+                $populationEffectRows =
+                    sale_population_effect_rows_from_post(
+                        $_POST
+                    );
+            } catch (InvalidArgumentException $e) {
+                $_SESSION['error'] =
+                    $e->getMessage();
+
+                header(
+                    "Location: sales_records.php?report_mode={$reportMode}&month={$month}&year={$year}&farm_type={$farmType}"
+                );
+                exit();
+            }
         }
         try {
             if ($saleFarmType !== 'ruminant') {
@@ -931,13 +984,47 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             exit();
         }
 
-        try {
-            $slaughterSaleSelection =
-                $prepareSlaughterSaleInput(
-                    $_POST,
-                    $saleIdForSlaughter
-                );
-        } catch (SlaughterOutputSaleException $e) {
+        if ($salesOnlyWorkspace) {
+            $_POST['sale_stock_source'] =
+                'general_inventory';
+
+            $_POST['farm_type'] =
+                'general';
+
+            $_POST['production_type'] =
+                'general';
+
+            $_POST['cycle_id'] =
+                '0';
+
+            $_POST['population_effect_mode'] =
+                'financial_only';
+
+            $_POST['sale_animal_allocation_mode'] =
+                'shared';
+
+            unset(
+                $_POST['population_cycle_ids'],
+                $_POST['population_quantities'],
+                $_POST['sale_animal_ids'],
+                $_POST['sale_animal_amounts'],
+                $_POST['sale_animal_exit_outcomes'],
+                $_POST['slaughter_output_ids'],
+                $_POST['slaughter_output_quantities'],
+                $_POST['slaughter_output_domain']
+            );
+
+            $slaughterSaleSelection = [
+                'mode' => 'financial_only',
+            ];
+        } else {
+            try {
+                $slaughterSaleSelection =
+                    $prepareSlaughterSaleInput(
+                        $_POST,
+                        $saleIdForSlaughter
+                    );
+            } catch (SlaughterOutputSaleException $e) {
             $_SESSION['error'] =
                 $e->getMessage();
 
@@ -945,6 +1032,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 "Location: sales_records.php?report_mode={$reportMode}&month={$month}&year={$year}&farm_type={$farmType}"
             );
             exit();
+            }
         }
 
         try {
@@ -987,12 +1075,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             exit();
         }
         $newTotal = (float)$_POST['quantity'] * (float)$_POST['unit_price'];
-        try {
-            $populationEffectRows = sale_population_effect_rows_from_post($_POST);
-        } catch (InvalidArgumentException $e) {
-            $_SESSION['error'] = $e->getMessage();
-            header("Location: sales_records.php?report_mode={$reportMode}&month={$month}&year={$year}&farm_type={$farmType}");
-            exit();
+        if ($salesOnlyWorkspace) {
+            $populationEffectRows = [];
+        } else {
+            try {
+                $populationEffectRows =
+                    sale_population_effect_rows_from_post(
+                        $_POST
+                    );
+            } catch (InvalidArgumentException $e) {
+                $_SESSION['error'] =
+                    $e->getMessage();
+
+                header(
+                    "Location: sales_records.php?report_mode={$reportMode}&month={$month}&year={$year}&farm_type={$farmType}"
+                );
+                exit();
+            }
         }
         try {
             if ($saleFarmType !== 'ruminant') {
@@ -1209,9 +1308,16 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                             Sales Records - <?php echo htmlspecialchars($periodLabel); ?>
                         </h4>
                         <div class="d-flex gap-2 report-controls">
+                            <?php if ($salesOnlyWorkspace): ?>
+                            <select id="farmTypeFilter" class="d-none" aria-hidden="true">
+                                <option value="general" selected>General</option>
+                            </select>
+                            <select id="productionTypeFilter" class="d-none" aria-hidden="true">
+                                <option value="all" selected>All</option>
+                            </select>
+                            <?php else: ?>
                             <select class="form-select app-width-150" id="farmTypeFilter">
                                 <?php if ($canChooseFarmType): ?>
-                                <?php if ($salesOnlyScope): ?><option value="general" selected>All Sales</option><?php endif; ?>
                                 <?php if (count(accessibleFarmTypes()) === 2): ?><option value="all" <?php echo $farmType == 'all' ? 'selected' : ''; ?>>All Farms</option><?php endif; ?>
                                 <?php foreach (accessibleFarmTypes() as $type): ?><option value="<?php echo $type; ?>" <?php echo $farmType === $type ? 'selected' : ''; ?>><?php echo ucfirst($type); ?></option><?php endforeach; ?>
                                 <?php if (in_array('general', $saleFarmTypes, true)): ?><option value="general" <?php echo $farmType==='general'?'selected':''; ?>>General</option><?php endif; ?>
@@ -1223,6 +1329,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 <option value="all">All Production Types</option>
                                 <?php foreach($reportProductionOptions as $value=>$label): ?><option value="<?php echo htmlspecialchars($value); ?>" <?php echo $productionTypeFilter===$value?'selected':''; ?>><?php echo htmlspecialchars($label); ?></option><?php endforeach; ?>
                             </select>
+                            <?php endif; ?>
                             <select class="form-select app-width-140" id="reportMode">
                                 <option value="monthly" <?php echo $reportMode === 'monthly' ? 'selected' : ''; ?>>Monthly</option>
                                 <option value="yearly" <?php echo $reportMode === 'yearly' ? 'selected' : ''; ?>>Yearly</option>
@@ -1483,12 +1590,14 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                     <tr>
                                         <th>Date</th>
                                         <th>Reference</th>
+                                        <?php if (!$salesOnlyWorkspace): ?>
                                         <th>Farm Type</th>
                                         <th>Production Type</th>
                                         <th>Cycle</th>
                                         <th>Allocation</th>
                                         <th>Animal Revenue Attribution</th>
                                         <th>Population Effect</th>
+                                        <?php endif; ?>
                                         <th>Product</th>
                                         <th>Quantity</th>
                                         <th>Unit</th>
@@ -1505,7 +1614,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 <tbody>
                                     <?php if (empty($salesRecords)): ?>
                                     <tr>
-                                        <td colspan="<?php echo $showActions ? '17' : '16'; ?>" class="text-center text-muted py-4">
+                                        <td colspan="<?php echo $salesOnlyWorkspace ? ($showActions ? '11' : '10') : ($showActions ? '17' : '16'); ?>" class="text-center text-muted py-4">
                                             <i class="bi bi-cart display-4 d-block mb-2"></i>
                                             No sales recorded for this period
                                         </td>
@@ -1519,6 +1628,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                             <td class="text-nowrap">
                                                 <code><?php echo htmlspecialchars((string)($sale['public_reference'] ?? '—')); ?></code>
                                             </td>
+                                            <?php if (!$salesOnlyWorkspace): ?>
                                             <td>
                                                 <span class="badge bg-<?php echo $sale['farm_type'] === 'poultry' ? 'info' : ($sale['farm_type'] === 'ruminant' ? 'warning' : 'secondary'); ?>">
                                                     <?php echo ucfirst($sale['farm_type']); ?>
@@ -1587,6 +1697,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                                     <?php endif; ?>
                                                 <?php endif; ?>
                                             </td>
+                                            <?php endif; ?>
                                             <td>
                                                 <span class="badge bg-primary">
                                                     <?php echo app_html($sale['product_type']); ?>
@@ -1678,6 +1789,14 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
+                        <?php if ($salesOnlyWorkspace): ?>
+                        <input
+                            type="hidden"
+                            name="sale_stock_source"
+                            id="addSaleStockSource"
+                            value="general_inventory"
+                        >
+                        <?php else: ?>
                         <div class="mb-3">
                             <label>Sales Stock Source</label>
                             <select
@@ -1711,9 +1830,10 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 Use Slaughter Output Inventory only when this sale physically consumes a recorded Poultry or Ruminant slaughter output.
                             </small>
                         </div>
+                        <?php endif; ?>
 
                         <div
-                            class="card mb-3 d-none"
+                            class="card mb-3<?php echo $salesOnlyWorkspace ? '' : ' d-none'; ?>"
                             id="addGeneralInventoryPanel"
                         >
                             <div class="card-body py-3">
@@ -1721,7 +1841,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                     for="addGeneralInventoryItem"
                                     class="form-label fw-semibold"
                                 >
-                                    General Inventory Item
+                                    <?php echo $salesOnlyWorkspace ? 'Inventory Item / Product' : 'General Inventory Item'; ?>
                                 </label>
                                 <select
                                     name="stock_item_id"
@@ -1784,11 +1904,12 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                         </div>
 
                         <div class="row">
-                            <div class="col-md-6 mb-3">
+                            <div class="<?php echo $salesOnlyWorkspace ? 'col-12' : 'col-md-6'; ?> mb-3">
                                 <label>Sale Date</label>
                                 <input type="date" name="sale_date" id="addSaleDate" class="form-control"
                                        value="<?php echo date('Y-m-d'); ?>" required>
                             </div>
+                            <?php if (!$salesOnlyWorkspace): ?>
                             <div class="col-md-6 mb-3">
                                 <label>Farm Type</label>
                                 <select name="farm_type" id="addFarmType" class="form-select" required>
@@ -1799,8 +1920,21 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                     <?php endif; ?>
                                 </select>
                             </div>
+                            <?php else: ?>
+                            <select name="farm_type" id="addFarmType" class="d-none" aria-hidden="true">
+                                <option value="general" selected>General</option>
+                            </select>
+                            <?php endif; ?>
                         </div>
-                        
+
+                        <?php if ($salesOnlyWorkspace): ?>
+                        <select name="production_type" id="addProductionType" class="d-none" aria-hidden="true">
+                            <option value="general" selected>General</option>
+                        </select>
+                        <select name="cycle_id" id="addCycleId" class="d-none" aria-hidden="true">
+                            <option value="0" selected>Not applicable</option>
+                        </select>
+                        <?php else: ?>
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label>Production Type</label>
@@ -1812,6 +1946,16 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 <select name="cycle_id" id="addCycleId" class="form-select"><option value="0">Shared between cycles</option></select>
                             </div>
                         </div>
+                        <?php endif; ?>
+                        <?php if ($salesOnlyWorkspace): ?>
+                        <input type="hidden" name="product_type" id="addProductType" value="">
+                        <select name="unit_preset" id="addUnitPreset" class="d-none" aria-hidden="true">
+                            <option value="">Select unit...</option>
+                            <?php foreach (sales_unit_presets() as $value => $label): ?><option value="<?php echo htmlspecialchars($value); ?>"><?php echo htmlspecialchars($label); ?></option><?php endforeach; ?>
+                            <option value="__custom__">Other / Custom...</option>
+                        </select>
+                        <input type="hidden" name="unit_custom" id="addUnitCustom" value="">
+                        <?php else: ?>
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label>Product Type</label>
@@ -1828,6 +1972,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 <input type="text" name="unit_custom" id="addUnitCustom" class="form-control mt-2 d-none" maxlength="30" placeholder="Enter custom unit">
                             </div>
                         </div>
+                        <?php endif; ?>
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
@@ -1847,7 +1992,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                             </div>
                         </div>
 
-                        <?php $renderSalePopulationEffectControls('add'); ?>
+                        <?php if (!$salesOnlyWorkspace) $renderSalePopulationEffectControls('add'); ?>
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
@@ -2001,6 +2146,14 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
+                        <?php if ($salesOnlyWorkspace): ?>
+                        <input
+                            type="hidden"
+                            name="sale_stock_source"
+                            id="editSaleStockSource"
+                            value="general_inventory"
+                        >
+                        <?php else: ?>
                         <div class="mb-3">
                             <label>Sales Stock Source</label>
                             <select
@@ -2031,9 +2184,10 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 Corrections keep prior Poultry or Ruminant slaughter-output Inventory history auditable.
                             </small>
                         </div>
+                        <?php endif; ?>
 
                         <div
-                            class="card mb-3 d-none"
+                            class="card mb-3<?php echo $salesOnlyWorkspace ? '' : ' d-none'; ?>"
                             id="editGeneralInventoryPanel"
                         >
                             <div class="card-body py-3">
@@ -2041,7 +2195,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                     for="editGeneralInventoryItem"
                                     class="form-label fw-semibold"
                                 >
-                                    General Inventory Item
+                                    <?php echo $salesOnlyWorkspace ? 'Inventory Item / Product' : 'General Inventory Item'; ?>
                                 </label>
                                 <select
                                     name="stock_item_id"
@@ -2104,18 +2258,32 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                         </div>
 
                         <div class="row">
-                            <div class="col-md-6 mb-3">
+                            <div class="<?php echo $salesOnlyWorkspace ? 'col-12' : 'col-md-6'; ?> mb-3">
                                 <label>Sale Date</label>
                                 <input type="date" name="sale_date" id="editSaleDate" class="form-control" required>
                             </div>
+                            <?php if (!$salesOnlyWorkspace): ?>
                             <div class="col-md-6 mb-3">
                                 <label>Farm Type</label>
                                 <select name="farm_type" id="editSaleFarmType" class="form-select" required>
                                     <?php foreach ($saleFarmTypes as $type): ?><option value="<?php echo $type; ?>"><?php echo $saleFarmTypeLabel($type); ?></option><?php endforeach; ?>
                                 </select>
                             </div>
+                            <?php else: ?>
+                            <select name="farm_type" id="editSaleFarmType" class="d-none" aria-hidden="true">
+                                <option value="general" selected>General</option>
+                            </select>
+                            <?php endif; ?>
                         </div>
 
+                        <?php if ($salesOnlyWorkspace): ?>
+                        <select name="production_type" id="editSaleProductionType" class="d-none" aria-hidden="true">
+                            <option value="general" selected>General</option>
+                        </select>
+                        <select name="cycle_id" id="editSaleCycleId" class="d-none" aria-hidden="true">
+                            <option value="0" selected>Not applicable</option>
+                        </select>
+                        <?php else: ?>
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label>Production Type</label>
@@ -2126,6 +2294,17 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 <select name="cycle_id" id="editSaleCycleId" class="form-select"><option value="0">Shared between cycles</option></select>
                             </div>
                         </div>
+                        <?php endif; ?>
+                        <?php if ($salesOnlyWorkspace): ?>
+                        <input type="hidden" name="product_type" id="editSaleProduct" value="">
+                        <select name="unit_preset" id="editSaleUnitPreset" class="d-none" aria-hidden="true">
+                            <option value="">Select unit...</option>
+                            <?php foreach (sales_unit_presets() as $value => $label): ?><option value="<?php echo htmlspecialchars($value); ?>"><?php echo htmlspecialchars($label); ?></option><?php endforeach; ?>
+                            <option value="__custom__">Other / Custom...</option>
+                        </select>
+                        <input type="hidden" name="unit_custom" id="editSaleUnitCustom" value="">
+                        <small class="d-none" id="editSaleUnitLegacyHint"></small>
+                        <?php else: ?>
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label>Product Type</label>
@@ -2142,6 +2321,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 <small class="text-muted" id="editSaleUnitLegacyHint"></small>
                             </div>
                         </div>
+                        <?php endif; ?>
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
@@ -2160,7 +2340,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                             </div>
                         </div>
 
-                        <?php $renderSalePopulationEffectControls('edit'); ?>
+                        <?php if (!$salesOnlyWorkspace) $renderSalePopulationEffectControls('edit'); ?>
 
                         <div class="card mb-3" id="editPaymentStatusCard">
                             <div class="card-body py-2">
@@ -2223,6 +2403,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
     <div
         id="managementSalesRecordsConfig"
         hidden
+        data-sales-only-workspace="<?php echo $salesOnlyWorkspace ? '1' : '0'; ?>"
         data-sale-unit-presets="<?php echo htmlspecialchars(
             app_json_script(array_keys(sales_unit_presets())),
             ENT_QUOTES | ENT_SUBSTITUTE,
