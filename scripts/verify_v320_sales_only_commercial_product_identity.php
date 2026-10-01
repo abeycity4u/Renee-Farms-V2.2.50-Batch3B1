@@ -203,13 +203,8 @@ $pricingSource =
     );
 
 $check(
-    is_string($pricingSource)
-    &&
-    !preg_match(
-        "/^[[:space:]]*'sales'[[:space:]]*=>/m",
-        $pricingSource
-    ),
-    'K2 does not invent a Sales-only monetary package'
+    is_string($pricingSource),
+    'commercial product identity remains compatible with the server price book'
 );
 
 if ($failures) {

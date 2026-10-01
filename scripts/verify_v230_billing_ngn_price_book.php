@@ -48,9 +48,24 @@ $packages = $book['packages'] ?? [];
 $seatPrices = $book['seat_unit_prices'] ?? [];
 
 $expectedMonthly = [
-    'starter' => ['poultry' => '10000.00', 'ruminant' => '10000.00', 'poultry+ruminant' => '15000.00'],
-    'growth' => ['poultry' => '20000.00', 'ruminant' => '20000.00', 'poultry+ruminant' => '30000.00'],
-    'pro' => ['poultry' => '35000.00', 'ruminant' => '35000.00', 'poultry+ruminant' => '50000.00'],
+    'starter' => [
+        'sales' => '10000.00',
+        'poultry' => '10000.00',
+        'ruminant' => '10000.00',
+        'poultry+ruminant' => '15000.00',
+    ],
+    'growth' => [
+        'sales' => '20000.00',
+        'poultry' => '20000.00',
+        'ruminant' => '20000.00',
+        'poultry+ruminant' => '30000.00',
+    ],
+    'pro' => [
+        'sales' => '35000.00',
+        'poultry' => '35000.00',
+        'ruminant' => '35000.00',
+        'poultry+ruminant' => '50000.00',
+    ],
 ];
 $expectedSeatMonthly = [
     'poultry_manager' => '2000.00',
@@ -59,8 +74,8 @@ $expectedSeatMonthly = [
     'viewer' => '1000.00',
 ];
 
-$check(($book['version'] ?? null) === 'ngn-launch-v1',
-    'price book version is ngn-launch-v1');
+$check(($book['version'] ?? null) === 'ngn-launch-v2',
+    'price book version is ngn-launch-v2');
 $check(($book['currency'] ?? null) === 'NGN',
     'price book currency is NGN');
 $check(billing_currency_policy_supported() === ['NGN'],
@@ -155,17 +170,36 @@ $check($seatSameAcrossPlans,
 $check(!isset($seatPrices['starter']['farm_admin']),
     'Farm Admin remains included/protected and is not sold as an extra seat');
 
-$salesNotStandalone = true;
+$salesStandaloneConfigured = true;
 foreach (['starter', 'growth', 'pro'] as $plan) {
-    if (isset($packages[$plan]['sales'])) $salesNotStandalone = false;
+    if (!isset($packages[$plan]['sales'])) {
+        $salesStandaloneConfigured = false;
+    }
 }
-$check($salesNotStandalone,
-    'shared Sales remains included and has no standalone package price');
+$check(
+    $salesStandaloneConfigured,
+    'standalone Sales has an explicit server-authoritative package price'
+);
+
+$sharedSalesPoultry =
+    billing_pricing_resolve(
+        'starter',
+        'monthly',
+        ['poultry', 'sales'],
+        []
+    );
+
+$check(
+    ($sharedSalesPoultry['module_bundle'] ?? null) === 'poultry'
+    &&
+    ($sharedSalesPoultry['amount'] ?? null) === '10000.00',
+    'shared Sales on Poultry remains included without a second package charge'
+);
 
 $starter = billing_pricing_resolve('starter', 'monthly', ['poultry'], []);
 $check(($starter['amount'] ?? null) === '10000.00'
     && ($starter['currency'] ?? null) === 'NGN'
-    && ($starter['pricing_version'] ?? null) === 'ngn-launch-v1',
+    && ($starter['pricing_version'] ?? null) === 'ngn-launch-v2',
     'Starter Poultry monthly resolution returns ₦10,000 NGN with version identity');
 
 $proBothAnnual = billing_pricing_resolve('pro', 'annual', ['poultry', 'ruminant'], []);

@@ -3,11 +3,12 @@
  * V2.3 launch commercial price book — Nigeria / NGN.
  *
  * Commercial policy:
- * - Poultry and Ruminant are the only separately priced operational modules;
- * - shared basic Sales is included and is never a separate module price;
+ * - standalone Sales is a separately priced commercial product;
+ * - Poultry/Ruminant tenants continue to receive shared basic Sales without
+ *   creating another priced bundle dimension;
  * - annual billing is ten times the monthly amount (two months free);
  * - extra-seat prices use the same ten-times annual rule;
- * - changing any live amount requires a new price-book version.
+ * - changing any live amount or package catalog requires a new price-book version.
  */
 
 if (!function_exists('billing_price_book_ngn')) {
@@ -33,10 +34,14 @@ if (!function_exists('billing_price_book_ngn')) {
         ];
 
         return [
-            'version' => 'ngn-launch-v1',
+            'version' => 'ngn-launch-v2',
             'currency' => 'NGN',
             'packages' => [
                 'starter' => [
+                    'sales' => [
+                        'monthly' => '10000.00',
+                        'annual' => '100000.00',
+                    ],
                     'poultry' => [
                         'monthly' => '10000.00',
                         'annual' => '100000.00',
@@ -51,6 +56,10 @@ if (!function_exists('billing_price_book_ngn')) {
                     ],
                 ],
                 'growth' => [
+                    'sales' => [
+                        'monthly' => '20000.00',
+                        'annual' => '200000.00',
+                    ],
                     'poultry' => [
                         'monthly' => '20000.00',
                         'annual' => '200000.00',
@@ -65,6 +74,10 @@ if (!function_exists('billing_price_book_ngn')) {
                     ],
                 ],
                 'pro' => [
+                    'sales' => [
+                        'monthly' => '35000.00',
+                        'annual' => '350000.00',
+                    ],
                     'poultry' => [
                         'monthly' => '35000.00',
                         'annual' => '350000.00',
