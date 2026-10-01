@@ -5,6 +5,12 @@ require_once(__DIR__ . '/../lib/farm_intelligence.php');
 requireLogin();
 requireBusinessReportAccess();
 $farmId = requireCurrentFarmId();
+
+if (current_farm_is_sales_only()) {
+    header('Location: ' . BASE_URL . '/no_access.php');
+    exit();
+}
+
 $userFarmType = getUserFarmType();
 $canChooseFarmType = isPlatformOwner() || hasRole('farm_admin', 'sales_rep');
 $requestedFarmType = $canChooseFarmType ? ($_GET['farm_type'] ?? null) : $userFarmType;

@@ -55,12 +55,32 @@ $canViewRuminantFeeds = $ruminantEntitled && $navHas('ruminant_feeds');
 $canViewRuminantExpenses = $ruminantExpenseEntitled && $navHas('ruminant_expenses');
 $showRuminantMenu = $canViewRuminantDaily || $canViewRuminantAnimals || $canViewRuminantFeeds || $canViewRuminantExpenses;
 
-$canViewSales = $salesEntitled && $navHas('sales');
-$canViewExpenseReport = $navHas('expenses');
-$canViewReports = $navHas('reports');
-$canViewFarmIntelligence = $navHas('farm_intelligence');
-$canViewProfitability = $navHas('profitability');
-$canViewProductionCycles = $navHas('production_cycles');
+$salesOnlyWorkspace =
+    current_farm_is_sales_only();
+
+$canViewSales =
+    $salesEntitled && $navHas('sales');
+
+$canViewExpenseReport =
+    $navHas('expenses');
+
+$canViewReports =
+    $navHas('reports');
+
+$canViewLivestockReport =
+    !$salesOnlyWorkspace
+    && $canViewReports;
+
+$canViewFarmIntelligence =
+    !$salesOnlyWorkspace
+    && $navHas('farm_intelligence');
+
+$canViewProfitability =
+    $navHas('profitability');
+
+$canViewProductionCycles =
+    !$salesOnlyWorkspace
+    && $navHas('production_cycles');
 $canManageUsers = $navHas('users');
 $canManagePermissions = isPlatformOwner() || hasRole('farm_admin');
 $showManagementMenu = $canViewSales || $canViewExpenseReport || $canViewReports || $canViewFarmIntelligence || $canViewProfitability || $canViewProductionCycles || $canManageUsers || $canManagePermissions || isPlatformOwner();
@@ -220,8 +240,10 @@ $showManagementMenu = $canViewSales || $canViewExpenseReport || $canViewReports 
             <?php if ($canViewExpenseReport): ?>
             <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/management/expenses.php"><i class="bi bi-cash-stack menu-icon me-2"></i> Expense Report</a></li>
             <?php endif; ?>
-            <?php if ($canViewReports): ?>
+            <?php if ($canViewLivestockReport): ?>
             <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/management/poultry_ruminant_report.php"><i class="bi bi-clipboard-data menu-icon me-2"></i> Poultry & Ruminant Report</a></li>
+            <?php endif; ?>
+            <?php if ($canViewReports): ?>
             <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/management/reports.php"><i class="bi bi-bar-chart-line menu-icon me-2"></i> Analytics Dashboard</a></li>
             <?php endif; ?>
             <?php if ($canViewFarmIntelligence): ?>

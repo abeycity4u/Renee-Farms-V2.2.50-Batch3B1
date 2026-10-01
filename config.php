@@ -201,10 +201,13 @@ function hasRole(string ...$requiredRoles): bool {
 function currentAccessLabel(): string {
     if (isPlatformOwner()) return 'Platform Owner';
     if (hasRole('farm_admin')) {
-        $labels = [];
-        if (farmHasModule('poultry')) $labels[] = 'Poultry';
-        if (farmHasModule('ruminant')) $labels[] = 'Ruminant';
-        if (farmHasModule('sales')) $labels[] = 'Sales';
+        if (
+            function_exists('current_farm_is_sales_only')
+            && current_farm_is_sales_only()
+        ) {
+            return 'Sales Only';
+        }
+
         return 'Farm Administration';
     }
     $labels = [];

@@ -11,6 +11,11 @@ if ($pdfRequested) {
 
 $tenantFarmId = requireCurrentFarmId();
 
+if (current_farm_is_sales_only()) {
+    header('Location: ' . BASE_URL . '/no_access.php');
+    exit();
+}
+
 $userType = getUserType();
 $userFarmType = getUserFarmType();
 $canChooseFarmType = isPlatformOwner() || hasRole('farm_admin', 'sales_rep');

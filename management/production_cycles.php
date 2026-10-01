@@ -11,6 +11,12 @@ require_once(__DIR__ . '/../lib/production_population_intelligence.php');
 requireLogin();
 requireBusinessReportAccess();
 $tenantFarmId = requireCurrentFarmId();
+
+if (current_farm_is_sales_only()) {
+    header('Location: ' . BASE_URL . '/no_access.php');
+    exit();
+}
+
 if (!isPlatformOwner() && !hasRole('farm_admin') && !hasPermission(getUserType(), 'production_cycles')) { header('Location: ' . BASE_URL . '/no_access.php'); exit(); }
 
 $cycleTableExists = false;
