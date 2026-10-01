@@ -65,48 +65,68 @@ $dashboardCanUpdateStock =
         )
     );
 
+/*
+ * Inventory visibility must follow the shared Inventory entitlement contract,
+ * not legacy user farm-access labels. This is especially important for a
+ * Sales-only tenant, whose valid operational Inventory scope is General.
+ */
+$dashboardInventoryFarmTypes =
+    allowedInventoryFarmTypes(
+        true
+    );
+
+$dashboardInventoryLivestockTypes =
+    array_values(
+        array_intersect(
+            $dashboardInventoryFarmTypes,
+            [
+                'poultry',
+                'ruminant',
+            ]
+        )
+    );
+
 $dashboardActiveCycles = [];
 
-if ($dashboardCanUpdateStock) {
-    if ($farmAccess === 'both') {
-        $dashboardCycleStmt =
-            $pdo->prepare(
-                "SELECT
-                     id,
-                     cycle_code,
-                     farm_type,
-                     production_type
-                 FROM production_cycles
-                 WHERE farm_id=?
-                   AND status='active'
-                   AND farm_type IN ('poultry','ruminant')
-                 ORDER BY start_date DESC,id DESC"
-            );
+if (
+    $dashboardCanUpdateStock
+    &&
+    $dashboardInventoryLivestockTypes
+) {
+    $cyclePlaceholders =
+        implode(
+            ',',
+            array_fill(
+                0,
+                count(
+                    $dashboardInventoryLivestockTypes
+                ),
+                '?'
+            )
+        );
 
-        $dashboardCycleStmt->execute([
-            $tenantFarmId,
-        ]);
+    $dashboardCycleStmt =
+        $pdo->prepare(
+            "SELECT
+                 id,
+                 cycle_code,
+                 farm_type,
+                 production_type
+             FROM production_cycles
+             WHERE farm_id=?
+               AND status='active'
+               AND farm_type IN ($cyclePlaceholders)
+             ORDER BY start_date DESC,id DESC"
+        );
 
-    } else {
-        $dashboardCycleStmt =
-            $pdo->prepare(
-                "SELECT
-                     id,
-                     cycle_code,
-                     farm_type,
-                     production_type
-                 FROM production_cycles
-                 WHERE farm_id=?
-                   AND status='active'
-                   AND farm_type=?
-                 ORDER BY start_date DESC,id DESC"
-            );
-
-        $dashboardCycleStmt->execute([
-            $tenantFarmId,
-            $farmAccess,
-        ]);
-    }
+    $dashboardCycleStmt->execute(
+        array_merge(
+            [
+                $tenantFarmId,
+            ],
+            $dashboardInventoryLivestockTypes
+        )
+    );
 
     $dashboardActiveCycles =
         $dashboardCycleStmt->fetchAll(
@@ -114,55 +134,113 @@ if ($dashboardCanUpdateStock) {
         ) ?: [];
 }
 
-if ($farmAccess === 'both') {
-    $stockQuery = "SELECT
-                       si.*,
-                       COALESCE(NULLIF(ic.inventory_role,''),'operational') AS inventory_role
-                   FROM stock_items si
-                   INNER JOIN inventory_categories ic
-                       ON ic.id=si.category_id
-                      AND ic.farm_id=si.farm_id
-                   WHERE si.farm_id=?
-                     AND si.farm_type IN ('poultry','ruminant','both')
-                     AND si.is_active=1
-                   ORDER BY si.current_stock ASC";
-    $stockStmt = $pdo->prepare($stockQuery);
-    $stockStmt->execute([$tenantFarmId]);
-} else {
-    $stockQuery = "SELECT
-                       si.*,
-                       COALESCE(NULLIF(ic.inventory_role,''),'operational') AS inventory_role
-                   FROM stock_items si
-                   INNER JOIN inventory_categories ic
-                       ON ic.id=si.category_id
-                      AND ic.farm_id=si.farm_id
-                   WHERE si.farm_id=?
-                     AND si.farm_type IN (?, 'both')
-                     AND si.is_active=1
-                   ORDER BY si.current_stock ASC";
-    $stockStmt = $pdo->prepare($stockQuery);
-    $stockStmt->execute([$tenantFarmId, $farmAccess]);
-}
-$stockItems = $stockStmt->fetchAll();
+$stockItems = [];
 
-// Get today's transactions
-$today = date('Y-m-d');
-if ($farmAccess === 'both') {
-    $transQuery = "SELECT t.*, s.item_name, s.unit FROM stock_transactions t
-                   JOIN stock_items s ON t.stock_item_id = s.id AND s.is_active = 1
-                   WHERE t.farm_id = ? AND s.farm_id = ? AND t.transaction_date = ? AND t.is_reversed = 0
-                   ORDER BY t.id DESC LIMIT 10";
-    $transStmt = $pdo->prepare($transQuery);
-    $transStmt->execute([$tenantFarmId, $tenantFarmId, $today]);
-} else {
-    $transQuery = "SELECT t.*, s.item_name, s.unit FROM stock_transactions t
-                   JOIN stock_items s ON t.stock_item_id = s.id AND s.is_active = 1
-                   WHERE t.farm_id = ? AND s.farm_id = ? AND t.farm_type = ? AND t.transaction_date = ? AND t.is_reversed = 0
-                   ORDER BY t.id DESC LIMIT 10";
-    $transStmt = $pdo->prepare($transQuery);
-    $transStmt->execute([$tenantFarmId, $tenantFarmId, $farmAccess, $today]);
+if ($dashboardInventoryFarmTypes) {
+    $inventoryPlaceholders =
+        implode(
+            ',',
+            array_fill(
+                0,
+                count(
+                    $dashboardInventoryFarmTypes
+                ),
+                '?'
+            )
+        );
+
+    $stockQuery =
+        "SELECT
+             si.*,
+             COALESCE(
+                 NULLIF(ic.inventory_role,''),
+                 'operational'
+             ) AS inventory_role
+         FROM stock_items si
+         INNER JOIN inventory_categories ic
+             ON ic.id=si.category_id
+            AND ic.farm_id=si.farm_id
+         WHERE si.farm_id=?
+           AND si.farm_type IN ($inventoryPlaceholders)
+           AND si.is_active=1
+         ORDER BY si.current_stock ASC";
+
+    $stockStmt =
+        $pdo->prepare(
+            $stockQuery
+        );
+
+    $stockStmt->execute(
+        array_merge(
+            [
+                $tenantFarmId,
+            ],
+            $dashboardInventoryFarmTypes
+        )
+    );
+
+    $stockItems =
+        $stockStmt->fetchAll()
+        ?: [];
 }
-$todayTransactions = $transStmt->fetchAll();
+
+// Today's transaction list uses the same Inventory entitlement boundary.
+$today = date('Y-m-d');
+$todayTransactions = [];
+
+if ($dashboardInventoryFarmTypes) {
+    $transactionPlaceholders =
+        implode(
+            ',',
+            array_fill(
+                0,
+                count(
+                    $dashboardInventoryFarmTypes
+                ),
+                '?'
+            )
+        );
+
+    $transQuery =
+        "SELECT
+             t.*,
+             s.item_name,
+             s.unit
+         FROM stock_transactions t
+         INNER JOIN stock_items s
+             ON t.stock_item_id=s.id
+            AND s.farm_id=t.farm_id
+            AND s.is_active=1
+         WHERE t.farm_id=?
+           AND s.farm_id=?
+           AND s.farm_type IN ($transactionPlaceholders)
+           AND t.transaction_date=?
+           AND t.is_reversed=0
+         ORDER BY t.id DESC
+         LIMIT 10";
+
+    $transStmt =
+        $pdo->prepare(
+            $transQuery
+        );
+
+    $transStmt->execute(
+        array_merge(
+            [
+                $tenantFarmId,
+                $tenantFarmId,
+            ],
+            $dashboardInventoryFarmTypes,
+            [
+                $today,
+            ]
+        )
+    );
+
+    $todayTransactions =
+        $transStmt->fetchAll()
+        ?: [];
+}
 
 // Low-stock/reorder policy applies only to operational Inventory.
 // Slaughter outputs are replenished through processing, never supplier reorder.

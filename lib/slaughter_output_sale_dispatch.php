@@ -65,7 +65,15 @@ function slaughter_output_sale_domain_from_post(
         $mode === ''
         ||
         $mode === 'financial_only'
+        ||
+        $mode === 'general_inventory'
     ) {
+        /*
+         * General Inventory is a physical Sales stock source, but it is
+         * owned by general_sale_inventory.php rather than the slaughter
+         * allocation lifecycle. Treat it as non-slaughter here so the two
+         * shared stock workflows can compose without rejecting each other.
+         */
         return null;
     }
 
@@ -132,6 +140,48 @@ function slaughter_output_sale_selection_from_post(
     array $input,
     ?int $saleId = null
 ): array {
+    $sourceMode =
+        strtolower(
+            trim(
+                (string)(
+                    $input['sale_stock_source']
+                    ?? 'financial_only'
+                )
+            )
+        );
+
+    /*
+     * This dispatcher owns only Slaughter Output Inventory.
+     *
+     * Financial-only Sales and General Inventory Sales are handled by
+     * their own shared workflows. Return a neutral slaughter selection
+     * before inspecting any stale/hidden slaughter fields in the form.
+     */
+    if (
+        $sourceMode === ''
+        ||
+        $sourceMode === 'financial_only'
+        ||
+        $sourceMode === 'general_inventory'
+    ) {
+        return [
+            'mode' =>
+                'financial_only',
+
+            'slaughter_domain' =>
+                null,
+
+            'rows' =>
+                [],
+        ];
+    }
+
+    if ($sourceMode !== 'slaughter_output') {
+        throw new SlaughterOutputSaleException(
+            'Choose a valid Sales stock source.'
+        );
+    }
+
     $rows =
         slaughter_output_sale_common_rows_from_post(
             $input,
