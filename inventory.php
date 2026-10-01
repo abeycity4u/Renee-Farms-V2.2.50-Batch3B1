@@ -105,8 +105,25 @@ $lowStockItems = 0;
 $moderateStockItems = 0;
 $goodStockItems = 0;
 $totalInventoryValue = 0;
-$poultryItems = 0;
-$ruminantItems = 0;
+
+$inventoryMetricFarmTypes =
+    isPlatformOwner()
+        ? ['poultry', 'ruminant', 'general']
+        : allowedInventoryFarmTypes(false);
+
+$inventoryMetricFarmTypes =
+    array_values(
+        array_intersect(
+            ['poultry', 'ruminant', 'general'],
+            $inventoryMetricFarmTypes
+        )
+    );
+
+$inventoryFarmTypeItemCounts = [
+    'poultry' => 0,
+    'ruminant' => 0,
+    'general' => 0,
+];
 
 foreach ($inventoryItems as $item) {
     $currentStock = (float) ($item['current_stock'] ?? 0);
@@ -117,10 +134,15 @@ foreach ($inventoryItems as $item) {
 
     $totalInventoryValue += $currentStock * $unitCost;
 
-    if (($item['farm_type'] ?? '') === 'poultry') {
-        $poultryItems++;
-    } elseif (($item['farm_type'] ?? '') === 'ruminant') {
-        $ruminantItems++;
+    $itemFarmType =
+        strtolower(
+            trim(
+                (string)($item['farm_type'] ?? '')
+            )
+        );
+
+    if (isset($inventoryFarmTypeItemCounts[$itemFarmType])) {
+        $inventoryFarmTypeItemCounts[$itemFarmType]++;
     }
 
     if (
@@ -985,9 +1007,33 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <div class="card-body">
                             <p class="text-muted mb-2">Inventory Value</p>
                             <h3 class="fw-bold mb-2">₦<?php echo number_format($totalInventoryValue, 2); ?></h3>
-                            <div class="small text-muted d-flex gap-3">
-                                <span><i class="bi bi-feather me-1"></i>Poultry: <?php echo $poultryItems; ?></span>
-                                <span><i class="bi bi-tree me-1"></i>Ruminant: <?php echo $ruminantItems; ?></span>
+                            <div class="small text-muted d-flex gap-3 flex-wrap">
+                                <?php foreach ($inventoryMetricFarmTypes as $metricFarmType): ?>
+                                    <?php
+                                        $metricLabel =
+                                            $metricFarmType === 'poultry'
+                                                ? 'Poultry'
+                                                : (
+                                                    $metricFarmType === 'ruminant'
+                                                        ? 'Ruminant'
+                                                        : 'General'
+                                                );
+
+                                        $metricIcon =
+                                            $metricFarmType === 'poultry'
+                                                ? 'bi-feather'
+                                                : (
+                                                    $metricFarmType === 'ruminant'
+                                                        ? 'bi-tree'
+                                                        : 'bi-box-seam'
+                                                );
+                                    ?>
+                                    <span>
+                                        <i class="bi <?php echo $metricIcon; ?> me-1"></i>
+                                        <?php echo $metricLabel; ?>:
+                                        <?php echo (int)($inventoryFarmTypeItemCounts[$metricFarmType] ?? 0); ?>
+                                    </span>
+                                <?php endforeach; ?>
                             </div>
                         </div>
                     </div>
