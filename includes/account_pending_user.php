@@ -115,14 +115,27 @@ if (!function_exists('account_pending_user_create')) {
                  )"
             );
 
-        $stmt->execute([
-            $farmId,
-            $username,
-            $placeholderHash,
-            $email,
-            $userType,
-            $fullName,
-        ]);
+        try {
+            $stmt->execute([
+                $farmId,
+                $username,
+                $placeholderHash,
+                $email,
+                $userType,
+                $fullName,
+            ]);
+        } catch (PDOException $e) {
+            if (str_contains(
+                $e->getMessage(),
+                'Duplicate entry'
+            )) {
+                throw new RuntimeException(
+                    'The username already exists for this farm. Please choose another username.'
+                );
+            }
+
+            throw $e;
+        }
 
         $userId =
             (int)$pdo->lastInsertId();
