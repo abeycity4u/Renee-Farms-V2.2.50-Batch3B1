@@ -193,7 +193,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             );
 
             $_SESSION['error'] =
-                $e instanceof InvalidArgumentException
+                ($e instanceof InvalidArgumentException)
+                || ($e instanceof RuntimeException)
                     ? $e->getMessage()
                     : 'Unable to add this user. The username may already exist for this farm.';
         }
