@@ -117,18 +117,34 @@ try {
 $check($unknownRejected,
     'unknown checkout fields fail closed');
 
-$badModuleRejected = false;
-try {
+$salesOnlyCheckout =
     billing_route_normalize_checkout_input([
         'plan_code' => 'starter',
         'billing_interval' => 'monthly',
         'modules' => ['sales'],
     ]);
-} catch (InvalidArgumentException $e) {
-    $badModuleRejected = true;
-}
-$check($badModuleRejected,
-    'shared Sales cannot enter checkout as a purchasable module');
+
+$check(
+    ($salesOnlyCheckout['modules'] ?? null)
+        === ['sales'],
+    'standalone Sales can enter checkout as its commercial product'
+);
+
+$sharedSalesCheckout =
+    billing_route_normalize_checkout_input([
+        'plan_code' => 'starter',
+        'billing_interval' => 'monthly',
+        'modules' => [
+            'poultry',
+            'sales',
+        ],
+    ]);
+
+$check(
+    ($sharedSalesCheckout['modules'] ?? null)
+        === ['poultry'],
+    'shared Sales does not create a second checkout product dimension'
+);
 
 $oldBase = getenv('BILLING_PUBLIC_BASE_URL');
 putenv('BILLING_PUBLIC_BASE_URL=https://billing.example.test/app');

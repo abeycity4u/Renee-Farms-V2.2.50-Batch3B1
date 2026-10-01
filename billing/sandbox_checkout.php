@@ -10,6 +10,7 @@
 require_once dirname(__DIR__) . '/init.php';
 require_once dirname(__DIR__) . '/includes/billing_payment_foundation.php';
 require_once dirname(__DIR__) . '/includes/billing_pricing_contract.php';
+require_once dirname(__DIR__) . '/includes/billing_commercial_product.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_readiness.php';
 require_once dirname(__DIR__) . '/includes/farm_entitlements.php';
 require_once dirname(__DIR__) . '/includes/subscription_seat_policy.php';
@@ -64,12 +65,13 @@ if (!filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) {
     exit('A valid farm contact email is required before sandbox billing QA.');
 }
 
-$modules = array_values(array_intersect(['poultry', 'ruminant'], farm_entitlement_modules($pdo, $farmId)));
-sort($modules, SORT_STRING);
-if (!$modules) {
-    http_response_code(409);
-    exit('The designated QA farm must already have Poultry, Ruminant, or both enabled.');
-}
+$modules =
+    billing_commercial_product_require_modules(
+        farm_entitlement_modules(
+            $pdo,
+            $farmId
+        )
+    );
 
 $planOrder = ['starter', 'growth', 'pro'];
 $currentPlan = strtolower(trim((string)($farm['subscription_plan'] ?? 'starter')));
@@ -134,7 +136,7 @@ $providerHtml = htmlspecialchars($provider, ENT_QUOTES, 'UTF-8');
         <div class="item"><span class="label">Provider</span><?= $providerLabelHtml ?></div>
         <div class="item"><span class="label">Plan</span><?= htmlspecialchars($planLabel, ENT_QUOTES, 'UTF-8') ?></div>
         <div class="item"><span class="label">Billing interval</span>Monthly</div>
-        <div class="item"><span class="label">Modules preserved</span><?= htmlspecialchars(implode(' + ', $moduleLabels), ENT_QUOTES, 'UTF-8') ?></div>
+        <div class="item"><span class="label">Commercial product</span><?= htmlspecialchars(implode(' + ', $moduleLabels), ENT_QUOTES, 'UTF-8') ?></div>
         <div class="item"><span class="label">Server-authoritative test amount</span><?= $currency ?> <?= $amount ?></div>
     </div>
 

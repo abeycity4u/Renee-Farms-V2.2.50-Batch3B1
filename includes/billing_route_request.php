@@ -9,6 +9,7 @@
  */
 
 require_once __DIR__ . '/platform_public_url.php';
+require_once __DIR__ . '/billing_commercial_product.php';
 
 if (!function_exists('billing_route_public_base_url')) {
     function billing_route_public_base_url(): string
@@ -77,18 +78,15 @@ if (!function_exists('billing_route_normalize_checkout_input')) {
         }
 
         $modulesRaw = $input['modules'] ?? [];
-        if (!is_array($modulesRaw)) $modulesRaw = [$modulesRaw];
-        $modules = [];
-        foreach ($modulesRaw as $module) {
-            $module = strtolower(trim((string)$module));
-            if (!in_array($module, ['poultry', 'ruminant'], true)) {
-                throw new InvalidArgumentException('Checkout module must be Poultry or Ruminant.');
-            }
-            $modules[$module] = true;
+
+        if (!is_array($modulesRaw)) {
+            $modulesRaw = [$modulesRaw];
         }
-        $modules = array_keys($modules);
-        sort($modules, SORT_STRING);
-        if (!$modules) throw new InvalidArgumentException('Select Poultry, Ruminant, or both.');
+
+        $modules =
+            billing_commercial_product_require_modules(
+                $modulesRaw
+            );
 
         $seatRaw = $input['seat_addons'] ?? [];
         if (!is_array($seatRaw)) throw new InvalidArgumentException('Seat add-ons must be supplied as a role map.');
