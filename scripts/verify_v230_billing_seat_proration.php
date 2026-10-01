@@ -258,6 +258,58 @@ $check(
 );
 
 $check(
+    billing_seat_proration_history_modules_compatible(
+        [
+            'modules_snapshot' => '["sales"]',
+            'subscription_status' => 'active',
+            'change_reason' => 'billing_payment_applied',
+            'payment_attempt_id' => 37,
+        ],
+        ['sales']
+    ) === true,
+    'exact commercial-product history remains compatible'
+);
+
+$check(
+    billing_seat_proration_history_modules_compatible(
+        [
+            'modules_snapshot' => '[]',
+            'subscription_status' => 'trial',
+            'change_reason' => 'trial_onboarding_activated',
+            'payment_attempt_id' => null,
+        ],
+        ['sales']
+    ) === true,
+    'legacy activated trial with empty module snapshot may contribute a billing boundary'
+);
+
+$check(
+    billing_seat_proration_history_modules_compatible(
+        [
+            'modules_snapshot' => '[]',
+            'subscription_status' => 'trial',
+            'change_reason' => 'trial_onboarding_provisioned',
+            'payment_attempt_id' => null,
+        ],
+        ['sales']
+    ) === false,
+    'unactivated legacy trial does not become a commercial billing boundary'
+);
+
+$check(
+    billing_seat_proration_history_modules_compatible(
+        [
+            'modules_snapshot' => '[]',
+            'subscription_status' => 'trial',
+            'change_reason' => 'trial_onboarding_activated',
+            'payment_attempt_id' => 999,
+        ],
+        ['sales']
+    ) === false,
+    'paid-linked empty-module history cannot bypass commercial-product matching'
+);
+
+$check(
     strpos(
         $source,
         "'lineage_start' =>"

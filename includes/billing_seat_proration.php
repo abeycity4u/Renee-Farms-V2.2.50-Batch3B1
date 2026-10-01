@@ -71,6 +71,32 @@ if (!function_exists('billing_seat_proration_modules_match')) {
     }
 }
 
+if (!function_exists('billing_seat_proration_history_modules_compatible')) {
+    function billing_seat_proration_history_modules_compatible(
+        array $row,
+        array $modules
+    ): bool {
+        if (billing_seat_proration_modules_match(
+            $row['modules_snapshot'] ?? null,
+            $modules
+        )) {
+            return true;
+        }
+
+        $legacyModules = billing_seat_proration_decode_modules(
+            $row['modules_snapshot'] ?? null
+        );
+
+        return $legacyModules === []
+            && strtolower(trim(
+                (string)($row['subscription_status'] ?? '')
+            )) === 'trial'
+            && (string)($row['change_reason'] ?? '')
+                === 'trial_onboarding_activated'
+            && empty($row['payment_attempt_id']);
+    }
+}
+
 if (!function_exists('billing_seat_proration_amount')) {
     function billing_seat_proration_amount(
         DateTimeImmutable $now,
@@ -188,6 +214,8 @@ if (!function_exists('billing_seat_proration_timeline')) {
                 s.id AS subscription_id,
                 s.plan_code,
                 s.billing_interval,
+                s.status AS subscription_status,
+                s.change_reason,
                 s.modules_snapshot,
                 s.subscription_starts_at,
                 s.subscription_ends_at,
@@ -333,8 +361,8 @@ if (!function_exists('billing_seat_proration_timeline')) {
                 continue;
             }
 
-            if (!billing_seat_proration_modules_match(
-                $row['modules_snapshot'] ?? null,
+            if (!billing_seat_proration_history_modules_compatible(
+                $row,
                 $modules
             )) {
                 continue;
