@@ -186,6 +186,51 @@ if (!function_exists('require_entitled_module')) {
     }
 }
 
+if (!function_exists('farm_entitlement_reporting_farm_types')) {
+    function farm_entitlement_reporting_farm_types(
+        PDO $pdo,
+        int $farmId
+    ): array {
+        if ($farmId < 1) {
+            return [];
+        }
+
+        $enabled =
+            farm_entitlement_modules(
+                $pdo,
+                $farmId
+            );
+
+        $reportingTypes = [];
+
+        if (in_array('poultry', $enabled, true)) {
+            $reportingTypes[] = 'poultry';
+        }
+
+        if (in_array('ruminant', $enabled, true)) {
+            $reportingTypes[] = 'ruminant';
+        }
+
+        /*
+         * General is the reporting scope for a Sales-only tenant.
+         * Shared Sales attached to a livestock tenant remains inside its
+         * livestock reporting scope and does not create another farm type.
+         */
+        if (
+            !$reportingTypes
+            &&
+            farm_entitlement_sales_available(
+                $pdo,
+                $farmId
+            )
+        ) {
+            $reportingTypes[] = 'general';
+        }
+
+        return $reportingTypes;
+    }
+}
+
 if (!function_exists('effective_livestock_scope')) {
     function effective_livestock_scope(): array
     {

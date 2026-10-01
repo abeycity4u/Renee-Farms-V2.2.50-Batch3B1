@@ -11,9 +11,69 @@ requireBusinessReportAccess();
 
 $farmId = requireCurrentFarmId();
 $access = getUserFarmType();
-$canChoose = isPlatformOwner() || hasRole('farm_admin','sales_rep');
-$farmType = $canChoose ? ($_GET['farm_type'] ?? 'all') : ($access === 'all' ? 'all' : $access);
-if (!in_array($farmType, ['all','poultry','ruminant','general'], true)) $farmType = 'all';
+
+$reportingFarmTypes =
+    farm_entitlement_reporting_farm_types(
+        $pdo,
+        $farmId
+    );
+
+$canChoose =
+    (
+        isPlatformOwner()
+        ||
+        hasRole('farm_admin','sales_rep')
+    )
+    &&
+    count($reportingFarmTypes) > 1;
+
+$defaultFarmType =
+    count($reportingFarmTypes) > 1
+        ? 'all'
+        : ($reportingFarmTypes[0] ?? '');
+
+if ($canChoose) {
+    $requestedFarmType =
+        strtolower(
+            trim(
+                (string)(
+                    $_GET['farm_type']
+                    ?? $defaultFarmType
+                )
+            )
+        );
+
+    $validFarmTypes =
+        array_merge(
+            ['all'],
+            $reportingFarmTypes
+        );
+
+    $farmType =
+        in_array(
+            $requestedFarmType,
+            $validFarmTypes,
+            true
+        )
+            ? $requestedFarmType
+            : $defaultFarmType;
+} else {
+    $restrictedFarmType =
+        strtolower(
+            trim(
+                (string)$access
+            )
+        );
+
+    $farmType =
+        in_array(
+            $restrictedFarmType,
+            $reportingFarmTypes,
+            true
+        )
+            ? $restrictedFarmType
+            : $defaultFarmType;
+}
 
 $productionType = strtolower(trim((string)($_GET['production_type'] ?? 'all')));
 $productionOptions = $farmType === 'all' ? [] : attribution_production_types($farmType);
@@ -167,7 +227,51 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
                     <label class="form-label">Month</label><input type="month" name="month" class="form-control" value="<?php echo htmlspecialchars($month); ?>">
                 <?php endif; ?>
             </div>
-            <div class="col-md-2"><label class="form-label">Farm type</label><select name="farm_type" id="profitFarmType" class="form-select" <?php echo $canChoose?'':'disabled'; ?>><option value="all" <?php echo $farmType==='all'?'selected':''; ?>>All</option><option value="poultry" <?php echo $farmType==='poultry'?'selected':''; ?>>Poultry</option><option value="ruminant" <?php echo $farmType==='ruminant'?'selected':''; ?>>Ruminant</option><option value="general" <?php echo $farmType==='general'?'selected':''; ?>>General</option></select><?php if(!$canChoose): ?><input type="hidden" name="farm_type" value="<?php echo htmlspecialchars($farmType); ?>"><?php endif; ?></div>
+            <div class="col-md-2">
+                <label class="form-label">Farm type</label>
+                <select
+                    name="farm_type"
+                    id="profitFarmType"
+                    class="form-select"
+                    <?php echo $canChoose ? '' : 'disabled'; ?>
+                >
+                    <?php if (count($reportingFarmTypes) > 1): ?>
+                        <option
+                            value="all"
+                            <?php echo $farmType === 'all' ? 'selected' : ''; ?>
+                        >
+                            All
+                        </option>
+                    <?php endif; ?>
+
+                    <?php foreach ($reportingFarmTypes as $reportFarmType): ?>
+                        <?php
+                            $reportFarmTypeLabel =
+                                $reportFarmType === 'poultry'
+                                    ? 'Poultry'
+                                    : (
+                                        $reportFarmType === 'ruminant'
+                                            ? 'Ruminant'
+                                            : 'General'
+                                    );
+                        ?>
+                        <option
+                            value="<?php echo htmlspecialchars($reportFarmType); ?>"
+                            <?php echo $farmType === $reportFarmType ? 'selected' : ''; ?>
+                        >
+                            <?php echo htmlspecialchars($reportFarmTypeLabel); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+
+                <?php if (!$canChoose): ?>
+                    <input
+                        type="hidden"
+                        name="farm_type"
+                        value="<?php echo htmlspecialchars($farmType); ?>"
+                    >
+                <?php endif; ?>
+            </div>
             <div class="col-md-3"><label class="form-label">Production type</label><select name="production_type" id="profitProductionType" class="form-select"><option value="all">All production types</option><?php foreach($productionOptions as $value=>$label): ?><option value="<?php echo htmlspecialchars($value); ?>" <?php echo $productionType===$value?'selected':''; ?>><?php echo htmlspecialchars($label); ?></option><?php endforeach; ?></select></div>
             <div class="col-md-3"><label class="form-label">Production cycle (optional)</label><select name="cycle_id" id="profitCycleId" class="form-select"><option value="0"><?php echo $productionType !== 'all' ? 'All ' . htmlspecialchars(attribution_label($productionType)) . ' cycles' : 'All cycles'; ?></option><?php foreach($visibleCycles as $c): ?><option value="<?php echo (int)$c['id']; ?>" <?php echo $cycleId===(int)$c['id']?'selected':''; ?>><?php echo htmlspecialchars($c['cycle_code'].' — '.$c['production_type'].' ('.$c['status'].')'); ?></option><?php endforeach; ?></select></div>
             <div class="col-md-1"><button class="btn btn-primary w-100">Apply</button></div>
