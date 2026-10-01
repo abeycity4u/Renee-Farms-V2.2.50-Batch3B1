@@ -11,6 +11,7 @@ require_once dirname(__DIR__) . '/init.php';
 require_once dirname(__DIR__) . '/includes/subscription_recovery.php';
 require_once dirname(__DIR__) . '/includes/billing_payment_foundation.php';
 require_once dirname(__DIR__) . '/includes/billing_reactivation_quote.php';
+require_once dirname(__DIR__) . '/includes/billing_commercial_product.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_selection.php';
 require_once dirname(__DIR__) . '/includes/billing_provider_readiness.php';
 
@@ -52,7 +53,13 @@ $statusLabels = [
 $statusLabel = $statusLabels[$statusCode] ?? ucfirst(str_replace('_', ' ', $statusCode));
 $pricing = $reactivation['pricing'] ?? null;
 $planLabel = $pricing ? subscription_plan_label((string)$pricing['plan_code']) : '';
-$moduleLabels = $pricing ? array_map(static fn(string $m): string => ucfirst($m), $pricing['modules']) : [];
+$productLabel = $pricing
+    ? billing_commercial_product_label(
+        is_array($pricing['modules'] ?? null)
+            ? $pricing['modules']
+            : []
+    )
+    : '';
 
 if ($statusCode === 'past_due') {
     $introCopy = 'Your subscription has expired, so operational access is temporarily paused. Your farm records remain safe and unchanged. Renew the current subscription below to restore workspace access.';
@@ -87,7 +94,7 @@ if ($statusCode === 'past_due') {
                 <div class="notice-icon">✓</div>
                 <div>
                     <strong>Your farm data is safe</strong>
-                    <p>Renewal does not replace your plan or livestock setup. After a successful verified payment, your current plan, livestock bundle and purchased seat allowances are restored with workspace access.</p>
+                    <p>Renewal does not replace your current commercial product. After a successful verified payment, your current plan, commercial product and purchased seat allowances are restored with workspace access.</p>
                 </div>
             </div>
 
@@ -102,7 +109,7 @@ if ($statusCode === 'past_due') {
                     <div class="item"><span class="label">Status</span><span class="value"><?= htmlspecialchars($statusLabel, ENT_QUOTES, 'UTF-8') ?></span></div>
                     <div class="item"><span class="label">Plan</span><span class="value"><?= htmlspecialchars($planLabel, ENT_QUOTES, 'UTF-8') ?></span></div>
                     <div class="item"><span class="label">Billing interval</span><span class="value"><?= htmlspecialchars(ucfirst((string)$pricing['billing_interval']), ENT_QUOTES, 'UTF-8') ?></span></div>
-                    <div class="item"><span class="label">Livestock bundle</span><span class="value"><?= htmlspecialchars(implode(' + ', $moduleLabels), ENT_QUOTES, 'UTF-8') ?></span></div>
+                    <div class="item"><span class="label">Commercial product</span><span class="value"><?= htmlspecialchars($productLabel, ENT_QUOTES, 'UTF-8') ?></span></div>
                     <div class="item amount"><span class="label">Renewal amount</span><span class="value"><?= htmlspecialchars((string)$pricing['currency'], ENT_QUOTES, 'UTF-8') ?> <?= number_format((float)$pricing['amount'], 2) ?></span></div>
                 </div>
 
@@ -134,7 +141,7 @@ if ($statusCode === 'past_due') {
                 </form>
             <?php endif; ?>
 
-            <p class="foot">Need a different plan or livestock bundle? Contact support before paying. &nbsp; <a href="<?= htmlspecialchars(BASE_URL . '/login.php', ENT_QUOTES, 'UTF-8') ?>">Return to sign in</a></p>
+            <p class="foot">Need a different plan or commercial product? Contact support before paying. &nbsp; <a href="<?= htmlspecialchars(BASE_URL . '/login.php', ENT_QUOTES, 'UTF-8') ?>">Return to sign in</a></p>
         </div>
     </main>
 </div>

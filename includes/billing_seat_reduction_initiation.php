@@ -95,7 +95,7 @@ if (!function_exists('billing_seat_reduction_request_input')) {
             $modules
         )) {
             throw new InvalidArgumentException(
-                'The selected seat role is unavailable for this livestock subscription.'
+                'The selected seat role is unavailable for this commercial subscription.'
             );
         }
 
