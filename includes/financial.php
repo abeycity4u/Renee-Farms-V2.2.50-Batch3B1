@@ -5,6 +5,7 @@ require_once __DIR__ . '/../lib/attribution.php';
 require_once __DIR__ . '/../lib/inventory_financial.php';
 require_once __DIR__ . '/../lib/stock_consumption_economics.php';
 require_once __DIR__ . '/../lib/slaughter_output_sale_economics.php';
+require_once __DIR__ . '/../lib/general_sale_inventory_economics.php';
 /**
  * Traceable profitability engine.
  *
@@ -632,6 +633,38 @@ function getProfitabilitySummary(
         );
     }
 
+    /*
+     * General Inventory-backed Sales recognise their frozen consumed-stock
+     * value as COGS, not as ordinary operating inventory consumption.
+     */
+    $generalSaleInventoryEconomics =
+        general_sale_inventory_economics_summary(
+            $pdo,
+            $farmId,
+            $startDate,
+            $endDate,
+            $farmType,
+            $productionType !== ''
+                ? $productionType
+                : null,
+            $cycleId
+        );
+
+    $generalSaleInventoryCogs =
+        (float)(
+            $generalSaleInventoryEconomics[
+                'general_sale_inventory_cogs'
+            ]
+            ?? 0
+        );
+
+    $costOfGoodsSold =
+        round(
+            $slaughterOutputCogs
+            + $generalSaleInventoryCogs,
+            2
+        );
+
     $nonFeedExpenses=$manualNonFeedExpenses+$inventoryOperatingConsumption;
 
     /*
@@ -640,7 +673,7 @@ function getProfitabilitySummary(
      * explain both values without double-counting either one.
      */
     $totalOperatingCost=$nonFeedExpenses+$feedCost;
-    $totalRecognizedCost=$totalOperatingCost+$slaughterOutputCogs;
+    $totalRecognizedCost=$totalOperatingCost+$costOfGoodsSold;
 
     return [
         'revenue'=>$revenue,
@@ -649,7 +682,8 @@ function getProfitabilitySummary(
         'manual_non_feed_expenses'=>$manualNonFeedExpenses,
         'inventory_operating_consumption_cost'=>$inventoryOperatingConsumption,
         'inventory_operating_consumption_breakdown'=>$inventoryConsumptionBreakdown,
-        'cost_of_goods_sold'=>$slaughterOutputCogs,
+        'cost_of_goods_sold'=>$costOfGoodsSold,
+        'general_sale_inventory_cogs'=>$generalSaleInventoryCogs,
         'slaughter_output_cogs'=>$slaughterOutputCogs,
         'slaughter_output_full_cost_valuation'=>$slaughterOutputFullCostValuation,
         'slaughter_output_embedded_operating_cost'=>$slaughterOutputEmbeddedOperatingCost,
@@ -659,6 +693,7 @@ function getProfitabilitySummary(
         'cost_of_goods_sold_breakdown'=>[
             'poultry_slaughter_output'=>$poultrySlaughterOutputCogs,
             'ruminant_slaughter_output'=>$ruminantSlaughterOutputCogs,
+            'general_sale_inventory'=>$generalSaleInventoryCogs,
             'full_cost_sold_valuation'=>$slaughterOutputFullCostValuation,
             'embedded_operating_cost_already_recognized'=>$slaughterOutputEmbeddedOperatingCost,
         ],
@@ -695,9 +730,10 @@ function getProfitabilitySummary(
             'cost_of_goods_sold'=>[
                 'poultry_slaughter_output'=>$poultrySlaughterOutputCogs,
             'ruminant_slaughter_output'=>$ruminantSlaughterOutputCogs,
+                'general_sale_inventory'=>$generalSaleInventoryCogs,
                 'full_cost_sold_valuation'=>$slaughterOutputFullCostValuation,
                 'embedded_operating_cost_already_recognized'=>$slaughterOutputEmbeddedOperatingCost,
-                'total'=>$slaughterOutputCogs,
+                'total'=>$costOfGoodsSold,
             ],
             'other_operating_cost'=>[
                 'manual_non_feed_expenses'=>$manualNonFeedExpenses,
