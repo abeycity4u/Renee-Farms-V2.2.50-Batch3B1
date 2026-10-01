@@ -46,6 +46,10 @@ if (!function_exists('billing_seat_proration_decode_modules')) {
             return null;
         }
 
+        if ($decoded === []) {
+            return [];
+        }
+
         try {
             return billing_pricing_normalize_modules($decoded);
         } catch (Throwable $e) {
