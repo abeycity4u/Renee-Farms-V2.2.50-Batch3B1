@@ -192,11 +192,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 . $e->getMessage()
             );
 
-            $_SESSION['error'] =
-                ($e instanceof InvalidArgumentException)
-                || ($e instanceof RuntimeException)
-                    ? $e->getMessage()
-                    : 'Unable to add this user. The username may already exist for this farm.';
+            if ($e instanceof InvalidArgumentException
+                || $e instanceof RuntimeException
+            ) {
+                $_SESSION['error'] = $e->getMessage();
+            } elseif ($e instanceof PDOException
+                && str_contains(
+                    $e->getMessage(),
+                    'Duplicate entry'
+                )
+            ) {
+                $_SESSION['error'] =
+                    'Unable to add this user. The username already exists for this farm. Please choose another username.';
+            } else {
+                error_log(
+                    'Team user creation failed for farm '
+                    . $farmId
+                    . ': '
+                    . $e->getMessage()
+                );
+
+                $_SESSION['error'] =
+                    'Unable to add this user. Please try again.';
+            }
         }
 
         header(
