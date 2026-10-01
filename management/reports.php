@@ -21,14 +21,23 @@ if ($requestedFarmType === 'both' && count(accessibleFarmTypes()) === 2) {
     $requestedFarmType = 'all';
 }
 
-// Sales-only farms have no livestock scope to normalize, but their neutral
-// general sales must remain available to the analytics dashboard and export.
-$salesOnlyScope = enabledFarmTypes() === []
-    && farmHasModule('sales')
-    && (isPlatformOwner() || hasRole('farm_admin', 'sales_rep', 'viewer'));
-$farmType = $salesOnlyScope
+// Standalone Sales-only farms report against the General business scope.
+// The entitlement contract is authoritative; livestock-capable farms keep
+// their existing report scope and selector behavior.
+$salesOnlyWorkspace =
+    current_farm_is_sales_only();
+
+$salesOnlyScope =
+    $salesOnlyWorkspace;
+
+$farmType = $salesOnlyWorkspace
     ? 'general'
-    : normalizeFarmType($requestedFarmType, true, false, $canChooseFarmType);
+    : normalizeFarmType(
+        $requestedFarmType,
+        true,
+        false,
+        $canChooseFarmType
+    );
 $startDate = $year . '-01-01';
 $endDate = $year . '-12-31';
 
@@ -51,31 +60,77 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
         exit();
     }
 
-    fputcsv($output, ['Farm Reports & Analytics']);
+    fputcsv(
+        $output,
+        [
+            $salesOnlyWorkspace
+                ? 'Analytics Dashboard'
+                : 'Farm Reports & Analytics'
+        ]
+    );
+
     fputcsv($output, ['Year', $year]);
-    fputcsv($output, ['Farm Type', ucfirst($farmType)]);
+
+    if (!$salesOnlyWorkspace) {
+        fputcsv(
+            $output,
+            ['Farm Type', ucfirst($farmType)]
+        );
+    }
+
     fputcsv($output, []);
 
-    fputcsv($output, [
-        'Month',
-        'Farm Type',
-        'Revenue',
-        'Feed Consumed',
-        'Other Operating Cost',
-        'Total Operating Cost',
-        'Operating Profit / Loss'
-    ]);
+    if ($salesOnlyWorkspace) {
+        fputcsv($output, [
+            'Month',
+            'Revenue',
+            'Cost of Goods Sold',
+            'Gross Profit',
+            'Operating Expenses',
+            'Net Profit / Loss',
+            'Profit Margin'
+        ]);
+    } else {
+        fputcsv($output, [
+            'Month',
+            'Farm Type',
+            'Revenue',
+            'Feed Consumed',
+            'Other Operating Cost',
+            'Total Operating Cost',
+            'Operating Profit / Loss'
+        ]);
+    }
 
     foreach ($profitData as $data) {
-        fputcsv($output, [
-            date('M Y', strtotime($data['month'] . '-01')),
-            ucfirst($data['farm_type']),
-            number_format((float) $data['total_sales'], 2, '.', ''),
-            number_format((float) $data['feed_consumed'], 2, '.', ''),
-            number_format((float) $data['other_operating_cost'], 2, '.', ''),
-            number_format((float) $data['total_expenses'], 2, '.', ''),
-            number_format((float) $data['net_profit'], 2, '.', ''),
-        ]);
+        if ($salesOnlyWorkspace) {
+            fputcsv($output, [
+                date('M Y', strtotime($data['month'] . '-01')),
+                number_format((float)$data['total_sales'], 2, '.', ''),
+                number_format((float)$data['cost_of_goods_sold'], 2, '.', ''),
+                number_format((float)$data['gross_profit'], 2, '.', ''),
+                number_format((float)$data['operating_expenses'], 2, '.', ''),
+                number_format((float)$data['net_profit'], 2, '.', ''),
+                $data['margin_percent'] === null
+                    ? ''
+                    : number_format(
+                        (float)$data['margin_percent'],
+                        2,
+                        '.',
+                        ''
+                    ) . '%',
+            ]);
+        } else {
+            fputcsv($output, [
+                date('M Y', strtotime($data['month'] . '-01')),
+                ucfirst($data['farm_type']),
+                number_format((float)$data['total_sales'], 2, '.', ''),
+                number_format((float)$data['feed_consumed'], 2, '.', ''),
+                number_format((float)$data['other_operating_cost'], 2, '.', ''),
+                number_format((float)$data['total_expenses'], 2, '.', ''),
+                number_format((float)$data['net_profit'], 2, '.', ''),
+            ]);
+        }
     }
 
     if (!empty($topProducts)) {
@@ -134,7 +189,12 @@ $pdfReportUrl = pdf_report_current_url();
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">
-                        <h4><i class="bi bi-graph-up-arrow"></i> Farm Reports & Analytics</h4>
+                        <h4>
+                            <i class="bi bi-graph-up-arrow"></i>
+                            <?php echo $salesOnlyWorkspace
+                                ? 'Analytics Dashboard'
+                                : 'Farm Reports & Analytics'; ?>
+                        </h4>
                         <div class="d-flex gap-2 mt-2 report-controls">
                             <select class="form-select app-width-150" id="yearFilter">
                                 <?php for ($y = date('Y'); $y >= 2020; $y--): ?>
@@ -143,6 +203,17 @@ $pdfReportUrl = pdf_report_current_url();
                                 </option>
                                 <?php endfor; ?>
                             </select>
+                            <?php if ($salesOnlyWorkspace): ?>
+                            <select
+                                id="farmTypeFilter"
+                                class="d-none"
+                                aria-hidden="true"
+                            >
+                                <option value="general" selected>
+                                    General
+                                </option>
+                            </select>
+                            <?php else: ?>
                             <select class="form-select app-width-200" id="farmTypeFilter">
                                 <?php if ($canChooseFarmType): ?>
                                 <?php if (count(accessibleFarmTypes()) === 2): ?><option value="all" <?php echo $farmType == 'all' ? 'selected' : ''; ?>>All Farms</option><?php endif; ?>
@@ -151,6 +222,7 @@ $pdfReportUrl = pdf_report_current_url();
                                 <option value="<?php echo $farmType; ?>" selected><?php echo ucfirst($farmType); ?> Only</option>
                                 <?php endif; ?>
                             </select>
+                            <?php endif; ?>
                             <a class="btn btn-primary" href="<?php echo htmlspecialchars($pdfReportUrl); ?>" target="_blank">
                                 <i class="bi bi-file-earmark-pdf"></i> PDF Report
                             </a>
@@ -170,7 +242,7 @@ $pdfReportUrl = pdf_report_current_url();
                                     </div>
                                     <div class="card-body">
                                         <?php if ($pdfRequested): ?>
-<div class="table-responsive"><table class="table table-bordered"><thead><tr><th>Month</th><th>Farm Type</th><th>Net Profit</th></tr></thead><tbody><?php foreach ($profitData as $row): ?><tr><td><?php echo date('M Y', strtotime($row['month'] . '-01')); ?></td><td><?php echo ucfirst($row['farm_type']); ?></td><td>₦<?php echo number_format($row['net_profit'], 2); ?></td></tr><?php endforeach; ?></tbody></table></div>
+<div class="table-responsive"><table class="table table-bordered"><thead><tr><th>Month</th><?php if (!$salesOnlyWorkspace): ?><th>Farm Type</th><?php endif; ?><th>Net Profit</th></tr></thead><tbody><?php foreach ($profitData as $row): ?><tr><td><?php echo date('M Y', strtotime($row['month'] . '-01')); ?></td><?php if (!$salesOnlyWorkspace): ?><td><?php echo ucfirst($row['farm_type']); ?></td><?php endif; ?><td>₦<?php echo number_format($row['net_profit'], 2); ?></td></tr><?php endforeach; ?></tbody></table></div>
 <?php else: ?><canvas id="profitChart" height="100"></canvas><?php endif; ?>
                                     </div>
                                 </div>
@@ -183,17 +255,76 @@ $pdfReportUrl = pdf_report_current_url();
                                     <div class="card-body">
                                         <?php
                                         $yearlyTotals = [
-                                            'sales' => 0,
-                                            'expenses' => 0,
-                                            'profit' => 0
+                                            'sales' => 0.0,
+                                            'cogs' => 0.0,
+                                            'gross_profit' => 0.0,
+                                            'operating_expenses' => 0.0,
+                                            'expenses' => 0.0,
+                                            'profit' => 0.0,
                                         ];
 
                                         foreach ($profitData as $data) {
-                                            $yearlyTotals['sales'] += $data['total_sales'];
-                                            $yearlyTotals['expenses'] += $data['total_expenses'];
-                                            $yearlyTotals['profit'] += $data['net_profit'];
+                                            $yearlyTotals['sales'] +=
+                                                (float)$data['total_sales'];
+
+                                            $yearlyTotals['cogs'] +=
+                                                (float)($data['cost_of_goods_sold'] ?? 0);
+
+                                            $yearlyTotals['gross_profit'] +=
+                                                (float)($data['gross_profit'] ?? 0);
+
+                                            $yearlyTotals['operating_expenses'] +=
+                                                (float)($data['operating_expenses'] ?? 0);
+
+                                            $yearlyTotals['expenses'] +=
+                                                (float)$data['total_expenses'];
+
+                                            $yearlyTotals['profit'] +=
+                                                (float)$data['net_profit'];
                                         }
+
+                                        $yearlyMargin =
+                                            abs($yearlyTotals['sales']) > 0.00001
+                                                ? (
+                                                    $yearlyTotals['profit']
+                                                    / $yearlyTotals['sales']
+                                                ) * 100
+                                                : null;
                                         ?>
+                                        <?php if ($salesOnlyWorkspace): ?>
+                                        <div class="mb-3">
+                                            <h6>Total Revenue</h6>
+                                            <h3 class="text-success">₦<?php echo number_format($yearlyTotals['sales'], 2); ?></h3>
+                                        </div>
+                                        <div class="mb-3">
+                                            <h6>Cost of Goods Sold</h6>
+                                            <h3>₦<?php echo number_format($yearlyTotals['cogs'], 2); ?></h3>
+                                        </div>
+                                        <div class="mb-3">
+                                            <h6>Gross Profit</h6>
+                                            <h3 class="<?php echo $yearlyTotals['gross_profit'] >= 0 ? 'text-success' : 'text-danger'; ?>">
+                                                ₦<?php echo number_format($yearlyTotals['gross_profit'], 2); ?>
+                                            </h3>
+                                        </div>
+                                        <div class="mb-3">
+                                            <h6>Operating Expenses</h6>
+                                            <h3 class="text-danger">₦<?php echo number_format($yearlyTotals['operating_expenses'], 2); ?></h3>
+                                        </div>
+                                        <div class="mb-3">
+                                            <h6>Net Profit / Loss</h6>
+                                            <h3 class="<?php echo $yearlyTotals['profit'] >= 0 ? 'text-success' : 'text-danger'; ?>">
+                                                ₦<?php echo number_format($yearlyTotals['profit'], 2); ?>
+                                            </h3>
+                                        </div>
+                                        <div>
+                                            <h6>Profit Margin</h6>
+                                            <h3>
+                                                <?php echo $yearlyMargin === null
+                                                    ? 'N/A'
+                                                    : number_format($yearlyMargin, 2) . '%'; ?>
+                                            </h3>
+                                        </div>
+                                        <?php else: ?>
                                         <div class="mb-3">
                                             <h6>Total Revenue</h6>
                                             <h3 class="text-success">₦<?php echo number_format($yearlyTotals['sales'], 2); ?></h3>
@@ -208,6 +339,7 @@ $pdfReportUrl = pdf_report_current_url();
                                                 ₦<?php echo number_format($yearlyTotals['profit'], 2); ?>
                                             </h3>
                                         </div>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                             </div>
@@ -221,6 +353,41 @@ $pdfReportUrl = pdf_report_current_url();
                             <div class="card-body">
                                 <div class="table-responsive">
                                     <table class="table table-bordered">
+                                        <?php if ($salesOnlyWorkspace): ?>
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th>Month</th>
+                                                <th>Revenue</th>
+                                                <th>COGS</th>
+                                                <th>Gross Profit</th>
+                                                <th>Operating Expenses</th>
+                                                <th>Net Profit / Loss</th>
+                                                <th>Profit Margin</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($profitData as $data): ?>
+                                            <tr>
+                                                <td><?php echo date('M Y', strtotime($data['month'] . '-01')); ?></td>
+                                                <td class="text-success">₦<?php echo number_format($data['total_sales'], 2); ?></td>
+                                                <td>₦<?php echo number_format($data['cost_of_goods_sold'], 2); ?></td>
+                                                <td>₦<?php echo number_format($data['gross_profit'], 2); ?></td>
+                                                <td class="text-danger">₦<?php echo number_format($data['operating_expenses'], 2); ?></td>
+                                                <td class="fw-bold <?php echo $data['net_profit'] >= 0 ? 'text-success' : 'text-danger'; ?>">
+                                                    ₦<?php echo number_format($data['net_profit'], 2); ?>
+                                                </td>
+                                                <td>
+                                                    <?php echo $data['margin_percent'] === null
+                                                        ? 'N/A'
+                                                        : number_format(
+                                                            (float)$data['margin_percent'],
+                                                            2
+                                                        ) . '%'; ?>
+                                                </td>
+                                            </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                        <?php else: ?>
                                         <thead class="table-dark">
                                             <tr>
                                                 <th>Month</th>
@@ -251,6 +418,7 @@ $pdfReportUrl = pdf_report_current_url();
                                             </tr>
                                             <?php endforeach; ?>
                                         </tbody>
+                                        <?php endif; ?>
                                     </table>
                                 </div>
                             </div>
@@ -273,7 +441,11 @@ $pdfReportUrl = pdf_report_current_url();
                             <div class="col-md-6">
                                 <div class="card">
                                     <div class="card-header">
-                                        <h5>Expense Breakdown</h5>
+                                        <h5>
+                                            <?php echo $salesOnlyWorkspace
+                                                ? 'Cost & Expense Breakdown'
+                                                : 'Expense Breakdown'; ?>
+                                        </h5>
                                     </div>
                                     <div class="card-body">
                                         <?php if ($pdfRequested): ?>

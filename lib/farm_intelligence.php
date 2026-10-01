@@ -45,12 +45,28 @@ function farm_intelligence_monthly_series(PDO $pdo, int $farmId, int $year, stri
         $start = sprintf('%04d-%02d-01', $year, $month);
         $end = date('Y-m-t', strtotime($start));
         $summary = farm_intelligence_summary($pdo, $farmId, $start, $end, $farmType);
+        $revenue =
+            (float)$summary['revenue'];
+
+        $costOfGoodsSold =
+            (float)(
+                $summary['cost_of_goods_sold']
+                ?? 0
+            );
+
+        $operatingExpenses =
+            (float)$summary['feed_consumption_cost']
+            + (float)$summary['non_feed_expenses'];
+
         $rows[] = [
             'month' => substr($start, 0, 7),
             'farm_type' => $farmType,
-            'total_sales' => (float)$summary['revenue'],
+            'total_sales' => $revenue,
+            'cost_of_goods_sold' => $costOfGoodsSold,
+            'gross_profit' => $revenue - $costOfGoodsSold,
             'feed_consumed' => (float)$summary['feed_consumption_cost'],
             'other_operating_cost' => (float)$summary['non_feed_expenses'],
+            'operating_expenses' => $operatingExpenses,
             'total_expenses' => (float)($summary['total_recognized_cost'] ?? $summary['total_operating_cost']),
             'net_profit' => (float)$summary['profit'],
             'margin_percent' => $summary['margin_percent'],
@@ -64,9 +80,42 @@ function farm_intelligence_expense_breakdown(PDO $pdo, int $farmId, string $star
     $summary = farm_intelligence_summary($pdo, $farmId, $startDate, $endDate, $farmType);
     $breakdown = [];
 
-    if ((float)($summary['cost_of_goods_sold'] ?? 0) != 0.0) {
+    $totalCogs =
+        (float)(
+            $summary['cost_of_goods_sold']
+            ?? 0
+        );
+
+    $generalSaleCogs =
+        (float)(
+            $summary['general_sale_inventory_cogs']
+            ?? 0
+        );
+
+    $slaughterOutputCogs =
+        (float)(
+            $summary['slaughter_output_cogs']
+            ?? 0
+        );
+
+    if (abs($generalSaleCogs) > 0.00001) {
+        $breakdown['Cost of Goods Sold · General Inventory'] =
+            $generalSaleCogs;
+    }
+
+    if (abs($slaughterOutputCogs) > 0.00001) {
         $breakdown['Cost of Goods Sold · Slaughter Output'] =
-            (float)$summary['cost_of_goods_sold'];
+            $slaughterOutputCogs;
+    }
+
+    $otherCogs =
+        $totalCogs
+        - $generalSaleCogs
+        - $slaughterOutputCogs;
+
+    if (abs($otherCogs) > 0.00001) {
+        $breakdown['Cost of Goods Sold'] =
+            $otherCogs;
     }
 
     if ((float)$summary['feed_consumption_cost'] != 0.0) {

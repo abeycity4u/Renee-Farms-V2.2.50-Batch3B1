@@ -10,6 +10,10 @@ requireLogin();
 requireBusinessReportAccess();
 
 $farmId = requireCurrentFarmId();
+
+$salesOnlyWorkspace =
+    current_farm_is_sales_only();
+
 $access = getUserFarmType();
 
 $reportingFarmTypes =
@@ -75,9 +79,46 @@ if ($canChoose) {
             : $defaultFarmType;
 }
 
-$productionType = strtolower(trim((string)($_GET['production_type'] ?? 'all')));
-$productionOptions = $farmType === 'all' ? [] : attribution_production_types($farmType);
-if ($productionType !== 'all' && !isset($productionOptions[$productionType])) $productionType = 'all';
+if ($salesOnlyWorkspace) {
+    $farmType =
+        'general';
+
+    $productionType =
+        'all';
+
+    $productionOptions =
+        [];
+} else {
+    $productionType =
+        strtolower(
+            trim(
+                (string)(
+                    $_GET['production_type']
+                    ?? 'all'
+                )
+            )
+        );
+
+    $productionOptions =
+        $farmType === 'all'
+            ? []
+            : attribution_production_types(
+                $farmType
+            );
+
+    if (
+        $productionType !== 'all'
+        &&
+        !isset(
+            $productionOptions[
+                $productionType
+            ]
+        )
+    ) {
+        $productionType =
+            'all';
+    }
+}
 
 $period = ($_GET['period'] ?? 'monthly') === 'daily' ? 'daily' : 'monthly';
 $selectedDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['date'] ?? '') ? $_GET['date'] : date('Y-m-d');
@@ -92,29 +133,123 @@ if ($period === 'daily') {
     $periodLabel = date('F Y', strtotime($start));
 }
 
-$cycleId = (int)($_GET['cycle_id'] ?? 0);
-$cyclesStmt = $pdo->prepare("SELECT id,cycle_code,farm_type,production_type,status FROM production_cycles WHERE farm_id=? ORDER BY start_date DESC,id DESC");
-$cyclesStmt->execute([$farmId]);
-$cycles = $cyclesStmt->fetchAll(PDO::FETCH_ASSOC);
-$visibleCycles = array_values(array_filter($cycles, static function(array $cycle) use ($farmType, $productionType): bool {
-    if ($farmType !== 'all' && strtolower((string)$cycle['farm_type']) !== $farmType) return false;
-    if ($productionType !== 'all' && strtolower((string)$cycle['production_type']) !== $productionType) return false;
-    return true;
-}));
-$validCycleIds = array_map('intval', array_column($visibleCycles,'id'));
-if ($cycleId && !in_array($cycleId, $validCycleIds, true)) $cycleId = 0;
+if ($salesOnlyWorkspace) {
+    $cycleId =
+        0;
+
+    $cycles =
+        [];
+
+    $visibleCycles =
+        [];
+} else {
+    $cycleId =
+        (int)(
+            $_GET['cycle_id']
+            ?? 0
+        );
+
+    $cyclesStmt =
+        $pdo->prepare(
+            "SELECT id,cycle_code,farm_type,production_type,status
+             FROM production_cycles
+             WHERE farm_id=?
+             ORDER BY start_date DESC,id DESC"
+        );
+
+    $cyclesStmt->execute(
+        [$farmId]
+    );
+
+    $cycles =
+        $cyclesStmt->fetchAll(
+            PDO::FETCH_ASSOC
+        );
+
+    $visibleCycles =
+        array_values(
+            array_filter(
+                $cycles,
+                static function (
+                    array $cycle
+                ) use (
+                    $farmType,
+                    $productionType
+                ): bool {
+                    if (
+                        $farmType !== 'all'
+                        &&
+                        strtolower(
+                            (string)$cycle[
+                                'farm_type'
+                            ]
+                        ) !== $farmType
+                    ) {
+                        return false;
+                    }
+
+                    if (
+                        $productionType !== 'all'
+                        &&
+                        strtolower(
+                            (string)$cycle[
+                                'production_type'
+                            ]
+                        ) !== $productionType
+                    ) {
+                        return false;
+                    }
+
+                    return true;
+                }
+            )
+        );
+
+    $validCycleIds =
+        array_map(
+            'intval',
+            array_column(
+                $visibleCycles,
+                'id'
+            )
+        );
+
+    if (
+        $cycleId
+        &&
+        !in_array(
+            $cycleId,
+            $validCycleIds,
+            true
+        )
+    ) {
+        $cycleId =
+            0;
+    }
+}
 
 $summary = getProfitabilitySummary($pdo, $farmId, $start, $end, $farmType, $cycleId ?: null, $productionType === 'all' ? null : $productionType);
 
 $unallocatedShared =
-    profitability_unallocated_shared_summary(
-        $pdo,
-        $farmId,
-        $start,
-        $end
-    );
+    $salesOnlyWorkspace
+        ? [
+            'rows' => [],
+            'revenue_unallocated' => 0.0,
+            'operating_shared_unallocated' => 0.0,
+            'cash_feed_purchase_unallocated' => 0.0,
+            'stock_attribution_exception_count' => 0,
+            'stock_attribution_exception_amount' => 0.0,
+        ]
+        : profitability_unallocated_shared_summary(
+            $pdo,
+            $farmId,
+            $start,
+            $end
+        );
 
 $canManageStockAllocation =
+    !$salesOnlyWorkspace
+    &&
     stock_consumption_allocation_workspace_can_manage();
 
 $profitabilityAttribution =
@@ -181,25 +316,104 @@ $summary['mortality_value'] = !empty($poultryEconomics['available'])
 // Shared-revenue inclusion and unallocated pooled revenue are provided
 // by the central profitability read model above.
 
-// Use the same effective-transaction predicate as feed movement summaries and feed-cost reporting.
-// Compatibility contract: transaction_type='used' AND is_reversed = 0 AND reversal_of_id IS NULL
-$effectiveStockSql = stock_effective_sql_predicate();
-$feedItemSql = stock_feed_transaction_sql_predicate('t');
-$uncostedSql = "SELECT COUNT(*)
-                FROM stock_transactions t
-                JOIN stock_items s ON s.id=t.stock_item_id AND s.farm_id=t.farm_id
-                LEFT JOIN inventory_categories c ON c.id=s.category_id AND c.farm_id=s.farm_id
-                WHERE t.farm_id=? AND t.transaction_type='used' AND {$effectiveStockSql}
-                  AND {$feedItemSql} AND t.transaction_date BETWEEN ? AND ? AND t.total_cost IS NULL";
-$uncostedParams = [$farmId, $start, $end];
-if ($farmType && $farmType !== 'all') { $uncostedSql .= " AND t.farm_type=?"; $uncostedParams[] = $farmType; }
-if ($productionType !== 'all') { $uncostedSql .= " AND t.production_type=?"; $uncostedParams[] = $productionType; }
-if ($cycleId) { $uncostedSql .= " AND t.cycle_id=?"; $uncostedParams[] = $cycleId; }
-$hasUncosted = $pdo->prepare($uncostedSql);
-$hasUncosted->execute($uncostedParams);
-$uncosted = (int)$hasUncosted->fetchColumn();
+if ($salesOnlyWorkspace) {
+    $uncosted =
+        0;
 
-$toggleParams = ['farm_type' => $farmType, 'production_type' => $productionType, 'cycle_id' => $cycleId];
+    $toggleParams = [
+        'farm_type' =>
+            'general',
+    ];
+} else {
+    // Use the same effective-transaction predicate as feed movement summaries
+    // and feed-cost reporting.
+    // Compatibility contract:
+    // transaction_type='used'
+    // AND is_reversed = 0
+    // AND reversal_of_id IS NULL
+    $effectiveStockSql =
+        stock_effective_sql_predicate();
+
+    $feedItemSql =
+        stock_feed_transaction_sql_predicate(
+            't'
+        );
+
+    $uncostedSql =
+        "SELECT COUNT(*)
+         FROM stock_transactions t
+         JOIN stock_items s
+           ON s.id=t.stock_item_id
+          AND s.farm_id=t.farm_id
+         LEFT JOIN inventory_categories c
+           ON c.id=s.category_id
+          AND c.farm_id=s.farm_id
+         WHERE t.farm_id=?
+           AND t.transaction_type='used'
+           AND {$effectiveStockSql}
+           AND {$feedItemSql}
+           AND t.transaction_date BETWEEN ? AND ?";
+
+    $uncostedParams = [
+        $farmId,
+        $start,
+        $end,
+    ];
+
+    if (
+        $farmType
+        &&
+        $farmType !== 'all'
+    ) {
+        $uncostedSql .=
+            " AND t.farm_type=?";
+
+        $uncostedParams[] =
+            $farmType;
+    }
+
+    if ($productionType !== 'all') {
+        $uncostedSql .=
+            " AND t.production_type=?";
+
+        $uncostedParams[] =
+            $productionType;
+    }
+
+    if ($cycleId) {
+        $uncostedSql .=
+            " AND t.cycle_id=?";
+
+        $uncostedParams[] =
+            $cycleId;
+    }
+
+    $uncostedSql .=
+        " AND t.total_cost IS NULL";
+
+    $hasUncosted =
+        $pdo->prepare(
+            $uncostedSql
+        );
+
+    $hasUncosted->execute(
+        $uncostedParams
+    );
+
+    $uncosted =
+        (int)$hasUncosted->fetchColumn();
+
+    $toggleParams = [
+        'farm_type' =>
+            $farmType,
+
+        'production_type' =>
+            $productionType,
+
+        'cycle_id' =>
+            $cycleId,
+    ];
+}
 $dailyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'daily', 'date' => $period === 'daily' ? $selectedDate : date('Y-m-d')]));
 $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'monthly', 'month' => $period === 'monthly' ? $month : substr($selectedDate, 0, 7)]));
 ?>
@@ -208,7 +422,14 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
 <?php include(__DIR__.'/../navbar.php'); ?>
 <div class="container-fluid py-4">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 app-responsive-toolbar">
-        <div><h2 class="mb-1">Profitability</h2><p class="text-muted mb-0">Traceable profitability using recorded revenue, sale-specific cost of goods sold, effective feed consumption and operating costs.</p></div>
+        <div>
+            <h2 class="mb-1">Profitability</h2>
+            <p class="text-muted mb-0">
+                <?php echo $salesOnlyWorkspace
+                    ? 'Business profitability from recorded sales, inventory cost of goods sold and operating expenses.'
+                    : 'Traceable profitability using recorded revenue, sale-specific cost of goods sold, effective feed consumption and operating costs.'; ?>
+            </p>
+        </div>
         <a class="btn btn-outline-secondary" href="<?php echo BASE_URL; ?>/management/reports.php">Back to Analytics</a>
     </div>
 
@@ -227,6 +448,18 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
                     <label class="form-label">Month</label><input type="month" name="month" class="form-control" value="<?php echo htmlspecialchars($month); ?>">
                 <?php endif; ?>
             </div>
+            <?php if ($salesOnlyWorkspace): ?>
+            <input
+                type="hidden"
+                name="farm_type"
+                value="general"
+            >
+            <div class="col-md-2">
+                <button class="btn btn-primary w-100">
+                    Apply
+                </button>
+            </div>
+            <?php else: ?>
             <div class="col-md-2">
                 <label class="form-label">Farm type</label>
                 <select
@@ -275,7 +508,10 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
             <div class="col-md-3"><label class="form-label">Production type</label><select name="production_type" id="profitProductionType" class="form-select"><option value="all">All production types</option><?php foreach($productionOptions as $value=>$label): ?><option value="<?php echo htmlspecialchars($value); ?>" <?php echo $productionType===$value?'selected':''; ?>><?php echo htmlspecialchars($label); ?></option><?php endforeach; ?></select></div>
             <div class="col-md-3"><label class="form-label">Production cycle (optional)</label><select name="cycle_id" id="profitCycleId" class="form-select"><option value="0"><?php echo $productionType !== 'all' ? 'All ' . htmlspecialchars(attribution_label($productionType)) . ' cycles' : 'All cycles'; ?></option><?php foreach($visibleCycles as $c): ?><option value="<?php echo (int)$c['id']; ?>" <?php echo $cycleId===(int)$c['id']?'selected':''; ?>><?php echo htmlspecialchars($c['cycle_code'].' — '.$c['production_type'].' ('.$c['status'].')'); ?></option><?php endforeach; ?></select></div>
             <div class="col-md-1"><button class="btn btn-primary w-100">Apply</button></div>
+            <?php endif; ?>
         </div>
+
+        <?php if (!$salesOnlyWorkspace): ?>
         <div class="col-12 profitability-filter-help">
             <i class="bi bi-info-circle me-1"></i>
             Production type narrows Layer, Broiler, a ruminant species, or the recorded Shared Operation.
@@ -283,6 +519,7 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
             Unallocated shared balances remain at their parent scope until an explicit compatible allocation is recorded.
             Choose a cycle only when you need cycle-level analysis.
         </div>
+        <?php endif; ?>
     </form>
 
     <?php if ($cycleId && $allocatedSharedRevenue > 0.009): ?>
@@ -307,15 +544,49 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
     <?php endif; ?>
 
     <div class="d-flex justify-content-between align-items-center mb-2"><h5 class="mb-0"><?php echo $period === 'daily' ? 'Daily Analysis' : 'Monthly Analysis'; ?></h5><span class="text-muted"><?php echo htmlspecialchars($periodLabel); ?></span></div>
+    <?php
+        $grossProfit =
+            (float)$summary['revenue']
+            -
+            (float)(
+                $summary['cost_of_goods_sold']
+                ?? 0
+            );
+
+        $operatingExpenses =
+            (float)$summary['feed_consumption_cost']
+            +
+            (float)$summary['non_feed_expenses'];
+
+        $profitMargin =
+            abs((float)$summary['revenue']) > 0.00001
+                ? (
+                    (float)$summary['profit']
+                    /
+                    (float)$summary['revenue']
+                ) * 100
+                : null;
+    ?>
+
     <div class="row g-3 mb-4">
+        <?php if ($salesOnlyWorkspace): ?>
+        <div class="col-12 col-sm-6 col-xl-4"><div class="card h-100"><div class="card-body"><div class="text-muted">Revenue</div><h3 class="mt-2">₦<?php echo number_format($summary['revenue'],2); ?></h3></div></div></div>
+        <div class="col-12 col-sm-6 col-xl-4"><div class="card h-100"><div class="card-body"><div class="text-muted">Cost of Goods Sold</div><h3 class="mt-2">₦<?php echo number_format($summary['cost_of_goods_sold'] ?? 0,2); ?></h3></div></div></div>
+        <div class="col-12 col-sm-6 col-xl-4"><div class="card h-100"><div class="card-body"><div class="text-muted">Gross Profit</div><h3 class="mt-2 <?php echo $grossProfit >= 0 ? 'text-success' : 'text-danger'; ?>">₦<?php echo number_format($grossProfit,2); ?></h3></div></div></div>
+        <div class="col-12 col-sm-6 col-xl-4"><div class="card h-100"><div class="card-body"><div class="text-muted">Operating Expenses</div><h3 class="mt-2">₦<?php echo number_format($operatingExpenses,2); ?></h3></div></div></div>
+        <div class="col-12 col-sm-6 col-xl-4"><div class="card h-100"><div class="card-body"><div class="text-muted">Net Profit / Loss</div><h3 class="mt-2 <?php echo $summary['profit']>=0?'text-success':'text-danger'; ?>">₦<?php echo number_format($summary['profit'],2); ?></h3></div></div></div>
+        <div class="col-12 col-sm-6 col-xl-4"><div class="card h-100"><div class="card-body"><div class="text-muted">Profit Margin</div><h3 class="mt-2"><?php echo $profitMargin === null ? 'N/A' : number_format($profitMargin,2) . '%'; ?></h3></div></div></div>
+        <?php else: ?>
         <div class="col-12 col-sm-6 col-xl"><div class="card h-100"><div class="card-body"><div class="text-muted">Revenue</div><h3 class="mt-2">₦<?php echo number_format($summary['revenue'],2); ?></h3></div></div></div>
         <div class="col-12 col-sm-6 col-xl"><div class="card h-100"><div class="card-body"><div class="text-muted">Cost of goods sold</div><h3 class="mt-2">₦<?php echo number_format($summary['cost_of_goods_sold'] ?? 0,2); ?></h3><div class="small text-muted">P&amp;L COGS releases only frozen purchase/capital basis. Full-cost sold valuation: ₦<?php echo number_format($summary['slaughter_output_full_cost_valuation'] ?? 0,2); ?> · embedded operating cost not charged again: ₦<?php echo number_format($summary['slaughter_output_embedded_operating_cost'] ?? 0,2); ?>.</div></div></div></div>
         <div class="col-12 col-sm-6 col-xl"><div class="card h-100"><div class="card-body"><div class="text-muted">Feed consumed</div><h3 class="mt-2">₦<?php echo number_format($summary['feed_consumption_cost'],2); ?></h3></div></div></div>
         <div class="col-12 col-sm-6 col-xl"><div class="card h-100"><div class="card-body"><div class="text-muted">Other operating cost</div><h3 class="mt-2">₦<?php echo number_format($summary['non_feed_expenses'],2); ?></h3></div></div></div>
         <div class="col-12 col-sm-6 col-xl"><div class="card h-100"><div class="card-body"><div class="text-muted">Profit / Loss</div><h3 class="mt-2 <?php echo $summary['profit']>=0?'text-success':'text-danger'; ?>">₦<?php echo number_format($summary['profit'],2); ?></h3></div></div></div>
+        <?php endif; ?>
     </div>
 
 
+    <?php if (!$salesOnlyWorkspace): ?>
     <div class="card mb-4" id="unallocated-shared-balances">
         <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div>
@@ -630,6 +901,9 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
         </div>
     </div>
 
+    <?php endif; ?>
+
+    <?php if (!$salesOnlyWorkspace): ?>
     <div class="card mb-4" id="profitability-attribution">
         <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div>
@@ -788,7 +1062,16 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
         </div>
     </div>
 
-    <?php if($uncosted>0): ?><div class="alert alert-warning"><strong>Cost data notice:</strong> <?php echo $uncosted; ?> effective feed-use transaction(s) in this period have no cost snapshot. They are excluded from feed-consumption cost so the platform does not invent a cost.</div><?php endif; ?>
+    <?php endif; ?>
+
+    <?php if (!$salesOnlyWorkspace && $uncosted > 0): ?>
+        <div class="alert alert-warning">
+            <strong>Cost data notice:</strong>
+            <?php echo $uncosted; ?>
+            effective feed-use transaction(s) in this period have no cost snapshot.
+            They are excluded from feed-consumption cost so the platform does not invent a cost.
+        </div>
+    <?php endif; ?>
 
     <?php if (!empty($poultryEconomics['available'])): ?>
         <?php
@@ -842,11 +1125,71 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
         </div>
     <?php endif; ?>
 
+    <?php if ($salesOnlyWorkspace): ?>
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-header fw-semibold">
+                    How this result is calculated
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-7">Revenue from sales</dt>
+                        <dd class="col-5 text-end">₦<?php echo number_format($summary['revenue'],2); ?></dd>
+
+                        <dt class="col-7">Cost of goods sold</dt>
+                        <dd class="col-5 text-end">₦<?php echo number_format($summary['cost_of_goods_sold'] ?? 0,2); ?></dd>
+
+                        <dt class="col-7">Gross profit</dt>
+                        <dd class="col-5 text-end">₦<?php echo number_format($grossProfit,2); ?></dd>
+
+                        <dt class="col-7">Operating expenses</dt>
+                        <dd class="col-5 text-end">₦<?php echo number_format($operatingExpenses,2); ?></dd>
+
+                        <hr>
+
+                        <dt class="col-7">Net Profit / Loss</dt>
+                        <dd class="col-5 text-end fw-bold <?php echo $summary['profit']>=0?'text-success':'text-danger'; ?>">
+                            ₦<?php echo number_format($summary['profit'],2); ?>
+                        </dd>
+                    </dl>
+
+                    <p class="small text-muted mt-3 mb-0">
+                        Revenue comes from recorded sales.
+                        Cost of goods sold is released from the frozen cost of General Inventory actually sold.
+                        Operating expenses come from recognised business expenses and operating inventory consumption.
+                        Inventory purchases are not charged twice when stock is later sold or used.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header fw-semibold">
+                    Reporting integrity
+                </div>
+                <div class="card-body">
+                    <p class="mb-2">
+                        Daily and monthly views use the same canonical profitability engine.
+                    </p>
+
+                    <p class="mb-0 text-muted small">
+                        Reversed stock movements remain available in the audit ledger but are excluded from effective inventory cost calculations.
+                        Historical sale cost uses the recorded inventory cost snapshot, so later stock-price changes do not rewrite prior profit.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php else: ?>
     <div class="row g-4">
         <div class="col-lg-7"><div class="card"><div class="card-header fw-semibold">How this result is calculated</div><div class="card-body"><dl class="row mb-0"><dt class="col-7">Revenue from sales</dt><dd class="col-5 text-end">₦<?php echo number_format($summary['revenue'],2); ?></dd><dt class="col-7">Cost of goods sold (purchase/capital basis released on sale)</dt><dd class="col-5 text-end">₦<?php echo number_format($summary['cost_of_goods_sold'] ?? 0,2); ?></dd><dt class="col-7">Feed consumed (cost snapshot)</dt><dd class="col-5 text-end">₦<?php echo number_format($summary['feed_consumption_cost'],2); ?></dd><dt class="col-7">Other operating expenses</dt><dd class="col-5 text-end">₦<?php echo number_format($summary['non_feed_expenses'],2); ?></dd><dd class="col-12 small text-muted text-end mb-2">Manual/non-stock: ₦<?php echo number_format($summary['manual_non_feed_expenses'] ?? 0,2); ?> · Consumed operating inventory: ₦<?php echo number_format($summary['inventory_operating_consumption_cost'] ?? 0,2); ?></dd><hr><dt class="col-7">Profit / Loss</dt><dd class="col-5 text-end fw-bold <?php echo $summary['profit']>=0?'text-success':'text-danger'; ?>">₦<?php echo number_format($summary['profit'],2); ?></dd></dl><p class="small text-muted mt-3 mb-0">Slaughter-output Inventory retains its full-cost valuation, but Profit / Loss COGS releases only the frozen purchase/capital component when output is sold. Direct/shared operating costs already recognised through expenses or consumed-stock economics remain embedded valuation disclosure and are not charged again. Unsold slaughter-output value remains in Inventory and is not charged again to period Profit / Loss. Feed purchases are tracked as cash expenses (₦<?php echo number_format($summary['cash_feed_expenses'],2); ?>) but are not added again to consumed-feed cost. Feed profitability is consumption-based, preventing purchase-day distortion and double counting. Medication/Vaccine, Supplement and Consumables inventory are likewise recognised inside Other operating cost when USED; their purchase receipts remain spending/cash-flow records rather than a second profitability charge.<?php if (!empty($poultryEconomics['available'])): ?> Mortality value is tracked separately as productive-bird loss intelligence and is not deducted again from period Profit / Loss.<?php endif; ?></p></div></div></div>
         <div class="col-lg-5"><div class="card"><div class="card-header fw-semibold">Reporting integrity</div><div class="card-body"><p class="mb-2">Daily and monthly views use the same calculation engine. Monthly is the sum of activity inside the selected month; Daily limits that engine to one date.</p><p class="mb-0 text-muted small">Reversed originals and restoration/reversal rows remain available in the audit ledger but are excluded from operational feed quantity and profitability calculations. Feed usage is valued from its transaction cost snapshot, so a later inventory price change does not rewrite historical profit. Production type and cycle attribution keep Layer, Broiler and ruminant species costs separated; pooled activity remains explicit instead of being guessed.</p></div></div></div>
     </div>
+    <?php endif; ?>
 </div>
+<?php if (!$salesOnlyWorkspace): ?>
 <div
     id="managementProfitabilityConfig"
     hidden
@@ -863,4 +1206,5 @@ $monthlyUrl = '?' . http_build_query(array_merge($toggleParams, ['period' => 'mo
     data-cycle-id="<?php echo (int)$cycleId; ?>"
 ></div>
 <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/management-profitability.js'); ?>"></script>
+<?php endif; ?>
 </body></html>
