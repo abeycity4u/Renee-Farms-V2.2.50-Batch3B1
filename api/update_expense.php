@@ -71,10 +71,16 @@ try {
      * Canonical category authority owns both normal edits and historical
      * Inventory-owned category preservation.
      */
+    $categorySurface =
+        $farmType === 'general'
+            ? 'general_operating'
+            : 'manual';
+
     $category =
         expense_category_normalize_for_update(
             $category,
-            $existing['category'] ?? ''
+            $existing['category'] ?? '',
+            $categorySurface
         );
 
     $requestedProduction =

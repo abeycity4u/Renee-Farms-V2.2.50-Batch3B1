@@ -52,6 +52,57 @@ const expensePermissionScope = 'expense_report';
         applyFilters();
     });
 
+    const createGeneralExpenseForm =
+        document.getElementById('createGeneralExpenseForm');
+
+    if (createGeneralExpenseForm) {
+        createGeneralExpenseForm.addEventListener(
+            'submit',
+            async function(e) {
+                e.preventDefault();
+
+                const formData =
+                    new FormData(this);
+
+                formData.append(
+                    'csrf_token',
+                    csrfToken
+                );
+
+                try {
+                    const response =
+                        await fetch(
+                            '../api/create_general_expense.php',
+                            {
+                                method: 'POST',
+                                body: formData
+                            }
+                        );
+
+                    const result =
+                        await response.json();
+
+                    if (result.success) {
+                        location.reload();
+                        return;
+                    }
+
+                    AppNotify.error(
+                        result.error
+                        || result.message
+                        || 'Unable to record expense'
+                    );
+
+                } catch (error) {
+                    AppNotify.error(
+                        'Network error: '
+                        + error.message
+                    );
+                }
+            }
+        );
+    }
+
     if (canManageExpenses) {
     attachEditModal({
         buttonSelector: '.edit-expense-btn',

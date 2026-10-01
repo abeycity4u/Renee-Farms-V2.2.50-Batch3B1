@@ -30,6 +30,7 @@ if (!function_exists('expense_category_catalog')) {
                 'label' => 'Feed',
                 'manual' => false,
                 'slaughter_processing' => false,
+                'general_operating' => false,
                 'historical_only' => true,
             ],
 
@@ -37,6 +38,7 @@ if (!function_exists('expense_category_catalog')) {
                 'label' => 'Medication',
                 'manual' => false,
                 'slaughter_processing' => false,
+                'general_operating' => false,
                 'historical_only' => true,
             ],
 
@@ -47,6 +49,7 @@ if (!function_exists('expense_category_catalog')) {
                 'label' => 'Salary / Wages',
                 'manual' => true,
                 'slaughter_processing' => false,
+                'general_operating' => true,
                 'historical_only' => false,
             ],
 
@@ -54,6 +57,7 @@ if (!function_exists('expense_category_catalog')) {
                 'label' => 'Labour Cost',
                 'manual' => true,
                 'slaughter_processing' => true,
+                'general_operating' => true,
                 'historical_only' => false,
             ],
 
@@ -61,6 +65,7 @@ if (!function_exists('expense_category_catalog')) {
                 'label' => 'Logistics / Transport',
                 'manual' => true,
                 'slaughter_processing' => true,
+                'general_operating' => true,
                 'historical_only' => false,
             ],
 
@@ -68,6 +73,7 @@ if (!function_exists('expense_category_catalog')) {
                 'label' => 'Fuel / Energy',
                 'manual' => true,
                 'slaughter_processing' => true,
+                'general_operating' => true,
                 'historical_only' => false,
             ],
 
@@ -75,6 +81,71 @@ if (!function_exists('expense_category_catalog')) {
                 'label' => 'Processing Materials',
                 'manual' => true,
                 'slaughter_processing' => true,
+                'general_operating' => false,
+                'historical_only' => false,
+            ],
+
+            'rent' => [
+                'label' => 'Rent / Lease',
+                'manual' => false,
+                'slaughter_processing' => false,
+                'general_operating' => true,
+                'historical_only' => false,
+            ],
+
+            'utilities' => [
+                'label' => 'Utilities',
+                'manual' => false,
+                'slaughter_processing' => false,
+                'general_operating' => true,
+                'historical_only' => false,
+            ],
+
+            'marketing' => [
+                'label' => 'Marketing / Advertising',
+                'manual' => false,
+                'slaughter_processing' => false,
+                'general_operating' => true,
+                'historical_only' => false,
+            ],
+
+            'repairs_maintenance' => [
+                'label' => 'Repairs / Maintenance',
+                'manual' => false,
+                'slaughter_processing' => false,
+                'general_operating' => true,
+                'historical_only' => false,
+            ],
+
+            'bank_charges' => [
+                'label' => 'Bank / Payment Charges',
+                'manual' => false,
+                'slaughter_processing' => false,
+                'general_operating' => true,
+                'historical_only' => false,
+            ],
+
+            'communication' => [
+                'label' => 'Internet / Phone',
+                'manual' => false,
+                'slaughter_processing' => false,
+                'general_operating' => true,
+                'historical_only' => false,
+            ],
+
+            'taxes_levies' => [
+                'label' => 'Taxes / Levies',
+                'manual' => false,
+                'slaughter_processing' => false,
+                'general_operating' => true,
+                'historical_only' => false,
+            ],
+
+            'professional_fees' => [
+                'label' => 'Professional Fees',
+                'manual' => false,
+                'slaughter_processing' => false,
+                'general_operating' => true,
                 'historical_only' => false,
             ],
 
@@ -82,6 +153,7 @@ if (!function_exists('expense_category_catalog')) {
                 'label' => 'Miscellaneous',
                 'manual' => true,
                 'slaughter_processing' => true,
+                'general_operating' => true,
                 'historical_only' => false,
             ],
         ];
@@ -104,6 +176,7 @@ if (!function_exists('expense_category_options')) {
                 [
                     'manual',
                     'slaughter_processing',
+                    'general_operating',
                     'report',
                 ],
                 true
@@ -289,7 +362,8 @@ if (!function_exists('expense_category_normalize_for_update')) {
      */
     function expense_category_normalize_for_update(
         $value,
-        $existingValue
+        $existingValue,
+        string $surface = 'manual'
     ): string {
         $category =
             strtolower(
@@ -321,7 +395,7 @@ if (!function_exists('expense_category_normalize_for_update')) {
         return
             expense_category_normalize(
                 $category,
-                'manual'
+                $surface
             );
     }
 }

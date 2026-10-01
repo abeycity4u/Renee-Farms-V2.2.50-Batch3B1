@@ -77,6 +77,7 @@ function permission_catalog(): array
             'sales_receivables_edit' => ['label' => 'Sales Receivables', 'action' => 'Edit', 'description' => 'Modify eligible sales receivable and payment records.', 'roles' => $sharedSalesRoles],
             'sales_receivables_delete' => ['label' => 'Sales Receivables', 'action' => 'Delete', 'description' => 'Delete eligible sales receivable and payment records.', 'roles' => $sharedSalesRoles],
             'expenses' => ['label' => 'Expense Report', 'action' => 'View', 'description' => 'View the farm Expense Report when delegated by Farm Admin.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
+            'expenses_add' => ['label' => 'Expense Report', 'action' => 'Add', 'description' => 'Record new General non-stock operating expenses from the Expense Report page.', 'roles' => ['sales_rep']],
             'expenses_edit' => ['label' => 'Expense Report', 'action' => 'Edit', 'description' => 'Modify eligible expense records from the Expense Report page.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
             'expenses_delete' => ['label' => 'Expense Report', 'action' => 'Delete', 'description' => 'Delete eligible expense records from the Expense Report page.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
         ],

@@ -15,6 +15,25 @@ $tenantFarmId = requireCurrentFarmId();
 $userType = getUserType();
 $userFarmType = getUserFarmType();
 $canManageExpenses = isPlatformOwner() || hasRole('farm_admin') || hasPermission(getUserType(), 'expenses');
+
+$salesOnlyWorkspace =
+    current_farm_is_sales_only();
+
+$canAddGeneralExpense =
+    $salesOnlyWorkspace
+    &&
+    (
+        isPlatformOwner()
+        ||
+        hasRole('farm_admin')
+        ||
+        (
+            hasPermission(getUserType(), 'expenses')
+            &&
+            hasPermission(getUserType(), 'expenses_add')
+        )
+    );
+
 $canChooseFarmType = isPlatformOwner() || hasRole('farm_admin', 'sales_rep');
 
 $reportMode = $_GET['report_mode'] ?? 'monthly';
@@ -47,6 +66,18 @@ $categoryOptions =
     expense_category_options(
         'report'
     );
+
+$createCategoryOptions =
+    expense_category_options(
+        'general_operating'
+    );
+
+$editCategoryOptions =
+    $salesOnlyWorkspace
+        ? expense_category_options(
+            'general_operating'
+        )
+        : $categoryOptions;
 
 $category =
     strtolower(
@@ -131,6 +162,18 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                             Expense Report - <?php echo htmlspecialchars($periodLabel); ?>
                         </h4>
                         <div class="d-flex gap-2 report-controls">
+                            <?php if ($canAddGeneralExpense): ?>
+                            <button
+                                type="button"
+                                class="btn btn-success text-nowrap"
+                                data-bs-toggle="modal"
+                                data-bs-target="#createGeneralExpenseModal"
+                            >
+                                <i class="bi bi-plus-circle"></i>
+                                Record Expense
+                            </button>
+                            <?php endif; ?>
+
                             <select class="form-select app-width-150" id="farmTypeFilter">
                                 <?php if ($canChooseFarmType): ?>
                                 <?php if (count(accessibleFarmTypes()) === 2): ?><option value="all" <?php echo $farmType == 'all' ? 'selected' : ''; ?>>All Farms</option><?php endif; ?>
@@ -420,6 +463,136 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
         </div>
     </div>
 
+    <?php if ($canAddGeneralExpense): ?>
+    <!-- Sales-only General Operating Expense Modal -->
+    <div class="modal fade" id="createGeneralExpenseModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="createGeneralExpenseForm">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Record Expense</h5>
+                        <button
+                            type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                        ></button>
+                    </div>
+
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="createExpenseDate" class="form-label">
+                                Date
+                            </label>
+                            <input
+                                type="date"
+                                name="expense_date"
+                                id="createExpenseDate"
+                                class="form-control"
+                                value="<?= htmlspecialchars(date('Y-m-d'), ENT_QUOTES) ?>"
+                                required
+                            >
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="createExpenseCategory" class="form-label">
+                                Category
+                            </label>
+                            <select
+                                name="category"
+                                id="createExpenseCategory"
+                                class="form-select"
+                                required
+                            >
+                                <option value="">Select category</option>
+
+                                <?php foreach ($createCategoryOptions as $value => $label): ?>
+                                <option
+                                    value="<?= htmlspecialchars(
+                                        (string)$value,
+                                        ENT_QUOTES | ENT_SUBSTITUTE,
+                                        'UTF-8'
+                                    ) ?>"
+                                >
+                                    <?= htmlspecialchars(
+                                        (string)$label,
+                                        ENT_QUOTES | ENT_SUBSTITUTE,
+                                        'UTF-8'
+                                    ) ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+
+                            <small class="text-muted">
+                                Stock purchases belong in Inventory and are not recorded again as operating expenses.
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="createExpenseUnit" class="form-label">
+                                Quantity
+                            </label>
+                            <input
+                                type="number"
+                                name="unit"
+                                id="createExpenseUnit"
+                                class="form-control"
+                                step="0.01"
+                                min="0.01"
+                                value="1"
+                                required
+                            >
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="createExpenseAmount" class="form-label">
+                                Amount per Unit (₦)
+                            </label>
+                            <input
+                                type="number"
+                                name="amount"
+                                id="createExpenseAmount"
+                                class="form-control"
+                                step="0.01"
+                                min="0.01"
+                                required
+                            >
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="createExpenseDescription" class="form-label">
+                                Description
+                            </label>
+                            <textarea
+                                name="description"
+                                id="createExpenseDescription"
+                                class="form-control"
+                                rows="3"
+                            ></textarea>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button
+                            type="button"
+                            class="btn btn-secondary"
+                            data-bs-dismiss="modal"
+                        >
+                            Cancel
+                        </button>
+
+                        <button
+                            type="submit"
+                            class="btn btn-primary"
+                        >
+                            Save Expense
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <?php if ($canManageExpenses): ?>
     <!-- Edit Expense Modal -->
     <div class="modal fade" id="editExpenseModal" tabindex="-1">
@@ -438,9 +611,33 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                         </div>
                         <div class="mb-3">
                             <label>Farm Type</label>
-                            <select name="farm_type" id="editFarmType" class="form-select" required>
-                                <?php foreach (allowedFarmTypes() as $type): ?><option value="<?php echo $type; ?>"><?php echo ucfirst($type); ?></option><?php endforeach; ?>
+                            <?php if ($salesOnlyWorkspace): ?>
+                            <input
+                                type="hidden"
+                                name="farm_type"
+                                id="editFarmType"
+                                value="general"
+                            >
+                            <input
+                                type="text"
+                                class="form-control"
+                                value="General"
+                                disabled
+                            >
+                            <?php else: ?>
+                            <select
+                                name="farm_type"
+                                id="editFarmType"
+                                class="form-select"
+                                required
+                            >
+                                <?php foreach (allowedFarmTypes() as $type): ?>
+                                <option value="<?php echo $type; ?>">
+                                    <?php echo ucfirst($type); ?>
+                                </option>
+                                <?php endforeach; ?>
                             </select>
+                            <?php endif; ?>
                         </div>
                         <div class="mb-3">
                             <label>Category</label>
@@ -451,7 +648,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'expen
                                 class="form-select"
                                 required
                             >
-                                <?php foreach ($categoryOptions as $value => $label): ?>
+                                <?php foreach ($editCategoryOptions as $value => $label): ?>
                                     <option
                                         value="<?= htmlspecialchars(
                                             (string)$value,
