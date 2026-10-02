@@ -372,9 +372,11 @@ if (!function_exists('account_credential_delivery_html_message')) {
         ) {
             $details .=
                 '<tr>'
-                . '<td style="padding:7px 0;color:#64748b;width:42%;">Farm</td>'
-                . '<td style="padding:7px 0;color:#0f172a;font-weight:600;">'
+                . '<td style="padding:8px 0 14px;">'
+                . '<div style="font-size:12px;line-height:1.4;color:#64748b;text-transform:uppercase;letter-spacing:.4px;">Farm</div>'
+                . '<div style="margin-top:4px;font-size:16px;line-height:1.45;color:#0f172a;font-weight:700;">'
                 . $safeFarm
+                . '</div>'
                 . '</td>'
                 . '</tr>';
         }
@@ -382,18 +384,22 @@ if (!function_exists('account_credential_delivery_html_message')) {
         if ($isTenantAccount) {
             $details .=
                 '<tr>'
-                . '<td style="padding:7px 0;color:#64748b;">Farm Workspace ID</td>'
-                . '<td style="padding:7px 0;color:#0f172a;font-weight:600;">'
+                . '<td style="padding:8px 0 14px;">'
+                . '<div style="font-size:12px;line-height:1.4;color:#64748b;text-transform:uppercase;letter-spacing:.4px;">Farm Workspace ID</div>'
+                . '<div style="margin-top:4px;font-size:16px;line-height:1.45;color:#0f172a;font-weight:700;word-break:break-word;">'
                 . $safeWorkspace
+                . '</div>'
                 . '</td>'
                 . '</tr>';
         }
 
         $details .=
             '<tr>'
-            . '<td style="padding:7px 0;color:#64748b;">Username</td>'
-            . '<td style="padding:7px 0;color:#0f172a;font-weight:600;">'
+            . '<td style="padding:8px 0;">'
+            . '<div style="font-size:12px;line-height:1.4;color:#64748b;text-transform:uppercase;letter-spacing:.4px;">Username</div>'
+            . '<div style="margin-top:4px;font-size:16px;line-height:1.45;color:#0f172a;font-weight:700;word-break:break-word;">'
             . $safeUsername
+            . '</div>'
             . '</td>'
             . '</tr>';
 
@@ -428,11 +434,13 @@ if (!function_exists('account_credential_delivery_html_message')) {
             . '</td></tr>'
             . '</table>'
             . '<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 26px;">'
-            . '<tr><td style="background:#198754;border-radius:8px;">'
+            . '<tr><td bgcolor="#198754" style="background:#198754;border-radius:8px;">'
             . '<a href="'
             . $safeLink
-            . '" style="display:inline-block;padding:14px 24px;color:#ffffff;text-decoration:none;font-size:16px;font-weight:700;">'
+            . '" style="display:inline-block;padding:14px 24px;color:#ffffff !important;-webkit-text-fill-color:#ffffff;text-decoration:none;font-size:16px;font-weight:700;">'
+            . '<span style="color:#ffffff !important;-webkit-text-fill-color:#ffffff;">'
             . $buttonLabel
+            . '</span>'
             . '</a>'
             . '</td></tr>'
             . '</table>'
