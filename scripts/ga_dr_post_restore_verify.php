@@ -56,7 +56,7 @@ $coreTables = [
     'subscriptions',
     'billing_payment_attempts',
     'stock_items',
-    'stock_ledger',
+    'stock_transactions',
     'sales',
     'farm_expenses',
     'production_cycles',
@@ -74,6 +74,7 @@ foreach ($coreTables as $table) {
 foreach ([
     ['users', 'farm_id'],
     ['stock_items', 'farm_id'],
+    ['stock_transactions', 'farm_id'],
     ['sales', 'farm_id'],
     ['farm_expenses', 'farm_id'],
     ['production_cycles', 'farm_id'],
@@ -90,7 +91,7 @@ if (dr_table_exists($pdo, 'schema_migrations')) {
 
 // Aggregate counts prove that the restored dataset is populated without exposing
 // any names, emails, financial values, tokens or row contents.
-foreach (['farms', 'users', 'subscriptions', 'stock_items', 'sales', 'farm_expenses'] as $table) {
+foreach (['farms', 'users', 'subscriptions', 'stock_items', 'stock_transactions', 'sales', 'farm_expenses'] as $table) {
     if (!dr_table_exists($pdo, $table)) continue;
     $count = (int)$pdo->query("SELECT COUNT(*) FROM `{$table}`")->fetchColumn();
     echo 'COUNT_' . strtoupper($table) . '=' . $count . PHP_EOL;
@@ -100,6 +101,7 @@ foreach (['farms', 'users', 'subscriptions', 'stock_items', 'sales', 'farm_expen
 $orphanChecks = [
     'users_without_farm' => 'SELECT COUNT(*) FROM users u LEFT JOIN farms f ON f.id = u.farm_id WHERE f.id IS NULL',
     'stock_without_farm' => 'SELECT COUNT(*) FROM stock_items s LEFT JOIN farms f ON f.id = s.farm_id WHERE f.id IS NULL',
+    'stock_transactions_without_farm' => 'SELECT COUNT(*) FROM stock_transactions st LEFT JOIN farms f ON f.id = st.farm_id WHERE f.id IS NULL',
     'sales_without_farm' => 'SELECT COUNT(*) FROM sales s LEFT JOIN farms f ON f.id = s.farm_id WHERE f.id IS NULL',
 ];
 
