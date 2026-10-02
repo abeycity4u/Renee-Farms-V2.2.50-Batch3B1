@@ -5,7 +5,7 @@
  * Keep the minimum requirement, hashing/verification primitives and authenticated
  * session binding in one place so credential flows cannot drift apart during GA
  * hardening. Authenticated sessions are bound to the current stored password hash;
- * any password change therefore revokes older sessions on their next request.
+ * any password change therefore revokes older sessions on their next protected request.
  */
 
 if (!function_exists('password_security_min_length')) {
@@ -74,6 +74,34 @@ if (!function_exists('password_security_bind_authenticated_session')) {
 
         $_SESSION['credential_session_fingerprint'] =
             password_security_session_fingerprint($storedHash);
+    }
+}
+
+if (!function_exists('password_security_public_credential_route')) {
+    /**
+     * Public credential routes may need to render their PRG confirmation after a
+     * password reset made an existing authenticated browser session stale. They
+     * expose no authenticated tenant data, so defer revocation until the next
+     * protected request instead of destroying the success flash prematurely.
+     */
+    function password_security_public_credential_route(): bool
+    {
+        $path = '/' . ltrim(
+            str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? '')),
+            '/'
+        );
+
+        foreach ([
+            '/sign.php',
+            '/login.php',
+            '/account/activate.php',
+            '/account/forgot_password.php',
+            '/account/reset_password.php',
+        ] as $suffix) {
+            if ($path === $suffix || str_ends_with($path, $suffix)) return true;
+        }
+
+        return false;
     }
 }
 
@@ -150,6 +178,7 @@ if (
     && $pdo instanceof PDO
     && session_status() === PHP_SESSION_ACTIVE
     && isset($_SESSION['user_id'])
+    && !password_security_public_credential_route()
 ) {
     password_security_enforce_authenticated_session($pdo);
 }
