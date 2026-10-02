@@ -210,10 +210,10 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
 
         if (layerEggSale) {
             sharedOption.text(
-                'Automatically allocate across eligible Layer cycles'
+                'Automatic — based on production history'
             );
             $(ids.help).text(
-                'Revenue will be allocated automatically using each eligible Layer cycle’s available unsold egg inventory.'
+                'Shared Layer egg sales are allocated using eligible unsold egg production records. Cycles without recorded egg production are excluded.'
             );
             return;
         }
@@ -338,7 +338,7 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
 
     const saleStockSourceGuidance = {
         financial_only:
-            'No Inventory is deducted. Revenue Attribution still decides where the sale revenue belongs, and Live Animal Impact independently records any animals that left the farm.',
+            'Records the sale value and revenue allocation only. Use population impact or inventory source when something physically leaves the farm.',
 
         slaughter_output:
             'The selected slaughter-output lot will be consumed. Live population was already changed by the slaughter record, so this sale must not remove the same animals again.'
@@ -1938,7 +1938,7 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
             .text(
                 farm === 'ruminant'
                     ? 'No additional group animals leave the farm'
-                    : 'No animals leave the farm — record sale/revenue only'
+                    : 'No animals leave the farm — financial sale only'
             );
 
         modeElement

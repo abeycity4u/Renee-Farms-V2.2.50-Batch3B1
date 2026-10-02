@@ -116,12 +116,17 @@ verify_contract(
 verify_contract(
     strpos(
         $js,
-        'Automatically allocate across eligible Layer cycles'
+        'Automatic — based on production history'
     ) !== false
     &&
     strpos(
         $js,
-        'available unsold egg inventory'
+        'eligible unsold egg production records'
+    ) !== false
+    &&
+    strpos(
+        $js,
+        'Cycles without recorded egg production are excluded.'
     ) !== false,
     'Shared Layer egg sale explains automatic unsold-pool allocation'
 );

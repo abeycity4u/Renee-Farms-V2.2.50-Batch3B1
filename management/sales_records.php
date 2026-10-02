@@ -209,7 +209,7 @@ $renderSalePopulationEffectControls = static function (string $prefix): void {
                 class="form-select"
             >
                 <option value="financial_only" selected>
-                    No animals leave the farm — record sale/revenue only
+                    No animals leave the farm — financial sale only
                 </option>
                 <option value="remove_live_population">
                     Animals leave the farm — reduce live population
@@ -1802,14 +1802,14 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                         >
                         <?php else: ?>
                         <div class="mb-3">
-                            <label>Stock / Inventory Source</label>
+                            <label>Physical Stock Impact</label>
                             <select
                                 name="sale_stock_source"
                                 id="addSaleStockSource"
                                 class="form-select"
                             >
                                 <option value="financial_only" selected>
-                                    Financial only — no Inventory movement
+                                    Financial record only — no physical stock removed
                                 </option>
                                 <option
                                     value="slaughter_output"
@@ -1828,7 +1828,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 class="text-muted d-block mt-1"
                                 id="addSaleStockSourceHelp"
                             >
-                                No Inventory is deducted. Revenue Attribution still decides where the sale revenue belongs, and Live Animal Impact independently records any animals that left the farm.
+                                Records the sale value and revenue allocation only. Use population impact or inventory source when something physically leaves the farm.
                             </small>
                         </div>
                         <?php endif; ?>
@@ -1946,7 +1946,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 <label>Revenue Attribution</label>
                                 <select name="cycle_id" id="addCycleId" class="form-select"><option value="0">Not tied to one cycle</option></select>
                                 <small class="text-muted d-block mt-1" id="addRevenueAttributionHelp">
-                                    This sale is not assigned directly to one production cycle.
+                                    This sale is not assigned directly to one production cycle. Shared production sales use the selected allocation rules.
                                 </small>
                             </div>
                         </div>
@@ -2159,14 +2159,14 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                         >
                         <?php else: ?>
                         <div class="mb-3">
-                            <label>Stock / Inventory Source</label>
+                            <label>Physical Stock Impact</label>
                             <select
                                 name="sale_stock_source"
                                 id="editSaleStockSource"
                                 class="form-select"
                             >
                                 <option value="financial_only">
-                                    Financial only — no active Inventory consumption
+                                    Financial record only — no physical stock removed
                                 </option>
                                 <option value="slaughter_output">
                                     Slaughter Output Inventory — explicit lot
@@ -2182,7 +2182,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 class="text-muted d-block mt-1"
                                 id="editSaleStockSourceHelp"
                             >
-                                No Inventory is deducted. Revenue Attribution still decides where the sale revenue belongs, and Live Animal Impact independently records any animals that left the farm.
+                                Records the sale value and revenue allocation only. Use population impact or inventory source when something physically leaves the farm.
                             </small>
                         </div>
                         <?php endif; ?>
@@ -2294,7 +2294,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 <label>Revenue Attribution</label>
                                 <select name="cycle_id" id="editSaleCycleId" class="form-select"><option value="0">Not tied to one cycle</option></select>
                                 <small class="text-muted d-block mt-1" id="editRevenueAttributionHelp">
-                                    This sale is not assigned directly to one production cycle.
+                                    This sale is not assigned directly to one production cycle. Shared production sales use the selected allocation rules.
                                 </small>
                             </div>
                         </div>

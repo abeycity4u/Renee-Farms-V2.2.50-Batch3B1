@@ -38,9 +38,9 @@ function verify_relationship(
 verify_relationship(
     substr_count(
         $page,
-        '<label>Stock / Inventory Source</label>'
+        '<label>Physical Stock Impact</label>'
     ) === 2,
-    'Add and Edit use Stock / Inventory Source label'
+    'Add and Edit use Physical Stock Impact label'
 );
 
 verify_relationship(
@@ -72,19 +72,19 @@ verify_relationship(
 verify_relationship(
     strpos(
         $js,
-        'No Inventory is deducted.'
+        'sale value and revenue allocation'
     ) !== false
     &&
     strpos(
         $js,
-        'Revenue Attribution still decides where the sale revenue belongs'
+        'population impact'
     ) !== false
     &&
     strpos(
         $js,
-        'Live Animal Impact independently records any animals that left the farm'
+        'physically leaves the farm'
     ) !== false,
-    'Financial-only guidance separates Inventory, revenue, and population'
+    'Financial-only guidance separates revenue from physical impact'
 );
 
 verify_relationship(
