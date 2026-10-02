@@ -1,6 +1,7 @@
 {
   "name": "renee-farms/platform-v2",
   "description": "Renee Farms V2.2 farm management platform",
+  "license": "proprietary",
   "type": "project",
   "require": {
     "dompdf/dompdf": "^3.0"
