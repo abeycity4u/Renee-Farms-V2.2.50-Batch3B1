@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/farm_entitlements.php';
+
 if (!function_exists('permission_catalog')) {
 function permission_catalog(): array
 {
@@ -25,21 +27,19 @@ function permission_catalog(): array
             'poultry_health_edit' => ['label' => 'Poultry Health & Treatment', 'action' => 'Edit', 'description' => 'Modify existing health and treatment events.', 'roles' => ['poultry_manager']],
             'poultry_health_delete' => ['label' => 'Poultry Health & Treatment', 'action' => 'Delete', 'description' => 'Delete health and treatment events.', 'roles' => ['poultry_manager']],
 
+        ],
+        'Poultry Expenses' => [
+            'poultry_expenses' => ['label' => 'Poultry Expenses', 'action' => 'View', 'description' => 'View the consolidated Poultry Expenses workspace for Layer, Broiler and Shared expense records.', 'roles' => $salesOptionalExpenseRoles],
+            'poultry_expenses_add' => ['label' => 'Poultry Expenses', 'action' => 'Add', 'description' => 'Record Layer, Broiler or Shared Poultry non-stock expenses.', 'roles' => $salesOptionalExpenseRoles],
+            'poultry_expenses_edit' => ['label' => 'Poultry Expenses', 'action' => 'Edit', 'description' => 'Modify eligible Layer, Broiler or Shared Poultry expense records.', 'roles' => $salesOptionalExpenseRoles],
+            'poultry_expenses_delete' => ['label' => 'Poultry Expenses', 'action' => 'Delete', 'description' => 'Delete eligible Layer, Broiler or Shared Poultry expense records.', 'roles' => $salesOptionalExpenseRoles],
+        ],
+        'Poultry Slaughter Processing' => [
             'poultry_slaughter' => ['label' => 'Poultry Slaughter Processing', 'action' => 'View', 'description' => 'View Poultry slaughter batches, processing cost basis and processed-output history.', 'roles' => ['poultry_manager']],
             'poultry_slaughter_batch_add' => ['label' => 'Poultry Slaughter Processing', 'action' => 'Create Batch', 'description' => 'Record a Poultry slaughter event and its canonical live-population exit.', 'roles' => ['poultry_manager']],
             'poultry_slaughter_processing_expense_add' => ['label' => 'Poultry Slaughter Processing', 'action' => 'Add Processing Expense', 'description' => 'Record canonical processing expenses against an open Poultry slaughter batch.', 'roles' => ['poultry_manager']],
             'poultry_slaughter_finalize' => ['label' => 'Poultry Slaughter Processing', 'action' => 'Finalize Cost Basis', 'description' => 'Freeze the Poultry slaughter batch processing cost basis before processed outputs are received.', 'roles' => ['poultry_manager']],
             'poultry_slaughter_output_add' => ['label' => 'Poultry Slaughter Processing', 'action' => 'Add Output', 'description' => 'Receive processed Poultry output into canonical Slaughter Output Inventory after cost finalization.', 'roles' => ['poultry_manager']],
-        ],
-        'Poultry Expenses' => [
-            'poultry_layer_expenses' => ['label' => 'Layer Expenses', 'action' => 'View', 'description' => 'View Layer expense records.', 'roles' => $salesOptionalExpenseRoles],
-            'poultry_layer_expenses_add' => ['label' => 'Layer Expenses', 'action' => 'Add', 'description' => 'Record new Layer non-stock expenses.', 'roles' => $salesOptionalExpenseRoles],
-            'poultry_layer_expenses_edit' => ['label' => 'Layer Expenses', 'action' => 'Edit', 'description' => 'Modify existing Layer expense records.', 'roles' => $salesOptionalExpenseRoles],
-            'poultry_layer_expenses_delete' => ['label' => 'Layer Expenses', 'action' => 'Delete', 'description' => 'Delete Layer expense records.', 'roles' => $salesOptionalExpenseRoles],
-            'poultry_broiler_expenses' => ['label' => 'Broiler Expenses', 'action' => 'View', 'description' => 'View Broiler expense records.', 'roles' => $salesOptionalExpenseRoles],
-            'poultry_broiler_expenses_add' => ['label' => 'Broiler Expenses', 'action' => 'Add', 'description' => 'Record new Broiler non-stock expenses.', 'roles' => $salesOptionalExpenseRoles],
-            'poultry_broiler_expenses_edit' => ['label' => 'Broiler Expenses', 'action' => 'Edit', 'description' => 'Modify existing Broiler expense records.', 'roles' => $salesOptionalExpenseRoles],
-            'poultry_broiler_expenses_delete' => ['label' => 'Broiler Expenses', 'action' => 'Delete', 'description' => 'Delete Broiler expense records.', 'roles' => $salesOptionalExpenseRoles],
         ],
         'Ruminant Operations' => [
             'ruminant_overview' => ['label' => 'Ruminant Overview', 'action' => 'View', 'description' => 'View the Ruminant dashboard and overall summary.', 'roles' => ['ruminant_manager']],
@@ -51,10 +51,6 @@ function permission_catalog(): array
             'ruminant_animals_add' => ['label' => 'Ruminant Animal Registry', 'action' => 'Add', 'description' => 'Register new ruminant animals.', 'roles' => ['ruminant_manager']],
             'ruminant_animals_edit' => ['label' => 'Ruminant Animal Registry', 'action' => 'Edit', 'description' => 'Modify existing animal registry details.', 'roles' => ['ruminant_manager']],
             'ruminant_animals_exit' => ['label' => 'Ruminant Animal Registry', 'action' => 'Record Exit', 'description' => 'Record dead, culled or transferred lifecycle exits.', 'roles' => ['ruminant_manager']],
-            'ruminant_slaughter' => ['label' => 'Ruminant Slaughter Processing', 'action' => 'View', 'description' => 'View Ruminant slaughter batches, processing cost basis and processed-output history.', 'roles' => ['ruminant_manager']],
-            'ruminant_slaughter_batch_add' => ['label' => 'Ruminant Slaughter Processing', 'action' => 'Create Batch', 'description' => 'Open processing for a lifecycle-confirmed slaughtered tagged animal.', 'roles' => ['ruminant_manager']],
-            'ruminant_slaughter_processing_expense_add' => ['label' => 'Ruminant Slaughter Processing', 'action' => 'Add Processing Expense', 'description' => 'Record canonical processing expenses against an open Ruminant slaughter batch before cost-basis freeze.', 'roles' => ['ruminant_manager']],
-            'ruminant_slaughter_output_add' => ['label' => 'Ruminant Slaughter Processing', 'action' => 'Add Output', 'description' => 'Freeze the Ruminant slaughter cost basis when required and receive processed output into Slaughter Output Inventory.', 'roles' => ['ruminant_manager']],
             'ruminant_feeds' => ['label' => 'Ruminant Feed Records', 'action' => 'View', 'description' => 'View Ruminant feed records.', 'roles' => ['ruminant_manager']],
             'ruminant_feeds_add' => ['label' => 'Ruminant Feed Records', 'action' => 'Add', 'description' => 'Record new Ruminant feed usage transactions.', 'roles' => ['ruminant_manager']],
             'ruminant_expenses' => ['label' => 'Ruminant Expenses', 'action' => 'View', 'description' => 'View Ruminant expense records available to the role.', 'roles' => $salesOptionalRuminantExpenseRoles],
@@ -62,10 +58,16 @@ function permission_catalog(): array
             'ruminant_expenses_edit' => ['label' => 'Ruminant Expenses', 'action' => 'Edit', 'description' => 'Modify existing Ruminant expense records.', 'roles' => $salesOptionalRuminantExpenseRoles],
             'ruminant_expenses_delete' => ['label' => 'Ruminant Expenses', 'action' => 'Delete', 'description' => 'Delete Ruminant expense records.', 'roles' => $salesOptionalRuminantExpenseRoles],
         ],
+        'Ruminant Slaughter Processing' => [
+            'ruminant_slaughter' => ['label' => 'Ruminant Slaughter Processing', 'action' => 'View', 'description' => 'View Ruminant slaughter batches, processing cost basis and processed-output history.', 'roles' => ['ruminant_manager']],
+            'ruminant_slaughter_batch_add' => ['label' => 'Ruminant Slaughter Processing', 'action' => 'Create Batch', 'description' => 'Open processing for a lifecycle-confirmed slaughtered tagged animal.', 'roles' => ['ruminant_manager']],
+            'ruminant_slaughter_processing_expense_add' => ['label' => 'Ruminant Slaughter Processing', 'action' => 'Add Processing Expense', 'description' => 'Record canonical processing expenses against an open Ruminant slaughter batch before cost-basis freeze.', 'roles' => ['ruminant_manager']],
+            'ruminant_slaughter_output_add' => ['label' => 'Ruminant Slaughter Processing', 'action' => 'Add Output', 'description' => 'Freeze the Ruminant slaughter cost basis when required and receive processed output into Slaughter Output Inventory.', 'roles' => ['ruminant_manager']],
+        ],
         'Inventory & Stock' => [
-            'inventory' => ['label' => 'Inventory', 'action' => 'View', 'description' => 'View inventory items, balances and stock history.', 'roles' => ['poultry_manager','ruminant_manager']],
-            'inventory_add_new_item' => ['label' => 'Inventory', 'action' => 'Add Item', 'description' => 'Create new inventory items.', 'roles' => ['poultry_manager','ruminant_manager']],
-            'update_stock' => ['label' => 'Inventory', 'action' => 'Update Stock', 'description' => 'Post received/used stock quantities and adjustments.', 'roles' => ['poultry_manager','ruminant_manager']],
+            'inventory' => ['label' => 'Inventory', 'action' => 'View', 'description' => 'View inventory items, balances and stock history.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
+            'inventory_add_new_item' => ['label' => 'Inventory', 'action' => 'Add Item', 'description' => 'Create new inventory items.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
+            'update_stock' => ['label' => 'Inventory', 'action' => 'Update Stock', 'description' => 'Post received/used stock quantities and adjustments.', 'roles' => ['poultry_manager','ruminant_manager','sales_rep']],
         ],
         'Sales & General Expenses' => [
             'sales' => ['label' => 'Sales Records', 'action' => 'View', 'description' => 'View sales records and receivable history.', 'roles' => $sharedSalesRoles],
@@ -123,6 +125,134 @@ function permission_catalog_applicable(string $role, string $code): bool
 }
 }
 
+/*
+ * Canonical tenant-aware applicability authority.
+ *
+ * The permission catalog determines whether a role may ever receive a
+ * permission. This helper adds the target tenant's commercial entitlement
+ * boundary so the Permissions UI, save route and runtime checks agree.
+ */
+if (!function_exists('permission_catalog_applicable_for_farm')) {
+function permission_catalog_applicable_for_farm(
+    PDO $pdo,
+    int $farmId,
+    string $role,
+    string $code
+): bool {
+    if (
+        $farmId < 1
+        || !permission_catalog_applicable($role, $code)
+    ) {
+        return false;
+    }
+
+    if (str_starts_with($code, 'poultry_')) {
+        return farm_entitlement_has(
+            $pdo,
+            $farmId,
+            'poultry'
+        );
+    }
+
+    if (str_starts_with($code, 'ruminant_')) {
+        return farm_entitlement_has(
+            $pdo,
+            $farmId,
+            'ruminant'
+        );
+    }
+
+    if (
+        in_array(
+            $code,
+            [
+                'inventory',
+                'inventory_add_new_item',
+                'update_stock',
+            ],
+            true
+        )
+    ) {
+        if ($role === 'sales_rep') {
+            return farm_entitlement_is_sales_only(
+                $pdo,
+                $farmId
+            );
+        }
+
+        if ($role === 'poultry_manager') {
+            return farm_entitlement_has(
+                $pdo,
+                $farmId,
+                'poultry'
+            );
+        }
+
+        if ($role === 'ruminant_manager') {
+            return farm_entitlement_has(
+                $pdo,
+                $farmId,
+                'ruminant'
+            );
+        }
+
+        return false;
+    }
+
+    if (
+        str_starts_with($code, 'sales')
+        || in_array(
+            $code,
+            [
+                'expenses',
+                'expenses_add',
+                'expenses_edit',
+                'expenses_delete',
+                'profitability',
+                'reports',
+            ],
+            true
+        )
+    ) {
+        return farm_entitlement_sales_available(
+            $pdo,
+            $farmId
+        );
+    }
+
+    if (
+        in_array(
+            $code,
+            [
+                'farm_intelligence',
+                'production_cycles',
+            ],
+            true
+        )
+    ) {
+        if ($role === 'poultry_manager') {
+            return farm_entitlement_has(
+                $pdo,
+                $farmId,
+                'poultry'
+            );
+        }
+
+        if ($role === 'ruminant_manager') {
+            return farm_entitlement_has(
+                $pdo,
+                $farmId,
+                'ruminant'
+            );
+        }
+
+        return false;
+    }
+
+    return true;
+}
+}
+
 if (!function_exists('permission_catalog_expense_report_row_accessible')) {
 function permission_catalog_expense_report_row_accessible(array $expense): bool
 {
@@ -177,10 +307,24 @@ function permission_catalog_expense_action_code(array $expense, string $action):
     $poultryCategory = strtolower((string)($expense['poultry_category'] ?? ''));
 
     if ($farmType === 'poultry') {
-        $poultryType = in_array($productionType, ['layer', 'broiler'], true) ? $productionType : $poultryCategory;
-        if (in_array($poultryType, ['layer', 'broiler'], true)) {
-            return 'poultry_' . $poultryType . '_expenses_' . $action;
+        $poultryType = in_array(
+            $productionType,
+            ['layer', 'broiler', 'shared'],
+            true
+        )
+            ? $productionType
+            : $poultryCategory;
+
+        if (
+            in_array(
+                $poultryType,
+                ['layer', 'broiler', 'shared'],
+                true
+            )
+        ) {
+            return 'poultry_expenses_' . $action;
         }
+
         return null;
     }
     if ($farmType === 'ruminant') return 'ruminant_expenses_' . $action;
@@ -218,6 +362,20 @@ function permission_catalog_poultry_expense_required_permissions(
             )
         );
 
+    if (
+        !in_array(
+            $productionType,
+            [
+                'layer',
+                'broiler',
+                'shared',
+            ],
+            true
+        )
+    ) {
+        return [];
+    }
+
     $suffixMap = [
         'view' =>
             '',
@@ -236,36 +394,13 @@ function permission_catalog_poultry_expense_required_permissions(
         return [];
     }
 
-    $suffix =
-        $suffixMap[$action];
-
-    if ($productionType === 'layer') {
-        return [
-            'poultry_layer_expenses'
-            . $suffix,
-        ];
-    }
-
-    if ($productionType === 'broiler') {
-        return [
-            'poultry_broiler_expenses'
-            . $suffix,
-        ];
-    }
-
-    if ($productionType === 'shared') {
-        return [
-            'poultry_layer_expenses'
-            . $suffix,
-
-            'poultry_broiler_expenses'
-            . $suffix,
-        ];
-    }
-
-    return [];
+    return [
+        'poultry_expenses'
+        . $suffixMap[$action],
+    ];
 }
 }
+
 /*
  * Canonical operational permission requirements for an existing expense row.
  *
@@ -445,18 +580,8 @@ function permission_catalog_expense_operational_can(
 
     /*
      * Edit/Delete always require visibility as well as the action permission.
-     * For Poultry Shared this becomes:
-     *
-     * View:
-     *   Layer View AND Broiler View
-     *
-     * Edit:
-     *   both View permissions
-     *   AND both Edit permissions
-     *
-     * Delete:
-     *   both View permissions
-     *   AND both Delete permissions
+     * Poultry Layer, Broiler and Shared all resolve through the consolidated
+     * Poultry Expenses permission family.
      */
     $required =
         permission_catalog_expense_required_permissions(

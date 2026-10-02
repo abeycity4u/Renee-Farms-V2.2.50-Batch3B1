@@ -38,7 +38,9 @@ $modules = permission_catalog_codes();
 $permissionGroupClasses = [
     'Poultry Operations' => 'permission-group-poultry-ops',
     'Poultry Expenses' => 'permission-group-poultry-expenses',
+    'Poultry Slaughter Processing' => 'permission-group-poultry-ops',
     'Ruminant Operations' => 'permission-group-ruminant',
+    'Ruminant Slaughter Processing' => 'permission-group-ruminant',
     'Inventory & Stock' => 'permission-group-inventory',
     'Sales & General Expenses' => 'permission-group-sales',
     'Management Insights' => 'permission-group-insights',
@@ -152,7 +154,7 @@ unset($_SESSION['permission_error_detail']);
                       <small><?= htmlspecialchars((string)($meta['description'] ?? '')) ?></small>
                     </td>
                     <?php foreach ($roles as $role):
-                      $applicable = permission_catalog_applicable($role,$module);
+                      $applicable = permission_catalog_applicable_for_farm($pdo, $permissionFarmId, $role, $module);
                       $checked = ($applicable && !empty($permissions[$role][$module]) && (int)$permissions[$role][$module] === 1) ? 'checked' : '';
                     ?>
                       <td class="text-center">

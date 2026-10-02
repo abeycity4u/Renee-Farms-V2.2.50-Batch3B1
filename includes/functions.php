@@ -2,6 +2,8 @@
 <?php
 // includes/functions.php (updated compatibility)
 
+require_once __DIR__ . '/permission_catalog.php';
+
 // If $pdo is not set but $conn (mysqli) is present, create a PDO wrapper.
 if (!isset($pdo) && isset($conn) && $conn instanceof mysqli) {
     $mysqli = $conn;
@@ -146,16 +148,10 @@ function hasPermission($role, $module) {
         if ($module === 'permissions' || $module === 'users') return false;
         if (hasRole('viewer')) return in_array($module, ['management', 'reports'], true);
 
-        // Dedicated Sales Representatives remain outside Inventory and Farm
-        // Intelligence. Expense records, Expense Report, Profitability and Farm
-        // Reports & Analytics are optional Farm Admin delegations.
-        $dedicatedSalesRep = hasRole('sales_rep')
-            && !hasRole('poultry_manager')
-            && !hasRole('ruminant_manager');
-        if ($dedicatedSalesRep
-            && in_array($module, ['inventory', 'inventory_add_new_item', 'update_stock', 'farm_intelligence'], true)) {
-            return false;
-        }
+        // Farm/product applicability is resolved centrally by
+        // permission_catalog_applicable_for_farm() below. In particular,
+        // Sales-only Sales Representatives may be delegated General Inventory
+        // without gaining livestock Inventory on Poultry/Ruminant products.
 
         // Livestock expense records are intentionally delegable to a Sales Rep
         // without granting the underlying operational manager role.
@@ -189,6 +185,45 @@ function hasPermission($role, $module) {
     $roles = array_values(array_filter(array_unique($roles ?: [$role])));
     if (!$roles) return false;
     $farmId = function_exists('getCurrentFarmId') ? getCurrentFarmId() : 0;
+
+    /*
+     * Enforce the same role + tenant entitlement applicability used by the
+     * permission matrix and save route. Only catalog-managed permissions are
+     * filtered here so legacy non-catalog checks retain their existing path.
+     */
+    if (
+        isset($pdo)
+        && $pdo instanceof PDO
+        && $farmId > 0
+        && function_exists('permission_catalog_flat')
+        && function_exists('permission_catalog_applicable_for_farm')
+    ) {
+        $catalog = permission_catalog_flat();
+
+        if (isset($catalog[$module])) {
+            $roles = array_values(
+                array_filter(
+                    $roles,
+                    static function ($candidateRole) use (
+                        $pdo,
+                        $farmId,
+                        $module
+                    ): bool {
+                        return permission_catalog_applicable_for_farm(
+                            $pdo,
+                            $farmId,
+                            (string)$candidateRole,
+                            (string)$module
+                        );
+                    }
+                )
+            );
+
+            if (!$roles) {
+                return false;
+            }
+        }
+    }
 
     if (isset($pdo)) {
         $placeholders = implode(',', array_fill(0, count($roles), '?'));

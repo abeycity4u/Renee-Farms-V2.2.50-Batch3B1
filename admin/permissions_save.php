@@ -38,7 +38,12 @@ try {
 
     foreach ($roles as $role) {
         foreach ($modules as $module) {
-            $allowed = (permission_catalog_applicable($role,$module)
+            $allowed = (permission_catalog_applicable_for_farm(
+                    $pdo,
+                    $permissionFarmId,
+                    $role,
+                    $module
+                )
                 && isset($incoming[$role][$module])
                 && (string)$incoming[$role][$module] === '1') ? 1 : 0;
             $stmt = $pdo->prepare("INSERT INTO permissions (farm_id,role,module,allowed) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE allowed = VALUES(allowed)");
