@@ -1,0 +1,41 @@
+name: Renee AgriSuite GA Regression
+
+on:
+  push:
+    branches:
+      - v320-ga-hardening
+  pull_request:
+    branches:
+      - v320-ga-hardening
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ga-regression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-regression:
+    name: Source regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Runtime versions
+        run: |
+          php --version
+          composer --version
+
+      - name: Run non-destructive GA regression
+        run: bash scripts/run_v320_ga_regression.sh
+
+      - name: Dependency advisory audit
+        run: composer audit --locked --no-dev --no-interaction
+
+      - name: Validate dependency lock install
+        run: composer install --no-dev --prefer-dist --no-interaction --no-progress --no-scripts
