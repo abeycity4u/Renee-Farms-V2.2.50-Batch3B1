@@ -34,6 +34,18 @@ jobs:
       - name: Run non-destructive GA regression
         run: bash scripts/run_v320_ga_regression.sh
 
+  dependency-assurance:
+    name: Dependency assurance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Composer manifest
+        run: composer validate --no-check-publish --no-interaction
+
       - name: Dependency advisory audit
         run: composer audit --locked --no-dev --no-interaction
 
