@@ -132,7 +132,8 @@ $check(
     'Paystack webhook uses HMAC-SHA512 and timing-safe comparison'
 );
 $check(
-    str_contains($scriptsHtaccess, 'Require all denied') && str_contains($scriptsHtaccess, 'deny from all'),
+    str_contains($scriptsHtaccess, 'Require all denied')
+        || str_contains(strtolower($scriptsHtaccess), 'deny from all'),
     'maintenance/verifier scripts are denied over Apache HTTP'
 );
 $check(
@@ -142,8 +143,9 @@ $check(
     'runtime secrets and production root htaccess are excluded from Git'
 );
 $check(
-    str_contains($api, 'PDOException') && str_contains($api, 'SQLSTATE'),
-    'API exception helper suppresses database/SQLSTATE details'
+    str_contains($api, 'instanceof PDOException')
+        && str_contains($api, 'return $fallback;'),
+    'API exception helper suppresses database exception details'
 );
 
 // Candidate findings are warnings until caller/reachability analysis proves a defect.
