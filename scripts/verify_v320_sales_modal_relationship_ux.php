@@ -91,13 +91,8 @@ verify_relationship(
     strpos(
         $js,
         'The selected General Inventory item will be deducted.'
-    ) !== false
-    &&
-    strpos(
-        $js,
-        'this choice does not by itself remove live animals'
-    ) !== false,
-    'General Inventory guidance does not imply live-population removal'
+    ) === false,
+    'Livestock stock-source guidance does not advertise General Inventory'
 );
 
 verify_relationship(

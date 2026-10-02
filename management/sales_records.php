@@ -87,10 +87,12 @@ $saleFarmTypeLabel = static function (string $type): string {
 };
 
 $generalSaleInventoryItems =
-    general_sale_inventory_available_items(
-        $pdo,
-        $tenantFarmId
-    );
+    $salesOnlyWorkspace
+        ? general_sale_inventory_available_items(
+            $pdo,
+            $tenantFarmId
+        )
+        : [];
 
 $prepareSlaughterSaleInput =
     static function (
@@ -476,7 +478,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 general_sale_inventory_selection_from_post(
                     $pdo,
                     $tenantFarmId,
-                    $_POST
+                    $_POST,
+                    $salesOnlyWorkspace
                 );
         } catch (RuntimeException $e) {
             $_SESSION['error'] =
@@ -1040,7 +1043,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 general_sale_inventory_selection_from_post(
                     $pdo,
                     $tenantFarmId,
-                    $_POST
+                    $_POST,
+                    $salesOnlyWorkspace
                 );
         } catch (RuntimeException $e) {
             $_SESSION['error'] =
@@ -1808,12 +1812,6 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                     Financial only — no Inventory movement
                                 </option>
                                 <option
-                                    value="general_inventory"
-                                    <?php echo empty($generalSaleInventoryItems) ? 'disabled' : ''; ?>
-                                >
-                                    General Inventory — deduct selected stock item
-                                </option>
-                                <option
                                     value="slaughter_output"
                                     <?php echo empty($slaughterSaleLots) ? 'disabled' : ''; ?>
                                 >
@@ -2169,12 +2167,6 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                             >
                                 <option value="financial_only">
                                     Financial only — no active Inventory consumption
-                                </option>
-                                <option
-                                    value="general_inventory"
-                                    <?php echo empty($generalSaleInventoryItems) ? 'disabled' : ''; ?>
-                                >
-                                    General Inventory — deduct selected stock item
                                 </option>
                                 <option value="slaughter_output">
                                     Slaughter Output Inventory — explicit lot

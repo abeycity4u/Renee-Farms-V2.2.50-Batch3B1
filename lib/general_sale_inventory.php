@@ -20,7 +20,8 @@ function general_sale_inventory_source_type(): string
 function general_sale_inventory_selection_from_post(
     PDO $pdo,
     int $farmId,
-    array &$input
+    array &$input,
+    bool $allowGeneralInventory = true
 ): array {
     $source =
         strtolower(
@@ -37,6 +38,12 @@ function general_sale_inventory_selection_from_post(
             'mode' => 'financial_only',
             'stock_item_id' => null,
         ];
+    }
+
+    if (!$allowGeneralInventory) {
+        throw new RuntimeException(
+            'General Inventory sales are available only in a Sales-only workspace.'
+        );
     }
 
     $itemId =

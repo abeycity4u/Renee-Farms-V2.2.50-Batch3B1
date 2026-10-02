@@ -340,9 +340,6 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
         financial_only:
             'No Inventory is deducted. Revenue Attribution still decides where the sale revenue belongs, and Live Animal Impact independently records any animals that left the farm.',
 
-        general_inventory:
-            'The selected General Inventory item will be deducted. Revenue Attribution remains separate, and this choice does not by itself remove live animals.',
-
         slaughter_output:
             'The selected slaughter-output lot will be consumed. Live population was already changed by the slaughter record, so this sale must not remove the same animals again.'
     };
