@@ -202,6 +202,12 @@ Live production/staging equivalence must be checked separately; the example file
 
 The Paystack webhook uses cryptographic signature validation and transactional/locking behavior as described above.
 
+### Dependency lock and Composer audit — PASS
+
+Both the protected baseline and GA branch contain a committed `composer.lock`. The GA workflow runs `composer validate --strict`, installs the locked graph and executes `composer audit --locked`. The reviewed workflow run completed the Composer validation/install/audit steps successfully.
+
+The lock currently pins `dompdf/dompdf` to a concrete release and therefore provides reproducible Composer resolution from Git. Dependency risk must still be re-audited continuously as advisories change.
+
 ## Confirmed GA findings
 
 ### GA-SEC-001 — Retired `/login.php` redirects remain in central bootstrap
@@ -222,22 +228,6 @@ Required resolution:
 
 - centralize the canonical sign-in route and replace remaining legacy redirects;
 - add/retain a regression contract preventing the retired route from returning.
-
-### GA-DEP-001 — Composer dependency graph is not reproducibly locked
-
-**Severity:** Medium release-engineering / supply-chain assurance issue
-
-**Status:** OPEN
-
-`composer.json` declares `dompdf/dompdf ^3.0`, but no `composer.lock` exists in the reviewed GA branch tree.
-
-The existing GA workflow runs `composer install` followed by `composer audit --locked`. Without a committed lock file, installations may resolve different transitive versions at different times and the exact dependency set used for a release is not reproducible from Git alone.
-
-Required resolution:
-
-- generate and commit `composer.lock` from a controlled Composer environment;
-- run `composer validate` and `composer audit --locked` against the committed lock;
-- treat lock changes as reviewed release changes.
 
 ### GA-CSP-001 — Script CSP still allows `unsafe-inline` and `unsafe-eval`
 
@@ -332,4 +322,4 @@ GA-1 can be considered complete when:
 4. runtime-only checks are explicitly deferred rather than assumed;
 5. GA-2 receives a prioritized authorization/tenancy review queue.
 
-At the time of this document, criteria 1–4 are complete. GA-2 should begin with object-level tenant ownership and legacy login-route remediation, followed by exception-disclosure and PDF/report review.
+At the time of this document, all five criteria are satisfied. GA-1 is **COMPLETE**. GA-2 continues with object-level tenant ownership, legacy login-route remediation, exception-disclosure review and PDF/report hardening.
