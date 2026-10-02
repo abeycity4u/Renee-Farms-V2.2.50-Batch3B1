@@ -46,6 +46,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
 }
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    require_valid_csrf_post();
     require_rate_limit('login_attempt', 12, 300);
     $accountType = ($_POST['account_type'] ?? 'farm') === 'platform' ? 'platform' : 'farm';
     $selectedAccountType = $accountType;
@@ -170,6 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <?php endif; ?>
 
             <form method="POST" autocomplete="on">
+                <?php echo csrf_field(); ?>
                 <div class="login-type-toggle" role="radiogroup" aria-label="Account type">
                     <label><input type="radio" name="account_type" value="farm" <?php echo $selectedAccountType === 'farm' ? 'checked' : ''; ?> data-login-type> Farm login</label>
                     <span class="toggle-divider" aria-hidden="true"></span>
