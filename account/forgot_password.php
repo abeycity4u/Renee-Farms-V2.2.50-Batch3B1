@@ -40,10 +40,16 @@ $selectedAccountType =
     $_SESSION['credential_request_account_type']
     ?? 'farm';
 
+$requestComplete =
+    !empty(
+        $_SESSION['credential_request_complete']
+    );
+
 unset(
     $_SESSION['credential_request_message'],
     $_SESSION['credential_request_type'],
-    $_SESSION['credential_request_account_type']
+    $_SESSION['credential_request_account_type'],
+    $_SESSION['credential_request_complete']
 );
 
 if (!in_array(
@@ -137,6 +143,14 @@ if (
 
     $_SESSION['credential_request_message'] =
         (string)($result['message'] ?? '');
+
+    /*
+     * One-request PRG completion state.
+     * The following GET consumes this flag and renders the confirmation
+     * surface instead of showing the submission form again.
+     */
+    $_SESSION['credential_request_complete'] =
+        true;
 
     header(
         'Location: '
@@ -287,136 +301,201 @@ if (
             Account Recovery
         </span>
 
-        <h2>
-            Request a password reset
-        </h2>
-
-        <p>
-            Choose the account type and provide your normal sign-in
-            identity.
-        </p>
-
-        <?php if (
-            is_string($flashMessage)
-            && $flashMessage !== ''
-        ): ?>
+        <?php if ($requestComplete): ?>
             <div
-                class="<?php
-                    echo $flashType === 'success'
-                        ? 'success'
-                        : 'error';
-                ?>"
+                class="recovery-confirmation"
                 role="status"
+                aria-live="polite"
             >
-                <?php
+                <span
+                    class="recovery-confirmation-icon"
+                    aria-hidden="true"
+                >
+                    ✓
+                </span>
+
+                <h2>
+                    Check your email
+                </h2>
+
+                <p class="recovery-confirmation-lead">
+                    If the account details are valid, a password reset
+                    link will be sent to the email address on the
+                    account.
+                </p>
+
+                <div class="recovery-confirmation-note">
+                    The password reset link expires in
+                    <strong>1 hour</strong>.
+                    If you do not see the email, check your spam or junk
+                    folder.
+                </div>
+
+                <div class="recovery-confirmation-actions">
+                    <a
+                        class="button recovery-primary-action"
+                        href="<?php
+                            echo htmlspecialchars(
+                                BASE_URL . '/sign.php',
+                                ENT_QUOTES,
+                                'UTF-8'
+                            );
+                        ?>"
+                    >
+                        Back to Sign In
+                    </a>
+
+                    <a
+                        class="recovery-secondary-action"
+                        href="<?php
+                            echo htmlspecialchars(
+                                BASE_URL . '/',
+                                ENT_QUOTES,
+                                'UTF-8'
+                            );
+                        ?>"
+                    >
+                        Return to Home Page
+                    </a>
+                </div>
+
+                <p class="helper recovery-privacy-note">
+                    For privacy, we do not confirm whether the account
+                    details matched an eligible account.
+                </p>
+            </div>
+        <?php else: ?>
+            <h2>
+                Request a password reset
+            </h2>
+
+            <p>
+                Choose the account type and provide your normal sign-in
+                identity.
+            </p>
+
+            <?php if (
+                is_string($flashMessage)
+                && $flashMessage !== ''
+            ): ?>
+                <div
+                    class="<?php
+                        echo $flashType === 'success'
+                            ? 'success'
+                            : 'error';
+                    ?>"
+                    role="status"
+                >
+                    <?php
+                        echo htmlspecialchars(
+                            $flashMessage,
+                            ENT_QUOTES,
+                            'UTF-8'
+                        );
+                    ?>
+                </div>
+            <?php endif; ?>
+
+            <form
+                method="POST"
+                action="<?php
                     echo htmlspecialchars(
-                        $flashMessage,
+                        BASE_URL
+                        . '/account/forgot_password.php',
                         ENT_QUOTES,
                         'UTF-8'
                     );
-                ?>
-            </div>
+                ?>"
+                autocomplete="off"
+            >
+                <?php echo csrf_field(); ?>
+
+                <div
+                    class="login-type-toggle"
+                    role="radiogroup"
+                    aria-label="Account type"
+                >
+                    <label>
+                        <input
+                            type="radio"
+                            name="account_type"
+                            value="farm"
+                            <?php
+                                echo $selectedAccountType === 'farm'
+                                    ? 'checked'
+                                    : '';
+                            ?>
+                        >
+                        Farm account
+                    </label>
+
+                    <span
+                        class="toggle-divider"
+                        aria-hidden="true"
+                    ></span>
+
+                    <label>
+                        <input
+                            type="radio"
+                            name="account_type"
+                            value="platform"
+                            <?php
+                                echo $selectedAccountType === 'platform'
+                                    ? 'checked'
+                                    : '';
+                            ?>
+                        >
+                        Platform account
+                    </label>
+                </div>
+
+                <div>
+                    <label for="workspace_id">
+                        Farm Workspace ID
+                    </label>
+
+                    <input
+                        id="workspace_id"
+                        name="workspace_id"
+                        type="text"
+                        autocapitalize="none"
+                        autocomplete="off"
+                        placeholder="Required for farm accounts"
+                    >
+
+                    <small class="form-hint">
+                        Platform accounts can leave this field blank.
+                    </small>
+                </div>
+
+                <div>
+                    <label for="username">
+                        Username
+                    </label>
+
+                    <input
+                        id="username"
+                        name="username"
+                        type="text"
+                        required
+                        autocomplete="username"
+                        autocapitalize="none"
+                    >
+                </div>
+
+                <button
+                    class="button"
+                    type="submit"
+                >
+                    Send Password Reset Link
+                </button>
+            </form>
+
+            <p class="helper">
+                For privacy, the same confirmation is shown whether or
+                not the account details match an eligible account.
+            </p>
         <?php endif; ?>
-
-        <form
-            method="POST"
-            action="<?php
-                echo htmlspecialchars(
-                    BASE_URL
-                    . '/account/forgot_password.php',
-                    ENT_QUOTES,
-                    'UTF-8'
-                );
-            ?>"
-            autocomplete="off"
-        >
-            <?php echo csrf_field(); ?>
-
-            <div
-                class="login-type-toggle"
-                role="radiogroup"
-                aria-label="Account type"
-            >
-                <label>
-                    <input
-                        type="radio"
-                        name="account_type"
-                        value="farm"
-                        <?php
-                            echo $selectedAccountType === 'farm'
-                                ? 'checked'
-                                : '';
-                        ?>
-                    >
-                    Farm account
-                </label>
-
-                <span
-                    class="toggle-divider"
-                    aria-hidden="true"
-                ></span>
-
-                <label>
-                    <input
-                        type="radio"
-                        name="account_type"
-                        value="platform"
-                        <?php
-                            echo $selectedAccountType === 'platform'
-                                ? 'checked'
-                                : '';
-                        ?>
-                    >
-                    Platform account
-                </label>
-            </div>
-
-            <div>
-                <label for="workspace_id">
-                    Farm Workspace ID
-                </label>
-
-                <input
-                    id="workspace_id"
-                    name="workspace_id"
-                    type="text"
-                    autocapitalize="none"
-                    autocomplete="off"
-                    placeholder="Required for farm accounts"
-                >
-
-                <small class="form-hint">
-                    Platform accounts can leave this field blank.
-                </small>
-            </div>
-
-            <div>
-                <label for="username">
-                    Username
-                </label>
-
-                <input
-                    id="username"
-                    name="username"
-                    type="text"
-                    required
-                    autocomplete="username"
-                    autocapitalize="none"
-                >
-            </div>
-
-            <button
-                class="button"
-                type="submit"
-            >
-                Send reset link
-            </button>
-        </form>
-
-        <p class="helper">
-            For privacy, the same confirmation is shown whether or not
-            the account details match an eligible account.
-        </p>
     </section>
 </main>
 </body>

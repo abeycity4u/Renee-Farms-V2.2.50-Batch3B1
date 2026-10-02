@@ -304,6 +304,92 @@
             font-size: .82rem;
         }
 
+        .recovery-confirmation {
+            text-align: center;
+        }
+
+        .recovery-confirmation-icon {
+            width: 58px;
+            height: 58px;
+            margin: 0 auto 1rem;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            background: rgba(45, 106, 79, 0.12);
+            border: 1px solid rgba(45, 106, 79, 0.22);
+            color: #2d6a4f;
+            font-size: 1.6rem;
+            font-weight: 800;
+        }
+
+        .auth-card .recovery-confirmation-lead {
+            max-width: 40ch;
+            margin: 0.75rem auto 1rem;
+            color: #365f4d;
+            line-height: 1.6;
+        }
+
+        .recovery-confirmation-note {
+            margin: 0 auto 1.35rem;
+            padding: 0.85rem 1rem;
+            max-width: 42ch;
+            border-radius: 12px;
+            background: rgba(45, 106, 79, 0.08);
+            border: 1px solid rgba(45, 106, 79, 0.14);
+            color: #496b5d;
+            font-size: 0.88rem;
+            line-height: 1.55;
+        }
+
+        .recovery-confirmation-actions {
+            display: grid;
+            gap: 0.72rem;
+            max-width: 360px;
+            margin: 0 auto;
+        }
+
+        .recovery-primary-action {
+            display: block;
+            text-decoration: none;
+            text-align: center;
+        }
+
+        .recovery-primary-action:hover,
+        .recovery-primary-action:focus-visible {
+            color: #ffffff;
+            text-decoration: none;
+        }
+
+        .recovery-secondary-action {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 44px;
+            padding: 0.68rem 1rem;
+            border-radius: 12px;
+            border: 1px solid rgba(45, 106, 79, 0.22);
+            color: #2d6a4f;
+            background: rgba(255,255,255,.7);
+            font-weight: 700;
+            font-size: 0.9rem;
+            text-decoration: none;
+        }
+
+        .recovery-secondary-action:hover {
+            background: rgba(45, 106, 79, 0.08);
+            color: #1b4332;
+        }
+
+        .recovery-secondary-action:focus-visible {
+            outline: 3px solid var(--ring);
+            outline-offset: 3px;
+        }
+
+        .auth-card .recovery-privacy-note {
+            margin: 1rem auto 0;
+            max-width: 44ch;
+        }
+
         @media (max-width: 960px) {
             .auth-shell {
                 grid-template-columns: 1fr;
