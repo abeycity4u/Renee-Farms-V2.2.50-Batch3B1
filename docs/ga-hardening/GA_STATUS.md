@@ -26,36 +26,68 @@
 
 ## Current evidence
 
-### Completed
+### Completed / verified in source
 
-- isolated GA branch created from exact protected v3.2 baseline;
-- GA-1 attack-surface inventory committed;
+- isolated GA branch created from the exact protected v3.2 baseline;
+- GA-1 attack-surface inventory completed;
 - core authentication/session/password controls reviewed;
+- `/login.php` confirmed as the intentional restricted subscription-recovery bridge rather than a stale route;
+- subscription-recovery login CSRF boundary corrected on GA branch and protected by focused regression coverage;
 - Paystack webhook authentication/locking pattern reviewed;
+- Flutterwave adapter/source transport review confirms webhook hash verification and shared HTTPS-only provider transport;
 - tenant-scoped source review completed for selected high-value Sales, Inventory, Expense, Allocation, Permissions and Team User paths;
 - expense PDF tenant scope and Dompdf resource policy reviewed;
+- PDF raw-exception disclosure corrected on GA branch and covered by regression contract;
 - Composer metadata/locked dependency install/audit are part of GA CI;
-- source-level tenant authorization regression contract added;
-- PDF security regression contract added;
-- source vulnerability scanner added;
-- GA regression workflow expanded to run new hardening contracts.
+- source-level tenant authorization regression contract present;
+- source vulnerability scanner present and being calibrated toward behavior/high-signal findings;
+- GA reachability audit added for runtime schema migration/API error-surface mapping;
+- GA regression workflow expanded to run hardening contracts;
+- API and architecture documentation are present under `docs/`;
+- release checklist and GA changelog are present under `docs/ga-hardening/`.
 
-### Confirmed open findings
+### Remediated findings
 
 | ID | Severity | Finding | Status |
 |---|---:|---|---|
-| GA-SEC-001 | Medium | Central bootstrap still redirects some unauthenticated/expired tenant sessions to retired `/login.php` instead of canonical sign-in route | OPEN |
-| GA-CSP-001 | Medium hardening debt | CSP script policy still permits `unsafe-inline` and `unsafe-eval`; staged browser-safe migration required | OPEN / DEFERRED UNTIL E2E |
-| GA-PDF-001 | Low–Medium | Raw PDF exception details could reach browser | **SOURCE FIXED; CI/semantic verification pending** |
+| GA-SEC-003 | Security boundary | Subscription-recovery bridge could inspect recovery credentials before normal sign-in CSRF validation | **REMEDIATED ON GA BRANCH** |
+| GA-PDF-001 | Low–Medium | Raw PDF exception details could reach browser | **REMEDIATED ON GA BRANCH** |
 
-### Review candidates
+### Retired false positive
+
+The earlier GA-SEC-001 assertion that `/login.php` was missing/retired is withdrawn. `/login.php` is an intentional billing-recovery bridge that falls through to `sign.php`; removing it would break the designed recovery path.
+
+### Open hardening debt / review candidates
 
 | ID | Area | Status |
 |---|---|---|
-| GA-REV-001 | API exception normalization / raw domain-vs-internal exception responses | IN PROGRESS |
+| GA-CSP-001 | CSP `unsafe-inline` / `unsafe-eval` compatibility allowances | DEFERRED UNTIL E2E/STAGING COVERAGE |
+| GA-SEC-002 / GA-REV-001 | API exception normalization / domain-vs-internal messages | IN PROGRESS |
 | GA-REV-002 | Remaining object-level tenant ownership surfaces | IN PROGRESS |
-| GA-REV-003 | Remaining report/PDF authorization and escaping surfaces | IN PROGRESS |
+| GA-REV-003 | Remaining report/export authorization and escaping surfaces | IN PROGRESS |
+| GA-ARCH-001 | Reachability of legacy runtime schema migration helper | IN PROGRESS |
 | GA-INT-001 | Team User delete atomicity (integrity, not currently classified security) | REVIEW |
+
+## CI / automated assurance
+
+The GA workflow currently includes:
+
+- Composer validation;
+- locked dependency installation;
+- `composer audit --locked`;
+- repository-wide PHP lint;
+- GA source-security contract;
+- GA source vulnerability scan;
+- GA reachability audit;
+- login and subscription-recovery security contracts;
+- tenant authorization contract;
+- permission/navigation contracts;
+- credential/password-recovery contracts;
+- PDF security contract;
+- verifier-directory HTTP-deny check;
+- repository secret-file policy.
+
+CI is considered GA-4 PASS only when the current hardening head completes green; historical green/failing runs are evidence but not a substitute for the latest-head result.
 
 ## Runtime evidence still required
 
