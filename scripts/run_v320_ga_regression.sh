@@ -70,6 +70,9 @@ run_php_verifier_if_present \
 run_php_verifier_if_present \
     scripts/verify_v320_login_security_contract.php \
     "Login security contract"
+run_php_verifier_if_present \
+    scripts/verify_v320_api_security_contract.php \
+    "Browser API security contract"
 
 # Existing closed-workstream verifiers included here only when they are source/static
 # contracts. Destructive billing, migration, provisioning and live-state certification
