@@ -322,6 +322,49 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
         refreshRuminantSaleAnimalChoices('edit', rows);
     }
 
+    function saleStockSourceGuidanceSelectors(prefix) {
+        const edit = prefix === 'edit';
+
+        return {
+            source: edit
+                ? '#editSaleStockSource'
+                : '#addSaleStockSource',
+
+            help: edit
+                ? '#editSaleStockSourceHelp'
+                : '#addSaleStockSourceHelp'
+        };
+    }
+
+    const saleStockSourceGuidance = {
+        financial_only:
+            'No Inventory is deducted. Revenue Attribution still decides where the sale revenue belongs, and Live Animal Impact independently records any animals that left the farm.',
+
+        general_inventory:
+            'The selected General Inventory item will be deducted. Revenue Attribution remains separate, and this choice does not by itself remove live animals.',
+
+        slaughter_output:
+            'The selected slaughter-output lot will be consumed. Live population was already changed by the slaughter record, so this sale must not remove the same animals again.'
+    };
+
+    function refreshSaleStockSourceGuidance(prefix) {
+        if (salesRecordsConfig.salesOnlyWorkspace) return;
+
+        const ids =
+            saleStockSourceGuidanceSelectors(prefix);
+
+        const source =
+            String(
+                $(ids.source).val()
+                || 'financial_only'
+            );
+
+        $(ids.help).text(
+            saleStockSourceGuidance[source]
+            || saleStockSourceGuidance.financial_only
+        );
+    }
+
     function generalInventorySaleSelectors(prefix) {
         const edit = prefix === 'edit';
 
@@ -1668,6 +1711,10 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
                 rows
             );
 
+            refreshSaleStockSourceGuidance(
+                'edit'
+            );
+
             return;
         }
 
@@ -1682,6 +1729,10 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
         setSlaughterSaleMode(
             'edit',
             false
+        );
+
+        refreshSaleStockSourceGuidance(
+            'edit'
         );
     }
 
@@ -1986,6 +2037,7 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
             refreshSaleAttribution('add');
             refreshRuminantSaleAnimalChoices('add');
             refreshSalePopulationEffect('add');
+            refreshSaleStockSourceGuidance('add');
         }
 
 
@@ -2007,6 +2059,10 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
                     'add',
                     source === 'general_inventory'
                 );
+
+                refreshSaleStockSourceGuidance(
+                    'add'
+                );
             }
         );
 
@@ -2027,6 +2083,10 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
                 setGeneralInventorySaleMode(
                     'edit',
                     source === 'general_inventory'
+                );
+
+                refreshSaleStockSourceGuidance(
+                    'edit'
                 );
             }
         );
@@ -2409,6 +2469,10 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
                     'edit',
                     true,
                     stockItemId
+                );
+
+                refreshSaleStockSourceGuidance(
+                    'edit'
                 );
             } else {
                 setGeneralInventorySaleMode(

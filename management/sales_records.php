@@ -1798,7 +1798,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                         >
                         <?php else: ?>
                         <div class="mb-3">
-                            <label>Sales Stock Source</label>
+                            <label>Stock / Inventory Source</label>
                             <select
                                 name="sale_stock_source"
                                 id="addSaleStockSource"
@@ -1826,8 +1826,11 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 id="addSlaughterOutputDomain"
                                 value=""
                             >
-                            <small class="text-muted">
-                                Use Slaughter Output Inventory only when this sale physically consumes a recorded Poultry or Ruminant slaughter output.
+                            <small
+                                class="text-muted d-block mt-1"
+                                id="addSaleStockSourceHelp"
+                            >
+                                No Inventory is deducted. Revenue Attribution still decides where the sale revenue belongs, and Live Animal Impact independently records any animals that left the farm.
                             </small>
                         </div>
                         <?php endif; ?>
@@ -2158,7 +2161,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                         >
                         <?php else: ?>
                         <div class="mb-3">
-                            <label>Sales Stock Source</label>
+                            <label>Stock / Inventory Source</label>
                             <select
                                 name="sale_stock_source"
                                 id="editSaleStockSource"
@@ -2183,8 +2186,11 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 id="editSlaughterOutputDomain"
                                 value=""
                             >
-                            <small class="text-muted">
-                                Corrections keep prior Poultry or Ruminant slaughter-output Inventory history auditable.
+                            <small
+                                class="text-muted d-block mt-1"
+                                id="editSaleStockSourceHelp"
+                            >
+                                No Inventory is deducted. Revenue Attribution still decides where the sale revenue belongs, and Live Animal Impact independently records any animals that left the farm.
                             </small>
                         </div>
                         <?php endif; ?>
