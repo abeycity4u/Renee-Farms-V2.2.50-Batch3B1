@@ -65,6 +65,7 @@ jobs:
         run: |
           set -euo pipefail
           tests=(
+            scripts/verify_v320_login_security_contract.php
             scripts/verify_v320_permission_architecture_alignment.php
             scripts/verify_v320_navigation_permission_parity.php
             scripts/verify_v320_inventory_category_list_ux.php
