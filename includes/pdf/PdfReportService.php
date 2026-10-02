@@ -376,9 +376,10 @@ function pdf_report_finish(
         while (ob_get_level() > 0) {
             ob_end_clean();
         }
+        error_log('PDF generation failed: ' . get_class($e));
         http_response_code(503);
         header('Content-Type: text/plain; charset=UTF-8');
-        echo 'PDF generation unavailable: ' . $e->getMessage();
+        echo 'PDF generation is temporarily unavailable. Please try again.';
         exit;
     }
 }
