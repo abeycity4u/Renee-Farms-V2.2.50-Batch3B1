@@ -10,6 +10,12 @@ require_once __DIR__ . '/includes/subscription_recovery.php';
 
 if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST'
     && (($_POST['account_type'] ?? 'farm') === 'farm')) {
+    // This bridge intercepts the same credential POST that would otherwise
+    // fall through to sign.php. Validate the shared CSRF token before any
+    // account lookup or password verification so the special recovery path
+    // cannot bypass the canonical sign-in request boundary.
+    csrf_validate_request();
+
     $candidate = subscription_recovery_login_candidate(
         $pdo,
         (string)($_POST['farm_slug'] ?? ''),
