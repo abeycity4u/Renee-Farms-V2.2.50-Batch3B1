@@ -60,6 +60,9 @@ jobs:
       - name: GA source-security contract
         run: php scripts/ga_source_security_contract.php
 
+      - name: GA source vulnerability scan
+        run: php scripts/ga_source_vulnerability_scan.php
+
       - name: Static architecture regression contracts
         shell: bash
         run: |
