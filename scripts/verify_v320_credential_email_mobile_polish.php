@@ -61,25 +61,25 @@ $check(
 $check(
     str_contains(
         $delivery,
-        'bgcolor="#198754"'
+        'bgcolor="#d1fae5"'
     ),
-    'CTA includes email-client background fallback'
+    'CTA includes light email-client background fallback'
 );
 
 $check(
     str_contains(
         $delivery,
-        'color:#ffffff !important;-webkit-text-fill-color:#ffffff;'
+        'color:#064e3b !important;-webkit-text-fill-color:#064e3b;'
     ),
-    'CTA forces white text in dark-mode clients'
+    'CTA uses dark evergreen text for resilient contrast'
 );
 
 $check(
     substr_count(
         $delivery,
-        '-webkit-text-fill-color:#ffffff'
+        '-webkit-text-fill-color:#064e3b'
     ) >= 2,
-    'CTA anchor and inner text both protect white color'
+    'CTA anchor and inner text both protect evergreen color'
 );
 
 $check(

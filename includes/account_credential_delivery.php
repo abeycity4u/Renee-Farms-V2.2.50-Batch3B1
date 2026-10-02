@@ -434,11 +434,11 @@ if (!function_exists('account_credential_delivery_html_message')) {
             . '</td></tr>'
             . '</table>'
             . '<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 26px;">'
-            . '<tr><td bgcolor="#198754" style="background:#198754;border-radius:8px;">'
+            . '<tr><td bgcolor="#d1fae5" style="background:#d1fae5;border:1px solid #10b981;border-radius:8px;">'
             . '<a href="'
             . $safeLink
-            . '" style="display:inline-block;padding:14px 24px;color:#ffffff !important;-webkit-text-fill-color:#ffffff;text-decoration:none;font-size:16px;font-weight:700;">'
-            . '<span style="color:#ffffff !important;-webkit-text-fill-color:#ffffff;">'
+            . '" style="display:inline-block;padding:14px 24px;color:#064e3b !important;-webkit-text-fill-color:#064e3b;text-decoration:none;font-size:16px;font-weight:700;">'
+            . '<span style="color:#064e3b !important;-webkit-text-fill-color:#064e3b;">'
             . $buttonLabel
             . '</span>'
             . '</a>'
