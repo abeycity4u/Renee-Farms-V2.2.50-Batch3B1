@@ -44,16 +44,28 @@ $canViewBroilerDaily = $poultryEntitled && $navHas('poultry_daily_broiler');
 $canViewPoultryFeeds = $poultryEntitled && $navHas('poultry_feeds');
 $canViewPoultryHealth = $poultryEntitled && $navHas('poultry_health');
 $canViewPoultrySlaughter = $poultryEntitled && $navHas('poultry_slaughter');
-$canViewLayerExpenses = $poultryExpenseEntitled && $navHas('poultry_layer_expenses');
-$canViewBroilerExpenses = $poultryExpenseEntitled && $navHas('poultry_broiler_expenses');
-$canViewPoultryExpenses = $canViewLayerExpenses || $canViewBroilerExpenses;
-$showPoultryMenu = $canViewLayerDaily || $canViewBroilerDaily || $canViewPoultryFeeds || $canViewPoultryHealth || $canViewPoultrySlaughter || $canViewPoultryExpenses;
+$canViewPoultryExpenses = $poultryExpenseEntitled && $navHas('poultry_expenses');
+
+$showPoultryMenu =
+    $canViewLayerDaily
+    || $canViewBroilerDaily
+    || $canViewPoultryFeeds
+    || $canViewPoultryHealth
+    || $canViewPoultrySlaughter
+    || $canViewPoultryExpenses;
 
 $canViewRuminantDaily = $ruminantEntitled && $navHas('ruminant_daily');
 $canViewRuminantAnimals = $ruminantEntitled && $navHas('ruminant_animals');
 $canViewRuminantFeeds = $ruminantEntitled && $navHas('ruminant_feeds');
+$canViewRuminantSlaughter = $ruminantEntitled && $navHas('ruminant_slaughter');
 $canViewRuminantExpenses = $ruminantExpenseEntitled && $navHas('ruminant_expenses');
-$showRuminantMenu = $canViewRuminantDaily || $canViewRuminantAnimals || $canViewRuminantFeeds || $canViewRuminantExpenses;
+
+$showRuminantMenu =
+    $canViewRuminantDaily
+    || $canViewRuminantAnimals
+    || $canViewRuminantFeeds
+    || $canViewRuminantSlaughter
+    || $canViewRuminantExpenses;
 
 $salesOnlyWorkspace =
     current_farm_is_sales_only();
@@ -214,6 +226,8 @@ $showManagementMenu = $canViewSales || $canViewExpenseReport || $canViewReports 
             <?php endif; ?>
             <?php if ($canViewRuminantAnimals): ?>
             <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/ruminant/animal_registry.php"><i class="bi bi-tags menu-icon me-2"></i> Animal Registry</a></li>
+            <?php endif; ?>
+            <?php if ($canViewRuminantSlaughter): ?>
             <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/ruminant/slaughter_processing.php"><i class="bi bi-box-seam menu-icon me-2"></i> Slaughter Processing</a></li>
             <?php endif; ?>
             <?php if ($canViewRuminantFeeds): ?>
