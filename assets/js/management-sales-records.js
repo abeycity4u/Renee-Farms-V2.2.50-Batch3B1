@@ -210,7 +210,7 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
 
         if (layerEggSale) {
             sharedOption.text(
-                'Automatic — based on production history'
+                'Automatic — egg production'
             );
             $(ids.help).text(
                 'Shared Layer egg sales are allocated using eligible unsold egg production records. Cycles without recorded egg production are excluded.'
@@ -338,7 +338,7 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
 
     const saleStockSourceGuidance = {
         financial_only:
-            'Records the sale value and revenue allocation only. Use population impact or inventory source when something physically leaves the farm.',
+            'Records the sale value and revenue allocation only. Choose a physical stock source or population impact when something physically leaves the farm.',
 
         slaughter_output:
             'The selected slaughter-output lot will be consumed. Live population was already changed by the slaughter record, so this sale must not remove the same animals again.'

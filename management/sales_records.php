@@ -1828,7 +1828,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 class="text-muted d-block mt-1"
                                 id="addSaleStockSourceHelp"
                             >
-                                Records the sale value and revenue allocation only. Use population impact or inventory source when something physically leaves the farm.
+                                Records the sale value and revenue allocation only. Choose a physical stock source or population impact when something physically leaves the farm.
                             </small>
                         </div>
                         <?php endif; ?>
@@ -2182,7 +2182,7 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 class="text-muted d-block mt-1"
                                 id="editSaleStockSourceHelp"
                             >
-                                Records the sale value and revenue allocation only. Use population impact or inventory source when something physically leaves the farm.
+                                Records the sale value and revenue allocation only. Choose a physical stock source or population impact when something physically leaves the farm.
                             </small>
                         </div>
                         <?php endif; ?>

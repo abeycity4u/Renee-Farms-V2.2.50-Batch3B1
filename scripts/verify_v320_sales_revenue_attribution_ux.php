@@ -116,7 +116,7 @@ verify_contract(
 verify_contract(
     strpos(
         $js,
-        'Automatic — based on production history'
+        'Automatic — egg production'
     ) !== false
     &&
     strpos(
