@@ -3,7 +3,8 @@
  * GA browser-API security contract audit.
  *
  * This is a source contract, not a substitute for runtime IDOR/authorization
- * probes. It proves minimum entry-point controls consistently exist.
+ * probes. It proves minimum entry-point controls consistently exist while
+ * recognizing the application's canonical shared helper names.
  */
 
 declare(strict_types=1);
@@ -38,9 +39,7 @@ foreach ($files as $file) {
 
     $checked++;
 
-    $authenticated =
-        str_contains($source, 'requireLogin(')
-        || str_contains($source, 'requireLogin();');
+    $authenticated = str_contains($source, 'requireLogin(');
 
     api_contract_check(
         $authenticated,
@@ -49,19 +48,23 @@ foreach ($files as $file) {
 
     $isMutation = preg_match('/^(?:create|update|delete)_/i', $name) === 1;
     if (!$isMutation) {
-        if (!str_contains($source, 'farm_id') && !str_contains($source, 'getCurrentFarmId')) {
-            $review[] = $name . ': read route has no obvious direct farm_id/getCurrentFarmId token; confirm tenant binding through delegated service';
+        if (
+            !str_contains($source, 'farm_id')
+            && !str_contains($source, 'getCurrentFarmId')
+            && !str_contains($source, 'requireCurrentFarmId')
+        ) {
+            $review[] = $name . ': read route has no obvious direct farm scope token; confirm tenant binding through delegated service';
         }
         continue;
     }
 
     $postGuard =
-        str_contains($source, "require_method('POST')")
+        str_contains($source, "require_http_method('POST')")
         || str_contains($source, 'require_valid_csrf_post()')
         || preg_match('/REQUEST_METHOD[^\n]{0,100}POST/i', $source) === 1;
 
     $csrfGuard =
-        str_contains($source, 'require_csrf(')
+        str_contains($source, 'require_csrf_token()')
         || str_contains($source, 'require_valid_csrf_post()')
         || str_contains($source, 'csrf_request_is_valid(')
         || str_contains($source, 'verify_csrf_token(');
@@ -69,8 +72,12 @@ foreach ($files as $file) {
     api_contract_check($postGuard, $name . ' enforces POST mutation method');
     api_contract_check($csrfGuard, $name . ' enforces CSRF for browser mutation');
 
-    if (!str_contains($source, 'farm_id') && !str_contains($source, 'getCurrentFarmId')) {
-        $review[] = $name . ': mutation has no obvious direct farm_id/getCurrentFarmId token; confirm tenant binding through delegated service';
+    if (
+        !str_contains($source, 'farm_id')
+        && !str_contains($source, 'getCurrentFarmId')
+        && !str_contains($source, 'requireCurrentFarmId')
+    ) {
+        $review[] = $name . ': mutation has no obvious direct farm scope token; confirm tenant binding through delegated service';
     }
 }
 
