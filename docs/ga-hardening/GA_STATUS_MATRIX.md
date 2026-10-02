@@ -10,6 +10,19 @@ Status vocabulary:
 
 This matrix deliberately distinguishes source evidence from runtime certification.
 
+## Final repository CI evidence
+
+A complete GitHub Actions run on GA commit `47e12977c69be2896344400b126798b9890ded3b` completed successfully before this documentation-only status update:
+
+- workflow run: `37072381430` / run #64;
+- Source regression: **SUCCESS**;
+- Dependency assurance: **SUCCESS**;
+- Composer manifest validation: **SUCCESS**;
+- `composer audit --locked --no-dev`: **SUCCESS**;
+- locked production dependency install with `--no-scripts`: **SUCCESS**.
+
+Because this status file itself changes the branch HEAD, GitHub CI must also pass once more on the documentation-only checkpoint before runtime handoff. No product, security, billing, inventory, lifecycle or schema code is changed by this status update.
+
 | GA area | Current status | Evidence / result | Next owner |
 |---|---|---|---|
 | GA-1 Architecture & attack-surface inventory | PASS | `GA1_ATTACK_SURFACE.md` rebuilt from protected baseline; major public/auth/API/billing/domain/config/PDF surfaces catalogued | Chat agent complete |
@@ -20,12 +33,12 @@ This matrix deliberately distinguishes source evidence from runtime certificatio
 | Login CSRF | PASS at source | `sign.php` uses shared CSRF field + POST verifier; focused source contract exists | Work browser negative test |
 | Password-change session revocation | PASS at source | shared credential fingerprint + tenant-bound revalidation; focused verifier exists | Work disposable staging E2E |
 | PDF error disclosure | PASS at source | raw exception removed; generic browser response; remote loading remains disabled and chroot remains enabled | Work PDF negative probes |
-| API minimum entry-point contract | PENDING FINAL CI | verifier checks auth and create/update/delete POST+CSRF across `/api/*.php`; first verifier false-positive corrected to canonical helper names | GitHub CI final HEAD |
-| GA-3 source security scan | PENDING FINAL CI | `ga_source_security_scan.php` added; blockers/review findings classified | GitHub CI final HEAD |
-| Dependency advisory scan | PENDING FINAL CI | CI has independent `composer audit --locked --no-dev` job | GitHub CI final HEAD |
-| Dependency lock install | PENDING FINAL CI | CI installs locked production dependencies with `--no-scripts` | GitHub CI final HEAD |
-| GA-4 deterministic regression runner | PASS at source / PENDING CI | non-destructive runner added; destructive historical/live certification excluded by design | GitHub CI final HEAD |
-| Automated GitHub CI | PASS at configuration / PENDING FINAL RUN | workflow runs on push/PR to GA branch and manual dispatch; source and dependency jobs isolated | GitHub Actions |
+| API minimum entry-point contract | PASS | Final source regression on commit `47e12977...` passed after verifier was aligned with canonical API helpers | Work direct-route/IDOR runtime probes |
+| GA-3 source security scan | PASS | Included in successful final source regression on `47e12977...` | Work runtime DAST remains separate |
+| Dependency advisory scan | PASS | Independent CI dependency-assurance job; Composer locked audit succeeded on `47e12977...` | Re-run automatically on subsequent GA pushes/PRs |
+| Dependency lock install | PASS | Locked production dependency install with `--no-scripts` succeeded on `47e12977...` | Re-run automatically on subsequent GA pushes/PRs |
+| GA-4 deterministic regression runner | PASS | Non-destructive runner succeeded on `47e12977...`; destructive historical/live certification excluded by design | GitHub CI on every GA push/PR |
+| Automated GitHub CI | PASS | Source regression and dependency assurance are isolated jobs and both succeeded on `47e12977...` | Automatic on subsequent GA changes |
 | GA-5 Playwright suite authoring | PASS for prepared foundation | auth, invalid login, tenant-boundary/direct-route probes, error leakage and opt-in session-revocation test prepared | Work execution/extension |
 | Critical business E2E execution | BLOCKED | requires isolated staging, credentials and disposable fixtures | ChatGPT Work |
 | Staging certification | BLOCKED | isolated runtime not available in source-only chat | ChatGPT Work |
@@ -39,10 +52,10 @@ This matrix deliberately distinguishes source evidence from runtime certificatio
 | API documentation | PASS | `docs/API.md` | Chat agent complete |
 | Formal release checklist | PASS | `RELEASE_CHECKLIST_V3.2.md` | Chat agent complete; update with runtime evidence later |
 | GA changelog | PASS | `CHANGELOG_V3.2_GA.md` records only fresh GA work; explicitly not production deployment | Chat agent complete |
-| ChatGPT Work handoff | PASS | `CHATGPT_WORK_HANDOFF.md` constrains runtime execution and evidence | Ready for Work after final CI/source review |
+| ChatGPT Work handoff | PASS | `CHATGPT_WORK_HANDOFF.md` constrains runtime execution and evidence | Ready for Work after documentation-only checkpoint CI passes |
 | Runtime DAST/security probing | BLOCKED | staging required | ChatGPT Work |
 | Independent third-party pentest | BLOCKED | must be genuinely independent | External tester |
-| Formal production-readiness review | PASS WITH BLOCKERS | repository-side review can be completed, but final GA decision remains blocked by E2E/load/DR/monitoring/runtime security/external pentest evidence | Chat agent final + Work/external evidence |
+| Formal production-readiness review | PASS WITH BLOCKERS | repository-side review is complete; final GA decision remains blocked by E2E/load/DR/monitoring/runtime security/external pentest evidence | Chat agent final + Work/external evidence |
 | v3.2 General Availability | NOT YET READY TO DECLARE | no unresolved source Critical is currently proven, but mandatory runtime assurance is incomplete | User after evidence review |
 
 ## Known source fixes introduced by fresh GA run
@@ -50,7 +63,7 @@ This matrix deliberately distinguishes source evidence from runtime certificatio
 1. Stale authenticated sessions revoked after any password-hash change on next protected request.
 2. Login POST/form uses canonical CSRF protection.
 3. PDF failure no longer exposes raw exception messages.
-4. Security/static scanning, API contracts and deterministic regression become CI-enforced.
+4. Security/static scanning, API contracts and deterministic regression are CI-enforced.
 
 ## Expected operational effect when GA auth hardening is first deployed
 
@@ -62,4 +75,4 @@ Absent regression evidence, do not re-run destructive historical billing/seat ce
 
 ## Next status transition
 
-Before handing runtime work to Work, obtain a successful final GitHub CI run on the final `v320-ga-hardening` HEAD and perform a remote semantic diff review against protected baseline `10041da3c4e4a7b8101f8183c243d056c7b128`.
+After the documentation-only checkpoint CI succeeds, repository-side preparation is complete. Runtime work should continue from `CHATGPT_WORK_HANDOFF.md` on isolated staging. The protected baseline `v320-renee-agrisuite-branding` remains untouched.
