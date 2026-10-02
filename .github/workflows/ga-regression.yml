@@ -63,6 +63,9 @@ jobs:
       - name: GA source vulnerability scan
         run: php scripts/ga_source_vulnerability_scan.php
 
+      - name: GA reachability audit
+        run: php scripts/ga_reachability_audit.php
+
       - name: Static architecture regression contracts
         shell: bash
         run: |
