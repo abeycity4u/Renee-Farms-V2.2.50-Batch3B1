@@ -67,6 +67,9 @@ run_check "GA source security scan" php scripts/ga_source_security_scan.php
 run_php_verifier_if_present \
     scripts/verify_v320_password_session_invalidation.php \
     "Password session invalidation contract"
+run_php_verifier_if_present \
+    scripts/verify_v320_login_security_contract.php \
+    "Login security contract"
 
 # Existing closed-workstream verifiers included here only when they are source/static
 # contracts. Destructive billing, migration, provisioning and live-state certification
