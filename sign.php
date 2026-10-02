@@ -88,6 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $_SESSION['user_type'] = $user['user_type'];
         $_SESSION['full_name'] = $user['full_name'];
         $_SESSION['last_login_at'] = $previousLogin;
+        password_security_bind_authenticated_session($user);
 
         header('Location: dashboard.php');
         exit();
