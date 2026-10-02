@@ -219,6 +219,248 @@ if (!function_exists('account_credential_delivery_expiry_text')) {
     }
 }
 
+if (!function_exists('account_credential_delivery_html_escape')) {
+    function account_credential_delivery_html_escape(
+        $value
+    ): string {
+        return htmlspecialchars(
+            (string)$value,
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        );
+    }
+}
+
+if (!function_exists('account_credential_delivery_html_message')) {
+    function account_credential_delivery_html_message(
+        string $purpose,
+        array $account,
+        string $link,
+        string $expiresText
+    ): string {
+        $purpose =
+            account_credential_normalize_purpose(
+                $purpose
+            );
+
+        $fullName =
+            account_credential_delivery_text(
+                $account['full_name'] ?? '',
+                160
+            );
+
+        $farmName =
+            account_credential_delivery_text(
+                $account['farm_name'] ?? '',
+                180
+            );
+
+        $workspaceId =
+            account_credential_delivery_text(
+                $account['workspace_id'] ?? '',
+                120
+            );
+
+        $username =
+            account_credential_delivery_text(
+                $account['username'] ?? '',
+                120
+            );
+
+        $userType =
+            strtolower(
+                account_credential_delivery_text(
+                    $account['user_type'] ?? '',
+                    80
+                )
+            );
+
+        $isTenantAccount =
+            $workspaceId !== ''
+            && $workspaceId !== 'owner'
+            && !in_array(
+                $userType,
+                [
+                    'platform_owner',
+                    'platform_admin',
+                ],
+                true
+            );
+
+        $safeName =
+            account_credential_delivery_html_escape(
+                $fullName !== ''
+                    ? $fullName
+                    : 'there'
+            );
+
+        $safeFarm =
+            account_credential_delivery_html_escape(
+                $farmName
+            );
+
+        $safeWorkspace =
+            account_credential_delivery_html_escape(
+                $workspaceId
+            );
+
+        $safeUsername =
+            account_credential_delivery_html_escape(
+                $username
+            );
+
+        $safeLink =
+            account_credential_delivery_html_escape(
+                $link
+            );
+
+        $safeExpires =
+            account_credential_delivery_html_escape(
+                $expiresText
+            );
+
+        $product =
+            account_credential_delivery_html_escape(
+                platform_brand_product_text()
+            );
+
+        if ($purpose === 'activation') {
+            $heading =
+                'Your '
+                . $product
+                . ' account is ready';
+
+            $intro =
+                'Create your password to activate your account and access your workspace.';
+
+            $buttonLabel =
+                'Activate Your Account';
+
+            $expirySentence =
+                'This activation link expires in '
+                . $safeExpires
+                . '.';
+
+            $securitySentence =
+                'If you were not expecting this account, you can safely ignore this email.';
+        } else {
+            $heading =
+                'Reset your '
+                . $product
+                . ' password';
+
+            $intro =
+                'A password reset was requested for your account.';
+
+            $buttonLabel =
+                'Reset Your Password';
+
+            $expirySentence =
+                'This password reset link expires in '
+                . $safeExpires
+                . '.';
+
+            $securitySentence =
+                'If you did not request this change, you can safely ignore this email. Your existing password remains unchanged.';
+        }
+
+        $details = '';
+
+        if (
+            $isTenantAccount
+            && $farmName !== ''
+        ) {
+            $details .=
+                '<tr>'
+                . '<td style="padding:7px 0;color:#64748b;width:42%;">Farm</td>'
+                . '<td style="padding:7px 0;color:#0f172a;font-weight:600;">'
+                . $safeFarm
+                . '</td>'
+                . '</tr>';
+        }
+
+        if ($isTenantAccount) {
+            $details .=
+                '<tr>'
+                . '<td style="padding:7px 0;color:#64748b;">Farm Workspace ID</td>'
+                . '<td style="padding:7px 0;color:#0f172a;font-weight:600;">'
+                . $safeWorkspace
+                . '</td>'
+                . '</tr>';
+        }
+
+        $details .=
+            '<tr>'
+            . '<td style="padding:7px 0;color:#64748b;">Username</td>'
+            . '<td style="padding:7px 0;color:#0f172a;font-weight:600;">'
+            . $safeUsername
+            . '</td>'
+            . '</tr>';
+
+        return
+            '<!doctype html>'
+            . '<html>'
+            . '<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">'
+            . '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f1f5f9;padding:28px 12px;">'
+            . '<tr><td align="center">'
+            . '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:620px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">'
+            . '<tr><td style="background:#198754;padding:24px 30px;color:#ffffff;">'
+            . '<div style="font-size:22px;font-weight:700;letter-spacing:.2px;">'
+            . $product
+            . '</div>'
+            . '<div style="font-size:12px;opacity:.88;margin-top:4px;">by Renee Farms</div>'
+            . '</td></tr>'
+            . '<tr><td style="padding:32px 30px;">'
+            . '<div style="font-size:16px;margin-bottom:20px;">Hello '
+            . $safeName
+            . ',</div>'
+            . '<h1 style="font-size:25px;line-height:1.25;margin:0 0 12px;color:#0f172a;">'
+            . $heading
+            . '</h1>'
+            . '<p style="font-size:16px;line-height:1.65;margin:0 0 24px;color:#475569;">'
+            . $intro
+            . '</p>'
+            . '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:26px;">'
+            . '<tr><td style="padding:16px 20px;">'
+            . '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">'
+            . $details
+            . '</table>'
+            . '</td></tr>'
+            . '</table>'
+            . '<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 26px;">'
+            . '<tr><td style="background:#198754;border-radius:8px;">'
+            . '<a href="'
+            . $safeLink
+            . '" style="display:inline-block;padding:14px 24px;color:#ffffff;text-decoration:none;font-size:16px;font-weight:700;">'
+            . $buttonLabel
+            . '</a>'
+            . '</td></tr>'
+            . '</table>'
+            . '<p style="font-size:14px;line-height:1.6;color:#64748b;margin:0 0 10px;">'
+            . $expirySentence
+            . '</p>'
+            . '<p style="font-size:14px;line-height:1.6;color:#64748b;margin:0 0 22px;">'
+            . $securitySentence
+            . '</p>'
+            . '<p style="font-size:13px;line-height:1.6;color:#94a3b8;margin:0;">'
+            . 'If the button does not work, '
+            . '<a href="'
+            . $safeLink
+            . '" style="color:#198754;text-decoration:underline;">open the secure account page</a>.'
+            . '</p>'
+            . '</td></tr>'
+            . '<tr><td style="padding:18px 30px;background:#f8fafc;border-top:1px solid #e2e8f0;color:#94a3b8;font-size:12px;">'
+            . $product
+            . ' by Renee Farms'
+            . '</td></tr>'
+            . '</table>'
+            . '</td></tr>'
+            . '</table>'
+            . '</body>'
+            . '</html>';
+    }
+}
+
 if (!function_exists('account_credential_delivery_message')) {
     function account_credential_delivery_message(
         string $purpose,
@@ -330,6 +572,13 @@ if (!function_exists('account_credential_delivery_message')) {
             return [
                 'subject' => $subject,
                 'body' => $body,
+                'html_body' =>
+                    account_credential_delivery_html_message(
+                        $purpose,
+                        $account,
+                        $link,
+                        $expiresText
+                    ),
             ];
         }
 
@@ -358,6 +607,13 @@ if (!function_exists('account_credential_delivery_message')) {
         return [
             'subject' => $subject,
             'body' => $body,
+            'html_body' =>
+                account_credential_delivery_html_message(
+                    $purpose,
+                    $account,
+                    $link,
+                    $expiresText
+                ),
         ];
     }
 }
@@ -435,6 +691,8 @@ if (!function_exists('account_credential_send')) {
                 (string)$message['body'],
                 [
                     'sender' => $senderRole,
+                    'html_body' =>
+                        (string)($message['html_body'] ?? ''),
                 ]
             );
 

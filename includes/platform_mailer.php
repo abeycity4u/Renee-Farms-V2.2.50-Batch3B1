@@ -28,6 +28,109 @@ if (!function_exists('platform_mail_clean_header_text')) {
     }
 }
 
+if (!function_exists('platform_mail_normalize_body')) {
+    function platform_mail_normalize_body(
+        string $body
+    ): string {
+        $body =
+            str_replace(
+                ["\r\n", "\r"],
+                "\n",
+                $body
+            );
+
+        return str_replace(
+            "\n",
+            "\r\n",
+            $body
+        );
+    }
+}
+
+if (!function_exists('platform_mail_mime_payload')) {
+    function platform_mail_mime_payload(
+        string $textBody,
+        string $htmlBody = ''
+    ): array {
+        $textBody =
+            platform_mail_normalize_body(
+                $textBody
+            );
+
+        $htmlBody =
+            trim(
+                $htmlBody
+            );
+
+        if ($htmlBody === '') {
+            return [
+                'headers' => [
+                    'MIME-Version: 1.0',
+                    'Content-Type: text/plain; charset=UTF-8',
+                    'Content-Transfer-Encoding: 8bit',
+                ],
+                'body' => $textBody,
+                'multipart' => false,
+            ];
+        }
+
+        $htmlBody =
+            platform_mail_normalize_body(
+                $htmlBody
+            );
+
+        $boundary =
+            '=_ReneeAgriSuite_'
+            . bin2hex(
+                random_bytes(12)
+            );
+
+        $textEncoded =
+            rtrim(
+                chunk_split(
+                    base64_encode(
+                        $textBody
+                    ),
+                    76,
+                    "\r\n"
+                )
+            );
+
+        $htmlEncoded =
+            rtrim(
+                chunk_split(
+                    base64_encode(
+                        $htmlBody
+                    ),
+                    76,
+                    "\r\n"
+                )
+            );
+
+        $body =
+            '--' . $boundary . "\r\n"
+            . 'Content-Type: text/plain; charset=UTF-8' . "\r\n"
+            . 'Content-Transfer-Encoding: base64' . "\r\n\r\n"
+            . $textEncoded . "\r\n"
+            . '--' . $boundary . "\r\n"
+            . 'Content-Type: text/html; charset=UTF-8' . "\r\n"
+            . 'Content-Transfer-Encoding: base64' . "\r\n\r\n"
+            . $htmlEncoded . "\r\n"
+            . '--' . $boundary . '--';
+
+        return [
+            'headers' => [
+                'MIME-Version: 1.0',
+                'Content-Type: multipart/alternative; boundary="'
+                    . $boundary
+                    . '"',
+            ],
+            'body' => $body,
+            'multipart' => true,
+        ];
+    }
+}
+
 if (!function_exists('platform_mail_sender_env_keys')) {
     function platform_mail_sender_env_keys(): array
     {
@@ -243,22 +346,50 @@ if (!function_exists('platform_smtp_send')) {
             platform_smtp_command($socket, 'RCPT TO:<' . $to . '>', [250, 251]);
             platform_smtp_command($socket, 'DATA', [354]);
 
-            $headers = [
-                'MIME-Version: 1.0',
-                'Content-Type: text/plain; charset=UTF-8',
-                'Content-Transfer-Encoding: 8bit',
-                'From: ' . $fromName . ' <' . $fromAddress . '>',
-                'To: ' . $to,
-                'Subject: ' . $subject,
-                'Date: ' . date(DATE_RFC2822),
-                'Message-ID: <' . bin2hex(random_bytes(12)) . '@reneefarms.com>',
-            ];
-            if ($replyTo !== '') $headers[] = 'Reply-To: ' . $replyTo;
+            $mime =
+                platform_mail_mime_payload(
+                    $body,
+                    (string)($options['html_body'] ?? '')
+                );
 
-            $normalizedBody = str_replace(["\r\n", "\r"], "\n", $body);
-            $normalizedBody = str_replace("\n", "\r\n", $normalizedBody);
-            $normalizedBody = preg_replace('/(^|\r\n)\./', '$1..', $normalizedBody) ?? $normalizedBody;
-            $message = implode("\r\n", $headers) . "\r\n\r\n" . $normalizedBody . "\r\n.\r\n";
+            $headers = array_merge(
+                $mime['headers'],
+                [
+                    'From: ' . $fromName . ' <' . $fromAddress . '>',
+                    'To: ' . $to,
+                    'Subject: ' . $subject,
+                    'Date: ' . date(DATE_RFC2822),
+                    'Message-ID: <'
+                        . bin2hex(random_bytes(12))
+                        . '@reneefarms.com>',
+                ]
+            );
+
+            if ($replyTo !== '') {
+                $headers[] =
+                    'Reply-To: '
+                    . $replyTo;
+            }
+
+            $mimeBody =
+                (string)$mime['body'];
+
+            $mimeBody =
+                preg_replace(
+                    '/(^|\r\n)\./',
+                    '$1..',
+                    $mimeBody
+                )
+                ?? $mimeBody;
+
+            $message =
+                implode(
+                    "\r\n",
+                    $headers
+                )
+                . "\r\n\r\n"
+                . $mimeBody
+                . "\r\n.\r\n";
             if (fwrite($socket, $message) === false) throw new RuntimeException('SMTP message write failed.');
             platform_smtp_expect($socket, [250]);
             @fwrite($socket, "QUIT\r\n");
@@ -284,18 +415,46 @@ if (!function_exists('platform_php_mail_send')) {
                 $options['sender'] ?? null
             );
         $fromName = platform_mail_from_name();
-        $headers = [
-            'MIME-Version: 1.0',
-            'Content-Type: text/plain; charset=UTF-8',
-            'Content-Transfer-Encoding: 8bit',
-            'From: ' . $fromName . ' <' . $fromAddress . '>',
-        ];
-        $replyTo = platform_mail_reply_to();
-        if ($replyTo !== '') $headers[] = 'Reply-To: ' . $replyTo;
+        $mime =
+            platform_mail_mime_payload(
+                $body,
+                (string)($options['html_body'] ?? '')
+            );
+
+        $headers =
+            array_merge(
+                $mime['headers'],
+                [
+                    'From: '
+                        . $fromName
+                        . ' <'
+                        . $fromAddress
+                        . '>',
+                ]
+            );
+
+        $replyTo =
+            platform_mail_reply_to();
+
+        if ($replyTo !== '') {
+            $headers[] =
+                'Reply-To: '
+                . $replyTo;
+        }
 
         $sent = false;
+
         try {
-            $sent = mail($to, $subject, $body, implode("\r\n", $headers));
+            $sent =
+                mail(
+                    $to,
+                    $subject,
+                    (string)$mime['body'],
+                    implode(
+                        "\r\n",
+                        $headers
+                    )
+                );
         } catch (Throwable $e) {
             $sent = false;
         }
