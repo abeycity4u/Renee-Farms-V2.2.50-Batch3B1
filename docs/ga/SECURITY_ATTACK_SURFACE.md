@@ -1,12 +1,12 @@
 # Renee AgriSuite v3.2 — Security Attack Surface
 
-This document is the source-side attack-surface inventory for the v3.2 GA hardening branch. It records what has actually been inspected and separates source evidence from runtime evidence.
+This document is the source-side attack-surface inventory for `v320-ga-hardening`. It records inspected controls and keeps source evidence separate from runtime evidence.
 
 ## 1. Trust boundaries
 
 ### Public / unauthenticated
 
-- Sign in (`sign.php`)
+- Sign in (`sign.php` through the canonical `/login.php` bridge)
 - Account activation (`account/activate.php`)
 - Password recovery request (`account/forgot_password.php`)
 - Password reset (`account/reset_password.php`)
@@ -25,13 +25,13 @@ This document is the source-side attack-surface inventory for the v3.2 GA harden
 - Billing/account management
 - JSON/API mutation and read endpoints
 
-### Platform-owner / privileged
+### Platform Owner / privileged
 
 - Tenant/farm administration
 - Trial onboarding/provisioning
 - Commercial product/plan controls
 - Cross-tenant management surfaces
-- Migrations/maintenance scripts when invoked from CLI
+- Migrations/maintenance scripts when invoked deliberately
 
 ### External services
 
@@ -46,92 +46,92 @@ This document is the source-side attack-surface inventory for the v3.2 GA harden
 
 Source evidence inspected:
 
-- Password verification uses `password_verify()`.
-- Successful login regenerates the session identifier.
+- Password verification uses the central password-security service and PHP `password_verify()`.
+- Successful normal login regenerates the session identifier.
 - PHP session strict mode is enabled.
 - Session cookie is HttpOnly.
 - SameSite is Lax.
 - Secure is set when PHP detects HTTPS.
-- Authenticated inactivity timeout is 15 minutes.
+- Authenticated sessions have inactivity controls.
 - Login uses CSRF validation and rate limiting.
 
-### Finding GA-SEC-001 — stale login redirect target
+### `/login.php` clarification
 
-`config.php::requireLogin()` and the inactivity-timeout path redirect to `/login.php`, while the repository has no `login.php`; the canonical public login route is `sign.php`.
+`/login.php` is intentional. It is the restricted subscription-recovery bridge for Farm Admins whose farm is in a designated billing-recovery state; requests that do not enter recovery fall through to `sign.php`.
 
-**Status:** CONFIRMED SOURCE DEFECT — remediation required on GA branch.
+The earlier GA-SEC-001 assumption that `/login.php` was missing was a false positive and is retired.
 
-**Risk:** unauthenticated/expired-session navigation can be sent to a non-existent route instead of the sign-in surface, depending on production server rewrites.
+### GA-SEC-003 — subscription-recovery CSRF boundary
 
-**Runtime dependency:** production rewrite rules could mask this defect, but `.htaccess.example` does not document such a rewrite. The source contract should not depend on an undocumented rewrite.
+During GA source review, the recovery bridge was confirmed to inspect the special Farm Admin recovery login before `sign.php` reached its normal CSRF validation. This meant the recovery credential path did not share the same CSRF boundary as normal sign-in.
+
+**Status:** REMEDIATED ON `v320-ga-hardening`.
+
+The bridge now calls the shared `csrf_validate_request()` before recovery account lookup/password verification. A focused source regression contract requires the CSRF check to precede those operations, while the existing dedicated rate limit, password verification, session regeneration and normal `sign.php` fallthrough remain intact.
 
 ## 3. CSRF boundary
 
 - `config.php` remains the low-level token authority for compatibility.
 - `includes/csrf.php` is the shared form/request adapter.
 - API mutation helpers delegate to the shared validator.
+- The subscription-recovery bridge now validates CSRF before its special credential path.
 - Sampled critical mutation routes enforce CSRF before mutation.
 
-No duplicate token authority was identified in the inspected path.
+Endpoint coverage continues to be audited; helper existence alone is not treated as complete proof.
 
 ## 4. Tenant isolation / IDOR boundary
 
 Positive source evidence from sampled high-risk routes:
 
-- Sale deletion resolves current farm and selects the sale with both `id` and `farm_id`, under `FOR UPDATE`, before lifecycle reversal/deletion.
-- Inventory stock update resolves current farm and locks the stock item with both `id` and `farm_id` before applying the canonical stock service.
-- Both sampled routes require permissions, CSRF, rate limiting, validation, and transactions.
+- Sale deletion resolves the current farm and selects the sale with both `id` and `farm_id`, under `FOR UPDATE`, before lifecycle reversal/deletion.
+- Inventory stock update resolves the current farm and locks the stock item with both `id` and `farm_id` before using the canonical stock service.
+- Reviewed expense, financial-allocation, sale-revenue-allocation, user-management and permission-assignment paths use tenant-aware ownership rules.
 
-This is evidence of good architecture, not proof that every read/write route is tenant-safe.
+This is positive source evidence, not runtime proof that every route is tenant-safe.
 
-### GA-2 required test classes
+### Required staging IDOR classes
 
 For each ID-bearing route/API:
 
 1. Farm A user requests Farm B object ID.
-2. Farm A user mutates Farm B object ID.
+2. Farm A user attempts mutation of Farm B object ID.
 3. Lower-privilege tenant role invokes Farm Admin mutation.
 4. Sales-only user invokes livestock operation.
 5. Tenant user invokes Platform Owner surface.
-6. Deleted/suspended user reuses an old session.
+6. Deleted/suspended user attempts to reuse an old session.
 
-Expected outcome: no cross-tenant data disclosure or state mutation.
+Expected result: no cross-tenant data disclosure or state mutation.
 
 ## 5. Billing/payment boundary
 
 ### Webhook route
 
-`billing/webhook.php` was inspected.
+Positive source evidence:
 
-Positive evidence:
-
-- POST only.
-- Session independent by design.
-- Provider signature/hash is verified before provider event persistence.
-- Provider event is de-duplicated/registered through the billing audit layer.
-- A webhook payload is not treated as payment authority.
-- The route performs a fresh provider-side payment verification using the frozen reference.
-- Attempt row is locked before application.
-- Verification, refund reconciliation, seat reconciliation, paid-attempt dispatch and event completion are transactionally coordinated.
+- POST-only handling.
+- Session-independent by design.
+- Provider event authentication before persistence.
+- Provider event registration/de-duplication through billing audit services.
+- Webhook payload is not treated as payment authority.
+- Fresh provider-side payment verification using the frozen reference.
+- Attempt row locking before application.
+- Transactionally coordinated payment application/reconciliation behavior.
 
 ### Paystack adapter
 
-`PaystackBillingProviderAdapter::verifyWebhook()` was inspected.
+Positive source evidence:
 
-Positive evidence:
+- HMAC-SHA512 over the raw payload using the configured secret.
+- Timing-safe `hash_equals()` comparison.
+- HTTPS provider verification rather than trusting callback/query status.
 
-- Requires a 128-hex-character `x-paystack-signature`.
-- Computes HMAC-SHA512 over the raw payload using the configured secret.
-- Uses `hash_equals()` for comparison.
-- Payment verification uses Paystack's HTTPS verification endpoint rather than trusting callback/query status.
+### Remaining billing review
 
-### Remaining GA-2 billing work
-
-- Inspect Flutterwave webhook hash verification.
-- Inspect return/recovery routes for reference ownership and replay behavior.
-- Confirm checkout callback URLs cannot be attacker-selected.
-- Confirm amount/currency comparison against frozen attempt for every provider.
-- Confirm provider HTTP transport validates TLS and has bounded timeouts.
+- Flutterwave webhook verification.
+- Return/recovery reference ownership and replay behavior.
+- Callback URL authority.
+- Amount/currency comparison against frozen attempts for every provider.
+- TLS verification and bounded provider HTTP timeouts.
 
 ## 6. Output / browser security boundary
 
@@ -139,94 +139,111 @@ Source evidence:
 
 - Central HTML escaping uses `htmlspecialchars(..., ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')`.
 - Central JSON-for-script helper uses JSON hex escaping flags.
-- Application emits `X-Content-Type-Options: nosniff`.
-- Application emits `X-Frame-Options: SAMEORIGIN`.
-- Referrer-Policy is `strict-origin-when-cross-origin`.
-- Permissions-Policy is restrictive.
-- HSTS is emitted when HTTPS is detected.
-- CSP is emitted centrally in enforcing mode.
+- `X-Content-Type-Options: nosniff`.
+- `X-Frame-Options: SAMEORIGIN`.
+- `Referrer-Policy: strict-origin-when-cross-origin`.
+- Restrictive Permissions-Policy.
+- HSTS when HTTPS is detected.
+- Central enforcing Content-Security-Policy support.
 
-Residual review item:
+Residual hardening debt:
 
-- CSP currently permits some `unsafe-inline` behavior for compatibility. Treat this as defense-in-depth debt, not an automatic defect. Remove only after affected inline script/style surfaces are migrated and regression-tested.
+- CSP currently retains compatibility allowances such as `unsafe-inline` / `unsafe-eval`. Tightening must follow browser E2E coverage rather than a blind source edit.
 
 ## 7. API error boundary
 
-### Finding GA-SEC-002 — exception-message disclosure candidate
+### GA-SEC-002 — exception-message disclosure candidate
 
-`safe_api_exception_message()` suppresses PDO/SQLSTATE errors but returns arbitrary messages from other `Throwable` instances.
+`safe_api_exception_message()` suppresses PDO/database failures but allows selected non-PDO exception messages through.
 
-**Status:** CANDIDATE — not yet a confirmed vulnerability.
+**Status:** REVIEW CANDIDATE — not yet classified as a vulnerability.
 
-Before remediation, trace every caller and distinguish intentional validation exceptions from internal exceptions. The desired end state is an allowlisted validation-error contract plus generic fallback for unexpected internal errors.
+Caller analysis must distinguish intentional domain-validation messages from unexpected implementation exceptions. The target end state is useful allowlisted validation errors plus generic fallback for internal failures.
 
-## 8. Runtime schema mutation boundary
+## 8. PDF/report boundary
 
-### Finding GA-ARCH-001 — legacy request-time migration candidate
+The centralized PDF service:
+
+- disables remote resources;
+- chroots Dompdf to the application root;
+- strips script elements before rendering;
+- sanitizes output filenames;
+- now logs only the exception class and returns a generic 503 on PDF rendering failure rather than exposing raw exception text.
+
+The previously identified PDF raw-exception disclosure issue is therefore **REMEDIATED ON THE GA BRANCH**. Runtime resource-exhaustion and authorization tests remain staging work.
+
+## 9. Runtime schema mutation boundary
+
+### GA-ARCH-001 — legacy runtime migration candidate
 
 `includes/functions.php` contains schema helpers capable of `CREATE TABLE` / `ALTER TABLE` and a `runSchemaMigrations(PDO $pdo)` entry point.
 
-**Status:** CANDIDATE — reachability not yet proven.
+**Status:** CANDIDATE — reachability audit required.
 
-GA-2 must prove whether any normal HTTP request path calls this function. If reachable, runtime schema mutation should be removed from request handling and retained only in explicit migration/deployment tooling.
+If reachable in normal HTTP requests, schema mutation should be removed from request handling and retained only in explicit migration/deployment tooling.
 
-## 9. Rate-limit boundary
+## 10. Rate-limit boundary
 
 Observed architecture uses a shared guest/IP bucket with file locking and an authenticated user/session scope. A session fallback exists for availability if the shared guest bucket cannot be used.
 
 Runtime requirements:
 
-- Verify the shared temp path is writable.
-- Monitor failures that force fallback.
-- Verify client-IP derivation cannot be spoofed through untrusted forwarded headers.
-- Verify production proxy topology before trusting X-Forwarded-* headers.
+- verify the shared temp path is writable;
+- monitor failures that force fallback;
+- verify client-IP derivation/proxy topology;
+- verify forwarded headers are trusted only from known infrastructure.
 
-## 10. Server/file exposure boundary
+## 11. Server/file exposure boundary
 
-- Repository-root production `.htaccess` is intentionally untracked.
+- Production root `.htaccess` is intentionally untracked.
 - `.htaccess.example` documents HTTPS canonicalization, HSTS, disabled indexes, reduced fingerprinting and unsupported-method rejection.
-- `scripts/.htaccess` denies HTTP access under Apache 2.4 and 2.2 compatibility syntax.
-- `.env`, `.env.*`, logs, root `.htaccess`, and uploaded runtime files are excluded by `.gitignore` policy.
+- `scripts/.htaccess` denies direct HTTP access under the current Apache policy.
+- `.env`, `.env.*`, logs, root `.htaccess`, and runtime uploads are excluded by repository policy.
 
-Runtime must still verify Apache inheritance and production `.htaccess`; source examples cannot certify server behavior.
+Runtime must still verify actual Apache inheritance and production/staging server configuration.
 
-## 11. Dependency boundary
+## 12. Dependency boundary
 
 Composer direct dependency:
 
 - `dompdf/dompdf ^3.0`
 
-Current lock snapshot inspected:
+Current CI-resolved locked graph includes:
 
 - `dompdf/dompdf v3.1.6`
-- `dompdf/php-font-lib 1.0.1`
-- `dompdf/php-svg-lib 1.0.0`
-- `masterminds/html5 2.10.0`
-- `sabberworm/php-css-parser 8.9.0`
+- `dompdf/php-font-lib 1.0.2`
+- `dompdf/php-svg-lib 1.0.2`
+- `masterminds/html5 2.11.0`
+- `sabberworm/php-css-parser v9.4.0`
+- `thecodingmachine/safe v3.4.0`
 
-Version inspection is not a vulnerability audit. `composer audit` is required in CI and again on the GA release candidate.
+The GA workflow validates Composer metadata, installs the lock file and runs `composer audit --locked`. Advisory status is time-dependent and must remain a recurring CI check.
 
-## 12. Remaining attack-surface inventory
+## 13. Source scanner / CI evidence
 
-GA-1 is not complete until these are mapped:
+The GA source vulnerability scanner is intentionally high-signal. It fails CI for dangerous execution/TLS/request-include patterns and emits lower-confidence matches as review items rather than automatically rewriting code.
 
-- Flutterwave adapter and webhook verification
+False positives discovered in early runs (for example PDO `->exec()` being confused with PHP `exec()`, and an explicitly local/development `display_errors` branch) were corrected in the scanner rather than changing safe application behavior to satisfy a brittle check.
+
+## 14. Remaining attack-surface work
+
+- Flutterwave and remaining payment paths
 - Billing return/recover/checkout ownership rules
-- File upload endpoints and MIME/path handling
-- PDF/report generation and remote-resource policy
+- File upload/MIME/path handling
+- Remaining report/export authorization
 - Platform Owner/trial provisioning boundaries
 - Read-only API IDOR surfaces
-- Export/download endpoints
-- Any debug/dev/test route beneath web root
-- Session termination/cookie invalidation details
+- Public/dev/test route exposure beneath web root
 - Runtime proxy/TLS assumptions
+- Cross-tenant runtime tests
 
-## 13. Evidence standard
+## 15. Evidence standard
 
-- **PASS (source):** source contract inspected and sufficient for the claim.
-- **PASS (runtime):** staging/production-like execution produced evidence.
-- **CANDIDATE:** concerning source pattern requiring caller/reachability analysis.
-- **CONFIRMED SOURCE DEFECT:** behavior is incorrect from repository evidence without relying on speculation.
+- **PASS (source):** source contract inspected and sufficient for the stated source claim.
+- **PASS (runtime):** staging/production-like execution produced direct evidence.
+- **CANDIDATE:** concerning source pattern requiring semantic/reachability analysis.
+- **CONFIRMED SOURCE DEFECT:** incorrect behavior proven from repository evidence.
+- **REMEDIATED:** confirmed defect patched on the GA branch with regression evidence.
 - **BLOCKED:** requires staging, infrastructure, provider, or independent external access.
 
-No GA security claim should be upgraded from source-only evidence to runtime PASS without executing the corresponding runtime test.
+No source-only result is promoted to runtime certification without the corresponding runtime test.
