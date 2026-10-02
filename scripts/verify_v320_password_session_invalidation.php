@@ -69,7 +69,7 @@ ga_session_contract_check(
 );
 
 ga_session_contract_check(
-    str_contains($passwordSource, "SELECT password FROM users WHERE id = ? AND farm_id = ? LIMIT 1"),
+    str_contains($passwordSource, 'SELECT password FROM users WHERE id = ? AND farm_id = ? LIMIT 1'),
     'session enforcement revalidates user inside the current tenant'
 );
 
@@ -78,9 +78,9 @@ ga_session_contract_check(
     'session fingerprint comparison is timing-safe'
 );
 
+$sessionFingerprintNeedle = "\$_SESSION['credential_session_fingerprint']";
 ga_session_contract_check(
-    str_contains($passwordSource, "$_SESSION['credential_session_fingerprint']")
-        || str_contains($passwordSource, "\$_SESSION['credential_session_fingerprint']"),
+    str_contains($passwordSource, $sessionFingerprintNeedle),
     'authenticated session stores a credential fingerprint rather than the password hash'
 );
 
@@ -99,9 +99,9 @@ ga_session_contract_check(
     'Team User password changes use canonical hashing'
 );
 
+$failClosedNeedle = "if (\$farmId < 1 || \$sessionFingerprint === '')";
 ga_session_contract_check(
-    str_contains($passwordSource, "if ($farmId < 1 || $sessionFingerprint === '')")
-        || str_contains($passwordSource, "if (\$farmId < 1 || \$sessionFingerprint === '')"),
+    str_contains($passwordSource, $failClosedNeedle),
     'legacy authenticated sessions without credential fingerprint fail closed'
 );
 
