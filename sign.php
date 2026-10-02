@@ -5,6 +5,7 @@ require_once(__DIR__ . '/includes/functions.php');
 require_once(__DIR__ . '/api/api_helpers.php');
 require_once(__DIR__ . '/includes/account_credential_lifecycle.php');
 require_once(__DIR__ . '/includes/platform_brand.php');
+require_once(__DIR__ . '/includes/csrf.php');
 
 function verifyLoginPassword(PDO $pdo, array $user, string $password): bool {
     return password_security_verify($password, (string)($user['password'] ?? ''));
@@ -46,6 +47,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
 }
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    csrf_validate_request();
     require_rate_limit('login_attempt', 12, 300);
     $accountType = ($_POST['account_type'] ?? 'farm') === 'platform' ? 'platform' : 'farm';
     $selectedAccountType = $accountType;
@@ -169,6 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <?php endif; ?>
 
             <form method="POST" autocomplete="on">
+                <?php echo csrf_field(); ?>
                 <div class="login-type-toggle" role="radiogroup" aria-label="Account type">
                     <label><input type="radio" name="account_type" value="farm" <?php echo $selectedAccountType === 'farm' ? 'checked' : ''; ?> data-login-type> Farm login</label>
                     <span class="toggle-divider" aria-hidden="true"></span>
