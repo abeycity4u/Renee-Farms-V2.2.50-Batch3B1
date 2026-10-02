@@ -1,0 +1,115 @@
+name: Renee AgriSuite GA Regression
+
+on:
+  push:
+    branches:
+      - v320-ga-hardening
+  pull_request:
+    branches:
+      - v320-ga-hardening
+      - v320-renee-agrisuite-branding
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ga-regression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-contracts:
+    name: Source contracts and dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer:v2
+          coverage: none
+
+      - name: Validate Composer metadata
+        run: composer validate --strict --no-interaction
+
+      - name: Install locked dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress --no-scripts
+
+      - name: Audit locked dependencies
+        run: composer audit --locked --no-interaction
+
+      - name: PHP lint
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -d '' files < <(find . -path './vendor' -prune -o -name '*.php' -type f -print0)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo 'No PHP files found.' >&2
+            exit 1
+          fi
+          for file in "${files[@]}"; do
+            php -l "$file" >/dev/null
+          done
+          echo "PHP_LINT_FILES=${#files[@]}"
+          echo 'PHP_LINT=PASS'
+
+      - name: GA source-security contract
+        run: php scripts/ga_source_security_contract.php
+
+      - name: Static architecture regression contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          tests=(
+            scripts/verify_v320_permission_architecture_alignment.php
+            scripts/verify_v320_navigation_permission_parity.php
+            scripts/verify_v320_inventory_category_list_ux.php
+            scripts/verify_v320_credential_email_html_ux.php
+            scripts/verify_v320_credential_email_mobile_polish.php
+            scripts/verify_v320_credential_email_dark_mode_cta.php
+            scripts/verify_v320_login_password_recovery_ux.php
+            scripts/verify_v320_password_recovery_confirmation_ux.php
+          )
+
+          for test_file in "${tests[@]}"; do
+            if [ ! -f "$test_file" ]; then
+              echo "Missing required regression contract: $test_file" >&2
+              exit 1
+            fi
+            echo "=== $test_file ==="
+            php "$test_file"
+          done
+
+          echo 'STATIC_ARCHITECTURE_CONTRACTS=PASS'
+
+      - name: Ensure verifier directories remain web-denied
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'Require all denied' scripts/.htaccess
+          grep -Fq 'deny from all' scripts/.htaccess
+          echo 'SCRIPT_HTTP_DENY_CONTRACT=PASS'
+
+      - name: Repository secret-file policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          forbidden=0
+          while IFS= read -r tracked; do
+            case "$tracked" in
+              .env|.env.*|.htaccess)
+                if [ "$tracked" != '.env.example' ] && [ "$tracked" != '.htaccess.example' ]; then
+                  echo "Forbidden runtime secret/config file is tracked: $tracked" >&2
+                  forbidden=1
+                fi
+                ;;
+            esac
+          done < <(git ls-files)
+          if [ "$forbidden" -ne 0 ]; then
+            exit 1
+          fi
+          echo 'REPOSITORY_SECRET_FILE_POLICY=PASS'
