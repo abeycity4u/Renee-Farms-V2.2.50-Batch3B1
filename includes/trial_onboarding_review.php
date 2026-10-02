@@ -31,6 +31,9 @@ require_once __DIR__
     . '/farm_entitlements.php';
 
 require_once __DIR__
+    . '/billing_commercial_product.php';
+
+require_once __DIR__
     . '/subscription_plan_catalog.php';
 
 require_once __DIR__
@@ -135,17 +138,11 @@ if (!function_exists(
             );
 
         $approved =
-            $selectedModules === null
-                ? $requested
-                : farm_entitlement_normalize_modules(
-                    $selectedModules
-                );
-
-        if (!$approved) {
-            throw new InvalidArgumentException(
-                'At least one requested module must be approved.'
+            billing_commercial_product_selection_modules(
+                $selectedModules === null
+                    ? $requested
+                    : $selectedModules
             );
-        }
 
         sort($approved);
 

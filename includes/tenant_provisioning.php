@@ -36,6 +36,7 @@ require_once __DIR__ . '/farm_profile.php';
 require_once __DIR__ . '/account_identity_policy.php';
 require_once __DIR__ . '/account_pending_user.php';
 require_once __DIR__ . '/farm_entitlements.php';
+require_once __DIR__ . '/billing_commercial_product.php';
 require_once __DIR__ . '/subscription_plan_catalog.php';
 require_once __DIR__ . '/subscription_seat_policy.php';
 require_once __DIR__ . '/subscription_record.php';
@@ -206,17 +207,11 @@ if (!function_exists('tenant_provisioning_normalize_contract')) {
             );
 
         $modules =
-            farm_entitlement_normalize_modules(
+            billing_commercial_product_selection_modules(
                 is_array($input['modules'] ?? null)
                     ? $input['modules']
                     : []
             );
-
-        if (!$modules) {
-            throw new InvalidArgumentException(
-                'Select at least one tenant service entitlement.'
-            );
-        }
 
         $planCode =
             strtolower(

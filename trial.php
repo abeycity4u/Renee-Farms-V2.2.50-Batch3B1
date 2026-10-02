@@ -710,6 +710,12 @@ function trial_public_value(
                                     </label>
                                 <?php endforeach; ?>
                             </div>
+
+                            <div class="hint">
+                                Choose Sales by itself for a standalone Sales
+                                workspace. Poultry and Ruminant already include
+                                shared Sales capability.
+                            </div>
                         </fieldset>
                     </div>
 
@@ -730,5 +736,17 @@ function trial_public_value(
             </div>
         </section>
     </main>
+    <script
+        src="<?php
+            echo htmlspecialchars(
+                BASE_URL
+                . versioned_asset(
+                    '/assets/js/commercial-product-selection.js'
+                ),
+                ENT_QUOTES,
+                'UTF-8'
+            );
+        ?>"
+    ></script>
 </body>
 </html>

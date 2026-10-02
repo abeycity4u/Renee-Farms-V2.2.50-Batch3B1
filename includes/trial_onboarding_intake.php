@@ -35,6 +35,7 @@ require_once __DIR__ . '/account_identity_policy.php';
 require_once __DIR__ . '/account_credential_lifecycle.php';
 require_once __DIR__ . '/farm_contact_email.php';
 require_once __DIR__ . '/farm_entitlements.php';
+require_once __DIR__ . '/billing_commercial_product.php';
 
 if (!class_exists(
     'TrialOnboardingIntakeConflict'
@@ -230,7 +231,7 @@ if (!function_exists('trial_onboarding_intake_normalize')) {
         }
 
         $modules =
-            farm_entitlement_normalize_modules(
+            billing_commercial_product_selection_modules(
                 $modulesRaw
             );
 

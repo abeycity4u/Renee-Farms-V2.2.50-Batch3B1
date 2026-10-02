@@ -31,6 +31,9 @@ require_once __DIR__
 require_once __DIR__
     . '/tenant_provisioning.php';
 
+require_once __DIR__
+    . '/billing_commercial_product.php';
+
 if (!function_exists(
     'trial_onboarding_provisioning_decode_json_array'
 )) {
@@ -225,14 +228,16 @@ if (!function_exists(
                 'Approved modules snapshot'
             );
 
-        $modules =
-            farm_entitlement_normalize_modules(
-                $modulesSnapshot
-            );
-
-        if (!$modules) {
+        try {
+            $modules =
+                billing_commercial_product_selection_modules(
+                    $modulesSnapshot
+                );
+        } catch (InvalidArgumentException $exception) {
             throw new RuntimeException(
-                'Approved trial request has no service entitlement.'
+                'Approved trial request contains an invalid commercial product selection.',
+                0,
+                $exception
             );
         }
 

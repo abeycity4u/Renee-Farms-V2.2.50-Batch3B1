@@ -70,7 +70,18 @@ if (!function_exists('platform_owner_tenant_modules')) {
             'SELECT module_code FROM farm_modules WHERE farm_id = ? AND is_enabled = 1 ORDER BY module_code'
         );
         $stmt->execute([$farmId]);
-        return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+        $modules =
+            $stmt->fetchAll(PDO::FETCH_COLUMN)
+            ?: [];
+
+        return function_exists(
+            'farm_entitlement_subscribed_modules'
+        )
+            ? farm_entitlement_subscribed_modules(
+                $modules
+            )
+            : $modules;
     }
 }
 

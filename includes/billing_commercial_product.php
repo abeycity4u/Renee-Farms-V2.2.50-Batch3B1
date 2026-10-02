@@ -79,6 +79,79 @@ if (!function_exists('billing_commercial_product_modules')) {
     }
 }
 
+/**
+ * Validate an explicit commercial-product selection.
+ *
+ * Unlike billing_commercial_product_modules(), which deliberately remains
+ * tolerant of legacy livestock + Sales rows when reading existing tenants,
+ * this write-boundary helper rejects a new ambiguous selection.
+ */
+if (!function_exists('billing_commercial_product_selection_modules')) {
+    function billing_commercial_product_selection_modules(
+        array $modules
+    ): array {
+        $known = [];
+
+        foreach ($modules as $module) {
+            $module =
+                strtolower(
+                    trim(
+                        (string)$module
+                    )
+                );
+
+            if (
+                in_array(
+                    $module,
+                    [
+                        'poultry',
+                        'ruminant',
+                        'sales',
+                    ],
+                    true
+                )
+            ) {
+                $known[$module] =
+                    true;
+            }
+        }
+
+        if (!$known) {
+            throw new InvalidArgumentException(
+                'Select Sales, Poultry, Ruminant, or Poultry + Ruminant.'
+            );
+        }
+
+        $hasSales =
+            isset(
+                $known['sales']
+            );
+
+        $hasLivestock =
+            isset(
+                $known['poultry']
+            )
+            || isset(
+                $known['ruminant']
+            );
+
+        if (
+            $hasSales
+            && $hasLivestock
+        ) {
+            throw new InvalidArgumentException(
+                'Sales is a standalone commercial product. Choose Sales by itself, or choose Poultry, Ruminant, or both. Poultry and Ruminant already include shared Sales capability.'
+            );
+        }
+
+        return billing_commercial_product_modules(
+            array_keys(
+                $known
+            )
+        );
+    }
+}
+
 if (!function_exists('billing_commercial_product_require_modules')) {
     function billing_commercial_product_require_modules(
         array $modules

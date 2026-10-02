@@ -5,6 +5,7 @@ require_once dirname(__DIR__) . '/includes/farm_profile.php';
 require_once dirname(__DIR__) . '/includes/account_identity_policy.php';
 require_once dirname(__DIR__) . '/includes/account_pending_user.php';
 require_once dirname(__DIR__) . '/includes/tenant_provisioning.php';
+require_once dirname(__DIR__) . '/includes/billing_commercial_product.php';
 requireLogin();
 requirePlatformOwner();
 
@@ -253,7 +254,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $profileInputError =
             $profileException->getMessage();
     }
-    $submittedModules = farm_entitlement_normalize_modules($_POST['modules'] ?? []);
+    try {
+        $submittedModules =
+            billing_commercial_product_selection_modules(
+                is_array($_POST['modules'] ?? null)
+                    ? $_POST['modules']
+                    : []
+            );
+
+        $commercialProductError =
+            null;
+    } catch (InvalidArgumentException $commercialProductException) {
+        $submittedModules =
+            farm_entitlement_normalize_modules(
+                is_array($_POST['modules'] ?? null)
+                    ? $_POST['modules']
+                    : []
+            );
+
+        $commercialProductError =
+            $commercialProductException->getMessage();
+    }
     $seatAddOns = subscription_seat_normalize_addons(is_array($_POST['seat_addons'] ?? null) ? $_POST['seat_addons'] : []);
     $identityError = null;
     try {
@@ -330,7 +351,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($profileInputError !== null) {
         $error = $profileInputError;
     } elseif ($identityError !== null) $error = $identityError;
-    elseif (!$submittedModules) $error = 'Select Poultry, Ruminant, or both so the farm workspace has an active service entitlement.';
+    elseif ($commercialProductError !== null) $error = $commercialProductError;
     elseif ($emailPairError !== null) $error = $emailPairError;
     elseif ((isset($_POST['create_farm']) || $repairOwnerNeeded || $existingOwnerPending) && $rawOwnerEmail === '') $error = 'Farm Admin email is required so the account can be activated securely.';
     elseif (!in_array($plan, ['starter', 'growth', 'pro'], true) || !in_array($status, ['trial', 'active', 'past_due', 'suspended'], true)) $error = 'Select a valid subscription plan and status.';
@@ -704,10 +725,50 @@ if (isset($_GET['edit'])) {
     if ($editFarm) {
         $ownerId = findFarmAdminId($pdo, (int)$editFarm['id']);
         if ($ownerId) { $stmt = $pdo->prepare('SELECT * FROM users WHERE id = ? AND farm_id = ?'); $stmt->execute([$ownerId, $editFarm['id']]); $editOwner = $stmt->fetch(PDO::FETCH_ASSOC); }
-        $editModules = farm_entitlement_modules($pdo, (int)$editFarm['id']);
+        $editModules =
+            farm_entitlement_commercial_product_for_display(
+                farm_entitlement_modules(
+                    $pdo,
+                    (int)$editFarm['id']
+                )
+            );
     }
 }
 $farms = $pdo->query("SELECT f.*, GROUP_CONCAT(CASE WHEN fm.is_enabled = 1 THEN fm.module_code END ORDER BY fm.module_code SEPARATOR ', ') AS modules, DATEDIFF(f.subscription_ends_at, CURDATE()) AS days_remaining FROM farms f LEFT JOIN farm_modules fm ON fm.farm_id = f.id WHERE f.slug <> 'owner' GROUP BY f.id ORDER BY f.created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
+
+foreach ($farms as &$farmRow) {
+    $storedModules =
+        array_values(
+            array_filter(
+                array_map(
+                    'trim',
+                    explode(
+                        ',',
+                        (string)($farmRow['modules'] ?? '')
+                    )
+                ),
+                static fn (string $module): bool =>
+                    $module !== ''
+            )
+        );
+
+    $effectiveModules =
+        farm_entitlement_subscribed_modules(
+            $storedModules
+        );
+
+    $farmRow['modules'] =
+        $effectiveModules
+            ? implode(
+                ', ',
+                array_map(
+                    'ucfirst',
+                    $effectiveModules
+                )
+            )
+            : 'None';
+}
+unset($farmRow);
 $form = $editFarm ?: ['name'=>'','slug'=>'','primary_color'=>'#198754','contact_name'=>'','contact_email'=>'','subscription_plan'=>'starter','subscription_status'=>'trial','subscription_starts_at'=>'','subscription_ends_at'=>''];
 $owner = $editOwner ?: ['username'=>'','email'=>'','full_name'=>''];
 $ownerNeedsRepair = $editFarm !== null && $editOwner === null;
@@ -758,7 +819,7 @@ require_once dirname(__DIR__)
 <div class="col-md-4"><label class="form-label">Username</label><input class="form-control" name="owner_username" value="<?php echo htmlspecialchars($owner['username']); ?>" maxlength="<?php echo ACCOUNT_IDENTITY_USERNAME_MAX; ?>" required></div><?php if ($editFarm && !$ownerNeedsRepair && (($owner['credential_state'] ?? 'active') === 'active')): ?><div class="col-md-4"><label class="form-label">Password (leave blank to keep)</label><input class="form-control" type="password" name="owner_password" minlength="<?php echo password_security_min_length(); ?>"></div><?php endif; ?><div class="col-md-4"><label class="form-label">Farm Admin email</label><input class="form-control" type="email" name="owner_email" value="<?php echo htmlspecialchars($owner['email']); ?>" <?php echo (!$editFarm || $ownerNeedsRepair || (($owner['credential_state'] ?? '') === 'pending_activation')) ? 'required' : ''; ?>><div class="form-text">Used for account activation and password recovery. Required when creating or repairing a Farm Admin account.</div></div>
 <div class="col-md-6"><label class="form-label">Full Name</label><input class="form-control" name="owner_name" value="<?php echo htmlspecialchars($owner['full_name']); ?>" maxlength="<?php echo ACCOUNT_IDENTITY_FULL_NAME_MAX; ?>" required></div><div class="col-md-6"><label class="form-label">Farm name</label><input class="form-control" name="name" value="<?php echo htmlspecialchars($form['name']); ?>" required></div><div class="col-md-6"><label class="form-label">Farm Workspace ID</label><input class="form-control" name="slug" value="<?php echo htmlspecialchars($form['slug']); ?>" pattern="[a-z0-9]+(-[a-z0-9]+)*" required></div><div class="col-md-6"><label class="form-label">Logo upload</label><input class="form-control" type="file" name="logo" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"><?php if ($editFarm && !empty($editFarm['logo_path'])): ?><div class="form-text">Current logo is saved and will be kept unless you choose a replacement.</div><img src="<?php echo BASE_URL . htmlspecialchars($editFarm['logo_path']); ?>" alt="Current farm logo" class="img-thumbnail mt-2 app-farm-logo-preview"><?php endif; ?></div>
 <div class="col-md-4"><label class="form-label">Primary colour</label><input class="form-control form-control-color" type="color" name="primary_color" value="<?php echo htmlspecialchars($form['primary_color']); ?>"></div><div class="col-md-4"><label class="form-label">Contact name</label><input class="form-control" name="contact_name" value="<?php echo htmlspecialchars($form['contact_name']); ?>"></div><div class="col-md-4"><label class="form-label">Billing / contact email</label><input class="form-control" type="email" name="contact_email" value="<?php echo htmlspecialchars($form['contact_email']); ?>"><div class="form-text">Used for billing and commercial contact. Account activation is sent to the Farm Admin email above.</div></div>
-<div class="col-12"><div class="card border"><div class="card-body"><h3 class="h6 mb-1">Farm Admin</h3><p class="form-text mt-0 mb-0">Protected tenant administrator. Identity is always <strong>Farm Admin</strong>; operational access comes from the subscribed modules below, not specialist roles.</p></div></div></div>
+<div class="col-12"><div class="card border"><div class="card-body"><h3 class="h6 mb-1">Farm Admin</h3><p class="form-text mt-0 mb-0">Protected tenant administrator. Identity is always <strong>Farm Admin</strong>; workspace access comes from the commercial product below. Specialist roles such as Sales Rep never decide which product the tenant owns.</p></div></div></div>
 <?php if ($editFarm && !$ownerNeedsRepair && (($owner['credential_state'] ?? '') === 'pending_activation')): ?>
 <div class="col-12">
     <div class="alert alert-warning mb-0">
@@ -773,13 +834,14 @@ require_once dirname(__DIR__)
     </div>
 </div>
 <?php endif; ?>
-<div class="col-md-12"><label class="form-label d-block">Subscribed Modules</label><?php foreach ($moduleLabels as $value => $label): ?><div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="modules[]" value="<?php echo htmlspecialchars($value); ?>" data-module-entitlement="1" <?php echo in_array($value, $editModules, true) ? 'checked' : ''; ?>><label class="form-check-label"><?php echo htmlspecialchars($label); ?></label></div><?php endforeach; ?><div class="form-text">Disabling a module removes current operational access but preserves its historical farm records.</div></div>
+<div class="col-md-12"><label class="form-label d-block">Commercial Product</label><?php foreach ($moduleLabels as $value => $label): ?><div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="modules[]" value="<?php echo htmlspecialchars($value); ?>" data-module-entitlement="1" <?php echo in_array($value, $editModules, true) ? 'checked' : ''; ?>><label class="form-check-label"><?php echo htmlspecialchars($label); ?></label></div><?php endforeach; ?><div class="form-text">Choose Sales by itself for a Sales-only workspace, or choose Poultry, Ruminant, or both. Poultry and Ruminant already include shared Sales capability.</div></div>
 <div class="col-12"><div class="card border"><div class="card-body"><h3 class="h6 mb-1">User limits by role</h3><p class="form-text mt-0">Platform limit for how many login accounts this farm may create under each specialist role. Farm Admin is one protected account. Disabled modules force their specialist limit to 0 when saved.</p><div class="row g-2">
 <?php foreach (['poultry_manager'=>'Poultry users','ruminant_manager'=>'Ruminant users','sales_rep'=>'Sales users','viewer'=>'Viewer users'] as $limitRole=>$limitLabel): ?><div class="col-sm-6 col-lg-3"><label class="form-label"><?php echo $limitLabel; ?></label><input class="form-control" type="number" min="0" max="500" name="role_limits[<?php echo $limitRole; ?>]" value="<?php echo (int)($editRoleLimits[$limitRole] ?? 1); ?>"></div><?php endforeach; ?>
 </div></div></div></div>
 <div class="col-md-3"><label class="form-label">Plan</label><select class="form-select" name="plan"><?php foreach (['starter'=>'Starter','growth'=>'Growth','pro'=>'Pro'] as $value=>$label): ?><option value="<?php echo $value; ?>" <?php echo $form['subscription_plan']===$value?'selected':''; ?>><?php echo $label; ?></option><?php endforeach; ?></select></div><div class="col-md-3"><label class="form-label">Status</label><select class="form-select" name="status"><?php foreach (['trial'=>'Trial','active'=>'Active','past_due'=>'Past Due','suspended'=>'Suspended'] as $value=>$label): ?><option value="<?php echo $value; ?>" <?php echo $form['subscription_status']===$value?'selected':''; ?>><?php echo $label; ?></option><?php endforeach; ?></select></div><div class="col-md-3"><label class="form-label">Starts Date</label><input class="form-control" type="date" name="subscription_starts_at" value="<?php echo htmlspecialchars($form['subscription_starts_at'] ? date('Y-m-d', strtotime($form['subscription_starts_at'])) : ''); ?>"></div><div class="col-md-3"><label class="form-label">End Date</label><input class="form-control" type="date" name="subscription_ends_at" value="<?php echo htmlspecialchars($form['subscription_ends_at'] ? date('Y-m-d', strtotime($form['subscription_ends_at'])) : ''); ?>"></div>
 <div class="col-12"><button name="<?php echo $editFarm ? 'update_farm' : 'create_farm'; ?>" class="btn btn-success"><?php echo $editFarm ? 'Save farm changes' : 'Create farm and admin'; ?></button><?php if ($editFarm): ?><a class="btn btn-outline-secondary ms-2" href="<?php echo BASE_URL; ?>/management/farms.php">Cancel</a><?php endif; ?></div></form></div></div>
-<div class="card"><div class="table-responsive"><table class="table mb-0"><thead><tr><th>Farm</th><th>Farm Workspace ID</th><th>Modules</th><th>Plan</th><th>Status</th><th>Subscription Ends</th><th>Actions</th></tr></thead><tbody><?php foreach ($farms as $farm): ?><tr><td><?php echo htmlspecialchars($farm['name']); ?></td><td><?php echo htmlspecialchars($farm['slug']); ?></td><td><?php echo htmlspecialchars($farm['modules'] ?: 'None'); ?></td><td><?php echo htmlspecialchars($farm['subscription_plan']); ?></td><td><?php echo htmlspecialchars($farm['subscription_status']); ?></td><td><?php echo htmlspecialchars($farm['subscription_ends_at'] ? date('d M Y', strtotime($farm['subscription_ends_at'])) : 'Not set'); ?></td><td><a class="btn btn-sm btn-outline-primary" href="?edit=<?php echo (int)$farm['id']; ?>">Edit</a> <form method="post" class="d-inline"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token()); ?>"><input type="hidden" name="farm_id" value="<?php echo (int)$farm['id']; ?>"><?php if ($farm['subscription_status'] === 'suspended'): ?><button name="reactivate_farm" class="btn btn-sm btn-outline-success">Reactivate</button><?php else: ?><button type="button" name="suspend_farm" class="btn btn-sm btn-outline-warning" data-farm-action="suspend">Suspend</button><?php endif; ?><button type="button" name="delete_farm" class="btn btn-sm btn-outline-danger" data-farm-action="delete" data-farm-name="<?php echo app_attr($farm['name']); ?>">Delete</button></form></td></tr><?php endforeach; ?></tbody></table></div></div></main>
+<div class="card"><div class="table-responsive"><table class="table mb-0"><thead><tr><th>Farm</th><th>Farm Workspace ID</th><th>Subscribed Modules</th><th>Plan</th><th>Status</th><th>Subscription Ends</th><th>Actions</th></tr></thead><tbody><?php foreach ($farms as $farm): ?><tr><td><?php echo htmlspecialchars($farm['name']); ?></td><td><?php echo htmlspecialchars($farm['slug']); ?></td><td><?php echo htmlspecialchars($farm['modules'] ?: 'None'); ?></td><td><?php echo htmlspecialchars($farm['subscription_plan']); ?></td><td><?php echo htmlspecialchars($farm['subscription_status']); ?></td><td><?php echo htmlspecialchars($farm['subscription_ends_at'] ? date('d M Y', strtotime($farm['subscription_ends_at'])) : 'Not set'); ?></td><td><a class="btn btn-sm btn-outline-primary" href="?edit=<?php echo (int)$farm['id']; ?>">Edit</a> <form method="post" class="d-inline"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token()); ?>"><input type="hidden" name="farm_id" value="<?php echo (int)$farm['id']; ?>"><?php if ($farm['subscription_status'] === 'suspended'): ?><button name="reactivate_farm" class="btn btn-sm btn-outline-success">Reactivate</button><?php else: ?><button type="button" name="suspend_farm" class="btn btn-sm btn-outline-warning" data-farm-action="suspend">Suspend</button><?php endif; ?><button type="button" name="delete_farm" class="btn btn-sm btn-outline-danger" data-farm-action="delete" data-farm-name="<?php echo app_attr($farm['name']); ?>">Delete</button></form></td></tr><?php endforeach; ?></tbody></table></div></div></main>
 <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/farms.js'); ?>"></script>
 
+<script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/commercial-product-selection.js'); ?>"></script>
 </body></html>

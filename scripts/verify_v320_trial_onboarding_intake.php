@@ -113,9 +113,9 @@ verify_pass(
 verify_pass(
     str_contains(
         $source,
-        'farm_entitlement_normalize_modules'
+        'billing_commercial_product_selection_modules'
     ),
-    'requested module normalization stays centralized'
+    'requested commercial-product validation stays centralized'
 );
 
 verify_pass(

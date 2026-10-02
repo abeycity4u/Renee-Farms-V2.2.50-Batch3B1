@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/billing_commercial_product.php';
 /**
  * Canonical farm subscription/module entitlement helpers.
  *
@@ -43,6 +44,81 @@ if (!function_exists('farm_entitlement_normalize_modules')) {
             }
         }
         return $normalized;
+    }
+}
+
+/**
+ * Effective subscribed-module presentation.
+ *
+ * Poultry/Ruminant products include shared Sales capability without requiring
+ * a separate persisted farm_modules.sales row.
+ */
+if (!function_exists('farm_entitlement_subscribed_modules')) {
+    function farm_entitlement_subscribed_modules(
+        array $modules
+    ): array {
+        $modules =
+            farm_entitlement_normalize_modules(
+                $modules
+            );
+
+        if (
+            in_array(
+                'poultry',
+                $modules,
+                true
+            )
+            || in_array(
+                'ruminant',
+                $modules,
+                true
+            )
+        ) {
+            if (
+                !in_array(
+                    'sales',
+                    $modules,
+                    true
+                )
+            ) {
+                $modules[] =
+                    'sales';
+            }
+        }
+
+        $ordered = [];
+
+        foreach (
+            [
+                'poultry',
+                'ruminant',
+                'sales',
+            ]
+            as $module
+        ) {
+            if (
+                in_array(
+                    $module,
+                    $modules,
+                    true
+                )
+            ) {
+                $ordered[] =
+                    $module;
+            }
+        }
+
+        return $ordered;
+    }
+}
+
+if (!function_exists('farm_entitlement_commercial_product_for_display')) {
+    function farm_entitlement_commercial_product_for_display(
+        array $modules
+    ): array {
+        return billing_commercial_product_modules(
+            $modules
+        );
     }
 }
 

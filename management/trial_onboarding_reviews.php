@@ -982,5 +982,16 @@ include dirname(__DIR__)
 </div>
 </div>
 
+<script src="<?php
+    echo htmlspecialchars(
+        BASE_URL
+        . versioned_asset(
+            '/assets/js/commercial-product-selection.js'
+        ),
+        ENT_QUOTES,
+        'UTF-8'
+    );
+?>"></script>
+
 </body>
 </html>
