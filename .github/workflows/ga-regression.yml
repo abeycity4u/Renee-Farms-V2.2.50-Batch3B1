@@ -74,6 +74,8 @@ jobs:
             scripts/verify_v320_credential_email_dark_mode_cta.php
             scripts/verify_v320_login_password_recovery_ux.php
             scripts/verify_v320_password_recovery_confirmation_ux.php
+            scripts/verify_v320_ga_tenant_authorization_contract.php
+            scripts/verify_v320_pdf_security_contract.php
           )
 
           for test_file in "${tests[@]}"; do
