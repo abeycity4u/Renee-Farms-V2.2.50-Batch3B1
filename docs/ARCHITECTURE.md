@@ -8,8 +8,6 @@ This document describes the source architecture on the `v320-ga-hardening` branc
 
 ## Architectural principles
 
-The current architecture follows these project rules:
-
 1. **One fix, fit it all** — shared rules belong in common services/helpers rather than page-local copies.
 2. **Thin routes/pages** — HTTP pages and API endpoints coordinate authentication, authorization, input parsing and service calls; domain rules should live below them.
 3. **Tenant scope is explicit** — tenant-owned data operations carry the current `farm_id` through lookup and persistence.
@@ -26,146 +24,65 @@ Application entry bootstrap. It initializes the common runtime used by web pages
 
 ### `config.php`
 
-Central runtime bootstrap and security/session authority. Responsibilities include:
+Central runtime bootstrap and security/session authority. Responsibilities include environment-backed database configuration, timezone/base URL, response security policy, session configuration, inactivity handling, database connection, current user/farm context, login/tenant/Platform Owner gates, role/module helpers and common CSRF/session behavior.
 
-- environment-backed database configuration;
-- application timezone;
-- base URL resolution;
-- security headers / CSP emission;
-- PHP session configuration;
-- inactivity handling;
-- database connection and MySQL timezone alignment;
-- current-user/current-farm helpers;
-- login/tenant/Platform Owner gates;
-- role/module/farm-type helpers;
-- common CSRF/session behavior.
-
-`config.php` is intentionally environment-sensitive. Production configuration must never be replaced wholesale from a development copy without preserving deployment-specific authority.
+`config.php` is environment-sensitive. Production configuration must never be replaced wholesale from a development copy without preserving deployment-specific authority.
 
 ## Tenant model
 
-The tenant boundary is a Farm.
+The tenant boundary is a Farm. Typical authenticated session context contains `user_id`, `farm_id`, role-derived authority and authentication/session timing metadata.
 
-Typical authenticated session context contains:
-
-- `user_id`;
-- `farm_id`;
-- `user_type` / role-derived authority;
-- authentication/session timing metadata.
-
-Tenant-owned queries are expected to include `farm_id` directly or call a canonical service that requires a farm ID.
-
-Platform Owner is a deliberate global exception. Tenant roles must not gain equivalent cross-farm behavior.
+Tenant-owned queries are expected to include `farm_id` directly or call a canonical service that requires a farm ID. Platform Owner is a deliberate global exception; tenant roles must not gain equivalent cross-farm behavior.
 
 ## Commercial product and entitlements
 
-Commercial product authority is centralized under the billing/commercial-product helpers.
+Commercial product authority is centralized under billing/commercial-product helpers. Current combinations include Sales-only, Poultry, Ruminant and Poultry + Ruminant.
 
-Current product combinations include:
-
-- Sales-only;
-- Poultry;
-- Ruminant;
-- Poultry + Ruminant.
-
-Sales capability may also be effective for livestock products without becoming an independent duplicate product flag.
-
-Entitlements answer **what the farm has purchased/enabled**. They do not replace user permissions.
+Sales capability may also be effective for livestock products without becoming an independent duplicate product flag. Entitlements answer **what the farm has purchased/enabled**; they do not replace user permissions.
 
 ## Roles and permissions
 
-Core permission authority is represented by:
+Core authority is represented by `includes/permission_catalog.php`, `includes/permission_runtime.php`, shared resolution in `includes/functions.php`, and the permissions administration routes.
 
-- `includes/permission_catalog.php`;
-- shared permission resolution in `includes/functions.php`;
-- `admin/permissions.php`;
-- `admin/permissions_save.php`.
-
-Permission applicability is farm-aware so a permission that is nonsensical for a tenant product is not treated as assignable merely because its code exists.
-
-Navigation (`navbar.php`) consumes canonical permissions but is not itself an authorization boundary. Direct routes/APIs must independently enforce access.
+Permission applicability is farm-aware so a permission that is nonsensical for a tenant product is not assignable merely because its code exists. Navigation consumes canonical permissions but is not itself an authorization boundary; direct routes/APIs must independently enforce access.
 
 ## HTTP/UI organization
 
-### Root pages
-
-Root pages provide shared workspace surfaces such as Dashboard and Inventory.
-
-### `management/`
-
-Cross-domain management/reporting surfaces, including Sales Records, Expenses, Profitability, production-cycle management, user management, billing/refund review and PDF/report endpoints.
-
-### `poultry/`
-
-Poultry-specific operational surfaces including Layer/Broiler daily records, feeds, expenses, health and slaughter processing.
-
-### `ruminant/`
-
-Ruminant-specific operational surfaces including animal registry, daily records, feeds, expenses and slaughter processing.
-
-### `account/`
-
-Public credential lifecycle pages:
-
-- activation;
-- forgot password;
-- password reset.
-
-### `billing/`
-
-Subscription/payment routes, callbacks/webhooks and billing account workflows.
-
-### `api/`
-
-JSON/async application endpoints. `api/api_helpers.php` supplies shared API gates and response/error behavior.
+- Root pages provide shared surfaces such as Dashboard and Inventory.
+- `management/` contains cross-domain management/reporting, Sales, Expenses, Profitability, cycles, users and reports.
+- `poultry/` contains Layer/Broiler daily operations, feeds, health, expenses and slaughter processing.
+- `ruminant/` contains animal registry, daily records, feeds, expenses and slaughter processing.
+- `account/` contains public activation/forgot-password/reset-password pages.
+- `billing/` contains subscription/payment routes, callbacks/webhooks and billing account workflows.
+- `api/` contains JSON/async application endpoints, using `api/api_helpers.php` for shared gates/response behavior.
 
 ## Domain service layer
 
-The `lib/` and `includes/` directories contain shared domain/service authorities. Important service families include the following.
+The `lib/` and `includes/` directories contain shared domain/service authorities.
 
 ### Sales lifecycle
 
-Sales financial records are distinct from physical inventory and livestock population effects.
+Sales financial records are distinct from physical inventory and livestock population effects. Canonical lifecycle services own edit/delete/reversal behavior so routes do not independently recreate physical/financial side effects.
 
-Canonical sale lifecycle services own edit/delete/reversal behavior so direct page SQL does not independently recreate physical/financial side effects.
+### Stock / Inventory
 
-### Stock / inventory
-
-Canonical stock services maintain an append-oriented movement ledger and authoritative current balance.
-
-Important invariants:
-
-- stock item ownership is tenant-scoped;
-- received and used movements are explicit;
-- sale-driven inventory usage is represented by ledger movement rather than an unexplained balance edit;
-- corrections/restorations preserve audit history;
-- shared/cycle consumption attribution is handled separately from the physical stock movement itself.
+Canonical stock services maintain append-oriented movements and authoritative balances. Important invariants include tenant ownership, explicit receive/use movements, sale-driven ledger movement, reversible corrections, and separate cycle-consumption attribution.
 
 ### Financial allocation
 
-Shared financial-allocation services attribute revenue/expense/consumption between production cycles without rewriting the underlying source transaction.
-
-The application distinguishes:
-
-- source financial transaction;
-- allocation projection;
-- allocation revision/provenance history.
+Shared allocation services attribute revenue/expense/consumption between production cycles without rewriting the underlying source transaction. Source transaction, allocation projection and revision/provenance history remain distinct.
 
 ### Sale revenue allocation
 
-Manual shared-revenue allocation is a separate contract from automatic allocation such as Layer egg allocation.
-
-Persistence uses tenant-scoped parent sale loading, production-cycle validation, revision history and no-op detection.
+Manual shared-revenue allocation is separate from automatic allocation such as Layer egg allocation. Persistence uses tenant-scoped parent loading, production-cycle validation, revision history and no-op detection.
 
 ### Production cycle services
 
-Cycle services centralize lifecycle, production-entry economics and cycle-aware attribution rather than allowing independent pages to derive competing cycle state.
+Cycle services centralize lifecycle, production-entry economics and cycle-aware attribution rather than allowing independent pages to derive competing state.
 
 ### Livestock population
 
-Population effects are explicit domain effects. A financial sale does not automatically imply a population exit unless the selected sale/lifecycle contract says that animals physically left the live population.
-
-Slaughter processing similarly owns its physical lifecycle independently from sales revenue creation.
+Population effects are explicit domain events. A financial sale does not automatically imply population exit unless the selected lifecycle contract says animals physically left live population. Slaughter owns its physical lifecycle independently from sales revenue creation.
 
 ## Authentication and credentials
 
@@ -173,65 +90,43 @@ Slaughter processing similarly owns its physical lifecycle independently from sa
 
 `includes/password_security.php` is the canonical password hashing/verification authority. It prefers Argon2id where available and supports hash rehash/upgrade.
 
-### Login
+### Canonical login entry
 
-`sign.php` performs:
+`/login.php` is the canonical public login target. It is intentionally a thin bridge rather than a duplicate login implementation.
 
-- CSRF validation;
-- rate limiting;
-- tenant/platform account resolution;
-- password verification;
-- generic authentication failure messaging;
-- session ID regeneration before authenticated context is established.
+For ordinary login requests it falls through to `sign.php`. For an eligible Farm Admin whose farm is in a designated billing-recovery state, it may establish a restricted billing-only recovery session. The bridge uses the shared CSRF validator before recovery account lookup/password verification, retains dedicated throttling and relies on the shared recovery service for session regeneration/authorization.
+
+`sign.php` owns the normal sign-in implementation and form, including CSRF validation, throttling, tenant/platform account resolution, central password verification, generic failure messaging and session ID regeneration before authenticated context is established.
+
+This separation is deliberate: `/login.php` must not be removed as a stale route, and `sign.php` must not duplicate billing-recovery policy.
 
 ### Activation/reset lifecycle
 
-Credential tokens use the shared credential lifecycle/delivery services. Design invariants include:
-
-- expiring tokens;
-- one-time consumption;
-- supersession of previous same-purpose tokens;
-- account-enumeration-safe reset requests;
-- centralized HTML + plain-text email delivery.
+Credential tokens use shared credential lifecycle/delivery services. Invariants include expiring tokens, one-time consumption, same-purpose supersession, account-enumeration-safe reset requests and centralized multipart HTML/plain-text email delivery.
 
 ## Billing/payment architecture
 
-Payment provider integration is separated from commercial/subscription state.
+Provider integration is separated from commercial/subscription state.
 
-The Paystack webhook flow includes:
+The payment architecture uses authenticated provider events, server-side payment verification, frozen provider references/quotes, database transactions/row locking, canonical paid-attempt dispatch and immutable billing/subscription history.
 
-1. raw webhook receipt;
-2. HMAC authentication using the provider secret;
-3. tracked-reference validation;
-4. independent provider/payment verification where required by canonical billing service;
-5. transaction/row locking;
-6. canonical finalization;
-7. immutable subscription/billing history.
+Shared HTTP transport restricts billing provider requests to HTTPS and known provider hosts, enables TLS peer/host verification, disables redirects and applies bounded timeouts/response size. Paystack uses HMAC-SHA512/timing-safe webhook verification; Flutterwave uses its configured verification hash with timing-safe comparison.
 
 Exactly-once behavior and immutable history are release-critical invariants.
 
 ## Reporting and PDF
 
-Application-generated PDFs use `includes/pdf/PdfReportService.php` and Dompdf.
+Application PDFs use `includes/pdf/PdfReportService.php` and Dompdf. Current policy includes remote resources disabled, filesystem chroot to the application root, authorized/scoped report construction, sanitized filenames and generic user-facing PDF failure responses on the GA branch.
 
-Current security/resource policy includes:
-
-- remote resources disabled;
-- filesystem chroot to application root;
-- report HTML generated only after route authorization/data scoping;
-- sanitized output filename;
-- generic user-facing failure handling on the GA hardening branch.
-
-Individual report routes remain responsible for tenant authorization and escaping their dynamic content before rendering.
+Individual report routes remain responsible for tenant authorization and escaping dynamic content before rendering.
 
 ## Security architecture
 
-Central controls currently include:
+Central controls include:
 
 - strict/session cookie configuration;
 - HttpOnly + SameSite session cookie policy;
-- session ID rotation;
-- inactivity/session lifetime handling;
+- session ID rotation and inactivity/lifetime handling;
 - CSRF validation;
 - role/permission/entitlement enforcement;
 - tenant-scoped object access;
@@ -243,73 +138,28 @@ Central controls currently include:
 - payment webhook authentication;
 - safe API exception normalization;
 - repository secret-file policy;
-- web denial rules for verifier/migration/internal paths.
+- web denial rules for verifier/internal paths.
 
-CSP still contains compatibility allowances (`unsafe-inline` / `unsafe-eval`) that are tracked as GA hardening debt and must only be tightened after E2E browser coverage exists.
+CSP still contains compatibility allowances (`unsafe-inline` / `unsafe-eval`) tracked as GA hardening debt and gated on E2E coverage before tightening.
 
 ## Data integrity patterns
 
-The codebase uses several recurring integrity patterns:
-
-- PDO prepared statements;
-- explicit transactions around multi-row state transitions;
-- `FOR UPDATE` on critical parent/balance rows;
-- tenant ID carried through reads and writes;
-- immutable or append-only history for important billing/allocation events;
-- reversal/replacement rather than silent mutation of historical physical movements;
-- canonical shared services for domain transitions.
+Recurring patterns include PDO prepared statements, explicit transactions, `FOR UPDATE` on critical state, tenant IDs carried through reads/writes, immutable/append-oriented history, reversal/replacement semantics and shared services for domain transitions.
 
 ## Automated assurance
 
-GA source regression is defined in `.github/workflows/ga-regression.yml`.
+GA regression is defined in `.github/workflows/ga-regression.yml`. Pipeline categories include Composer validation/audit, repository-wide PHP lint, source-security and source-vulnerability scanning, reachability analysis, login/recovery contracts, permission/navigation contracts, credential/recovery contracts, tenant-authorization and PDF contracts, verifier-directory web-denial policy and repository secret-file policy.
 
-Current pipeline categories include:
-
-- Composer validation;
-- locked dependency installation;
-- Composer advisory audit;
-- PHP lint;
-- source-security contract;
-- source vulnerability scan;
-- login security contract;
-- permission/navigation contracts;
-- credential/recovery contracts;
-- tenant authorization contract;
-- PDF security contract;
-- protected verifier-directory policy;
-- repository secret-file policy.
-
-Runtime E2E, load, DAST and disaster-recovery tests are deliberately separate because they require an isolated deployed environment.
+Runtime E2E, load, DAST and disaster-recovery testing are deliberately separate because they require an isolated deployed environment.
 
 ## Deployment model
 
-The current production deployment is cPanel/Apache/PHP/MySQL based. Source and production runtime are separate directories. Production deployment practice uses:
+Production is cPanel/Apache/PHP/MySQL based. Source and runtime are separate directories. Deployment practice uses expected branch/HEAD guards, clean-worktree checks, source verification, backup, controlled copy, lint, source/runtime integrity hashes, runtime verification, rollback and focused browser QA.
 
-- expected-branch/expected-HEAD guards;
-- clean-worktree checks;
-- source verification;
-- runtime backup;
-- controlled file copy;
-- PHP lint;
-- source/runtime integrity hashes;
-- runtime contract verification;
-- rollback on failure;
-- focused browser QA.
-
-GA hardening must not deploy directly from `v320-ga-hardening` until the release readiness gate authorizes it.
+GA hardening must not deploy directly from `v320-ga-hardening` until the release-readiness gate authorizes it.
 
 ## Runtime assurance still required for GA
 
-Source architecture alone cannot prove:
+Source architecture alone cannot prove cross-tenant IDOR resistance under real sessions, runtime browser compatibility, actual web-server policy, live security headers, payment replay behavior, performance/concurrency limits, backup restore correctness, monitoring/alert delivery or independent third-party penetration results.
 
-- cross-tenant IDOR resistance under real sessions;
-- runtime browser compatibility;
-- actual Apache/server policy equivalence;
-- runtime CSP/header behavior;
-- payment replay/idempotency under provider-like traffic;
-- concurrency/performance limits;
-- backup restore correctness;
-- monitoring/alert delivery;
-- third-party independent penetration results.
-
-Those remain explicit GA staging/external gates rather than assumed passes.
+Those remain explicit staging/external gates rather than assumed passes.
