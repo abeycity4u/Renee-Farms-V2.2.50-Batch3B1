@@ -42,6 +42,7 @@ $warn = static function (bool $condition, string $label) use (&$warnings): void 
 try {
     $config = $read('config.php');
     $sign = $read('sign.php');
+    $passwordSecurity = $read('includes/password_security.php');
     $csrf = $read('includes/csrf.php');
     $output = $read('includes/output_security.php');
     $csp = $read('includes/csp_policy.php');
@@ -75,8 +76,14 @@ $check(
 );
 
 $check(
-    str_contains($sign, 'password_verify('),
-    'login uses password_verify'
+    str_contains($sign, 'password_security_verify(')
+        && str_contains($passwordSecurity, 'password_verify('),
+    'login uses central hash-only password verification'
+);
+
+$check(
+    str_contains($passwordSecurity, "password_get_info(\$storedHash)['algo'] === 0"),
+    'central password verifier rejects plaintext compatibility'
 );
 
 $check(
@@ -85,13 +92,15 @@ $check(
 );
 
 $check(
-    str_contains($sign, 'csrf_validate_request()'),
-    'login validates CSRF'
+    str_contains($sign, "'/includes/csrf.php'")
+        && str_contains($sign, 'csrf_validate_request()')
+        && str_contains($sign, 'csrf_field()'),
+    'login form and POST path use shared CSRF protection'
 );
 
 $check(
-    str_contains($sign, "require_rate_limit(\$pdo, 'login'"),
-    'login is rate limited'
+    preg_match("/require_rate_limit\\(\\s*'login_attempt'\\s*,\\s*12\\s*,\\s*300\\s*\\)/", $sign) === 1,
+    'login attempt rate limit is active'
 );
 
 $check(
@@ -129,9 +138,12 @@ $check(
     'billing webhook independently verifies payment with provider'
 );
 
+$verifyWebhookPos = strpos($webhook, 'billing_provider_verify_webhook(');
+$registerEventPos = strpos($webhook, 'billing_provider_event_register(');
 $check(
-    strpos($webhook, 'billing_provider_verify_webhook(')
-        < strpos($webhook, 'billing_provider_event_register('),
+    $verifyWebhookPos !== false
+        && $registerEventPos !== false
+        && $verifyWebhookPos < $registerEventPos,
     'webhook authentication occurs before event persistence'
 );
 
