@@ -199,7 +199,7 @@ $renderSalePopulationEffectControls = static function (string $prefix): void {
     ?>
     <div class="card mb-3 sale-population-effect-card" id="<?php echo $idPrefix; ?>PopulationEffectCard">
         <div class="card-body py-3">
-            <div class="fw-semibold mb-2">Live Population Effect</div>
+            <div class="fw-semibold mb-2">Live Animal Impact</div>
 
             <select
                 name="population_effect_mode"
@@ -207,10 +207,10 @@ $renderSalePopulationEffectControls = static function (string $prefix): void {
                 class="form-select"
             >
                 <option value="financial_only" selected>
-                    Financial only — no sale-owned population removal
+                    No animals leave the farm — record sale/revenue only
                 </option>
                 <option value="remove_live_population">
-                    Remove live population — explicit headcount by source cycle
+                    Animals leave the farm — reduce live population
                 </option>
             </select>
 
@@ -234,7 +234,7 @@ $renderSalePopulationEffectControls = static function (string $prefix): void {
                 id="<?php echo $idPrefix; ?>PopulationEffectAddRow"
                 class="btn btn-sm btn-outline-secondary d-none"
             >
-                Add source cycle
+                Add another source cycle
             </button>
 
             <div

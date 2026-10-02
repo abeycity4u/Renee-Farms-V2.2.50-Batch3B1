@@ -601,15 +601,15 @@ verify_true(
 verify_true(
     strpos(
         $salesJs,
-        'This option updates only the financial sale record.'
+        'sale does not physically remove animals from the farm'
     ) !== false
     && strpos(
         $salesJs,
-        'This option records a physical population removal.'
+        'animals were physically sold from the farm'
     ) !== false
     && strpos(
         $salesJs,
-        'whole headcount you explicitly enter'
+        'exact whole number removed from each source production cycle'
     ) !== false,
     'population mode explanation describes the selected operational effect'
 );

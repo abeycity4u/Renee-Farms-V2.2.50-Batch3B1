@@ -1594,15 +1594,15 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
     const salePopulationEffectExplanations = {
         financial_only: {
             default:
-                'This option updates only the financial sale record. It creates no sale-owned live-population deduction. Product type, quantity, and unit of measure are treated as financial/revenue data only.',
+                'Use this when the sale does not physically remove animals from the farm. The sale and revenue are recorded, but live population is unchanged.',
             ruminant:
-                'This sale creates no additional aggregate/group headcount deduction. Tagged ruminants explicitly marked Sold live or Culled/slaughtered are still removed from live population through the Animal Registry lifecycle. Product type, quantity, and unit of measure remain financial/revenue data only.'
+                'Use this when no additional group animals leave the farm. Tagged ruminants marked Sold live or Culled/slaughtered are still handled separately through their Animal Registry lifecycle.'
         },
         remove_live_population: {
             default:
-                'This option records a physical population removal. Saving this sale will reduce live population only by the whole headcount you explicitly enter for the selected source production cycle(s). Product type, sales quantity, and unit of measure do not determine the population change.',
+                'Use this when animals were physically sold from the farm. Enter the exact whole number removed from each source production cycle. Sale quantity and unit do not automatically determine the population change.',
             ruminant:
-                'Use this for additional aggregate/group headcount physically removed by this sale. Enter only the whole headcount removed from the selected source production cycle(s). Do not include tagged animals already marked Sold live or Culled/slaughtered because their Animal Registry lifecycle already updates population.'
+                'Use this only for additional untagged or group animals physically removed by the sale. Do not include tagged animals already marked Sold live or Culled/slaughtered because their Animal Registry lifecycle already updates population.'
         }
     };
 
@@ -1670,7 +1670,7 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
         cycleColumn.append(
             $('<label>', {
                 class: 'form-label small mb-1',
-                text: 'Source production cycle'
+                text: 'Animals came from'
             })
         );
 
@@ -1716,7 +1716,7 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
         quantityColumn.append(
             $('<label>', {
                 class: 'form-label small mb-1',
-                text: 'Whole headcount'
+                text: 'Animals removed'
             })
         );
 
@@ -1746,7 +1746,7 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
             actionColumn.append(
                 $('<div>', {
                     class: 'small text-muted pb-2',
-                    text: 'Selected sale cycle'
+                    text: 'Selected production cycle'
                 })
             );
         }
@@ -1777,16 +1777,16 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
             .find('option[value="financial_only"]')
             .text(
                 farm === 'ruminant'
-                    ? 'Financial only — no additional aggregate/group removal'
-                    : 'Financial only — no sale-owned population removal'
+                    ? 'No additional group animals leave the farm'
+                    : 'No animals leave the farm — record sale/revenue only'
             );
 
         modeElement
             .find('option[value="remove_live_population"]')
             .text(
                 farm === 'ruminant'
-                    ? 'Remove live population — aggregate/group headcount'
-                    : 'Remove live population — explicit headcount by source cycle'
+                    ? 'Group animals leave the farm — reduce live population'
+                    : 'Animals leave the farm — reduce live population'
             );
 
         $(ids.explanation).text(
@@ -1837,7 +1837,7 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
             rowsElement.append(
                 $('<div>', {
                     class: 'alert alert-warning py-2 mb-0',
-                    text: 'No matching production cycle is available for this population effect. To remove live population, first select or create an eligible production cycle. Otherwise, keep this sale as Financial only.'
+                    text: 'No matching production cycle is available. Select or create an eligible production cycle before recording animals leaving the farm. Otherwise, choose the option that keeps live population unchanged.'
                 })
             );
             addRowButton.addClass('d-none');
