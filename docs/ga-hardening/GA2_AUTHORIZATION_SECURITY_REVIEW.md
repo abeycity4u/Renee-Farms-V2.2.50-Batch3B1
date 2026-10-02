@@ -176,9 +176,9 @@ Required remediation:
 
 Still OPEN. `config.php` contains tenant unauthenticated/session-expiry redirects to retired `/login.php` while the canonical route is `sign.php`.
 
-### GA-DEP-001 — no committed Composer lock
+### Dependency lock / Composer audit — PASS
 
-Still OPEN. Exact dependency resolution remains non-reproducible until `composer.lock` is generated and reviewed in a controlled Composer environment.
+The protected baseline and GA branch both contain a committed `composer.lock`. The GA workflow validates Composer metadata, installs the locked dependency graph and runs `composer audit --locked`. The reviewed workflow completed those dependency steps successfully. No dependency-lock finding is open.
 
 ### GA-CSP-001 — `unsafe-inline` / `unsafe-eval`
 
