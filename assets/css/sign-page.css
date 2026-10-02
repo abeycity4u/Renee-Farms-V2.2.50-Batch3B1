@@ -206,6 +206,31 @@
             text-align: center;
         }
 
+        .auth-recovery-row {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 0.42rem;
+        }
+
+        .auth-recovery-link {
+            color: #2d6a4f;
+            font-size: 0.84rem;
+            font-weight: 700;
+            text-decoration: none;
+            border-radius: 6px;
+            padding: 0.18rem 0.1rem;
+        }
+
+        .auth-recovery-link:hover {
+            color: #1b4332;
+            text-decoration: underline;
+        }
+
+        .auth-recovery-link:focus-visible {
+            outline: 3px solid var(--ring);
+            outline-offset: 3px;
+        }
+
         .back-link {
             text-decoration: none;
             color: #f1fff5;

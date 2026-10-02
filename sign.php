@@ -185,12 +185,39 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 </div>
                 <div>
                     <label for="password">Password</label>
-                    <input id="password" name="password" type="password" required>
+                    <input
+                        id="password"
+                        name="password"
+                        type="password"
+                        required
+                        autocomplete="current-password"
+                    >
+
+                    <div class="auth-recovery-row">
+                        <a
+                            class="auth-recovery-link"
+                            href="<?php
+                                echo htmlspecialchars(
+                                    BASE_URL
+                                    . '/account/forgot_password.php',
+                                    ENT_QUOTES,
+                                    'UTF-8'
+                                );
+                            ?>"
+                        >
+                            Forgot password?
+                        </a>
+                    </div>
                 </div>
-                <button class="button" type="submit">Enter Workspace</button>
+
+                <button class="button" type="submit">
+                    Enter Workspace
+                </button>
             </form>
 
-            <p class="helper">Need access? Contact your administrator for account setup.</p>
+            <p class="helper">
+                Need a new account? Contact your administrator.
+            </p>
         </section>
     </main>
 <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/sign.js'); ?>"></script>
