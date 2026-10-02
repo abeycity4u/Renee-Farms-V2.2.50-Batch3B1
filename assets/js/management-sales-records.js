@@ -25,6 +25,10 @@
             configElement.dataset.saleUnitPresets,
             []
         ),
+        layerEggProductRules: parseJson(
+            configElement.dataset.layerEggProductRules,
+            {contains: [], exact: []}
+        ),
         salesCycles: parseJson(
             configElement.dataset.salesCycles,
             []
@@ -128,6 +132,109 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
     const slaughterSaleLots = salesRecordsConfig.slaughterSaleLots;
     const slaughterSaleHistoryMap = salesRecordsConfig.slaughterSaleHistoryMap;
 
+    function isLayerEggSaleProduct(product) {
+        const normalized = String(product || '').trim().toLowerCase();
+        if (!normalized) return false;
+
+        const rules =
+            salesRecordsConfig.layerEggProductRules
+            || {contains: [], exact: []};
+
+        const contains = Array.isArray(rules.contains)
+            ? rules.contains
+            : [];
+
+        const exact = Array.isArray(rules.exact)
+            ? rules.exact
+            : [];
+
+        return contains.some(needle => {
+            const normalizedNeedle =
+                String(needle || '').trim().toLowerCase();
+
+            return normalizedNeedle
+                && normalized.includes(normalizedNeedle);
+        }) || exact.some(value =>
+            String(value || '').trim().toLowerCase() === normalized
+        );
+    }
+
+    function revenueAttributionSelectors(prefix) {
+        const edit = prefix === 'edit';
+
+        return {
+            farm: edit ? '#editSaleFarmType' : '#addFarmType',
+            production: edit
+                ? '#editSaleProductionType'
+                : '#addProductionType',
+            cycle: edit ? '#editSaleCycleId' : '#addCycleId',
+            product: edit ? '#editSaleProduct' : '#addProductType',
+            help: edit
+                ? '#editRevenueAttributionHelp'
+                : '#addRevenueAttributionHelp'
+        };
+    }
+
+    function refreshRevenueAttributionGuidance(prefix) {
+        if (salesRecordsConfig.salesOnlyWorkspace) return;
+
+        const ids = revenueAttributionSelectors(prefix);
+        const farm = String($(ids.farm).val() || '');
+        const production =
+            String($(ids.production).val() || '');
+        const cycle = $(ids.cycle);
+        const cycleId = Number(cycle.val() || 0);
+        const product = String($(ids.product).val() || '');
+        const sharedOption =
+            cycle.find('option[value="0"]');
+
+        if (cycleId > 0) {
+            $(ids.help).text(
+                'All sale revenue is attributed directly to this production cycle.'
+            );
+            return;
+        }
+
+        if (farm === 'general') {
+            sharedOption.text('Not applicable');
+            $(ids.help).text(
+                'Revenue is not attributed to a livestock production cycle.'
+            );
+            return;
+        }
+
+        const layerEggSale =
+            farm === 'poultry'
+            && production === 'layer'
+            && isLayerEggSaleProduct(product);
+
+        if (layerEggSale) {
+            sharedOption.text(
+                'Automatically allocate across eligible Layer cycles'
+            );
+            $(ids.help).text(
+                'Revenue will be allocated automatically using each eligible Layer cycle’s available unsold egg inventory.'
+            );
+            return;
+        }
+
+        sharedOption.text('Not tied to one cycle');
+
+        if (
+            farm === 'poultry'
+            && production === 'layer'
+        ) {
+            $(ids.help).text(
+                'This sale is not assigned to one production cycle. If animals physically left the farm, record the exact source cycle(s) and headcount under Live Animal Impact below.'
+            );
+            return;
+        }
+
+        $(ids.help).text(
+            'This sale is not assigned directly to one production cycle.'
+        );
+    }
+
     function refreshSaleAttribution(prefix, selectedProduction = '', selectedCycle = 0) {
         // Add modal uses addFarmType; Edit modal uses editSaleFarmType.
         // Resolve the actual controls explicitly so edit never targets missing IDs.
@@ -142,13 +249,18 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
         Object.entries(options).forEach(([value,label]) => prod.append(new Option(label,value,false,value===selectedProduction)));
         if (!prod.val()) prod.prop('selectedIndex',0);
         const production = prod.val();
-        const sharedCycleLabel = farm === 'general' ? 'Not applicable' : (production === 'shared' ? 'No specific cycle' : 'Shared between cycles');
+        const sharedCycleLabel =
+            farm === 'general'
+                ? 'Not applicable'
+                : 'Not tied to one cycle';
         cycle.empty().append(new Option(sharedCycleLabel, '0'));
         salesCycles.filter(c => c.farm_type === farm && c.production_type === production).forEach(c => {
             cycle.append(new Option(`${c.cycle_code} — ${c.status}`, String(c.id), false, Number(c.id)===Number(selectedCycle)));
         });
         const wantedCycle = String(selectedCycle || 0);
         if (cycle.find(`option[value="${wantedCycle}"]`).length) cycle.val(wantedCycle); else cycle.val('0');
+
+        refreshRevenueAttributionGuidance(prefix);
     }
 
     function refreshRuminantSaleAnimalChoices(prefix, selectedRows = null) {
@@ -2061,11 +2173,27 @@ const saleUnitPresets = salesRecordsConfig.saleUnitPresets;
 
         $('#addCycleId').on(
             'change',
-            () => refreshSalePopulationEffect('add')
+            () => {
+                refreshRevenueAttributionGuidance('add');
+                refreshSalePopulationEffect('add');
+            }
         );
         $('#editSaleCycleId').on(
             'change',
-            () => refreshSalePopulationEffect('edit')
+            () => {
+                refreshRevenueAttributionGuidance('edit');
+                refreshSalePopulationEffect('edit');
+            }
+        );
+
+        $('#addProductType').on(
+            'input change',
+            () => refreshRevenueAttributionGuidance('add')
+        );
+
+        $('#editSaleProduct').on(
+            'input change',
+            () => refreshRevenueAttributionGuidance('edit')
         );
 
         $('#addPopulationEffectMode').on(

@@ -12,10 +12,35 @@ if (!defined('LAYER_EGGS_PER_CRATE')) {
     define('LAYER_EGGS_PER_CRATE', 30.0);
 }
 
+function layer_egg_sale_product_match_rules(): array
+{
+    return [
+        'contains' => ['egg'],
+        'exact' => ['crate', 'crates', 'egg crate', 'egg crates'],
+    ];
+}
+
 function layer_egg_is_sale_product(?string $product): bool
 {
     $product = strtolower(trim((string)$product));
-    return $product !== '' && (str_contains($product, 'egg') || in_array($product, ['crate','crates','egg crate','egg crates'], true));
+
+    if ($product === '') {
+        return false;
+    }
+
+    $rules = layer_egg_sale_product_match_rules();
+
+    foreach (($rules['contains'] ?? []) as $needle) {
+        if ($needle !== '' && str_contains($product, $needle)) {
+            return true;
+        }
+    }
+
+    return in_array(
+        $product,
+        $rules['exact'] ?? [],
+        true
+    );
 }
 
 

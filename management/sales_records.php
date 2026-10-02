@@ -1942,8 +1942,11 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 <small class="text-muted">Who produced this revenue: Layer, Broiler, species, or General.</small>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label>Production Cycle (optional)</label>
-                                <select name="cycle_id" id="addCycleId" class="form-select"><option value="0">Shared between cycles</option></select>
+                                <label>Revenue Attribution</label>
+                                <select name="cycle_id" id="addCycleId" class="form-select"><option value="0">Not tied to one cycle</option></select>
+                                <small class="text-muted d-block mt-1" id="addRevenueAttributionHelp">
+                                    This sale is not assigned directly to one production cycle.
+                                </small>
                             </div>
                         </div>
                         <?php endif; ?>
@@ -2290,8 +2293,11 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
                                 <select name="production_type" id="editSaleProductionType" class="form-select" required></select>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label>Production Cycle (optional)</label>
-                                <select name="cycle_id" id="editSaleCycleId" class="form-select"><option value="0">Shared between cycles</option></select>
+                                <label>Revenue Attribution</label>
+                                <select name="cycle_id" id="editSaleCycleId" class="form-select"><option value="0">Not tied to one cycle</option></select>
+                                <small class="text-muted d-block mt-1" id="editRevenueAttributionHelp">
+                                    This sale is not assigned directly to one production cycle.
+                                </small>
                             </div>
                         </div>
                         <?php endif; ?>
@@ -2406,6 +2412,11 @@ $pdfReportParams = $_GET; unset($pdfReportParams['pdf']); $pdfReportUrl = 'sales
         data-sales-only-workspace="<?php echo $salesOnlyWorkspace ? '1' : '0'; ?>"
         data-sale-unit-presets="<?php echo htmlspecialchars(
             app_json_script(array_keys(sales_unit_presets())),
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        ); ?>"
+        data-layer-egg-product-rules="<?php echo htmlspecialchars(
+            app_json_script(layer_egg_sale_product_match_rules()),
             ENT_QUOTES | ENT_SUBSTITUTE,
             'UTF-8'
         ); ?>"
