@@ -2,324 +2,164 @@
 
 ## Scope
 
-This document records the read-only GA-1 review of the `v320-ga-hardening` branch created from the protected v3.2 baseline commit `10041da3a3c4e4a7b8101f8183c243d056c7b128`.
+This document records the GA-1 source review of `v320-ga-hardening`, created from protected baseline commit `10041da3a3c4e4a7b8101f8183c243d056c7b128`.
 
-GA-1 does not authorize production mutation, destructive testing, load testing, database migration, or changes to the protected `v320-renee-agrisuite-branding` branch.
+GA-1 does not authorize production mutation, destructive testing, load testing, database migration, or changes to `v320-renee-agrisuite-branding`.
 
 Status vocabulary:
 
-- **PASS** — the reviewed source provides direct evidence of the control.
-- **FINDING** — a concrete issue is supported by source/repository evidence.
-- **REVIEW** — an area requires deeper source/runtime testing before classification.
-- **DEFERRED** — requires staging/runtime/infrastructure evidence and is intentionally left for the runtime hardening phase.
+- **PASS** — reviewed source directly supports the control.
+- **FINDING** — source supports a concrete defect.
+- **REMEDIATED** — a confirmed defect has been corrected on the GA branch with regression coverage.
+- **REVIEW** — deeper source/runtime evidence is required before classification.
+- **DEFERRED** — staging/runtime/infrastructure evidence is required.
 
-## Protected baseline and hardening branch
+## Branch isolation
 
-- Protected baseline branch: `v320-renee-agrisuite-branding`
-- Protected baseline commit: `10041da3a3c4e4a7b8101f8183c243d056c7b128`
-- GA hardening branch: `v320-ga-hardening`
-- GA branch starting commit: `10041da3a3c4e4a7b8101f8183c243d056c7b128`
+- Protected baseline: `v320-renee-agrisuite-branding`
+- Baseline commit: `10041da3a3c4e4a7b8101f8183c243d056c7b128`
+- Active hardening branch: `v320-ga-hardening`
+- GA branch starting commit: exact protected baseline commit above
 
-The baseline is treated as a known-good fallback and must remain unchanged during GA hardening.
+The baseline remains the known-good fallback and is not a GA work branch.
 
 ## Primary attack surfaces
 
 ### Public authentication and credential lifecycle
 
-Routes/services reviewed or identified:
-
-- `sign.php`
+- `/login.php` — canonical sign-in entry / restricted subscription-recovery bridge
+- `sign.php` — normal sign-in implementation and form
 - `account/activate.php`
 - `account/forgot_password.php`
 - `account/reset_password.php`
-- shared credential lifecycle/delivery helpers under `includes/`
+- shared credential lifecycle/delivery helpers
 
-Security boundaries:
-
-- account enumeration resistance
-- password verification and rehashing
-- login throttling
-- session establishment and regeneration
-- activation/reset token issuance, expiry, supersession and one-time consumption
-- CSRF on state-changing browser requests
+Security boundaries include account-enumeration resistance, password verification/rehashing, throttling, session establishment/regeneration, activation/reset token lifecycle and CSRF.
 
 ### Tenant authorization and permissions
 
-Primary authority surfaces:
+Primary authority surfaces include:
 
 - `config.php`
 - `includes/permission_catalog.php`
+- `includes/permission_runtime.php`
 - `includes/functions.php`
 - `admin/permissions.php`
 - `admin/permissions_save.php`
-- route/API permission gates
+- route/API gates
 
-Security boundaries:
-
-- farm/tenant isolation
-- role and permission applicability
-- module entitlement enforcement
-- horizontal object access (IDOR)
-- vertical privilege escalation
-- navigation/runtime permission parity
+Security boundaries include tenant isolation, role/permission applicability, module entitlements, horizontal object access, vertical privilege escalation and navigation/runtime parity.
 
 ### API surface
 
-The repository contains authenticated and public endpoints under `api/`, including inventory, expenses, reporting, financial allocation, record operations and sale lifecycle endpoints.
+Authenticated/public endpoints under `api/` cover Inventory, expenses, reporting, financial allocation, records and sales lifecycle operations. `api/api_helpers.php` centralizes authentication, permission, method, CSRF, rate-limit and response helpers.
 
-Shared API controls are implemented in `api/api_helpers.php`, including login checks, permission checks, request-method enforcement, CSRF validation, JSON responses and no-store headers.
+Priority runtime classes remain cross-tenant object IDs, cross-role access, mutation without CSRF, method confusion, exception leakage, replay/stale requests and over-posting.
 
-Highest-value API security tests for later stages:
+### Billing/payment
 
-- cross-tenant object IDs
-- cross-role access
-- state changes without CSRF
-- method confusion
-- over-posting/mass assignment
-- exception/error disclosure
-- stale/replayed requests
+Public provider webhooks/returns and authenticated billing/account routes are high-value boundaries. Reviewed Paystack code uses authenticated provider events, provider-side payment verification, transaction/locking and canonical billing services. Flutterwave and remaining callback/return paths remain in the review queue.
 
-### Billing and payment callbacks/webhooks
+### Sales, Inventory and financial allocation
 
-Identified billing attack surfaces include public Paystack callback/webhook routes and authenticated billing/account routes.
-
-`billing/paystack-webhook.php` was reviewed and currently demonstrates the expected security pattern:
-
-- POST-only handling
-- secret obtained through environment resolution
-- HMAC SHA-512 verification over the raw body
-- `hash_equals()` comparison
-- generic rejection responses
-- tracked-reference validation
-- transactional processing
-- row lock (`FOR UPDATE`) before finalization
-- canonical finalization helper
-
-Runtime replay/idempotency tests remain a staging concern.
-
-### Sales, inventory and financial allocation
-
-High-value mutation surfaces include:
-
-- sale create/edit/delete
-- inventory receive/use/restore
-- stock consumption allocation
-- sale revenue allocation
-- expenses
-- profitability/reporting
-
-Security concerns include tenant scoping, authorization, financial integrity, exactly-once/reversal behavior, parameter tampering and unauthorized cross-cycle/cross-farm allocation.
+High-value mutations include sales create/edit/delete, inventory receive/use/restore, stock consumption allocation, sale revenue allocation, expenses and profitability/reporting. Main risks are tenant scope, authorization, financial integrity, reversal/exactly-once behavior and parameter tampering.
 
 ### Poultry and ruminant lifecycle
 
-High-value mutation surfaces include:
+High-value mutations include daily records, cycles, animal registry, slaughter processing, live-population effects and feed consumption. Risks include farm/cycle ownership, impossible transitions, stale object references and cross-farm direct-object access.
 
-- daily records
-- production cycles
-- animal registry
-- slaughter processing
-- live-population effects
-- feed/inventory consumption
+### Reports/PDF/export
 
-Security and integrity concerns include authorization, farm/cycle ownership, impossible population transitions, stale object references and direct-object access between farms.
-
-### Reporting/export/PDF
-
-The application uses `dompdf/dompdf` and contains reporting/export surfaces. Review areas include:
-
-- authorization before report generation
-- tenant-scoped query inputs
-- reflected/stored HTML content entering generated reports
-- local/remote resource handling by PDF generation
-- resource-exhaustion behavior for large reports
+The application uses Dompdf. Security review covers report authorization, tenant-scoped inputs, output escaping, remote/local resource policy and resource-exhaustion behavior.
 
 ## Verified source controls
 
-### Session security — PASS
+### Session and login security — PASS
 
-`config.php` centrally configures session behavior, including:
+Observed controls include secure-cookie behavior under HTTPS, HttpOnly, SameSite=Lax, strict session mode, cookie-only sessions, inactivity controls, session ID regeneration, prepared login queries, generic failure wording, central password verification/rehashing and timing resistance for nonexistent accounts.
 
-- secure cookie behavior when HTTPS is active
-- HttpOnly cookies
-- SameSite=Lax
-- strict session mode
-- cookie-only sessions
-- inactivity timeout
-- hard lifetime
-- periodic session ID regeneration
+### Password recovery — PASS (source + prior browser certification)
 
-`sign.php` regenerates the session ID before establishing authenticated session context.
-
-### Login security — PASS
-
-The reviewed login flow uses:
-
-- canonical throttling
-- prepared queries
-- generic failure wording
-- canonical password verification
-- password-hash upgrade/rehash support
-- timing-resistance behavior for nonexistent accounts
-- farm/user active-state checks
-- session regeneration before authentication context is written
-
-### Password security — PASS
-
-`includes/password_security.php` centralizes password hashing and verification, preferring Argon2id when available and otherwise using the runtime default algorithm. Password rehashing is supported centrally.
-
-### Password recovery privacy and lifecycle — PASS (source + prior browser certification)
-
-The public recovery flow uses generic account-safe responses, rate limiting, CSRF protection, expiring reset tokens and one-time token consumption. The end-to-end browser flow has previously been certified on the protected baseline.
+The recovery flow uses generic account-safe responses, rate limiting, CSRF, expiring reset tokens and one-time consumption. The end-to-end browser flow was already certified on the protected baseline.
 
 ### CSRF — PASS as central control
 
-CSRF behavior remains centrally defined through the application bootstrap/config path and is consumed by browser/API mutations. Same-origin/request-token checks are present in the reviewed source.
+CSRF is centrally defined and consumed by browser/API mutations. GA review additionally found and fixed the special subscription-recovery login bridge so that it now validates the shared CSRF token before recovery account lookup/password verification.
 
-Later GA stages must still test endpoint coverage, not merely helper existence.
+### Output/browser controls — PASS as central controls
 
-### Output and response security — PASS as central control
+Central helpers provide HTML escaping, safe JSON-for-script encoding, `nosniff`, frame protection, Permissions-Policy, Referrer-Policy, HSTS on HTTPS and enforcing CSP support.
 
-`includes/output_security.php` centralizes:
+### Sensitive-path server policy — PASS in source example / DEFERRED live
 
-- HTML escaping helpers
-- attribute escaping
-- JSON-in-script encoding helper
-- JSON response helper
-- `X-Content-Type-Options: nosniff`
-- `X-Frame-Options: SAMEORIGIN`
-- restrictive `Permissions-Policy`
-- `Referrer-Policy`
-- HSTS on HTTPS
-- Content Security Policy emission
+`.htaccess.example` documents sensitive-path protection. `scripts/.htaccess` denies direct web access to verifier/maintenance scripts. Active production/staging server equivalence still requires runtime evidence.
 
-### Sensitive-path web-server policy — PASS in example configuration / DEFERRED for live verification
+### Dependency lock/audit — PASS in CI step
 
-`.htaccess.example` denies direct access to sensitive paths and file classes, including configuration files, environment files, dependency manifests, Git metadata, migrations, vendor internals, documentation, backups, logs and SQL/shell artifacts.
+The GA workflow validates Composer metadata, installs the committed lock file and runs `composer audit --locked`. Advisory status must remain continuously checked.
 
-Live production/staging equivalence must be checked separately; the example file is not proof of the active server configuration.
+## Confirmed GA finding
 
-### Payment webhook authentication — PASS in reviewed source
+### GA-SEC-003 — subscription-recovery login CSRF boundary
 
-The Paystack webhook uses cryptographic signature validation and transactional/locking behavior as described above.
+**Severity:** security boundary defect
 
-### Dependency lock and Composer audit — PASS
+**Status:** REMEDIATED ON GA BRANCH
 
-Both the protected baseline and GA branch contain a committed `composer.lock`. The GA workflow runs `composer validate --strict`, installs the locked graph and executes `composer audit --locked`. The reviewed workflow run completed the Composer validation/install/audit steps successfully.
+`/login.php` intentionally intercepts farm-login POSTs for suspended/past-due/cancelled Farm Admin billing recovery before falling through to `sign.php`. On the protected baseline, this special path could reach account lookup/password verification before the normal `sign.php` CSRF check.
 
-The lock currently pins `dompdf/dompdf` to a concrete release and therefore provides reproducible Composer resolution from Git. Dependency risk must still be re-audited continuously as advisories change.
+GA remediation now calls the shared CSRF validator before recovery account lookup. A focused regression contract verifies ordering, dedicated recovery throttling, password-before-session semantics, session regeneration and normal fallthrough.
 
-## Confirmed GA findings
+### Retired false positive: former GA-SEC-001
 
-### GA-SEC-001 — Retired `/login.php` redirects remain in central bootstrap
+The earlier assertion that `/login.php` did not exist was incorrect. The route is intentional and required for subscription recovery. It must not be removed or redirected wholesale to `sign.php`; doing so would break the billing-recovery design.
 
-**Severity:** Medium availability/authentication-control defect
+## Hardening debt / review candidates
 
-**Status:** OPEN on GA branch
+### GA-CSP-001 — compatibility allowances
 
-Source `config.php` still redirects tenant session expiry and unauthenticated tenant requests to `/login.php`, while the repository has no root `login.php`; the current public login route is `sign.php`.
+CSP retains `unsafe-inline` / `unsafe-eval` compatibility allowances. This is staged hardening debt rather than an automatic defect. Tightening must follow E2E browser coverage.
 
-Impact:
+### GA-SEC-002 / GA-REV-001 — API exception normalization
 
-- expired sessions or `requireLogin()` flows can be redirected to a nonexistent/retired route;
-- authentication controls remain protective, but recovery from an unauthenticated/expired state can fail with an incorrect destination;
-- this also conflicts with the existing GA source-security rule that detects legacy `/login.php` references.
+`safe_api_exception_message()` suppresses PDO/database details but can allow selected non-PDO exception messages through. Caller analysis must distinguish intentional validation errors from internal implementation failures before central behavior is changed.
 
-Required resolution:
+### GA-ARCH-001 — runtime schema mutation reachability
 
-- centralize the canonical sign-in route and replace remaining legacy redirects;
-- add/retain a regression contract preventing the retired route from returning.
+`includes/functions.php` contains schema helpers and `runSchemaMigrations(PDO $pdo)`. Reachability from normal HTTP requests is not yet proven. If reachable, request-time schema mutation should be retired in favor of explicit deployment migrations.
 
-### GA-CSP-001 — Script CSP still allows `unsafe-inline` and `unsafe-eval`
+### GA-REV-002 — endpoint-level tenant ownership
 
-**Severity:** Medium hardening debt
+Shared authentication/permission helpers are strong, but object-level handlers still require systematic tenant ownership review and runtime IDOR attempts.
 
-**Status:** OPEN / staged remediation required
+### GA-REV-003 — report/PDF policy
 
-`includes/csp_policy.php` currently permits `unsafe-inline` and `unsafe-eval` in `script-src`; `style-src` also permits `unsafe-inline`.
+The central PDF service disables remote resources, chroots Dompdf and now returns generic browser errors while logging a non-sensitive class indicator. Remaining runtime work is authorization/resource-exhaustion testing.
 
-This materially reduces CSP's ability to mitigate XSS. It is not safe to remove these directives blindly because existing UI code may depend on inline script/style execution.
+## Existing automated assurance
 
-Required resolution:
+The GA branch contains `.github/workflows/ga-regression.yml` plus focused security/architecture contracts. Current CI includes Composer validation/audit, repository-wide PHP lint, source security scanning, login/recovery contracts, tenant authorization contracts, PDF security contracts, permission/navigation contracts, credential/password-recovery contracts, web-denial policy and repository secret-file policy.
 
-- inventory inline scripts/styles and dynamic-eval dependencies;
-- introduce nonce/hash/external-script migration where practical;
-- remove `unsafe-eval` first if no runtime dependency requires it;
-- tighten `unsafe-inline` only after staging browser regression coverage exists.
+Early scanner false positives are treated as scanner defects when behavior is actually safe; application code is not changed merely to satisfy brittle pattern matching.
 
-## Review candidates — not yet classified as vulnerabilities
+## Runtime/infrastructure checks deferred
 
-### GA-REV-001 — API exception normalization coverage
+The following require an isolated staging/runtime environment:
 
-`api/api_helpers.php` includes `safe_api_exception_message()`, which suppresses common database/internal patterns but may return other exception messages to callers.
-
-Next review step:
-
-- enumerate all call sites;
-- identify which exception types/messages can contain internal identifiers, paths, SQL fragments, tenant context or other sensitive details;
-- only then decide whether the helper requires stricter allow-list behavior.
-
-### GA-REV-002 — Endpoint-level tenant ownership enforcement
-
-Shared permission/login helpers exist, but GA-2 must verify that object-level handlers also scope every record by the authenticated farm/tenant rather than authorizing only by role/permission.
-
-Priority objects:
-
-- sales
-- inventory items and ledger movements
-- expenses
-- production cycles
-- poultry daily records
-- ruminant animals/records
-- financial allocations
-- users/permissions
-- billing/account resources
-
-### GA-REV-003 — PDF/report input and resource policy
-
-`dompdf/dompdf` is present and reporting surfaces exist. GA-2/GA-3 must verify tenant authorization, HTML escaping/sanitization, remote-resource configuration and resource limits around PDF generation.
-
-## Existing automated assurance discovered during GA-1
-
-The branch already contains `.github/workflows/ga-regression.yml` and `scripts/ga_source_security_contract.php`.
-
-The security contract currently checks for several source-level regression classes, including:
-
-- legacy `/login.php` route references
-- authenticated APIs missing login enforcement
-- mutating APIs without CSRF guards
-- password hashing outside canonical helpers
-- raw JSON error leakage
-- mutation without a POST/method guard
-- `display_errors` exposure
-
-There is also a focused login-security contract covering session regeneration, throttling, generic errors, password upgrade behavior and session timeout enforcement.
-
-These assets will be retained and strengthened rather than replaced.
-
-## Runtime/infrastructure checks intentionally deferred
-
-The following cannot be certified from repository source alone and must be executed against an isolated staging/runtime environment:
-
-- cross-tenant IDOR attempts using real sessions and object IDs
+- cross-tenant IDOR with real sessions/object IDs
 - browser E2E execution
-- DAST/runtime security probing
-- load/stress testing
-- live HTTP header/CSP inspection
+- DAST/runtime probing
+- load/stress tests
+- live HTTP header/CSP verification
 - active `.htaccess` equivalence
-- database least-privilege inspection
-- backup restore / disaster-recovery drill
-- monitoring and alert delivery
+- database least-privilege review
+- backup restore/DR drill
+- monitoring/alert delivery
 - infrastructure patch/version state
 - external independent penetration test
 
 ## GA-1 exit criteria
 
-GA-1 can be considered complete when:
+GA-1 requires attack-surface inventory, identification of central security authorities, evidence-based source findings, explicit runtime deferrals and a prioritized GA-2 queue.
 
-1. primary public/authenticated attack surfaces are inventoried;
-2. existing central security authorities are identified;
-3. confirmed source findings are recorded without speculative classification;
-4. runtime-only checks are explicitly deferred rather than assumed;
-5. GA-2 receives a prioritized authorization/tenancy review queue.
-
-At the time of this document, all five criteria are satisfied. GA-1 is **COMPLETE**. GA-2 continues with object-level tenant ownership, legacy login-route remediation, exception-disclosure review and PDF/report hardening.
+All criteria are satisfied. **GA-1 is COMPLETE.** GA-2 continues with tenant ownership, exception disclosure, payment boundaries, debug/dev exposure and runtime-migration reachability.
