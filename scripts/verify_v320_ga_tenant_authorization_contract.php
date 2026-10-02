@@ -5,10 +5,9 @@ declare(strict_types=1);
 /**
  * GA tenant-authorization source contract.
  *
- * This verifier intentionally checks durable security invariants rather than
- * exact formatting. Runtime IDOR/privilege-escalation probing still belongs to
- * isolated staging; this contract prevents reviewed source gates from silently
- * disappearing between releases.
+ * This verifier checks durable authorization/ownership invariants rather than
+ * exact formatting or retired helper names. Runtime IDOR and privilege-
+ * escalation probing remains an isolated-staging requirement.
  */
 
 $root = dirname(__DIR__);
@@ -49,6 +48,7 @@ try {
     $financialAllocation = $read('api/update_financial_allocation.php');
     $saleAllocation = $read('api/update_sale_revenue_allocation.php');
     $permissionSave = $read('admin/permissions_save.php');
+    $csrf = $read('includes/csrf.php');
     $users = $read('management/users.php');
 } catch (Throwable $e) {
     echo 'FAIL: ' . $e->getMessage() . "\n";
@@ -57,17 +57,28 @@ try {
     exit(1);
 }
 
+/*
+ * Sale deletion is intentionally a thin orchestration route. Preserve both
+ * Sales permissions, tenant-scoped lock/delete and the canonical domain
+ * reversal/assertion services that protect dependent state.
+ */
 $check(
     $hasAll($deleteSale, [
         'requireLogin()',
         "require_http_method('POST')",
         'require_csrf_token()',
-        "hasPermission(getUserType(), 'delete_sales')",
-        'api_require_record_for_farm(',
-        "'sales_records'",
-        'sales_lifecycle_delete_sale_for_farm(',
+        "hasPermission(getUserType(), 'sales')",
+        "hasPermission(getUserType(), 'sales_delete')",
+        'requireCurrentFarmId()',
+        'SELECT * FROM sales_records WHERE id=? AND farm_id=? FOR UPDATE',
+        'sales_assert_manual_revenue_delete_allowed(',
+        'receivable_assert_sale_deletable(',
+        'sale_population_effect_assert_deletable(',
+        'slaughter_output_sale_assert_deletable(',
+        'general_sale_inventory_reverse_for_delete(',
+        'DELETE FROM sales_records WHERE id=? AND farm_id=?',
     ]),
-    'sale deletion keeps login, method, CSRF, permission, tenant lookup and canonical lifecycle gates'
+    'sale deletion keeps method, CSRF, Sales permissions, tenant lock/delete and dependent-state lifecycle guards'
 );
 
 $check(
@@ -89,11 +100,12 @@ $check(
         "require_http_method('POST')",
         'require_csrf_token()',
         'requireCurrentFarmId()',
-        'WHERE id = ? AND farm_id = ?',
-        'UPDATE expenses',
-        'farm_id = ?',
+        'FROM farm_expenses WHERE id=? AND farm_id=? LIMIT 1',
+        'permission_catalog_expense_operational_can(',
+        'UPDATE farm_expenses',
+        'WHERE id=? AND farm_id=?',
     ]),
-    'expense update keeps authenticated tenant-scoped mutation gates'
+    'expense update keeps authenticated tenant-scoped lookup, authorization and mutation gates'
 );
 
 $check(
@@ -120,17 +132,27 @@ $check(
     'sale revenue allocation keeps tenant parent lock and workspace authorization'
 );
 
+/*
+ * permissions_save.php uses the shared combined POST+CSRF helper rather than
+ * the API-specific method/token helpers. Verify that helper still enforces
+ * both invariants, then verify role authority and tenant-scoped target policy.
+ */
 $check(
     $hasAll($permissionSave, [
-        'requireLogin()',
-        "require_http_method('POST')",
-        'require_csrf_token()',
+        "!isPlatformOwner() && !hasRole('farm_admin')",
+        'require_valid_csrf_post()',
         'requireCurrentFarmId()',
-        'farm_id = ?',
-        "'farm_admin'",
-        "'platform_owner'",
+        'SELECT id FROM farms WHERE id = ? AND slug <> \'owner\' LIMIT 1',
+        'farm_entitlement_available_specialist_roles(',
+        'permission_catalog_applicable_for_farm(',
+        'INSERT INTO permissions (farm_id,role,module,allowed)',
+    ])
+    && $hasAll($csrf, [
+        "REQUEST_METHOD",
+        "!== 'POST'",
+        'csrf_request_is_valid()',
     ]),
-    'permission save keeps tenant target scope and protected privileged roles'
+    'permission save keeps privileged authority, POST+CSRF enforcement, tenant target validation and canonical applicability policy'
 );
 
 $check(
@@ -148,7 +170,7 @@ $check(
 
 $check(
     !preg_match(
-        '/(?:UPDATE|DELETE\s+FROM)\s+(?:sales_records|stock_items|expenses|users)\b[^;]{0,600}\bWHERE\s+id\s*=\s*\?(?![^;]{0,300}\bfarm_id\b)/is',
+        '/(?:UPDATE|DELETE\s+FROM)\s+(?:sales_records|stock_items|farm_expenses|users)\b[^;]{0,600}\bWHERE\s+id\s*=\s*\?(?![^;]{0,300}\bfarm_id\b)/is',
         implode("\n", [$deleteSale, $updateStock, $updateExpense, $users])
     ),
     'reviewed high-value direct mutations do not reduce ownership to bare id-only WHERE clauses'
