@@ -97,9 +97,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -Fq 'Require all denied' scripts/.htaccess
-          grep -Fq 'deny from all' scripts/.htaccess
-          echo 'SCRIPT_HTTP_DENY_CONTRACT=PASS'
+          if grep -Fq 'Require all denied' scripts/.htaccess || grep -Fiq 'deny from all' scripts/.htaccess; then
+            echo 'SCRIPT_HTTP_DENY_CONTRACT=PASS'
+          else
+            echo 'scripts/.htaccess does not deny HTTP access' >&2
+            exit 1
+          fi
 
       - name: Repository secret-file policy
         shell: bash
