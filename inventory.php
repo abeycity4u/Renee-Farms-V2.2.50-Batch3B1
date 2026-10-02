@@ -1321,7 +1321,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     <?php if ($canManageInventory): ?>
         <div class="modal fade" id="addCategoryModal" tabindex="-1">
-            <div class="modal-dialog modal-lg">
+            <div class="modal-dialog modal-xl">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Manage Inventory Categories</h5>
@@ -1329,7 +1329,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     </div>
                     <div class="modal-body">
                         <div class="row g-3">
-                            <div class="col-md-5">
+                            <div class="col-lg-4">
                                 <h6 class="mb-3">Add Category</h6>
                                 <form method="POST">
                                     <div class="mb-3">
@@ -1378,15 +1378,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                     <button type="submit" name="add_category" class="btn btn-primary w-100">Save Category</button>
                                 </form>
                             </div>
-                            <div class="col-md-7">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <h6 class="mb-0">Category List</h6>
-                                    <small class="text-muted">Delete only if category is no longer needed.</small>
+                            <div class="col-lg-8">
+                                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                                    <div>
+                                        <div class="d-flex align-items-center gap-2 mb-1">
+                                            <h6 class="mb-0">Category List</h6>
+                                            <span class="badge text-bg-secondary">
+                                                <?php echo count($categories); ?>
+                                                <?php echo count($categories) === 1 ? 'category' : 'categories'; ?>
+                                            </span>
+                                        </div>
+                                        <small class="text-muted">
+                                            Review category scope and classification. Categories assigned to inventory items cannot be deleted.
+                                        </small>
+                                    </div>
                                 </div>
-                                <div class="table-responsive app-scroll-max-320">
+
+                                <div
+                                    class="table-responsive border rounded"
+                                    style="max-height:460px;overflow:auto;"
+                                >
                                     <table class="table table-sm table-striped align-middle">
-                                        <thead>
-                                            <tr>
+                                        <thead class="position-sticky top-0" style="z-index:2;">
+                                            <tr class="text-nowrap">
                                                 <th>Name</th>
                                                 <th>Farm</th>
                                                 <th>Unit</th>
@@ -1405,7 +1419,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                                 <td>
                                                     <form method="POST" class="d-flex gap-1 align-items-center">
                                                         <input type="hidden" name="category_id" value="<?php echo (int)$category['id']; ?>">
-                                                        <select name="category_financial_type" class="form-select form-select-sm app-min-width-170">
+                                                        <select name="category_financial_type" class="form-select form-select-sm" style="min-width:210px;">
                                                             <?php foreach (inventory_financial_classifications() as $financialKey => $financialLabel): ?>
                                                                 <option value="<?php echo htmlspecialchars($financialKey); ?>" <?php echo (($category['financial_type'] ?? 'other_stock') === $financialKey) ? 'selected' : ''; ?>><?php echo htmlspecialchars($financialLabel); ?></option>
                                                             <?php endforeach; ?>
@@ -1416,7 +1430,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                                 <td>
                                                     <form method="POST" class="d-flex gap-1 align-items-center">
                                                         <input type="hidden" name="category_id" value="<?php echo (int)$category['id']; ?>">
-                                                        <select name="category_inventory_role" class="form-select form-select-sm app-min-width-170">
+                                                        <select name="category_inventory_role" class="form-select form-select-sm" style="min-width:220px;">
                                                             <?php foreach (inventory_category_roles() as $roleKey => $roleLabel): ?>
                                                                 <option value="<?php echo htmlspecialchars($roleKey); ?>" <?php echo (($category['inventory_role'] ?? 'operational') === $roleKey) ? 'selected' : ''; ?>>
                                                                     <?php echo htmlspecialchars($roleLabel); ?>
