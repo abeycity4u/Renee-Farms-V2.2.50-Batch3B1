@@ -26,6 +26,7 @@ mkdir -p \
     "$PRIVATE_ROOT/v320-subscription-lifecycle" \
     "$PRIVATE_ROOT/v320-subscription-reminder" \
     "$PRIVATE_ROOT/v320-monitoring" \
+    "$PRIVATE_ROOT/production-backup" \
     "$QA_LOG_ROOT"
 
 chmod 700 \
@@ -34,6 +35,7 @@ chmod 700 \
     "$PRIVATE_ROOT/v320-subscription-lifecycle" \
     "$PRIVATE_ROOT/v320-subscription-reminder" \
     "$PRIVATE_ROOT/v320-monitoring" \
+    "$PRIVATE_ROOT/production-backup" \
     "$QA_LOG_ROOT"
 
 #
@@ -77,12 +79,32 @@ install -m 700 \
     "$PRIVATE_ROOT/v320-subscription-reminder/run_v320_subscription_renewal_reminders_production.sh"
 
 #
-# Availability monitor — canonical repository source.
+# Production backup workers — canonical repository source.
+#
+
+install -m 700 \
+    "$REPO_ROOT/deployment/private-workers/v320-production-backup/run_production_backup.sh" \
+    "$PRIVATE_ROOT/production-backup/run_production_backup.sh"
+
+install -m 700 \
+    "$REPO_ROOT/deployment/private-workers/v320-production-backup/run_backup_retention.php" \
+    "$PRIVATE_ROOT/production-backup/run_backup_retention.php"
+
+install -m 700 \
+    "$REPO_ROOT/deployment/private-workers/v320-production-backup/run_production_backup_cycle.sh" \
+    "$PRIVATE_ROOT/production-backup/run_production_backup_cycle.sh"
+
+#
+# Availability and backup freshness monitoring — canonical repository source.
 #
 
 install -m 700 \
     "$REPO_ROOT/deployment/private-workers/v320-monitoring/run_availability_monitor.sh" \
     "$PRIVATE_ROOT/v320-monitoring/run_availability_monitor.sh"
+
+install -m 700 \
+    "$REPO_ROOT/deployment/private-workers/v320-monitoring/run_backup_freshness_monitor.sh" \
+    "$PRIVATE_ROOT/v320-monitoring/run_backup_freshness_monitor.sh"
 
 install -m 700 \
     "$REPO_ROOT/deployment/private-workers/v320-monitoring/send_monitoring_alert.php" \

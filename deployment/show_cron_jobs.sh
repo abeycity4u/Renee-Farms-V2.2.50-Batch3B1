@@ -34,4 +34,8 @@ cat <<CRON
 15 4 * * * /bin/sh $PRIVATE_ROOT/v320-subscription-reminder/run_v320_subscription_renewal_reminders_production.sh --send >> $QA_LOG_ROOT/subscription-renewal-reminder-worker.log 2>&1
 
 2-57/5 * * * * $PRIVATE_ROOT/v320-monitoring/run_availability_monitor.sh >> $QA_LOG_ROOT/v320-availability-monitor.log 2>&1
+
+7,22,37,52 * * * * $PRIVATE_ROOT/v320-monitoring/run_backup_freshness_monitor.sh >> $QA_LOG_ROOT/v320-backup-freshness-monitor.log 2>&1
+
+43 0,6,12,18 * * * * /bin/sh $PRIVATE_ROOT/production-backup/run_production_backup_cycle.sh >> $QA_LOG_ROOT/v320-production-backup.log 2>&1
 CRON
