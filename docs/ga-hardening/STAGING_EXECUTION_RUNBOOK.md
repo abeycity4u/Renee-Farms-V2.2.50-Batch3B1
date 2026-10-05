@@ -137,6 +137,12 @@ rsync -a --delete \
   --exclude='.env.*' \
   --exclude='logs/' \
   --exclude='uploads/' \
+  --exclude='deployment/' \
+  --exclude='migrations/' \
+  --exclude='scripts/' \
+  --exclude='docs/' \
+  --exclude='tests/' \
+  --exclude='test/' \
   "$REPO_DIR/" "$STAGING_DOCROOT/"
 
 cd "$STAGING_DOCROOT"

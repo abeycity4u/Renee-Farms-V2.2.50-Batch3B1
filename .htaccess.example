@@ -50,7 +50,7 @@ SetEnv PLATFORM_MAIL_FROM_NAME xxxxxx
 SetEnv PLATFORM_MAIL_REPLY_TO xxxxxx
 
 # V2.3 commercial hardening: block internal deployment/source artifacts
-<FilesMatch "^(BATCH_NOTES\.txt|RELEASE_NOTES\.txt|database_schema\.sql)$">
+<FilesMatch "^(BATCH_NOTES\.txt|RELEASE_NOTES\.txt|database_schema\.sql|composer\.json|composer\.lock)$">
     Require all denied
 </FilesMatch>
 
@@ -89,3 +89,10 @@ SetEnv PLATFORM_MAIL_FROM_ONBOARDING onboarding@reneefarms.com
 SetEnv PLATFORM_MAIL_FROM_SECURITY no-reply@reneefarms.com
 SetEnv PLATFORM_MAIL_FROM_NOTIFICATIONS notifications@reneefarms.com
 # END RENEE PLATFORM MAIL AUTHORITY
+
+# BEGIN RENEE RUNTIME PATH HARDENING
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(?:deployment|migrations|scripts|tests?|docs|\.github)(?:/|$) - [F,L]
+</IfModule>
+# END RENEE RUNTIME PATH HARDENING
