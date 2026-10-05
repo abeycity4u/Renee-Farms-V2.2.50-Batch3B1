@@ -231,7 +231,7 @@ containsAll(
             '$PRIVATE_ROOT/production-backup/' .
             'run_production_backup_cycle.sh',
 
-        '7,22,37,52 * * * * ' .
+        '9,24,39,54 * * * * ' .
             '$PRIVATE_ROOT/v320-monitoring/' .
             'run_backup_freshness_monitor.sh',
     ]
