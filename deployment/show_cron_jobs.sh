@@ -37,5 +37,5 @@ cat <<CRON
 
 9,24,39,54 * * * * $PRIVATE_ROOT/v320-monitoring/run_backup_freshness_monitor.sh >> $QA_LOG_ROOT/v320-backup-freshness-monitor.log 2>&1
 
-43 0,6,12,18 * * * * /bin/sh $PRIVATE_ROOT/production-backup/run_production_backup_cycle.sh >> $QA_LOG_ROOT/v320-production-backup.log 2>&1
+43 0,6,12,18 * * * /bin/sh $PRIVATE_ROOT/production-backup/run_production_backup_cycle.sh >> $QA_LOG_ROOT/v320-production-backup.log 2>&1
 CRON

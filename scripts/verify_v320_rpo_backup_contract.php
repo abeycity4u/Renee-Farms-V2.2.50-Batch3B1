@@ -227,7 +227,7 @@ containsAll(
     'cron',
     $cron,
     [
-        '43 0,6,12,18 * * * * /bin/sh ' .
+        '43 0,6,12,18 * * * /bin/sh ' .
             '$PRIVATE_ROOT/production-backup/' .
             'run_production_backup_cycle.sh',
 
