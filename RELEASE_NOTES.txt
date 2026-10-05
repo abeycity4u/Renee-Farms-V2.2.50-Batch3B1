@@ -428,3 +428,18 @@ V3.1 Account Credential Lifecycle Closure — 2026-09-27
 - Credential-worker, security-housekeeping and SMTP-rotation stages are closed.
 - No unfinished V3.1 product objective remains evidenced in the repository at release-closure review.
 - V3.1 release implementation scope is Account Credential Lifecycle.
+
+V3.2 General Availability — GA Hardening & Runtime Certification — 2026-10-05
+------------------------------------------------------------------------
+- Completed tenant/security-boundary hardening and representative authorization regression coverage.
+- Completed login/session, credential-state, password-recovery and reset lifecycle certification.
+- Completed browser E2E regression certification against the GA staging environment.
+- Hardened web metadata exposure for release notes, batch notes, schema and Composer metadata.
+- Certified disaster-recovery backup integrity and isolated database/files restore.
+- Completed bounded shared-host load testing with no HTTP failures in the certified test envelope.
+- Added production/staging availability monitoring with state-transition and recovery alerts through the canonical platform SMTP transport.
+- Added repository-supported installation of the availability monitor and generated cron definition.
+- Updated the installation/migration guide for fresh installs, existing-system migrations, private workers and monitoring setup.
+- Completed final source-state, deployment-reproducibility and remote GitHub semantic-diff review.
+- Internal technical GA hardening is complete; independent external penetration testing remains an external release-governance condition.
+- Formal RTO/RPO targets and maximum-capacity breaking-point benchmarking remain operational follow-up items.

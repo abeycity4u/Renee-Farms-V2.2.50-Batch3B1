@@ -1,6 +1,6 @@
 RENEE FARMS PLATFORM — CONSOLIDATED IMPLEMENTATION / QA NOTES
 ============================================================
-This is the single batch-notes file. Future implementation and QA entries must be appended here.
+This is the consolidated historical implementation / QA record. It is now FROZEN after the V3.2 GA closeout; retain this root file for historical and verifier compatibility, but do not append routine future implementation notes here.
 
 V2.2.48 Inventory Category Financial Type
 -----------------------------------------
