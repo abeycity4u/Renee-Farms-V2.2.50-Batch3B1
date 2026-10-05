@@ -69,6 +69,10 @@ The source tree contains the following categories. The table records the securit
 | `/api/get_item_details.php` | Inventory item detail | GET | login + Inventory View + item ID bound to current farm |
 | `/api/get_previous_stock.php` | Prior/current stock context | GET | login + Inventory View + farm-scoped item/transaction context |
 | `/api/get_record.php` | Layer/Broiler/Ruminant record fetch | GET | login + legacy View bridge + farm/module/cycle scope |
+| `/api/get_stock_history.php` | Stock transaction history, ledger integrity and allocation-action context | GET | login + current farm + Inventory/admin or permitted Poultry/Ruminant item scope + tenant-bound item/transactions |
+| `/api/get_stock_summary.php` | Dashboard stock summary for an allowed farm module | GET | login + current farm + Platform Owner/Farm Admin or permitted Poultry/Ruminant module scope + tenant-filtered aggregation |
+| `/api/stock_history.php` | Authenticated Stock History browser page | GET | login + current farm + tenant-bound item + Inventory/admin or permitted Poultry/Ruminant item scope |
+| `/api/update_expense.php` | Update an existing expense and its canonical attribution/revision state | POST | login + CSRF + rate limit + tenant-bound expense + scoped Edit authority + allocation/integrity services + transaction |
 | `/api/update_financial_allocation.php` | Update shared financial allocation | POST | login + CSRF + rate limit + parent loaded/locked inside current farm + scoped edit authority |
 | `/api/update_sale_revenue_allocation.php` | Update sale revenue allocation | POST | login + Sales/allocation authority + CSRF + tenant-bound sale/service |
 | `/api/update_stock.php` | Receive/use/adjust inventory through stock service | POST | login + Inventory/Update Stock + CSRF + rate limit + `id`/`farm_id` row lock |

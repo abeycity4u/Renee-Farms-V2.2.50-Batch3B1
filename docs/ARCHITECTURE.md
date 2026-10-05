@@ -222,13 +222,30 @@ The default GA regression runner is intentionally non-destructive. Live billing,
 
 ## 15. Deployment model
 
-Source checkout: `/home/renee/renee-deploy`
+GA source checkout: `/home/renee/renee-ga-staging-src`
+
+Protected production source checkout: `/home/renee/renee-deploy`
 
 Production runtime: `/home/renee/public_html`
 
-Production `config.php` intentionally differs from source and must not be wholesale replaced.
+Staging runtime: `/home/renee/staging.reneefarms.com`
+
+Private operational workers: `/home/renee/renee-private`
+
+Production `config.php` and `.htaccess` intentionally contain runtime-specific authority and must not be wholesale replaced.
 
 Controlled deployment requires branch/HEAD guards, clean source state, backup, selected-file deployment, lint/verifiers, source/runtime integrity comparison, rollback capability and focused browser QA.
+
+### Private workers and scheduled operations
+
+Scheduled operational workers are installed outside the public web root through `deployment/install_private_workers.sh`. The current private-worker set includes:
+
+- V3.1 credential delivery/outbox processing;
+- V3.2 subscription lifecycle processing;
+- V3.2 subscription renewal reminders;
+- V3.2 production/staging availability monitoring.
+
+`deployment/show_cron_jobs.sh` is the repository authority for the current cron definitions. Private workers may consume runtime authority through the certified private CLI bridge rather than duplicating database, SMTP, public-URL or mail policy. Worker code must remain outside `public_html` and reuse the same shared application services as browser routes.
 
 ## 16. Frozen/certified architectural contracts
 
@@ -243,16 +260,21 @@ Absent regression evidence, do not reopen:
 - trial onboarding historical certification;
 - password-recovery lifecycle already certified before GA session-revocation hardening.
 
-## 17. GA trust boundaries still requiring runtime evidence
+## 17. GA runtime evidence and remaining assurance boundaries
 
-Repository review cannot by itself certify:
+V3.2 GA hardening now has runtime evidence for:
 
-- cross-tenant behavior against real seeded tenants;
-- browser E2E across all valuable workflows;
-- concurrent performance and database contention;
-- backup restoration onto a clean target;
-- production/staging monitoring delivery;
-- runtime DAST;
-- independent third-party penetration testing.
+- seeded cross-tenant authorization and IDOR boundary probes;
+- certified Playwright browser E2E on the GA staging environment;
+- bounded concurrent shared-host load testing with no HTTP failures inside the certified envelope;
+- isolated database/files disaster-recovery restore with integrity verification;
+- production/staging availability checks and canonical SMTP alert delivery.
 
-Those are explicitly handed to isolated staging/ChatGPT Work after repository preparation is complete.
+This evidence does not establish the application's absolute capacity limit or formal recovery objectives.
+
+Still outstanding or external to the completed internal GA technical work:
+
+- independent third-party penetration testing;
+- broader runtime DAST if required by release governance;
+- formal RTO/RPO targets;
+- maximum-capacity / breaking-point benchmarking.

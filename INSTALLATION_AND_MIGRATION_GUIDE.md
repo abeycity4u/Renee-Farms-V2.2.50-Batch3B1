@@ -408,8 +408,60 @@ Existing Renee AgriSuite business environment
     -> normal migration runner only
 ```
 
-For database-specific baseline details, also see:
+The complete fresh-install database contract is defined below in Section 22.
 
-```text
-deployment/FRESH_INSTALL_DATABASE.md
-```
+## 22. Fresh-install database contract
+
+A brand-new host must use a brand-new empty database.
+
+The fresh-install database sources are:
+
+- `database_schema.sql`
+  - current structural baseline
+  - 69 base tables
+  - no production rows
+- `database_seed.sql`
+  - system-reference data only
+  - current Renee AgriSuite roles
+  - current `farm_id = 0` global permission defaults
+  - no production farms, users, credentials, payments, stock balances, or tenant state
+- `database_baseline_migrations.txt`
+  - exact historical migration filenames already represented by the current baseline
+- `scripts/bootstrap_fresh_install.php`
+  - guarded fresh-install bootstrap
+
+The current bootstrap sequence is:
+
+1. verify the target database contains zero base tables;
+2. import `database_schema.sql`;
+3. verify the baseline contains 69 tables;
+4. import `database_seed.sql`;
+5. verify 6 system roles and 71 global permission defaults;
+6. record all filenames from `database_baseline_migrations.txt` into `schema_migrations`;
+7. verify no production farm or user rows were seeded;
+8. run `scripts/run_migrations.php` afterward.
+
+Historical migrations remain source-controlled under `migrations/` and remain the upgrade path for existing installations.
+
+A fresh installation does not replay historical migrations already represented by the baseline manifest. Future migrations not represented by that manifest run normally through `scripts/run_migrations.php`.
+
+Do not run `scripts/bootstrap_fresh_install.php` against an existing Renee AgriSuite database. The bootstrap is intentionally guarded and refuses a target that already contains base tables.
+
+For a new host, use this order:
+
+1. create an empty database and database user;
+2. configure host environment values from `.htaccess.example`;
+3. run `scripts/bootstrap_fresh_install.php`;
+4. run `scripts/run_migrations.php`;
+5. install private workers with `deployment/install_private_workers.sh`;
+6. review cron entries with `deployment/show_cron_jobs.sh`;
+7. restore user uploads separately only when migrating an existing business environment.
+
+Production `.htaccess`, credentials, payment keys, SMTP passwords, uploaded business files and runtime logs are server-only and are not stored in GitHub.
+
+Current certified baseline facts at V3.2 GA closeout:
+
+- 69 schema tables;
+- 92 historical migration filenames represented in the baseline manifest;
+- 95 migration files present in source;
+- migrations `089`, `090` and `091` remain outside the baseline and are handled by the normal migration runner on a fresh installation.
