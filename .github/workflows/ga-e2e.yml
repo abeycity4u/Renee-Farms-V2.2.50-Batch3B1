@@ -1,0 +1,62 @@
+name: Renee AgriSuite GA Browser E2E
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ga-browser-e2e
+  cancel-in-progress: true
+
+jobs:
+  browser-e2e:
+    name: Staging browser E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: ga-staging
+
+    env:
+      CI: "true"
+      E2E_BASE_URL: ${{ vars.E2E_BASE_URL }}
+      E2E_FARM_SLUG: ${{ secrets.E2E_FARM_SLUG }}
+      E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
+      E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+      E2E_FOREIGN_STOCK_ITEM_ID: ${{ vars.E2E_FOREIGN_STOCK_ITEM_ID }}
+      E2E_DENIED_ROUTE: ${{ vars.E2E_DENIED_ROUTE }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install E2E dependencies
+        working-directory: tests/e2e
+        run: npm install --no-audit --no-fund
+
+      - name: Install Chromium
+        working-directory: tests/e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: Staging health preflight
+        run: curl --fail --silent --show-error "${E2E_BASE_URL}/sign.php" >/dev/null
+
+      - name: Run non-destructive Playwright suite
+        working-directory: tests/e2e
+        run: npm test
+
+      - name: Upload Playwright evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ga-playwright-evidence-${{ github.run_number }}
+          path: |
+            tests/e2e/playwright-report/
+            tests/e2e/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
