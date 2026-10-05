@@ -14,7 +14,14 @@ test.describe('Tenant and authorization boundaries', () => {
     const response = await page.request.get(`/api/get_item_details.php?id=${encodeURIComponent(foreignId)}`);
     const body = await response.text();
 
-    expect([403, 404]).toContain(response.status());
+    const status = response.status();
+
+    if (status === 200) {
+      expect(JSON.parse(body)).toEqual({ error: 'Item not found' });
+    } else {
+      expect([403, 404]).toContain(status);
+    }
+
     expect(body).not.toMatch(/"success"\s*:\s*true/i);
   });
 

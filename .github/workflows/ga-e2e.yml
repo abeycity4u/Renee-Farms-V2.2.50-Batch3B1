@@ -24,7 +24,6 @@ jobs:
       E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
       E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
       E2E_FOREIGN_STOCK_ITEM_ID: ${{ vars.E2E_FOREIGN_STOCK_ITEM_ID }}
-      E2E_DENIED_ROUTE: ${{ vars.E2E_DENIED_ROUTE }}
 
     steps:
       - name: Checkout

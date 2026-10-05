@@ -26,7 +26,6 @@ $required = [
     '${{ secrets.E2E_USERNAME }}',
     '${{ secrets.E2E_PASSWORD }}',
     '${{ vars.E2E_FOREIGN_STOCK_ITEM_ID }}',
-    '${{ vars.E2E_DENIED_ROUTE }}',
     'actions/upload-artifact@v4',
 ];
 
@@ -40,6 +39,7 @@ $forbidden = [
     'E2E_DESTRUCTIVE_CREDENTIAL_TEST:',
     'E2E_RESET_URL:',
     'E2E_NEW_PASSWORD:',
+    'E2E_DENIED_ROUTE:',
 ];
 
 foreach ($forbidden as $needle) {

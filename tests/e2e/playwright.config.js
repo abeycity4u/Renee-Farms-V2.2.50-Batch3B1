@@ -15,8 +15,8 @@ module.exports = defineConfig({
   use: {
     baseURL,
     ignoreHTTPSErrors: false,
-    trace: 'retain-on-failure',
-    screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    trace: process.env.CI ? 'off' : 'retain-on-failure',
+    screenshot: process.env.CI ? 'off' : 'only-on-failure',
+    video: process.env.CI ? 'off' : 'retain-on-failure',
   },
 });
