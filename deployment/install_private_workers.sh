@@ -25,6 +25,7 @@ mkdir -p \
     "$PRIVATE_ROOT/v310-credential-worker" \
     "$PRIVATE_ROOT/v320-subscription-lifecycle" \
     "$PRIVATE_ROOT/v320-subscription-reminder" \
+    "$PRIVATE_ROOT/v320-monitoring" \
     "$QA_LOG_ROOT"
 
 chmod 700 \
@@ -32,6 +33,7 @@ chmod 700 \
     "$PRIVATE_ROOT/v310-credential-worker" \
     "$PRIVATE_ROOT/v320-subscription-lifecycle" \
     "$PRIVATE_ROOT/v320-subscription-reminder" \
+    "$PRIVATE_ROOT/v320-monitoring" \
     "$QA_LOG_ROOT"
 
 #
@@ -73,6 +75,18 @@ install -m 600 \
 install -m 700 \
     "$REPO_ROOT/deployment/private-workers/v320-subscription-reminder/run_v320_subscription_renewal_reminders_production.sh" \
     "$PRIVATE_ROOT/v320-subscription-reminder/run_v320_subscription_renewal_reminders_production.sh"
+
+#
+# Availability monitor — canonical repository source.
+#
+
+install -m 700 \
+    "$REPO_ROOT/deployment/private-workers/v320-monitoring/run_availability_monitor.sh" \
+    "$PRIVATE_ROOT/v320-monitoring/run_availability_monitor.sh"
+
+install -m 700 \
+    "$REPO_ROOT/deployment/private-workers/v320-monitoring/send_monitoring_alert.php" \
+    "$PRIVATE_ROOT/v320-monitoring/send_monitoring_alert.php"
 
 echo "PASS: Renee AgriSuite private workers installed."
 echo "APP_ROOT=$APP_ROOT"
