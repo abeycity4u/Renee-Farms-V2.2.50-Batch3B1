@@ -40,23 +40,23 @@ Because this status file itself changes the branch HEAD, GitHub CI must also pas
 | GA-4 deterministic regression runner | PASS | Non-destructive runner succeeded on `47e12977...`; destructive historical/live certification excluded by design | GitHub CI on every GA push/PR |
 | Automated GitHub CI | PASS | Source regression and dependency assurance are isolated jobs and both succeeded on `47e12977...` | Automatic on subsequent GA changes |
 | GA-5 Playwright suite authoring | PASS for prepared foundation | auth, invalid login, tenant-boundary/direct-route probes, error leakage and opt-in session-revocation test prepared | Work execution/extension |
-| Critical business E2E execution | BLOCKED | requires isolated staging, credentials and disposable fixtures | ChatGPT Work |
-| Staging certification | BLOCKED | isolated runtime not available in source-only chat | ChatGPT Work |
+| Critical business E2E execution | PASS | authenticated staging browser regression completed; 7 scenarios total, 5 passed and 2 intentionally skipped | Complete |
+| Staging certification | PASS | isolated GA staging runtime was deployed and used for browser, security, DR-adjacent and operational certification work | Complete |
 | GA-7 load/stress harness | PASS for preparation | k6 authenticated read harness prepared with multi-session design and 10→25→50→100 VU ramp | Work execution + write workload |
-| Load/stress results | BLOCKED | requires isolated staging and server metrics | ChatGPT Work |
+| Load/stress results | PASS WITH RESIDUAL RISK | bounded shared-host runtime load certification completed with no HTTP failures in the certified envelope; maximum-capacity breaking point not established | Capacity ceiling remains operational follow-up |
 | GA-8 DR post-restore verifier | PASS for preparation | isolated-read-only verifier checks core tables/tenant keys/migration marker/aggregate counts/orphans | Work actual restore drill |
-| DR restore/RPO/RTO evidence | BLOCKED | requires real backup and clean restore target | ChatGPT Work |
+| DR restore/RPO/RTO evidence | PASS | isolated restore PASS; measured technical RTO 3.449 seconds (reported 4 seconds), restore class PREPROVISIONED_ISOLATED_TARGET; production RPO <= 6 hours is automated with off-host backup and freshness monitoring; see `RTO_RPO_CLOSEOUT.md` | Complete |
 | GA-9 monitoring contract | PASS for design | signals, secret-redaction policy, alert classes and runtime acceptance criteria documented | Work deploy/validate |
-| Monitoring runtime validation | BLOCKED | collector, credentials, alerts and infrastructure metrics require environment access | ChatGPT Work |
+| Monitoring runtime validation | PASS WITH RESIDUAL RISK | production/staging availability monitoring and production backup-freshness monitoring are deployed and reproducible; broader infrastructure/dashboard coverage remains an observability follow-up | Operations |
 | Architecture documentation | PASS | `docs/ARCHITECTURE.md` | Chat agent complete |
 | API documentation | PASS | `docs/API.md` | Chat agent complete |
 | Formal release checklist | PASS | `RELEASE_CHECKLIST_V3.2.md` | Chat agent complete; update with runtime evidence later |
 | GA changelog | PASS | `CHANGELOG_V3.2_GA.md` records only fresh GA work; explicitly not production deployment | Chat agent complete |
 | ChatGPT Work handoff | PASS | `CHATGPT_WORK_HANDOFF.md` constrains runtime execution and evidence | Ready for Work after documentation-only checkpoint CI passes |
-| Runtime DAST/security probing | BLOCKED | staging required | ChatGPT Work |
+| Runtime DAST/security probing | PASS WITH RESIDUAL RISK | tenant IDOR, authorization, credential/session, password recovery/reset, PDF and runtime exposure probes completed; independent third-party pentest remains separate | External pentest remains |
 | Independent third-party pentest | BLOCKED | must be genuinely independent | External tester |
-| Formal production-readiness review | PASS WITH BLOCKERS | repository-side review is complete; final GA decision remains blocked by E2E/load/DR/monitoring/runtime security/external pentest evidence | Chat agent final + Work/external evidence |
-| v3.2 General Availability | NOT YET READY TO DECLARE | no unresolved source Critical is currently proven, but mandatory runtime assurance is incomplete | User after evidence review |
+| Formal production-readiness review | PASS WITH EXTERNAL-PENTEST CONDITION | internal technical GA hardening, bounded load, DR, formal RTO/RPO and runtime monitoring evidence are complete; independent external pentest remains outside this internal certification | User / external tester |
+| v3.2 General Availability | TECHNICALLY READY WITH EXTERNAL CONDITIONS | internal technical readiness is positive; independent external pentest remains a release-governance condition, live billing remains a launch decision while billing is in TEST mode, and maximum-capacity breaking-point benchmarking is not established | User / external tester |
 
 ## Known source fixes introduced by fresh GA run
 

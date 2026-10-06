@@ -442,4 +442,8 @@ V3.2 General Availability — GA Hardening & Runtime Certification — 2026-10-0
 - Updated the installation/migration guide for fresh installs, existing-system migrations, private workers and monitoring setup.
 - Completed final source-state, deployment-reproducibility and remote GitHub semantic-diff review.
 - Internal technical GA hardening is complete; independent external penetration testing remains an external release-governance condition.
-- Formal RTO/RPO targets and maximum-capacity breaking-point benchmarking remain operational follow-up items.
+- Formal recovery objectives are now established: measured technical restore RTO is 3.449 seconds (reported 4 seconds) on a pre-provisioned isolated target, and production RPO is <= 6 hours.
+- Production full backups run every six hours, are copied to private encrypted Backblaze B2 storage, and use combined newest-8 / 7-daily / 4-weekly retention policy.
+- Production backup freshness monitoring is active with a six-hour threshold and state-transition/recovery alerting.
+- Maximum-capacity breaking-point benchmarking remains an operational follow-up item; the existing load result applies only to the bounded certified test envelope.
+- Independent external penetration testing remains an external release-governance condition; billing remains in TEST mode pending an explicit live-launch decision.

@@ -126,6 +126,19 @@ Monitoring is not GA-certified until Work/staging proves:
 9. retention/access policy is documented;
 10. monitoring failure itself has an external health signal.
 
+## Certified production availability / backup monitoring state — 2026-10-05
+
+The v3.2 runtime now has two certified operational monitoring paths:
+
+- production/staging availability monitoring with state-transition and recovery alerts;
+- production backup-freshness monitoring with a six-hour freshness threshold.
+
+Production backup monitoring validates the newest usable restore point, its manifest and SHA-256 checksums. The monitor runs at minutes 9, 24, 39 and 54 and intentionally avoids the availability-monitor schedule. A stale transition alerts when the newest valid successful backup exceeds six hours; a recovery transition alerts after a fresh valid backup is available again.
+
+Production full backups run at minute 43 of hours 00, 06, 12 and 18. Off-host copies are stored privately in Backblaze B2. The operational RTO/RPO evidence is recorded in `RTO_RPO_CLOSEOUT.md`.
+
+Broader infrastructure observability in the acceptance list above remains useful follow-up scope and is not implied complete merely by availability and backup-monitor certification.
+
 ## Production deployment rule
 
 Do not make production the first validation target. Configure and prove collection/alerts in isolated staging, then deploy production credentials/destinations through environment configuration. No monitoring secret belongs in the repository.

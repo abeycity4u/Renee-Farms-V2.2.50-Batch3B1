@@ -141,7 +141,7 @@ The verifier:
 - reports only aggregate counts, never tenant data or credentials;
 - checks selected orphan relationships.
 
-Actual backup restore remains infrastructure-dependent.
+The infrastructure-dependent restore was subsequently executed and certified during GA runtime hardening. The isolated restore passed with a measured technical RTO of 3.449 seconds (reported as 4 seconds) on a pre-provisioned isolated target. Production RPO <= 6 hours was then operationalized with six-hour full backups, private off-host Backblaze B2 copies, retention automation and backup-freshness monitoring. See `RTO_RPO_CLOSEOUT.md`.
 
 ## GA-9 preparation — Monitoring/operations
 
@@ -162,6 +162,6 @@ Added:
 
 Existing historical release/install notes are not blindly replaced.
 
-## Not production-deployed by this changelog
+## Production deployment status
 
-None of the GA hardening changes above should be assumed live merely because they exist on GitHub. Production deployment remains a separately guarded/approved operation after source evidence, staging/runtime testing and readiness review.
+GitHub presence alone still does not imply that every GA branch change is live. However, the private production backup workers, availability/backup monitoring components and production RPO cron automation described in the runtime closeout were deployed through guarded source-to-runtime integrity checks. Other GA changes retain their own deployment evidence and must not be inferred live solely from this changelog.

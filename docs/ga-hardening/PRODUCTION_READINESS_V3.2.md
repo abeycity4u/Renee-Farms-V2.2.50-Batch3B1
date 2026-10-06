@@ -6,7 +6,7 @@ This document is intentionally conservative. A source-complete GA hardening bran
 
 ## Executive status
 
-**Current overall status: BLOCKED FOR GA DECLARATION — runtime assurance incomplete.**
+**Current overall status: TECHNICAL READINESS PASS WITH EXTERNAL-PENTEST CONDITION.**
 
 Repository/source engineering is substantially prepared for General Availability review. No unresolved Critical source defect has been proven in the fresh GA review so far. Three concrete source issues were identified and remediated on the GA branch:
 
@@ -14,7 +14,7 @@ Repository/source engineering is substantially prepared for General Availability
 2. login POST did not participate in the shared CSRF form contract;
 3. PDF generation errors exposed raw exception messages to the browser.
 
-The remaining blockers are primarily assurance/operations rather than a known fundamental architecture failure: isolated staging E2E/security execution, load/capacity evidence, DR restore evidence, monitoring deployment/validation and a genuinely independent pentest.
+Internal runtime assurance now includes staging/browser regression, bounded shared-host load certification, isolated disaster-recovery restore, formal RTO/RPO evidence and deployed availability/backup-freshness monitoring. The remaining release-governance condition is a genuinely independent external pentest. Billing remains in TEST mode until an explicit launch decision enables live collection, and maximum-capacity breaking-point benchmarking is not established.
 
 ## Readiness by domain
 
@@ -32,15 +32,15 @@ The remaining blockers are primarily assurance/operations rather than a known fu
 | SQL/data access | PASS WITH RESIDUAL RISK | Prepared PDO/tenant predicates/transactions observed in reviewed paths; injection testing and broader dynamic-SQL review remain |
 | XSS/output security | PASS WITH RESIDUAL RISK | centralized CSP/output escaping patterns observed; stored/reflected runtime probes pending |
 | PDF/report security | PASS WITH RESIDUAL RISK | remote loading disabled, chroot enabled, raw error disclosure fixed; runtime path/resource probes pending |
-| Dependency security | PENDING FINAL CI | Composer audit/locked install configured as independent CI job |
-| Automated regression | PENDING FINAL CI | deterministic non-destructive runner and GitHub workflow prepared |
-| Browser E2E automation | PASS for code preparation / BLOCKED for execution | Playwright foundation prepared; staging needed |
-| Performance/capacity | BLOCKED | k6 harness prepared; actual concurrent test and server telemetry required |
-| Disaster recovery | BLOCKED | post-restore verifier prepared; real clean restore/RPO/RTO required |
-| Monitoring/observability | BLOCKED | monitoring contract defined; collector/alerts/infra metrics not deployed/validated from repo alone |
+| Dependency security | PASS | Composer audit and locked production dependency install completed successfully in GA CI |
+| Automated regression | PASS | deterministic non-destructive regression and dependency-assurance CI completed successfully on the GA branch |
+| Browser E2E automation | PASS | authenticated staging browser regression completed; 7 scenarios total, 5 passed and 2 intentionally skipped |
+| Performance/capacity | PASS WITH RESIDUAL RISK | bounded shared-host load certification completed without HTTP failures in the certified envelope; maximum-capacity breaking point remains unestablished |
+| Disaster recovery | PASS | isolated database/files restore and post-restore verifier PASS; measured technical RTO 3.449 seconds; production RPO <= 6 hours operationally automated; see `RTO_RPO_CLOSEOUT.md` |
+| Monitoring/observability | PASS WITH RESIDUAL RISK | production/staging availability and production backup-freshness monitoring are deployed; broader infrastructure dashboards remain an observability follow-up |
 | Documentation/change control | PASS | architecture/API/checklist/changelog/security/status/Work handoff prepared |
 | Independent security assurance | BLOCKED | independent third-party pentest not performed by this internal review |
-| Production GA declaration | BLOCKED | dependent on unresolved runtime/external evidence above |
+| Production GA declaration | PASS WITH EXTERNAL CONDITIONS | internal technical hardening is complete; independent external pentest remains required by release governance, billing is still TEST mode, and maximum-capacity breaking-point benchmarking is not established |
 
 ## Source changes requiring staging regression before production
 
@@ -118,4 +118,4 @@ All of the following should have acceptable evidence:
 11. final release checklist/evidence matrix updated;
 12. semantic diff and controlled production deployment plan approved by the user.
 
-Until those conditions are met, the correct classification is **late-stage production hardening / GA candidate preparation**, not completed General Availability.
+Internal technical GA hardening is now complete. The remaining classification is **technically ready with external/launch conditions**, not independently security certified. Do not claim completion of the independent pentest, live billing enablement or maximum-capacity breaking-point certification until those events actually occur.

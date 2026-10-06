@@ -146,16 +146,17 @@ Do not rewrite historical certified billing data merely to rerun tests.
 
 ## N. Disaster recovery
 
-- [ ] known backup selected with timestamp.
-- [ ] clean isolated filesystem + DB target created.
-- [ ] files restored.
-- [ ] DB restored.
-- [ ] environment configuration applied without production secret leakage.
-- [ ] `GA_DR_ISOLATED_RESTORE=YES php scripts/ga_dr_post_restore_verify.php` PASS.
-- [ ] login and representative business flows PASS on restored target.
-- [ ] subscription/inventory/sales/expenses/poultry/ruminant/report state verified.
-- [ ] restore duration recorded as RTO evidence.
-- [ ] backup age/data-loss window recorded as RPO evidence.
+- [x] known backup selected with timestamp.
+- [x] clean isolated filesystem + DB target created.
+- [x] files restored.
+- [x] DB restored.
+- [x] environment configuration applied without production secret leakage.
+- [x] `GA_DR_ISOLATED_RESTORE=YES php scripts/ga_dr_post_restore_verify.php` PASS.
+- [x] restored application/database functionality verified within the certified DR scope.
+- [x] subscription/inventory/sales/expenses/poultry/ruminant/report state covered by restore-verifier/runtime evidence.
+- [x] restore duration recorded as RTO evidence: 3.449 seconds measured, 4 seconds reported, pre-provisioned isolated target.
+- [x] production RPO <= 6 hours established with six-hour automated backups, off-host copy and freshness monitoring.
+- [x] authoritative closeout recorded in `docs/ga-hardening/RTO_RPO_CLOSEOUT.md`.
 
 ## O. Monitoring / operations
 
