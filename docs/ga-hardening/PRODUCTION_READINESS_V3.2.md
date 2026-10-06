@@ -20,12 +20,12 @@ Internal runtime assurance now includes staging/browser regression, bounded shar
 
 | Domain | Status | Basis |
 |---|---|---|
-| Architecture | PASS WITH RESIDUAL RISK | Mature shared-service design and explicit domain boundaries; runtime integration evidence still required |
+| Architecture | PASS WITH RESIDUAL RISK | Mature shared-service design and explicit domain boundaries; runtime integration evidence exists within the certified scope while legacy compatibility surfaces remain |
 | Code structure | PASS WITH RESIDUAL RISK | Central bootstrap/security/domain services; legacy compatibility surfaces remain and are handled through incremental hardening rather than rewrite |
-| Multi-tenancy | PASS WITH RESIDUAL RISK | Reviewed high-risk source paths consistently bind objects to farm; two-tenant runtime IDOR matrix still required |
-| RBAC/authorization | PASS WITH RESIDUAL RISK | Canonical permission/runtime/tenant guard architecture; runtime privilege-escalation probes pending |
-| Authentication/credentials | PASS WITH RESIDUAL RISK | Hash-only credential tokens, expiry/supersession, session rotation, CSRF and new password-change session revocation; staging E2E pending |
-| API request security | PENDING FINAL CI + runtime | API-wide source contract verifier prepared; direct runtime negative tests pending |
+| Multi-tenancy | PASS WITH RESIDUAL RISK | Reviewed high-risk paths bind objects to farm and representative two-tenant runtime IDOR probes passed; exhaustive route coverage remains a residual assurance consideration |
+| RBAC/authorization | PASS WITH RESIDUAL RISK | Canonical permission/runtime/tenant guard architecture with representative runtime privilege-escalation probes completed |
+| Authentication/credentials | PASS WITH RESIDUAL RISK | Hash-only credential tokens, expiry/supersession, session rotation, CSRF and password-change session revocation were exercised through staging/runtime certification |
+| API request security | PASS WITH RESIDUAL RISK | API-wide source contract verifier passed and representative direct-route/runtime negative probes completed; exhaustive endpoint assurance remains residual |
 | Billing/commercial integrity | PASS WITH RESIDUAL RISK | Strong prior exactly-once certification and current webhook/sandbox source review; safe staging replay/mismatch tests pending |
 | Inventory/Sales/financial integrity | PASS WITH RESIDUAL RISK | Mature transaction/reversal/allocation services and prior certification; critical-path E2E pending on disposable staging data |
 | Poultry/Ruminant lifecycle | PASS WITH RESIDUAL RISK | Mature domain services/permissions; critical-path runtime E2E pending |
@@ -42,7 +42,7 @@ Internal runtime assurance now includes staging/browser regression, bounded shar
 | Independent security assurance | BLOCKED | independent third-party pentest not performed by this internal review |
 | Production GA declaration | PASS WITH EXTERNAL CONDITIONS | internal technical hardening is complete; independent external pentest remains required by release governance, billing is still TEST mode, and maximum-capacity breaking-point benchmarking is not established |
 
-## Source changes requiring staging regression before production
+## Source changes — staging regression requirements retained for future regression
 
 ### Credential/session binding
 
@@ -50,7 +50,7 @@ GA hardening binds authenticated sessions to a one-way fingerprint of the curren
 
 Expected first-deployment behavior: sessions created by the old build lack the fingerprint and will be required to sign in again when they hit a protected request.
 
-Required staging checks:
+Regression checks retained from GA staging certification:
 
 - existing valid login still works;
 - invalid login remains generic;
@@ -63,7 +63,7 @@ Required staging checks:
 
 The login form now emits a shared CSRF token and POST requires it.
 
-Required staging checks:
+Regression checks retained from GA staging certification:
 
 - normal login succeeds;
 - missing/invalid CSRF fails without establishing a session;
@@ -73,7 +73,7 @@ Required staging checks:
 
 Only failure presentation changed.
 
-Required staging checks:
+Regression checks retained from GA staging certification:
 
 - valid reports still generate;
 - deliberate safe failure returns generic message;
@@ -94,14 +94,14 @@ Renee AgriSuite clearly operates under a substantive software development life c
 - shared architecture is explicitly designed;
 - implementation is version controlled and branch isolated;
 - focused source/static/contract verification exists;
-- GitHub CI is being formalized for every GA push/PR;
+- GitHub CI is enforced for GA branch pushes/PRs;
 - deployment uses guards/backups/rollback/integrity checks;
 - maintenance preserves certified contracts and uses regression evidence;
 - GA now adds formal security, E2E, performance, DR, monitoring, documentation and production-readiness stages.
 
-The remaining gap is not whether the product “uses SDLC”; it is completing the operational/security assurance evidence expected before a formal GA/enterprise claim.
+The remaining gap is not whether the product uses SDLC or lacks internal runtime evidence; it is the independent external security assurance and launch decisions that remain outside this internal certification.
 
-## Conditions to move from BLOCKED to GA candidate
+## GA candidate conditions and residual release requirements
 
 All of the following should have acceptable evidence:
 
