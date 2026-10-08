@@ -696,6 +696,49 @@ function stock_consumption_economics_select_rows(
 }
 
 if (!function_exists(
+    'stock_consumption_economics_source_request_cache'
+)) {
+function &stock_consumption_economics_source_request_cache(): array
+{
+    static $cache = [];
+    return $cache;
+}
+}
+
+if (!function_exists(
+    'stock_consumption_economics_forget_source_request_cache'
+)) {
+function stock_consumption_economics_forget_source_request_cache(
+    PDO $pdo,
+    int $farmId
+): void {
+    if ($farmId < 1) {
+        return;
+    }
+
+    $cache =&
+        stock_consumption_economics_source_request_cache();
+
+    $connectionKey =
+        spl_object_id($pdo);
+
+    if (!isset($cache[$connectionKey])) {
+        return;
+    }
+
+    unset(
+        $cache[$connectionKey][$farmId]
+    );
+
+    if (!$cache[$connectionKey]) {
+        unset(
+            $cache[$connectionKey]
+        );
+    }
+}
+}
+
+if (!function_exists(
     'stock_consumption_economics_source_rows'
 )) {
 function stock_consumption_economics_source_rows(
@@ -708,6 +751,46 @@ function stock_consumption_economics_source_rows(
         throw new InvalidArgumentException(
             'Consumed-stock economic farm identity is invalid.'
         );
+    }
+
+    $cache =&
+        stock_consumption_economics_source_request_cache();
+
+    $connectionKey =
+        spl_object_id($pdo);
+
+    if (
+        isset(
+            $cache[
+                $connectionKey
+            ][
+                $farmId
+            ][
+                $startDate
+            ]
+        )
+        &&
+        array_key_exists(
+            $endDate,
+            $cache[
+                $connectionKey
+            ][
+                $farmId
+            ][
+                $startDate
+            ]
+        )
+    ) {
+        return
+            $cache[
+                $connectionKey
+            ][
+                $farmId
+            ][
+                $startDate
+            ][
+                $endDate
+            ];
     }
 
     $effective =
@@ -835,6 +918,16 @@ function stock_consumption_economics_source_rows(
     }
 
     unset($row);
+
+    $cache[
+        $connectionKey
+    ][
+        $farmId
+    ][
+        $startDate
+    ][
+        $endDate
+    ] = $rows;
 
     return $rows;
 }
