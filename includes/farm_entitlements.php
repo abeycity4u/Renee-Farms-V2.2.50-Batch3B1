@@ -122,15 +122,52 @@ if (!function_exists('farm_entitlement_commercial_product_for_display')) {
     }
 }
 
+if (!function_exists('farm_entitlement_request_cache')) {
+    function &farm_entitlement_request_cache(): array
+    {
+        static $cache = [];
+        return $cache;
+    }
+}
+
+if (!function_exists('farm_entitlement_forget_request_cache')) {
+    function farm_entitlement_forget_request_cache(PDO $pdo, int $farmId): void
+    {
+        $cache =& farm_entitlement_request_cache();
+        $connectionKey = spl_object_id($pdo);
+
+        if (isset($cache[$connectionKey])) {
+            unset($cache[$connectionKey][$farmId]);
+        }
+    }
+}
+
 if (!function_exists('farm_entitlement_modules')) {
     function farm_entitlement_modules(PDO $pdo, int $farmId): array
     {
         if ($farmId < 1) return [];
+
+        $cache =& farm_entitlement_request_cache();
+        $connectionKey = spl_object_id($pdo);
+
+        if (
+            isset($cache[$connectionKey])
+            && array_key_exists($farmId, $cache[$connectionKey])
+        ) {
+            return $cache[$connectionKey][$farmId];
+        }
+
         $stmt = $pdo->prepare(
             'SELECT module_code FROM farm_modules WHERE farm_id = ? AND is_enabled = 1 ORDER BY module_code'
         );
         $stmt->execute([$farmId]);
-        return farm_entitlement_normalize_modules($stmt->fetchAll(PDO::FETCH_COLUMN) ?: []);
+
+        $cache[$connectionKey][$farmId] =
+            farm_entitlement_normalize_modules(
+                $stmt->fetchAll(PDO::FETCH_COLUMN) ?: []
+            );
+
+        return $cache[$connectionKey][$farmId];
     }
 }
 
@@ -138,12 +175,19 @@ if (!function_exists('farm_entitlement_has')) {
     function farm_entitlement_has(PDO $pdo, int $farmId, string $module): bool
     {
         $module = strtolower(trim($module));
-        if ($farmId < 1 || !in_array($module, farm_entitlement_known_modules(), true)) return false;
-        $stmt = $pdo->prepare(
-            'SELECT 1 FROM farm_modules WHERE farm_id = ? AND module_code = ? AND is_enabled = 1 LIMIT 1'
+
+        if (
+            $farmId < 1
+            || !in_array($module, farm_entitlement_known_modules(), true)
+        ) {
+            return false;
+        }
+
+        return in_array(
+            $module,
+            farm_entitlement_modules($pdo, $farmId),
+            true
         );
-        $stmt->execute([$farmId, $module]);
-        return (bool) $stmt->fetchColumn();
     }
 }
 
@@ -363,6 +407,9 @@ if (!function_exists('sync_farm_entitlements')) {
     {
         if ($farmId < 1) throw new InvalidArgumentException('A valid farm is required.');
         $modules = farm_entitlement_normalize_modules($modules);
+
+        // A write invalidates any module list read earlier in this request.
+        farm_entitlement_forget_request_cache($pdo, $farmId);
 
         $pdo->prepare('DELETE FROM farm_modules WHERE farm_id = ?')->execute([$farmId]);
         if (!$modules) return;
