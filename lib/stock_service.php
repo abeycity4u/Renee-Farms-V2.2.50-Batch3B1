@@ -5,6 +5,27 @@ require_once __DIR__ . '/stock_movement_attribution.php';
 require_once __DIR__ . '/stock_consumption_allocation_persistence.php';
 require_once __DIR__ . '/record_reference_persistence.php';
 require_once __DIR__ . '/inventory_category_role.php';
+
+if (!function_exists(
+    'stock_service_forget_consumption_economics_request_cache'
+)) {
+function stock_service_forget_consumption_economics_request_cache(
+    PDO $pdo,
+    int $farmId
+): void {
+    if (
+        function_exists(
+            'stock_consumption_economics_forget_source_request_cache'
+        )
+    ) {
+        stock_consumption_economics_forget_source_request_cache(
+            $pdo,
+            $farmId
+        );
+    }
+}
+}
+
 /**
  * Canonical inventory ledger service.
  *
@@ -448,6 +469,11 @@ function stock_apply_movement(
     // Legacy uncosted rows are deliberately left untouched by the helper.
     stock_recalculate_current_unit_cost($pdo, $farmId, $itemId);
 
+    stock_service_forget_consumption_economics_request_cache(
+        $pdo,
+        $farmId
+    );
+
     return $transactionId;
 }
 
@@ -890,6 +916,11 @@ function stock_reverse_transaction(
     // Re-price remaining stock from effective audit history. This matters when
     // a correction is posted after newer stock arrived at a different price.
     stock_recalculate_current_unit_cost($pdo, $farmId, (int)$item['id']);
+
+    stock_service_forget_consumption_economics_request_cache(
+        $pdo,
+        $farmId
+    );
 
     return $reversalId;
 }
