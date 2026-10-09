@@ -40,6 +40,13 @@ function farm_intelligence_summary(PDO $pdo, int $farmId, string $startDate, str
 
 if (!function_exists('farm_intelligence_monthly_series')) {
 function farm_intelligence_monthly_series(PDO $pdo, int $farmId, int $year, string $farmType = 'all'): array {
+    $seeded = $farmType !== ''
+        ? stock_consumption_economics_prefetch_monthly_source_rows(
+            $pdo, $farmId, $year
+        )
+        : [];
+
+    try {
     $rows = [];
     for ($month = 1; $month <= 12; $month++) {
         $start = sprintf('%04d-%02d-01', $year, $month);
@@ -73,6 +80,11 @@ function farm_intelligence_monthly_series(PDO $pdo, int $farmId, int $year, stri
         ];
     }
     return $rows;
+    } finally {
+        stock_consumption_economics_release_prefetched_monthly_source_rows(
+            $pdo, $farmId, $seeded
+        );
+    }
 }}
 
 if (!function_exists('farm_intelligence_expense_breakdown')) {
