@@ -698,9 +698,14 @@ function stock_consumption_economics_select_rows(
 if (!function_exists(
     'stock_consumption_economics_source_request_cache'
 )) {
-function &stock_consumption_economics_source_request_cache(): array
+function stock_consumption_economics_source_request_cache(): WeakMap
 {
-    static $cache = [];
+    static $cache = null;
+
+    if ($cache === null) {
+        $cache = new WeakMap();
+    }
+
     return $cache;
 }
 }
@@ -716,24 +721,18 @@ function stock_consumption_economics_forget_source_request_cache(
         return;
     }
 
-    $cache =&
-        stock_consumption_economics_source_request_cache();
+    $cache = stock_consumption_economics_source_request_cache();
 
-    $connectionKey =
-        spl_object_id($pdo);
-
-    if (!isset($cache[$connectionKey])) {
+    if (!isset($cache[$pdo])) {
         return;
     }
 
-    unset(
-        $cache[$connectionKey][$farmId]
-    );
+    $bucket = $cache[$pdo];
 
-    if (!$cache[$connectionKey]) {
-        unset(
-            $cache[$connectionKey]
-        );
+    unset($bucket->farms[$farmId]);
+
+    if (!$bucket->farms) {
+        unset($cache[$pdo]);
     }
 }
 }
@@ -745,7 +744,8 @@ function stock_consumption_economics_source_rows(
     PDO $pdo,
     int $farmId,
     string $startDate,
-    string $endDate
+    string $endDate,
+    ?int $maxRows = null
 ): array {
     if ($farmId < 1) {
         throw new InvalidArgumentException(
@@ -753,44 +753,28 @@ function stock_consumption_economics_source_rows(
         );
     }
 
-    $cache =&
-        stock_consumption_economics_source_request_cache();
+    if ($maxRows !== null && ($maxRows < 1 || $maxRows > 4096)) {
+        throw new InvalidArgumentException(
+            'Consumed-stock prefetch limit is invalid.'
+        );
+    }
 
-    $connectionKey =
-        spl_object_id($pdo);
+    $cache = stock_consumption_economics_source_request_cache();
+    $bucket = $cache[$pdo] ?? null;
 
     if (
-        isset(
-            $cache[
-                $connectionKey
-            ][
-                $farmId
-            ][
-                $startDate
-            ]
-        )
-        &&
-        array_key_exists(
+        $bucket !== null
+        && isset($bucket->farms[$farmId][$startDate])
+        && array_key_exists(
             $endDate,
-            $cache[
-                $connectionKey
-            ][
-                $farmId
-            ][
-                $startDate
-            ]
+            $bucket->farms[$farmId][$startDate]
         )
     ) {
-        return
-            $cache[
-                $connectionKey
-            ][
-                $farmId
-            ][
-                $startDate
-            ][
-                $endDate
-            ];
+        $cached = $bucket->farms[$farmId][$startDate][$endDate];
+
+        return $maxRows !== null && count($cached) > $maxRows
+            ? array_slice($cached, 0, $maxRows + 1)
+            : $cached;
     }
 
     $effective =
@@ -866,6 +850,10 @@ function stock_consumption_economics_source_rows(
            )
          ORDER BY t.transaction_date,t.id";
 
+    if ($maxRows !== null) {
+        $sql .= ' LIMIT ' . ($maxRows + 1);
+    }
+
     $params =
         array_merge(
             [
@@ -919,17 +907,183 @@ function stock_consumption_economics_source_rows(
 
     unset($row);
 
-    $cache[
-        $connectionKey
-    ][
-        $farmId
-    ][
-        $startDate
-    ][
-        $endDate
-    ] = $rows;
+    // A truncated prefetch result must never enter the canonical cache.
+    if ($maxRows !== null && count($rows) > $maxRows) {
+        return $rows;
+    }
+
+    if ($bucket === null) {
+        $bucket = (object)['farms' => []];
+        $cache[$pdo] = $bucket;
+    }
+
+    $bucket->farms[$farmId][$startDate][$endDate] = $rows;
 
     return $rows;
+}
+}
+
+/*
+ * Optional reporting prefetch. Reuse the canonical stock-source reader
+ * and cache; do not cache allocation rows or recalculate financial totals.
+ * The row cap bounds additional memory for a reporting request.
+ */
+if (!function_exists(
+    'stock_consumption_economics_prefetch_monthly_source_rows'
+)) {
+function stock_consumption_economics_prefetch_monthly_source_rows(
+    PDO $pdo,
+    int $farmId,
+    int $year,
+    int $maxRows = 2048
+): array {
+    if ($farmId < 1 || $year < 1000 || $year > 9999) {
+        return [];
+    }
+
+    if ($maxRows < 1 || $maxRows > 4096) {
+        throw new InvalidArgumentException(
+            'Consumed-stock prefetch limit is invalid.'
+        );
+    }
+
+    $annualStart = sprintf('%04d-01-01', $year);
+    $annualEnd = sprintf('%04d-12-31', $year);
+
+    $parents = stock_consumption_economics_source_rows(
+        $pdo,
+        $farmId,
+        $annualStart,
+        $annualEnd,
+        $maxRows
+    );
+
+    // Overflow falls back to the existing monthly database reads.
+    if (count($parents) > $maxRows) {
+        return [];
+    }
+
+    $months = [];
+
+    for ($month = 1; $month <= 12; $month++) {
+        $start = sprintf('%04d-%02d-01', $year, $month);
+        $months[$start] = [
+            'end' => date('Y-m-t', strtotime($start)),
+            'rows' => [],
+        ];
+    }
+
+    foreach ($parents as $parent) {
+        $date = (string)($parent['transaction_date'] ?? '');
+        $monthStart = substr($date, 0, 7) . '-01';
+
+        if (
+            strlen($date) !== 10
+            || $date < $annualStart
+            || $date > $annualEnd
+            || !isset($months[$monthStart])
+            || $date > $months[$monthStart]['end']
+        ) {
+            // Never seed partial or incorrectly partitioned source data.
+            return [];
+        }
+
+        $months[$monthStart]['rows'][] = $parent;
+    }
+
+    $cache = stock_consumption_economics_source_request_cache();
+    $bucket = $cache[$pdo] ?? null;
+
+    if ($bucket === null) {
+        $bucket = (object)['farms' => []];
+        $cache[$pdo] = $bucket;
+    }
+
+    $seeded = [];
+
+    foreach ($months as $start => $month) {
+        $end = $month['end'];
+
+        // Preserve any pre-existing canonical date-range cache entry.
+        if (
+            isset($bucket->farms[$farmId][$start])
+            && array_key_exists(
+                $end,
+                $bucket->farms[$farmId][$start]
+            )
+        ) {
+            continue;
+        }
+
+        $bucket->farms[$farmId][$start][$end] =
+            $month['rows'];
+
+        $seeded[] = [$start, $end];
+    }
+
+    return $seeded;
+}
+}
+
+/*
+ * Remove only the month entries seeded by this reporting operation.
+ * Keep the ordinary annual reader cache available to subsequent
+ * financial sections in the same request.
+ */
+if (!function_exists(
+    'stock_consumption_economics_release_prefetched_monthly_source_rows'
+)) {
+function stock_consumption_economics_release_prefetched_monthly_source_rows(
+    PDO $pdo,
+    int $farmId,
+    array $seeded
+): void {
+    if ($farmId < 1 || !$seeded) {
+        return;
+    }
+
+    $cache = stock_consumption_economics_source_request_cache();
+
+    if (!isset($cache[$pdo])) {
+        return;
+    }
+
+    $bucket = $cache[$pdo];
+
+    foreach ($seeded as $period) {
+        if (!is_array($period) || count($period) !== 2) {
+            continue;
+        }
+
+        [$start, $end] = $period;
+
+        if (
+            !isset($bucket->farms[$farmId][$start])
+            || !array_key_exists(
+                $end,
+                $bucket->farms[$farmId][$start]
+            )
+        ) {
+            continue;
+        }
+
+        unset($bucket->farms[$farmId][$start][$end]);
+
+        if (!$bucket->farms[$farmId][$start]) {
+            unset($bucket->farms[$farmId][$start]);
+        }
+    }
+
+    if (
+        isset($bucket->farms[$farmId])
+        && !$bucket->farms[$farmId]
+    ) {
+        unset($bucket->farms[$farmId]);
+    }
+
+    if (!$bucket->farms) {
+        unset($cache[$pdo]);
+    }
 }
 }
 

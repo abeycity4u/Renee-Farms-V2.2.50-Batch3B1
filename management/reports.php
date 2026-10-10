@@ -3,6 +3,7 @@
 require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/../includes/pdf/PdfReportService.php');
 require_once(__DIR__ . '/../lib/farm_intelligence.php');
+require_once(__DIR__ . '/../includes/readonly_session.php');
 requireLogin();
 requireBusinessReportAccess();
 $pdfRequested = pdf_report_is_requested();
@@ -40,6 +41,10 @@ $farmType = $salesOnlyWorkspace
     );
 $startDate = $year . '-01-01';
 $endDate = $year . '-12-31';
+
+// Authentication, permissions and tenant report scope are resolved.
+// Release the shared read-only session lock before financial queries.
+release_readonly_session_lock();
 
 // V2.2.49: Analytics delegates to the canonical consumed-cost intelligence layer.
 // There is deliberately no local Sales - farm_expenses profit formula here.
