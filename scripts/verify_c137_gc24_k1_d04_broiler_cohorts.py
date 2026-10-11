@@ -54,7 +54,6 @@ REQUIRED = {
     "canonical_population_never_below_zero_at_sale_date_or_later_projected_dates",
     "slaughter_is_separate_canonical_physical_movement_not_auto_inferred_from_head_sales",
     "broiler_daily_record_requires_positive_opening_and_age_and_mortality_lte_opening",
-    "feed_prices_and_stock_receipts_deferred_to_D05_avoid_fabricating_broiler_feed",
 }
 class Blocked(ValueError):
     pass
@@ -152,6 +151,7 @@ def validate_spec(doc):
            "PHYSICAL_EXIT_CONTRACT_MISSING")
     checks = set(doc["required_future_V2_fixture_proofs"])
     demand(len(checks) >= 18 and
+           "feed_prices_and_stock_receipts_deferred_to_D05_avoid_fabricating_broiler_feed" in checks and
            "no_assumption_financial_broiler_head_sale_equals_physical_exit" in checks and
            "dated_daily_mortality_and_population_continuity_before_after_exits" in checks and
            "regression_for_shared_sale_multi_cycle_exit_and_direct_sale_same_cycle_guard" in checks,
