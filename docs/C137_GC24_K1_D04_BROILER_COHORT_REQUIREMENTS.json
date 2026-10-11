@@ -1,0 +1,299 @@
+{
+  "version": "C137-GC24-K1-D04-BROILER-COHORT-CONTRACT-0",
+  "checkpoint": "GC24CG_K1_D04",
+  "scope": "READONLY_REQUIREMENTS_ONLY",
+  "readiness": "D04_COHORT_AND_EXIT_EVIDENCE_UNAPPROVED",
+  "planning_as_of": "2026-10-11",
+  "reporting_year_selection": {
+    "year": 2025,
+    "start_date": "2025-01-01",
+    "end_date": "2025-12-31",
+    "scope": "DESIGN_ONLY_DATE_RULES_PENDING"
+  },
+  "previous_preparation_head": "6da0d69d7b94bdb1dddb47d71b1f2cc8adfcfedb",
+  "certified_reports_source_head": "322438870263825f9e739a12c4bd478983e67141",
+  "prior_d03_spec_file_git_blob": "8c02f1a6fd0eb30944a38a28adce8c15968ea0be",
+  "prior_d03_spec_digests": {
+    "R1": "6d0e142f51c92c80d7031dedb3e47897d7b029d67f05c1095a62287e35268a44",
+    "R2": "0a33b8f8cbe21dc49c7e24577141e5d837904fe2a3e3c6a35d86e5b6b539d6a8"
+  },
+  "prior_d02_spec_digests": {
+    "R1": "c3c63b0c41d739f43ecdcb738b8e91089c1d354768ce4aacf927cc3c72dafb80",
+    "R2": "28528c2853db293b3210c54ca32447731699120d34386ba210669ca304391fe9"
+  },
+  "original_2026_event_digest_sha256": {
+    "R1": "e31421ee40ce25b16feb698313fcf337e74126a8e63d8c5dadeedf74e30165f2",
+    "R2": "985341ed4315788ee8f3b9d62b327da66d38fc63ea16d406c5c52bc9949d3dfe"
+  },
+  "legacy_sales_not_population_proof": {
+    "R1": {
+      "broiler_head_sales": 5469,
+      "broiler_feed_used_events": 0
+    },
+    "R2": {
+      "broiler_head_sales": 16422,
+      "broiler_feed_used_events": 0
+    },
+    "original_direct_broiler_sales": "broiler-a_only_broiler-b_unassigned",
+    "implication": "NO_EXIT_OR_COHORT_PROVEN"
+  },
+  "scenario_broiler_cycle_count": null,
+  "per_cohort_unknowns": {
+    "cycle_code": null,
+    "cycle_start_date": null,
+    "expected_end_date": null,
+    "cycle_close_date": null,
+    "opening_bird_headcount": null,
+    "acquisition_type": null,
+    "acquisition_date": null,
+    "acquisition_quantity": null,
+    "acquisition_age_days": null,
+    "purchased_bird_total_cost": null,
+    "acquisition_source": null,
+    "acquisition_reference": null,
+    "request_token": null,
+    "initial_lifecycle_phase": null,
+    "growing_phase_start": null,
+    "harvest_phase_transition_date": null,
+    "broiler_cohort_count": null,
+    "inter_cohort_stagger_days": null,
+    "first_eligible_harvest_date": null,
+    "last_eligible_harvest_date": null,
+    "sale_business_date": null,
+    "sale_farm_scope": null,
+    "sale_cycle_attribution": null,
+    "sale_unit_of_measure": null,
+    "sale_financial_quantity": null,
+    "sale_population_effect_mode": null,
+    "sale_population_cycle_ids": null,
+    "sale_population_integer_headcounts": null,
+    "mortality_daily_by_cycle": null,
+    "opening_population_before_each_event": null,
+    "daily_bird_age_days": null,
+    "feed_item_id": null,
+    "feed_quantity_per_day": null,
+    "priced_feed_receipts": null,
+    "slaughter_removal_sources": null,
+    "reconciled_cumulative_physical_outflow": null,
+    "closing_population_by_cycle": null,
+    "population_reconciliation_as_of": null,
+    "pre_2025_cohort_history_policy": null
+  },
+  "certified_source_contracts": [
+    {
+      "id": "S01",
+      "file": "lib/production_cycle_service.php",
+      "boundary": "cycle_opening_and_canonical_close",
+      "markers": [
+        "function production_cycle_create_v3(",
+        "production_population_establish_baseline(",
+        "'cycle_opening'",
+        "function production_cycle_close_v3(",
+        "futureMovementStmt",
+        "closing_headcount"
+      ]
+    },
+    {
+      "id": "S02",
+      "file": "lib/poultry_cycle_onboarding.php",
+      "boundary": "atomic_acquisition_and_initial_phase",
+      "markers": [
+        "function poultry_cycle_onboarding_record_initial(",
+        "poultry_acquisition_record(",
+        "poultry_lifecycle_record_initial_phase(",
+        "if ($quantity <= 0)",
+        "if ($ageDays < 1)"
+      ]
+    },
+    {
+      "id": "S03",
+      "file": "lib/poultry_cycle_acquisition.php",
+      "boundary": "broiler_purchase_and_transfer_fact",
+      "markers": [
+        "function poultry_acquisition_allowed_types(",
+        "if ($type === 'broiler')",
+        "'internal_transfer' =>",
+        "function poultry_acquisition_record(",
+        "Acquisition quantity must be greater than 0.",
+        "Age at acquisition must be at least 1 day.",
+        "Enter the actual total amount paid for purchased birds.",
+        "firstPhaseStart"
+      ]
+    },
+    {
+      "id": "S04",
+      "file": "lib/poultry_cycle_lifecycle.php",
+      "boundary": "explicit_growing_to_harvest",
+      "markers": [
+        "function poultry_lifecycle_allowed_phases(",
+        "'growing' => 'Growing / Rearing'",
+        "'harvest' => 'Harvest / Sale'",
+        "if ($type === 'broiler' && $current === 'growing')",
+        "function poultry_lifecycle_transition_phase(",
+        "Transition date must be later than the current phase start date."
+      ]
+    },
+    {
+      "id": "S05",
+      "file": "poultry/broiler_daily_record.php",
+      "boundary": "daily_mortality_population_and_feed",
+      "markers": [
+        "production_type = 'broiler' AND status = 'active'",
+        "if ($openingStock < 1 || $birdsAge < 1)",
+        "if ($mortality > $openingStock)",
+        "daily_population_continuity_expected_opening(",
+        "daily_population_continuity_apply(",
+        "sync_daily_feed_usage(",
+        "daily_population_sync_mortality(",
+        "$pdo->beginTransaction()",
+        "$pdo->commit()",
+        "$pdo->rollBack()"
+      ]
+    },
+    {
+      "id": "S06",
+      "file": "lib/daily_population_continuity.php",
+      "boundary": "canonical_opening_and_future_replay",
+      "markers": [
+        "function daily_population_continuity_expected_opening(",
+        "daily_population_boundary_snapshot(",
+        "function daily_population_continuity_apply("
+      ]
+    },
+    {
+      "id": "S07",
+      "file": "lib/daily_population_sync.php",
+      "boundary": "durable_mortality_projection",
+      "markers": [
+        "function daily_population_sync_mortality(",
+        "'movement_type' => 'mortality'"
+      ]
+    },
+    {
+      "id": "S08",
+      "file": "lib/sale_population_effects.php",
+      "boundary": "explicit_physical_sale_exit_not_financial_inference",
+      "markers": [
+        "sales_records remains financial truth",
+        "No population effect is inferred from product name, quantity, or sales UOM.",
+        "function sale_population_effect_rows_from_post(",
+        "'financial_only'",
+        "'remove_live_population'",
+        "sale_population_effect_positive_int(",
+        "function sale_population_effect_sync(",
+        "production_population_lock_cycle(",
+        "production_population_assert_date_in_cycle(",
+        "production_population_projection_sync("
+      ]
+    },
+    {
+      "id": "S09",
+      "file": "lib/production_population.php",
+      "boundary": "nonnegative_time_projection",
+      "markers": [
+        "function production_population_establish_baseline(",
+        "'cycle_opening'",
+        "function production_population_project_delta_locked(",
+        "if ($projectedQuantity < 0)",
+        "This population change would make a later recorded population balance negative.",
+        "'slaughter' => -1",
+        "'sale' => -1"
+      ]
+    },
+    {
+      "id": "S10",
+      "file": "lib/daily_feed_sync.php",
+      "boundary": "feed_stock_single_authority",
+      "markers": [
+        "function sync_daily_feed_usage(",
+        "daily_feed_sync_authoritative_cycle_guard(",
+        "stock_reverse_transaction(",
+        "stock_apply_movement("
+      ]
+    },
+    {
+      "id": "S11",
+      "file": "management/sales_records.php",
+      "boundary": "sales_transaction_calls_population_effect",
+      "markers": [
+        "sale_population_effect_rows_from_post(",
+        "sale_population_effect_sync(",
+        "name=\"population_effect_mode\"",
+        "remove_live_population",
+        "financial_only"
+      ]
+    }
+  ],
+  "observed_canonical_rules": [
+    "cycle_creation_creates_active_cycle_and_cycle_opening_population_baseline",
+    "onboarding_records_separate_acquisition_and_initial_lifecycle_phase",
+    "broiler_acquisition_types_are_purchased_or_internal_transfer_no_POL",
+    "purchased_birds_require_actual_non_null_total_acquisition_cost",
+    "growing_and_harvest_are_explicit_phases_growing_can_transition_to_harvest",
+    "lifecycle_stage_not_auto_inferred_from_bird_age_feed_mortality_or_sales",
+    "broiler_daily_record_requires_positive_opening_and_age_and_mortality_lte_opening",
+    "daily_opening_uses_canonical_population_boundary_for_V3_cycle",
+    "daily_record_mortality_is_separately_projected_to_population_ledger",
+    "daily_record_feed_usage_owns_one_canonical_USED_movement_with_reversal",
+    "financial_sale_does_not_automatically_remove_live_broiler_population",
+    "physical_sale_exit_requires_explicit_remove_live_population_mode_and_cycle_whole_headcount",
+    "sale_cycle_scope_and_farm_production_type_must_match_exit_source_cycle",
+    "multi_cycle_physical_exit_requires_financial_shared_cycle_attribution",
+    "sale_population_projection_edit_or_removal_uses_source_revisions_and_reversals",
+    "canonical_population_never_below_zero_at_sale_date_or_later_projected_dates",
+    "cycle_closure_requires_active_cycle_and_no_later_population_movements",
+    "slaughter_is_separate_canonical_physical_movement_not_auto_inferred_from_head_sales"
+  ],
+  "required_future_V2_fixture_proofs": [
+    "owner_approved_distinct_cohort_count_and_cycle_start_dates_for_2025_workload",
+    "owner_approved_opening_headcount_and_acquisition_facts_per_cohort",
+    "reconcile_acquisition_quantity_to_population_baseline_without_double_credit",
+    "biologically_evidenced_age_growing_harvest_transitions_and_harvest_dates",
+    "explicit_per_sale_financial_quantity_units_and_attribution_scope",
+    "explicit_per_sale_physical_effect_mode_and_integer_headcounts_when_sold_alive",
+    "no_assumption_financial_broiler_head_sale_equals_physical_exit",
+    "separate_source_provenance_for_any_slaughter_population_removal_without_double_counting",
+    "cumulative_cohort_ledger_nonnegative_at_all_posted_dates_and_after_corrections",
+    "dated_daily_mortality_and_population_continuity_before_after_exits",
+    "no_daily_record_after_opening_population_falls_to_zero_without_supported_inflow",
+    "broiler_feed_occurs_from_correct_item_and_daily_record_source_if_approved",
+    "feed_prices_and_stock_receipts_deferred_to_D05_avoid_fabricating_broiler_feed",
+    "cross_period_2024_or_2026_source_history_needs_separate_date_policy_approval",
+    "cycle_close_date_not_earlier_than_any_physical_movement_and_closing_count_reconciled",
+    "regression_for_shared_sale_multi_cycle_exit_and_direct_sale_same_cycle_guard",
+    "reversal_and_historical_edit_cannot_make_later_population_negative",
+    "2026_legacy_sales_load_is_not_2025_biological_ground_truth"
+  ],
+  "operational_gates": {
+    "D01_2025_YEAR": "SELECTED_DESIGN_ONLY",
+    "D01_2025_EVENT_DATE_POLICY": "PENDING",
+    "D02_LAYER_BIOLOGY": "UNAPPROVED",
+    "D03_LAYER_EGG_POOL": "UNPROVEN",
+    "D04_BROILER_COHORTS": "UNAPPROVED",
+    "D05_BROILER_FEED_COSTS": "UNAPPROVED",
+    "D06_TO_D12": "UNAPPROVED",
+    "NEW_V2_EVENT_STREAMS": "NOT_GENERATED",
+    "APPLICATION_PHP_RUNTIME": "NOT_EXECUTED",
+    "CANONICAL_SOURCE_MUTATION": "FORBIDDEN",
+    "DATABASE_MUTATION": "PROHIBITED",
+    "REPORTS_150_VU": "HOLD",
+    "REPORTS_200_VU": "PROHIBITED"
+  },
+  "authorization": {
+    "docs_and_offline_verifier_only": true,
+    "set_bird_numbers": false,
+    "set_age_or_harvest_schedule": false,
+    "map_legacy_sales_to_exits": false,
+    "invent_feed": false,
+    "generate_v2_events": false,
+    "modify_original_events": false,
+    "modify_certified_source": false,
+    "change_php_writers": false,
+    "execute_php": false,
+    "connect_to_database": false,
+    "write_to_database": false,
+    "deploy": false,
+    "import": false,
+    "load_test": false
+  }
+}
