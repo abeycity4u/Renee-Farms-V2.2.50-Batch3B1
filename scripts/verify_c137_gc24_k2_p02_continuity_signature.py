@@ -69,7 +69,9 @@ def signature_contract(src):
     start = src.index("function daily_population_continuity_preview(")
     end = src.index("    ): array {", start)
     head = src[start:end]
-    check(NEW_SIGNATURE in src and src.count(NEW_SIGNATURE)==1,
+    preview_signature = src[start:end + len("    ): array {")]
+    check(NEW_SIGNATURE in preview_signature
+          and preview_signature.count(NEW_SIGNATURE) == 1,
           "P02_OPTIONAL_TRAILING_SOURCE_ID_MISSING")
     check(head.count("$sourceId")==1
           and head.find("bool $forUpdate = false") <
@@ -126,12 +128,18 @@ def caller_contract():
           "P02_LAYER_SALE_REBUILD_SCOPE_DRIFT")
 
 def negative_cases(fixed):
+    preview_at = fixed.index("function daily_population_continuity_preview(")
+    prefix = fixed[:preview_at]
+    preview_and_following = fixed[preview_at:]
     altered=[
-        ("OPTIONAL_ID_REMOVAL",fixed.replace(NEW_SIGNATURE,OLD_SIGNATURE)),
-        ("SOURCE_ID_WRONG_TYPE",fixed.replace(
-            "?int $sourceId = null\n    ): array {",
-            "int $sourceId = null\n    ): array {",1
-        )),
+        ("OPTIONAL_ID_REMOVAL",
+         prefix + preview_and_following.replace(
+             NEW_SIGNATURE, OLD_SIGNATURE, 1)),
+        ("SOURCE_ID_WRONG_TYPE",
+         prefix + preview_and_following.replace(
+             "?int $sourceId = null\n    ): array {",
+             "int $sourceId = null\n    ): array {", 1
+         )),
         ("CANONICAL_FORWARD_LOSS",fixed.replace(
             "$rows,\n            $animalType,\n            $sourceId,\n            $forUpdate",
             "$rows,\n            $animalType,\n            null,\n            $forUpdate",1
