@@ -70,6 +70,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 2  # Needed to inspect exactly the triggering commit's changed path.
 
       - name: Guard one-file authorization commit before running synthetic SQL
         if: github.event_name == 'push'
