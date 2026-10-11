@@ -1,0 +1,429 @@
+{
+  "version": "C137-GC24-K1-D08-TRANSACTIONAL-SALES-REQUIREMENTS-0",
+  "checkpoint": "GC24CG_K1_D08",
+  "scope": "OFFLINE_READONLY_SOURCE_REVIEW",
+  "readiness": "D08_SALES_WRITER_AND_FINANCIAL_FACTS_UNAPPROVED",
+  "reporting": {
+    "selected_year": 2025,
+    "start": "2025-01-01",
+    "end": "2025-12-31",
+    "event_date_policy": "UNAPPROVED"
+  },
+  "preparation_parent_sha": "a5d3a0eb5955db34e482a902f4797a19c3c86efe",
+  "certified_reports_sha": "322438870263825f9e739a12c4bd478983e67141",
+  "design_as_of": "2026-10-11",
+  "prior_d07_requirements_git_blob": "5610a26f89b6e8da007831d8f1cf5885ec80cf46",
+  "prior_d07_spec_sha256": {
+    "R1": "48267cd7c330243200cebfd837bd541dbb3aa44f51a72d9107ab52695417a63d",
+    "R2": "991d5c5f14ffa462613744d4fd1491dbf6da2e83050a0e81f1c9dcf7a54d39c7"
+  },
+  "prior_d06_spec_sha256": {
+    "R1": "fdebc8ef7e2ef694721a62ff4cd15f416ab855c777ccc33c59e320daa2c2e940",
+    "R2": "ca29f1602575204c060f13904868fce14001760d6fc61f46e7420b08afd7958c"
+  },
+  "original_2026_event_sha256": {
+    "R1": "e31421ee40ce25b16feb698313fcf337e74126a8e63d8c5dadeedf74e30165f2",
+    "R2": "985341ed4315788ee8f3b9d62b327da66d38fc63ea16d406c5c52bc9949d3dfe"
+  },
+  "original_sale_counts_are_not_validated_2025_economics": "UNCHANGED_2026_WORKLOAD_IS_NOT_NEW_2025_DATA",
+  "isolated_database_reference_only": "renee_c137_gc24_http",
+  "synthetic_tenant_slug_reference_only": "c137-gc24-synthetic",
+  "sale_and_payment_unknowns": {
+    "tenant_farm_id": null,
+    "authorized_sales_actor_id": null,
+    "sale_record_count_R1": null,
+    "sale_record_count_R2": null,
+    "sale_ids_and_public_references": null,
+    "sale_source_business_dates": null,
+    "sale_farm_type": null,
+    "sale_production_type": null,
+    "sale_cycle_attribution": null,
+    "sale_attribution_scope": null,
+    "sale_product_type": null,
+    "sale_quantity": null,
+    "sale_unit_of_measure": null,
+    "sale_unit_price": null,
+    "sale_total_amount": null,
+    "sale_customer_name": null,
+    "sale_upfront_payment": null,
+    "sale_credit_balance": null,
+    "sale_payment_history": null,
+    "customer_ledger_entry_dates": null,
+    "customer_ledger_sale_row_id": null,
+    "customer_ledger_payment_row_ids": null,
+    "payment_allocate_to_invoice_ids": null,
+    "outstanding_debt_after_payment": null,
+    "receivables_deletion_policy": null,
+    "layer_egg_sale_unit_conversion": null,
+    "layer_egg_inventory_available_before_each_sale": null,
+    "layer_egg_sale_auto_allocation_rows": null,
+    "layer_egg_sale_rebuild_order": null,
+    "manual_non_egg_revenue_allocation_policy": null,
+    "allocation_revision_history": null,
+    "general_sale_stock_item_id": null,
+    "general_sale_inventory_movement_id": null,
+    "general_sale_stock_quantity_deduction": null,
+    "slaughter_sale_domain": null,
+    "slaughter_sale_lot_ids": null,
+    "slaughter_output_physical_qty": null,
+    "ruminant_sale_animal_ids": null,
+    "ruminant_animal_revenue_allocation": null,
+    "ruminant_sale_exit_outcomes": null,
+    "broiler_sale_population_effect_mode": null,
+    "broiler_sale_population_exit_cycle_ids": null,
+    "broiler_sale_population_exit_whole_heads": null,
+    "sale_edit_historical_reversal_policy": null,
+    "sale_delete_historical_reversal_policy": null,
+    "sale_public_reference_replay_idempotency_policy": null,
+    "transaction_date_cutoff_2025": null,
+    "pre_2025_sale_and_receivable_opening_balance": null,
+    "cross_period_payment_policy": null,
+    "stock_sale_financial_vs_physical_reconciliation": null,
+    "sale_farm_scope_negative_tests": null,
+    "action_CSRF_permission_matrix": null,
+    "per_sale_automatic_allocation_status": null,
+    "per_sale_rounding_and_money_cents": null,
+    "same_day_sale_ordering": null,
+    "sale_timestamp_vs_business_date_policy": null,
+    "sales_only_general_inventory_behavior": null,
+    "scenario_customer_pii_policy": null,
+    "sale_rollback_test_results": null
+  },
+  "source_contracts": [
+    {
+      "id": "S01",
+      "file": "management/sales_records.php",
+      "boundary": "sale_create_update_and_payment_coordinator",
+      "markers": [
+        "requireLogin();",
+        "$tenantFarmId = requireCurrentFarmId();",
+        "if (isset($_POST['add_sale']))",
+        "if (!$canAddSales)",
+        "$paymentReceived < 0 || $paymentReceived > $totalAmount",
+        "Customer name is required for credit/partial sales",
+        "attribution_validate_cycle(",
+        "$pdo->beginTransaction();",
+        "record_reference_persistence_insert_new(",
+        "INSERT INTO sales_records",
+        "general_sale_inventory_sync(",
+        "slaughter_output_sale_sync(",
+        "sale_population_effect_sync(",
+        "sales_refresh_automatic_allocation(",
+        "sales_rebuild_layer_egg_allocations(",
+        "INSERT INTO customer_ledger_entries",
+        "Sale was saved, but its shared Layer revenue could not yet be assigned",
+        "isset($_POST['record_payment'])",
+        "isset($_POST['update_sale'])",
+        "receivable_sync_sale_edit(",
+        "$rebuildFrom = min($oldDate"
+      ]
+    },
+    {
+      "id": "S02",
+      "file": "lib/sales_receivables.php",
+      "boundary": "cash_snapshot_and_derived_credit_ledger",
+      "markers": [
+        "payment_received on sales_records is the sale-time cash snapshot.",
+        "function receivable_sale_state(",
+        "function receivable_sync_sale_edit(",
+        "$st['payments']",
+        "Cannot reduce this sale below payments already received",
+        "function receivable_assert_sale_deletable(",
+        "entry_type='payment'"
+      ]
+    },
+    {
+      "id": "S03",
+      "file": "lib/sales_allocation.php",
+      "boundary": "automatic_egg_pool_and_manual_revision_guards",
+      "markers": [
+        "function sales_allocation_status(",
+        "function sales_auto_allocate_layer_egg(",
+        "layer_egg_pool_before_sale(",
+        "'status'=>'unallocated'",
+        "function sales_refresh_automatic_allocation(",
+        "function sales_rebuild_layer_egg_allocations(",
+        "ORDER BY sale_date,id",
+        "function sales_assert_manual_revenue_edit_allowed(",
+        "function sales_assert_manual_revenue_delete_allowed("
+      ]
+    },
+    {
+      "id": "S04",
+      "file": "lib/layer_egg_inventory.php",
+      "boundary": "dated_eggs_available_before_sale",
+      "markers": [
+        "function layer_egg_is_sale_product(",
+        "function layer_egg_sale_quantity_crates(",
+        "function layer_egg_pool_before_sale(",
+        "sale_date, id",
+        "available_crates"
+      ]
+    },
+    {
+      "id": "S05",
+      "file": "lib/sale_population_effects.php",
+      "boundary": "explicit_bird_exits_not_inferred_sales",
+      "markers": [
+        "No population effect is inferred from product name, quantity, or sales UOM.",
+        "function sale_population_effect_rows_from_post(",
+        "'financial_only'",
+        "'remove_live_population'",
+        "function sale_population_effect_sync(",
+        "production_population_projection_sync(",
+        "AND farm_id=?"
+      ]
+    },
+    {
+      "id": "S06",
+      "file": "lib/general_sale_inventory.php",
+      "boundary": "general_sales_inventory_source_stock_depletion",
+      "markers": [
+        "function general_sale_inventory_selection_from_post(",
+        "function general_sale_inventory_sync(",
+        "record_reference_persistence_require_transaction(",
+        "stock_reverse_transaction(",
+        "stock_apply_movement(",
+        "function general_sale_inventory_reverse_for_delete("
+      ]
+    },
+    {
+      "id": "S07",
+      "file": "lib/slaughter_output_sale_dispatch.php",
+      "boundary": "slaughter_lot_selection_stock_and_reversal",
+      "markers": [
+        "function slaughter_output_sale_selection_from_post(",
+        "function slaughter_output_sale_sync(",
+        "slaughter_output_sale_common_require_transaction(",
+        "function slaughter_output_sale_assert_deletable(",
+        "'financial_only'"
+      ]
+    },
+    {
+      "id": "S08",
+      "file": "lib/ruminant_sale_animal_allocation.php",
+      "boundary": "ruminant_sale_animal_financial_allocation",
+      "markers": [
+        "function ruminant_sale_build_animal_allocations(",
+        "function ruminant_sale_save_animal_allocations(",
+        "INSERT INTO ruminant_sale_animal_allocations",
+        "WHERE farm_id=?"
+      ]
+    },
+    {
+      "id": "S09",
+      "file": "lib/ruminant_animal_exit.php",
+      "boundary": "ruminant_specific_sale_exit_writer",
+      "markers": [
+        "function ruminant_sale_apply_exit_outcomes(",
+        "function ruminant_sale_reverse_exit_events(",
+        "farm_id"
+      ]
+    },
+    {
+      "id": "S10",
+      "file": "lib/attribution.php",
+      "boundary": "direct_cycle_or_shared_attribution",
+      "markers": [
+        "function attribution_normalize_production_type(",
+        "function attribution_scope(",
+        "function attribution_validate_cycle(",
+        "WHERE id=? AND farm_id=?"
+      ]
+    },
+    {
+      "id": "S11",
+      "file": "lib/sales_units.php",
+      "boundary": "canonical_preset_or_custom_unit",
+      "markers": [
+        "function sales_unit_presets(",
+        "function sales_unit_from_post("
+      ]
+    },
+    {
+      "id": "S12",
+      "file": "lib/record_reference_persistence.php",
+      "boundary": "sale_reference_issued_by_writer_transaction",
+      "markers": [
+        "function record_reference_persistence_insert_new(",
+        "function record_reference_persistence_require_transaction(",
+        "function record_reference_persistence_with_retry("
+      ]
+    },
+    {
+      "id": "S13",
+      "file": "lib/sale_revenue_allocation_service.php",
+      "boundary": "shared_revenue_parent_target_contract",
+      "markers": [
+        "function sale_revenue_allocation_service_parent_contract(",
+        "function sale_revenue_allocation_service_target_contract(",
+        "function sale_revenue_allocation_service_validate_desired_rows(",
+        "function sale_revenue_allocation_service_is_automatic_layer_egg("
+      ]
+    },
+    {
+      "id": "S14",
+      "file": "lib/sale_revenue_allocation_persistence.php",
+      "boundary": "allocation_revision_caller_transaction",
+      "markers": [
+        "function sale_revenue_allocation_persistence_require_transaction(",
+        "function sale_revenue_allocation_persistence_apply(",
+        "function sale_revenue_allocation_persistence_retain_shared(",
+        "function sale_revenue_allocation_persistence_append_revision("
+      ]
+    },
+    {
+      "id": "S15",
+      "file": "api/delete_sale.php",
+      "boundary": "sale_delete_reversal_and_prepayment_guard",
+      "markers": [
+        "require_http_method('POST')",
+        "require_csrf_token()",
+        "require_rate_limit('delete_sale'",
+        "receivable_assert_sale_deletable(",
+        "sale_population_effect_assert_deletable(",
+        "general_sale_inventory_reverse_for_delete(",
+        "ruminant_sale_reverse_exit_events(",
+        "sales_rebuild_layer_egg_allocations(",
+        "DELETE FROM sales_records WHERE id=? AND farm_id=?"
+      ]
+    },
+    {
+      "id": "S16",
+      "file": "includes/sales_receivable_permissions.php",
+      "boundary": "granular_payment_and_CSRF_bridge",
+      "markers": [
+        "require_valid_csrf_post(",
+        "hasPermission(getUserType(), 'sales_receivables')",
+        "'sales_receivables_edit'",
+        "'sales_receivables_delete'",
+        "if (isset($_POST['record_payment']))"
+      ]
+    },
+    {
+      "id": "S17",
+      "file": "api/update_sale_revenue_allocation.php",
+      "boundary": "allocation_edit_is_separate_authorized_flow",
+      "markers": [
+        "require_csrf_token();",
+        "$pdo->beginTransaction();",
+        "sale_revenue_allocation_persistence_retain_shared(",
+        "sale_revenue_allocation_persistence_apply(",
+        "$pdo->commit();"
+      ]
+    }
+  ],
+  "source_grounded_rules": [
+    "sales_records_is_primary_financial_sale_fact_with_farm_and_actor_and_sale_business_date",
+    "sales_create_and_update_routes_coordinate_dependent_facts_under_caller_transaction",
+    "sale_insert_uses_canonical_public_reference_persistence",
+    "sale_amount_computed_from_sale_quantity_and_unit_price",
+    "upfront_payment_snapshot_on_sale_record_is_separate_from_subsequent_payment_ledger",
+    "sale_with_credit_requires_customer_name_and_initial_credit_ledger_sale_row",
+    "payment_received_cannot_be_negative_or_greater_than_initial_sale_total",
+    "payment_entries_are_cash_facts_and_sale_entries_are_derived_receivable_amounts",
+    "sale_edit_refuses_new_total_below_already_received_payments",
+    "sale_delete_refuses_deletion_when_debt_payment_history_attached",
+    "sale_record_update_deletion_and_ledger_payments_are_separate_guarded_operations",
+    "sale_cycle_is_checked_against_farm_and_production_type",
+    "sale_unit_is_validated_through_shared_sale_unit_helper",
+    "sales_only_general_inventory_forces_general_farm_and_no_livestock_exits",
+    "general_inventory_sale_consumption_uses_canonical_stock_service_and_reversals",
+    "slaughter_output_sale_uses_domain_specific_lot_and_processed_inventory_authority",
+    "financial_livestock_sale_does_not_infer_live_population_change",
+    "explicit_sale_population_exit_requires_cycle_and_whole_bird_headcount",
+    "ruminant_sale_animal_allocation_is_separate_from_ruminant_exit_outcomes",
+    "shared_layer_egg_sale_auto_allocation_uses_dated_unsold_egg_pool",
+    "shared_layer_egg_sale_can_be_saved_with_unallocated_revenue_warning",
+    "layer_egg_sales_rebuild_prior_and_later_shared_allocations_in_business_date_ID_order",
+    "direct_cycle_revenue_attribution_is_not_the_same_as_automatic_shared_allocation",
+    "manual_revenue_allocation_lifecycle_is_guarded_and_revisioned",
+    "sale_edit_reconciles_receivables_inventory_physical_effects_and_allocations",
+    "sale_delete_checks_protected_allocation_payment_and_population_effects_before_removal",
+    "API_sale_deletion_requires_POST_CSRF_rate_limit_and_sale_delete_permission",
+    "payment_and_receivable_edit_permissions_are_separate_from_add_sale_permission",
+    "source_PHP_does_not_prove_any_2025_sales_stock_or_layer_egg_availability"
+  ],
+  "future_fixture_proofs": [
+    "approve_2025_sales_dates_and_any_preperiod_carryforward_before_new_events",
+    "require_approved_D06_target_actor_farm_entitlement_and_action_permissions",
+    "no_customer_PII_or_real_payment_details_in_synthetic_scenario",
+    "all_sale_quantities_prices_and_units_owner_approved_or_evidence_backed",
+    "validate_unit_price_times_qty_vs_sale_total_and_currency_cent_precision",
+    "match_cycle_and_production_type_and_farm_id_for_each_direct_sale",
+    "prove_credit_sale_cash_snapshot_plus_receivable_opening_balance_consistency",
+    "explicit_receivable_payment_entries_date_order_and_invoice_allocation",
+    "prevent_payment_total_over_sale_and_historical_editted_sale_amount",
+    "prevent_credit_sale_delete_after_real_payment_ledger_history",
+    "no_financial_sale_clearing_stock_without_correct_domain_specific_source",
+    "general_inventory_sale_has_sufficient_costed_stock_before_physical_use",
+    "livestock_sale_physical_exit_requires_explicit_valid population effect",
+    "broiler_cumulative_sale_exits_not_above_canonical_live_stock",
+    "ruminant_animal_exit_and_allocation_with_identified_animal_provenance",
+    "slaughter_output_sales_require_processed_lot_or_financial_only_policy",
+    "layer_egg_sale_unit_conversion_and_per_date_pool_are_verifiably_sufficient",
+    "shared_layer_egg_sales_fully_allocated_or_explicitly_rejected_from_representative_fixture",
+    "manual_non_layer_shared_allocation_requires_cycle_amount_and_revision_authority",
+    "never_use_60_40_manual_split_instead_of_real_layer_egg_production",
+    "sale_edits_rebuild_automatic_allocations_from_earliest_affected_business_date",
+    "sale_edit_reversal_and_deletion_preserve_stock_population_and_cash_integrity",
+    "no_direct_SQL_sales_writer_that_bypasses_shared_domain_workflows",
+    "select_replay_idempotency_and_public_reference_policy_before_any_import",
+    "explicit_payment_delete_reconciliation_and_no_fabricated_settlement",
+    "prove_no_cross_tenant_and_not_entitled_sales_API_operations",
+    "preserve_sale_revenue_allocation_revision_provenance",
+    "show_fully_costed_reports_eligible_source_rows_separately_from_financial_sales",
+    "preserve_protected_old_2026_event_streams_and_dont_backdate",
+    "do_not_create_test_transactions_or_advance_load_cadence_in_D08"
+  ],
+  "critical_separations": [
+    "sale_financial_record_neq_population_exit",
+    "sale_financial_record_neq_general_inventory_used",
+    "sale_revenue_neq_upfront_cash_received",
+    "credit_ledger_sale_row_neq_cash_payment_entry",
+    "shared_layer_egg_sale_saved_neq_auto_allocated",
+    "manual_allocation_neq_layer_egg_biology",
+    "processed_slaughter_inventory_neq_live_bird_sale",
+    "original_2026_sale_volume_neq_2025_validated_sales"
+  ],
+  "gates": {
+    "D01_year": "SELECTED_2025_DESIGN_ONLY",
+    "D01_date_policy": "UNAPPROVED",
+    "D02_layer_baseline": "UNAPPROVED",
+    "D03_layer_eggs": "UNPROVEN",
+    "D04_broiler_populations": "UNAPPROVED",
+    "D05_feed_inventory_costing": "UNAPPROVED",
+    "D06_tenant_actor": "UNAPPROVED",
+    "D07_inventory_writer": "UNAPPROVED",
+    "D08_sales_writer": "UNAPPROVED",
+    "D09_to_D12": "UNAPPROVED",
+    "receipt_and_customer_input": "NOT_APPROVED",
+    "actual_sale_rows": "NOT_CREATED",
+    "actual_payment_rows": "NOT_CREATED",
+    "population_exit_proof": "UNPROVEN",
+    "egg_allocation_proof": "UNPROVEN",
+    "new_v2_event_stream": "NOT_GENERATED",
+    "annual_150_VU": "HOLD",
+    "annual_200_VU": "PROHIBITED",
+    "database_connections": 0,
+    "database_writes": 0
+  },
+  "permissions": {
+    "offline_spec_only": true,
+    "choose_sale_amount": false,
+    "choose_sale_date": false,
+    "choose_customer_or_payment": false,
+    "create_sale": false,
+    "create_payment": false,
+    "create_population_exit": false,
+    "create_stock_used": false,
+    "allocate_revenue": false,
+    "modify_app_source": false,
+    "execute_PHP": false,
+    "access_database": false,
+    "write_database": false,
+    "generate_new_events": false,
+    "import_or_deploy": false,
+    "run_load_test": false
+  }
+}
