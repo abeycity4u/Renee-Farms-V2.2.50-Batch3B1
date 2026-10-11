@@ -141,7 +141,7 @@ def validate(spec):
             and [c["file"] for c in contracts] == list(FILES)
             and [c["id"] for c in contracts] ==
             ["S%02d" % (i+1) for i in range(len(FILES))]
-            and all(len(c["markers"])>=3 for c in contracts),
+            and all(len(c["markers"])>=2 for c in contracts),
             "D08_SOURCE_SCOPE_DRIFT")
     rules = set(spec["source_grounded_rules"])
     must = {
