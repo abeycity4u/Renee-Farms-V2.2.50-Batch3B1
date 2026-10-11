@@ -116,7 +116,8 @@ def main():
     reject(lambda: validate_manifest("R1", modified), "EVENT_MUTATION_ACCEPTED")
 
     modified = copy.deepcopy(base)
-    modified["records"][-1]["parent_ref"] = "unknown-parent"
+    next(row for row in modified["records"]
+         if row["kind"] == "stock_allocation")["parent_ref"] = "unknown-parent"
     reject(lambda: validate_manifest("R1", modified), "ORPHAN_ACCEPTED")
 
     modified = copy.deepcopy(base)
