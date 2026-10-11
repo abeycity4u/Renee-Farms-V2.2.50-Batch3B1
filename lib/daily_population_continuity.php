@@ -948,7 +948,8 @@ if (!function_exists('daily_population_continuity_preview')) {
         int $openingStock,
         int $mortality,
         ?string $animalType = null,
-        bool $forUpdate = false
+        bool $forUpdate = false,
+        ?int $sourceId = null
     ): array {
         $config = daily_population_continuity_type($recordType);
 
