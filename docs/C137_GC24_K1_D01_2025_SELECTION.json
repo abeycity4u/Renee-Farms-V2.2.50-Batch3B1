@@ -1,0 +1,66 @@
+{
+  "version": "C137-GC24-K1-D01-DESIGN-YEAR-1",
+  "decision": "D01",
+  "origin": "explicit_user_instruction_in_current_chat",
+  "as_of": "2026-10-11",
+  "selected_option": "independent_completed_2025_year_new_stream",
+  "selected_year": 2025,
+  "window_start": "2025-01-01",
+  "window_end": "2025-12-31",
+  "inclusive_days": 365,
+  "status": "YEAR_SELECTED_DESIGN_ONLY_DATE_POLICY_PENDING",
+  "prior_preparation_head": "476d0d34b1d58f4984208ea34bdffd1bbc9210da",
+  "certified_source_sha": "322438870263825f9e739a12c4bd478983e67141",
+  "frozen_z27k_register_blob_sha1": "babb4fe2e575c08b543bc435cc8cd04080f3e0e9",
+  "prior_z27k_dossier_spec_sha256": {
+    "R1": "3823c305c095a5eefa025ab4054580bec3dc4d04e3013a5cbf04b4df0a65ac63",
+    "R2": "17d40dbd17a72a470e1c8d99aea85d544b7be6bf9250ce6aace59c9f909bbde6"
+  },
+  "old_2026_event_digest_sha256": {
+    "R1": "e31421ee40ce25b16feb698313fcf337e74126a8e63d8c5dadeedf74e30165f2",
+    "R2": "985341ed4315788ee8f3b9d62b327da66d38fc63ea16d406c5c52bc9949d3dfe"
+  },
+  "old_2026_event_counts": {
+    "R1": 5452,
+    "R2": 13770
+  },
+  "original_z27k_register": "FROZEN_PRESELECTION_UNCHANGED",
+  "new_scenario_design_labels": [
+    "R1-V2-2025-DESIGN",
+    "R2-V2-2025-DESIGN"
+  ],
+  "new_events": "NOT_GENERATED",
+  "new_event_digest": "NOT_GENERATED",
+  "date_rules_per_event_kind": "UNRESOLVED",
+  "biological_assumptions": "UNRESOLVED",
+  "old_2026_to_2025_event_remap": "FORBIDDEN",
+  "downstream_unapproved": [
+    "D02",
+    "D03",
+    "D04",
+    "D05",
+    "D06",
+    "D07",
+    "D08",
+    "D09",
+    "D10",
+    "D11",
+    "D12"
+  ],
+  "next_design_checkpoint": "K1_D02",
+  "permissions": {
+    "design_documentation": true,
+    "modify_original_z27k": false,
+    "modify_certified_source": false,
+    "modify_original_event_streams": false,
+    "generate_new_v2_events": false,
+    "change_php_writers": false,
+    "connect_database": false,
+    "write_database": false,
+    "deploy": false,
+    "import_data": false,
+    "load_test": false,
+    "150_vu": "HOLD",
+    "200_vu": "PROHIBITED"
+  }
+}
