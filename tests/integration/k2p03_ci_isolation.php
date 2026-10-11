@@ -12,6 +12,27 @@ function k2p03_ci_require_environment(
     string $scenario,
     string $database
 ): void {
+    // Keep each CI scenario bound to its own branch, schema and fake credential.
+    $allowed = [
+        'B02' => [
+            'branch' => 'c137-gc24-k2p03-ci-mariadb-b02',
+            'database' => 'renee_k2p03_ci_b02',
+            'password' => 'ci-only-nonsecret-b02',
+        ],
+        'B03' => [
+            'branch' => 'c137-gc24-k2p03-ci-mariadb-b03',
+            'database' => 'renee_k2p03_ci_b03',
+            'password' => 'ci-only-nonsecret-b03',
+        ],
+    ];
+
+    if (!isset($allowed[$scenario])
+        || $branch !== $allowed[$scenario]['branch']
+        || $database !== $allowed[$scenario]['database']
+    ) {
+        throw new RuntimeException('Unrecognized isolated CI scenario.');
+    }
+
     $expected = [
         'GITHUB_ACTIONS' => 'true',
         'RUNNER_ENVIRONMENT' => 'github-hosted',
@@ -30,7 +51,7 @@ function k2p03_ci_require_environment(
         }
     }
 
-    if (getenv('CI_DB_PASSWORD') !== 'ci-only-nonsecret-b02') {
+    if (getenv('CI_DB_PASSWORD') !== $allowed[$scenario]['password']) {
         throw new RuntimeException('Disposable synthetic CI credentials do not match.');
     }
 }
@@ -61,7 +82,7 @@ function k2p03_ci_equal($expected, $actual, string $label): void
 
 function k2p03_ci_connection(string $database): PDO
 {
-    if ($database !== 'renee_k2p03_ci_b02') {
+    if (!in_array($database, ['renee_k2p03_ci_b02', 'renee_k2p03_ci_b03'], true)) {
         throw new RuntimeException('The requested CI schema is not approved.');
     }
 
@@ -100,6 +121,7 @@ function k2p03_ci_connection(string $database): PDO
         'farms', 'production_cycles', 'production_population_baselines',
         'production_population_movements', 'broiler_daily_records',
         'sales_records', 'sale_population_effects',
+        'ruminant_daily_records',
         'poultry_slaughter_batches', 'production_population_transfers',
         'production_population_transfer_legs',
     ] as $table) {
