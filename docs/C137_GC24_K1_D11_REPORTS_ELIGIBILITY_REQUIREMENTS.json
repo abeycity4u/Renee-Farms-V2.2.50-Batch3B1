@@ -1,0 +1,480 @@
+{
+  "version": "C137-GC24-K1-D11-REPORTS-ELIGIBILITY-PREFETCH-0",
+  "checkpoint": "GC24CG_K1_D11",
+  "scope": "OFFLINE_SOURCE_REQUIREMENTS_ONLY",
+  "review_state": "D11_SOURCE_REVIEW_PENDING_NODE_A",
+  "as_of": "2026-10-11",
+  "selected_year": {
+    "year": 2025,
+    "starts": "2025-01-01",
+    "ends": "2025-12-31",
+    "event_policy": "UNAPPROVED"
+  },
+  "preparation_parent_head": "1beb16cceeefb97371c9a93714fed2007c3a6c7c",
+  "certified_reports_head": "322438870263825f9e739a12c4bd478983e67141",
+  "prior_D10_git_blob_sha1": "d9f06ccb357acca5790091665a60f33fc1d26b89",
+  "prior_D10_spec_sha256": {
+    "R1": "9ac9355b16253ad2f110d499798cf9243c721e6dfeefd59e71cb210b54f14c12",
+    "R2": "37781fbde25095e6c667557c3f835151ab6f3817573c9af2d73d33c8f019abea"
+  },
+  "prior_D09_spec_sha256": {
+    "R1": "b07d009a87b0132fcd675e4aaf66e21a6594d086a871a6d84563c087c3128af6",
+    "R2": "013098e94b600544fb25651cb7154fb7e25e86096f70ebdb964b0e0a0bced94d"
+  },
+  "original_2026_event_sha256": {
+    "R1": "e31421ee40ce25b16feb698313fcf337e74126a8e63d8c5dadeedf74e30165f2",
+    "R2": "985341ed4315788ee8f3b9d62b327da66d38fc63ea16d406c5c52bc9949d3dfe"
+  },
+  "isolated_DB_reference_only": "renee_c137_gc24_http",
+  "tenant_slug_reference_only": "c137-gc24-synthetic",
+  "unknown_eligibility_and_capacity_inputs": {
+    "target_tenant_id": null,
+    "actual_tenant_authorized_actor_id": null,
+    "2025_reporting_event_date_approval": null,
+    "2025_preperiod_inventory_opening_receipts": null,
+    "R1_2025_eligible_used_count": null,
+    "R2_2025_eligible_used_count": null,
+    "R1_2025_effective_used_count": null,
+    "R2_2025_effective_used_count": null,
+    "R1_2025_feed_used_count": null,
+    "R2_2025_feed_used_count": null,
+    "R1_2025_operating_used_count": null,
+    "R2_2025_operating_used_count": null,
+    "actual_2025_total_cost_nonnull_count": null,
+    "actual_2025_total_cost_positive_count": null,
+    "actual_2025_total_cost_zero_count": null,
+    "actual_2025_cost_provenance_coverage": null,
+    "actual_2025_receipt_purchases": null,
+    "actual_2025_receipt_adjustments": null,
+    "actual_2025_item_farm_type_category_links": null,
+    "actual_2025_feed_classification_snapshots": null,
+    "actual_2025_other_operating_classes": null,
+    "actual_2025_ledger_reversal_lineage": null,
+    "actual_2025_used_authoritative_daily_sources": null,
+    "actual_2025_layer_daily_feed_used": null,
+    "actual_2025_broiler_daily_feed_used": null,
+    "actual_2025_ruminant_daily_feed_used": null,
+    "actual_2025_stock_attribution_exception_count": null,
+    "actual_2025_manual_stock_allocations": null,
+    "actual_2025_manual_revenue_allocations": null,
+    "actual_2025_expense_allocations": null,
+    "actual_2025_unallocated_balances": null,
+    "actual_2025_sales_egg_stock_reconciliation": null,
+    "actual_2025_broiler_live_population_reconciliation": null,
+    "actual_2025_monthly_reporting_cost_by_class": null,
+    "actual_2025_monthly_total_revenue": null,
+    "actual_2025_monthly_total_profit": null,
+    "actual_2025_monthly_combined_cash_receipts": null,
+    "actual_2025_shared_revenue_allocation_source": null,
+    "2048_threshold_exact_count_proof": null,
+    "2049_overflow_fallback_proof": null,
+    "small_fixture_SQL_contract_82_1_provenance": null,
+    "isolated_GC24_actual_SQL_calls": null,
+    "isolated_GC24_actual_source_queries": null,
+    "isolated_GC24_annual_prefetch_path": null,
+    "isolated_GC24_annual_cache_footprint": null,
+    "isolated_GC24_monthly_fallback_path": null,
+    "isolated_GC24_peak_memory_bytes": null,
+    "isolated_GC24_query_plan_state": null,
+    "isolated_GC24_database_row_sizes": null,
+    "isolated_GC24_concurrency_peak_VUs": null,
+    "isolated_GC24_25_VU_latency": null,
+    "isolated_GC24_50_VU_latency": null,
+    "isolated_GC24_75_VU_latency": null,
+    "isolated_GC24_100_VU_latency": null,
+    "isolated_GC24_125_VU_latency": null,
+    "isolated_GC24_150_VU_latency": null,
+    "isolated_GC24_200_VU_latency": null,
+    "isolated_GC24_error_rate": null,
+    "isolated_GC24_DB_CPU_and_IO": null,
+    "isolated_GC24_web_worker_saturation": null,
+    "isolated_GC24_node_C_generation_efficiency": null,
+    "isolated_GC24_report_endpoint_auth_role": null,
+    "isolated_GC24_multi_farm_cache_isolation": null,
+    "isolated_GC24_session_lock_release_profiler": null,
+    "isolated_GC24_profile_request_trace": null,
+    "load_duration_ramp_concurrency_plan": null,
+    "load_acceptance_latency_threshold": null,
+    "load_acceptance_errors_threshold": null,
+    "capacity_artifact_identity_digest": null,
+    "report_data_quality_approval_date": null,
+    "synthetic_data_version_authority": null,
+    "actual_import_authorization_state": null
+  },
+  "source_contracts": [
+    {
+      "id": "S01",
+      "file": "management/reports.php",
+      "role": "reports_endpoint_auth_tenant_session_and_year",
+      "markers": [
+        "requireBusinessReportAccess();",
+        "$tenantFarmId = requireCurrentFarmId();",
+        "release_readonly_session_lock();",
+        "farm_intelligence_monthly_series(",
+        "farm_intelligence_top_products(",
+        "farm_intelligence_expense_breakdown(",
+        "$startDate = $year . '-01-01';",
+        "$endDate = $year . '-12-31';"
+      ]
+    },
+    {
+      "id": "S02",
+      "file": "lib/farm_intelligence.php",
+      "role": "twelve_month_read_only_profitability_and_prefetch_lifecycle",
+      "markers": [
+        "function farm_intelligence_monthly_series(",
+        "stock_consumption_economics_prefetch_monthly_source_rows(",
+        "for ($month = 1; $month <= 12; $month++)",
+        "function farm_intelligence_summary(",
+        "getProfitabilitySummary(",
+        "stock_consumption_economics_release_prefetched_monthly_source_rows(",
+        "'net_profit'",
+        "'feed_consumed'"
+      ]
+    },
+    {
+      "id": "S03",
+      "file": "lib/stock_consumption_economics.php",
+      "role": "canonical_eligible_USED_rows_WeakMap_overflow_and_fallback",
+      "markers": [
+        "function stock_consumption_economics_source_request_cache(): WeakMap",
+        "function stock_consumption_economics_forget_source_request_cache(",
+        "function stock_consumption_economics_source_rows(",
+        "function stock_consumption_economics_prefetch_monthly_source_rows(",
+        "int $maxRows = 2048",
+        "$maxRows + 1",
+        "if (count($parents) > $maxRows)",
+        "return [];",
+        "'used'",
+        "t.total_cost IS NOT NULL",
+        "stock_effective_sql_predicate(",
+        "stock_feed_transaction_sql_predicate(",
+        "inventory_operating_consumption_classifications(",
+        "ORDER BY t.transaction_date,t.id",
+        "function stock_consumption_economics_release_prefetched_monthly_source_rows(",
+        "function stock_consumption_economics_summary(",
+        "function stock_consumption_economics_allocation_rows("
+      ]
+    },
+    {
+      "id": "S04",
+      "file": "lib/stock_reporting.php",
+      "role": "effective_posted_movement_excludes_reversals",
+      "markers": [
+        "function stock_effective_sql_predicate(",
+        "is_reversed = 0",
+        "reversal_of_id IS NULL",
+        "function stock_effective_movement_rows("
+      ]
+    },
+    {
+      "id": "S05",
+      "file": "lib/stock_costing.php",
+      "role": "posted_feed_classification_and_historical_cost_evidence",
+      "markers": [
+        "function stock_feed_transaction_sql_predicate(",
+        "financial_classification",
+        "function stock_weighted_cost_replay(",
+        "function stock_historical_unit_cost(",
+        "return round(max(0.0, $fallback), 4);"
+      ]
+    },
+    {
+      "id": "S06",
+      "file": "lib/inventory_financial.php",
+      "role": "operating_stock_classes_and_receipts_not_expense",
+      "markers": [
+        "function inventory_operating_consumption_classifications(",
+        "function inventory_financial_receipts(",
+        "function inventory_financial_receipt_total(",
+        "'medication_vaccine'",
+        "'supplement'",
+        "'consumables'"
+      ]
+    },
+    {
+      "id": "S07",
+      "file": "lib/stock_consumption_allocation_service.php",
+      "role": "costed_USED_eligibility_stricter_for_manual_allocation",
+      "markers": [
+        "function stock_consumption_allocation_service_is_effective_used(",
+        "function stock_consumption_allocation_service_parent_contract(",
+        "Only effective USED stock movements are eligible for consumed-stock allocation.",
+        "Consumed stock cost must be greater than zero before it can be allocated.",
+        "Daily-record stock usage requires authoritative source attribution before allocation."
+      ]
+    },
+    {
+      "id": "S08",
+      "file": "lib/profitability_unallocated_shared.php",
+      "role": "unallocated_attribution_disclosure_no_PL_mutation",
+      "markers": [
+        "This reader does NOT change Profit / Loss.",
+        "function profitability_unallocated_shared_summary(",
+        "'stock_feed_unallocated_cents'",
+        "'stock_operating_unallocated_cents'",
+        "'stock_attribution_exception_count'",
+        "stock_consumption_economics_source_rows("
+      ]
+    },
+    {
+      "id": "S09",
+      "file": "includes/financial.php",
+      "role": "canonical_profitability_reader_source_once",
+      "markers": [
+        "function getProfitabilitySummary(",
+        "stock_consumption_economics_summary(",
+        "'feed_consumption_cost'",
+        "'total_recognized_cost'",
+        "'profit'",
+        "'cash_feed_expenses'"
+      ]
+    },
+    {
+      "id": "S10",
+      "file": "includes/readonly_session.php",
+      "role": "release_read_only_PHP_session_lock",
+      "markers": [
+        "function release_readonly_session_lock(): bool",
+        "session_write_close();"
+      ]
+    },
+    {
+      "id": "S11",
+      "file": "scripts/verify_c137_reports_prefetch_contract.php",
+      "role": "existing_c137_canned_fixture_contract_not_GC24_qualification",
+      "markers": [
+        "'WEAKMAP_CACHE_CONTRACT'",
+        "'REPORTS_SQL_REDUCTION_CONTRACT'",
+        "$calls === 82 && $sources === 1",
+        "'MONTHLY_ROW_COUNT'",
+        "'ANNUAL_ACCOUNTING_CONSERVATION'",
+        "'REPORTING_MONTHLY_CACHE_RELEASE'",
+        "'SECOND_FARM_FINANCIAL_ISOLATION'",
+        "'OVERFLOW_FALLBACK'",
+        "'MONTHLY_PREFETCH_SEED'",
+        "'EXPLICIT_PREFETCH_RELEASE'"
+      ]
+    },
+    {
+      "id": "S12",
+      "file": "scripts/verify_c137_monthly_reporting_contract.php",
+      "role": "monthly_accounting_regression_fixtures_not_capacity_result",
+      "markers": [
+        "farm_intelligence_monthly_series(",
+        "'MONTHLY_NUMERICAL_CONTRACT'",
+        "'FEBRUARY_LEAP_YEAR_BOUNDARY'",
+        "'feed_consumption_cost'"
+      ]
+    },
+    {
+      "id": "S13",
+      "file": "scripts/verify_c137_reports_readonly_session_lock.php",
+      "role": "source_level_auth_before_lock_release",
+      "markers": [
+        "'Reports readable'",
+        "'requireBusinessReportAccess'",
+        "'session_write_close();'",
+        "'session_destroy|session_write_close)\\s*\\(/'"
+      ]
+    },
+    {
+      "id": "S14",
+      "file": "lib/daily_feed_sync.php",
+      "role": "daily_record_source_owned_USED_stock",
+      "markers": [
+        "function sync_daily_feed_usage(",
+        "stock_apply_movement(",
+        "stock_reverse_transaction(",
+        "daily_feed_sync_authoritative_cycle_guard("
+      ]
+    },
+    {
+      "id": "S15",
+      "file": "lib/stock_service.php",
+      "role": "transactional_stock_writer_and_request_cache_invalidation",
+      "markers": [
+        "function stock_apply_movement(",
+        "function stock_reverse_transaction(",
+        "stock_consumption_economics_forget_source_request_cache(",
+        "stock_movement_attribution_resolve("
+      ]
+    },
+    {
+      "id": "S16",
+      "file": "lib/stock_consumption_source_resolver.php",
+      "role": "authoritative_source_ID_and_cycle_validation",
+      "markers": [
+        "function stock_consumption_source_resolver_definition(",
+        "function stock_consumption_source_resolver_resolve(",
+        "function stock_consumption_source_resolver_assert_cycle_consistency("
+      ]
+    }
+  ],
+  "SQL_eligibility": {
+    "transaction_type": "used",
+    "effective": "is_reversed=0 AND reversal_of_id IS NULL",
+    "within_requested_farm_and_dates": true,
+    "total_cost": "IS NOT NULL",
+    "eligible_cost_classes": "feed snapshot OR operating consumption snapshot",
+    "require_positive_cost_in_SQL": false
+  },
+  "representative_evidence": {
+    "receipt_proven_real_positive_cost": "NOT_PROVEN",
+    "authoritative_daily_feed_linkage": "NOT_PROVEN",
+    "real_2025_count": "UNCOUNTED",
+    "daily_population_biology": "UNAPPROVED",
+    "per_month_reconciliation": "UNPROVEN"
+  },
+  "annual_prefetch": {
+    "default_maxRows": 2048,
+    "one_extra_probe": 2049,
+    "sql_limit_formula": "maxRows + 1",
+    "overflow_condition": "count(parents) > maxRows",
+    "overflow_behavior": "RETURN_EMPTY_SEEDS_MONTHLY_READ_FALLBACK",
+    "exact_boundary_behavior": "2048_CAN_SEED",
+    "cache_ownership": "WeakMap<PDO, farm_id, date-range>",
+    "release_behavior": "REMOVE_ONLY_SEEDED_MONTHS_KEEP_ANNUAL_CACHE",
+    "cache_scope": "REQUEST_AND_FARM",
+    "not_technical_capacity_requirement": true
+  },
+  "existing_small_C137_fixture_verifier": {
+    "verified_contract_source": "scripts/verify_c137_reports_prefetch_contract.php",
+    "expected_SQL_calls": 82,
+    "expected_stock_source_queries": 1,
+    "source_fixture_size_stock_transactions": 8,
+    "applies_to_GC24_rep_capacity": false,
+    "execution_this_step": "PROHIBITED"
+  },
+  "source_grounded_rules": [
+    "one_immutable_2026_event_stream_not_backdated_to_2025",
+    "calendar_2025_year_is_design_only",
+    "reports_endpoint_checks_auth_business_permission_farm_and_entitlement_before_query",
+    "reports_releases_readonly_session_lock_after_scope_resolution",
+    "annual_reporting_month_series_uses_shared_profitability_not_new_formula",
+    "canonical_USED_source_reader_uses_farm_ID_and_date_bounds",
+    "stock_effective_predicate_excludes_reversed_original_and_reversal_compensation",
+    "USED_rows_REQUIRE_transaction_type_used",
+    "posted_financial_classification_feed_is_snapshot",
+    "current_stock_category_changes_must_not_reinterpret_posted_Feed",
+    "other_operating_classes_medication_supplement_consumables_sql_eligible",
+    "source_reader_returns_date_and_id_order",
+    "annual_prefetch_default_maxRows_2048",
+    "annual_prefetch_max_rows_guard_1_to_4096",
+    "capped_query_reads_maxRows_plus_one",
+    "overflow_above_2048_returns_empty_seed_list_not_partial_month_cache",
+    "monthly_reader_fallback_occurs_after_empty_prefetch_result",
+    "exactly_2048_eligible_rows_can_be_seeded_into_twelve_months",
+    "annual_prefetch_does_not_cache_overflow_result",
+    "temporary_prefetched_months_released_in_try_finally",
+    "existing_annual_request_cache_kept_for_other_sections",
+    "PDO_WeakMap_cache_separated_by_farm_and_date_and_connection",
+    "cache_invalidation_is_farm_scoped_on_stock_writes",
+    "source_allocations_not_cached_by_annual_prefetch",
+    "annual_2048_is_per_farm_source_row_cache_cap_not_VU_capacity_goal",
+    "SQL_nonnull_cost_does_not_prove_positive_cost_or_historical_purchase",
+    "canonical_manual_stock_allocation_requires_positive_cost_and_source_integrity",
+    "2026_candidate_USED_counts_do_not_prove_2025_reports_eligibility",
+    "farm_intelligence_series_calculates_12_months_and_preserves_accounting",
+    "getProfitabilitySummary_is_canonical_financial_source",
+    "reader_unallocated_shared_changes_no_PL",
+    "farmwide_stock_cost_parent_counted_once_attribution_only",
+    "Reports_show_total_cash_feed_purchases_separately_from_cost_used",
+    "C137_small_fixture_SQL_calls_82_source_queries_1_is_unit_fixture_not_GC24_result",
+    "C137_contract_tests_overflow_cache_release_and_second_farm",
+    "C137_PHP_verifier_must_not_be_executed_in_D11",
+    "offline_review_does_not_run_SQL_PHP_or_load_tests",
+    "default_150_VU_HOLD_200_VU_PROHIBITED",
+    "used_cost_SQL_requires_total_cost_IS_NOT_NULL"
+  ],
+  "future_proofs": [
+    "D01_date_policy_and_pre_2025_source_history_approved",
+    "D02_D03_biology_and_egg_pool_approved",
+    "D04_broiler_population_exits_approved",
+    "D05_feed_stock_valuations_proven",
+    "D06_tenant_actor_permission_proven",
+    "D07_item_receipt_source_validated",
+    "D08_sale_payments_physical_effects_proven",
+    "D09_daily_record_mortality_feed_source_validated",
+    "D10_allocation_revision_conservation_proven",
+    "D09_continuity_sourceId_mismatch_investigated_in_authorized_runtime",
+    "reproduce_R1_and_R2_effective_USED_count_by_2025_and_farm",
+    "independently_count_eligible_SQL_rows_for_year_2025_per_scenario",
+    "prove_effective_reverse_filter_excludes_original_and_compensation",
+    "require_nonnull_total_cost_for_SQL_eligibility",
+    "require_positive_receipt_backed_cost_for_representative_used",
+    "verify_zero_cost_SQL_eligible_rows_separately_and_reject_as_unproven",
+    "prove_feed_classification_posted_snapshot_not_current_category",
+    "prove_operating_consumption_classification_posted_snapshot",
+    "prove_authoritative_daily_record_source_IDs_and_cycle_validity",
+    "prove_layer_and_broiler_feed_USED_nonzero_only_with_real_use",
+    "provide_R1_R2_per_month_per_class_eligible_counts",
+    "source_count_at_2048_exact_boundary_check",
+    "source_count_at_2049_overflow_fallback_check",
+    "assure_no_partial_month_cache_seed_at_overflow",
+    "verify_WeakMap_farm_connection_separation_without_cross_tenant_leak",
+    "verify_release_only_seeded_months_and_keep_annual_cache",
+    "record_real_GC24_SQL_source_query_counts_not_canned_82_1",
+    "count_stock_USED_parent_once_and_distinguish_allocations",
+    "verify_monthly_2025_profit_and_cogs_reconciliation",
+    "verify_monthly_cash_vs_consumed_feed_separation",
+    "prove_actual_REPORTS_results_not_empty_fixture_placeholder",
+    "no_fabricated_used_rows_to_force_prefetch_threshold",
+    "no_fabricated_item_prices_or_sale_revenue_to_improve_kpi",
+    "only_after_D12_import_approval_test_runtime_report_profiler",
+    "then_after_biology_approval_execute_capacity_plan",
+    "record_VU_ramp_latency_error_CPU_RAM_DB_IO_and_worker_pressure",
+    "do_not_upgrade_150_hold_or_200_prohibited_without_authorized_decision",
+    "preserve_immutable_2026_event_hashes_and_protected_DB",
+    "never_use_existing_PHP_verifier_DSN_read_C137_fixture_in_D11",
+    "no_php_run_database_connect_import_deploy_load_or_new_events_in_D11"
+  ],
+  "gates": {
+    "D01_year": "2025_DESIGN_ONLY",
+    "D01_event_date_policy": "UNAPPROVED",
+    "D02_layer": "UNAPPROVED",
+    "D03_egg_pool": "UNPROVEN",
+    "D04_broiler": "UNAPPROVED",
+    "D05_feed_cost": "UNAPPROVED",
+    "D06_tenant_actor": "UNAPPROVED",
+    "D07_inventory_writer": "UNAPPROVED",
+    "D08_sales_writer": "UNAPPROVED",
+    "D09_daily_writer": "UNAPPROVED",
+    "D10_allocations": "UNAPPROVED",
+    "D11_reports_eligibility": "UNPROVEN",
+    "D11_capacity": "UNPROVEN",
+    "D12_import": "UNAPPROVED",
+    "GC24_2025_eligible_used_rows": "UNCOUNTED",
+    "GC24_actual_report_SQL_calls": "UNMEASURED",
+    "GC24_actual_peak_VU": "NOT_TESTED",
+    "new_V2_events": "NOT_GENERATED",
+    "database_connections": 0,
+    "database_writes": 0,
+    "capacity_150_VU": "HOLD",
+    "capacity_200_VU": "PROHIBITED"
+  },
+  "permissions": {
+    "offline_source_review_only": true,
+    "run_PHP": false,
+    "run_existing_c137_fixture_script": false,
+    "connect_database": false,
+    "inspect_live_rows": false,
+    "count_real_DB_rows": false,
+    "create_stock_received": false,
+    "create_stock_used": false,
+    "create_daily_record": false,
+    "create_sale": false,
+    "create_allocation": false,
+    "alter_inventory": false,
+    "mutate_preload_fixture": false,
+    "generate_V2_events": false,
+    "approve_eligibility": false,
+    "approve_2048_row_count": false,
+    "approve_150_VU": false,
+    "approve_200_VU": false,
+    "run_load_test": false,
+    "change_runtime_sources": false,
+    "modify_certified_source": false,
+    "import_or_deploy": false
+  }
+}
