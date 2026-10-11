@@ -145,7 +145,7 @@ def validate(spec):
             "D08_SOURCE_SCOPE_DRIFT")
     rules = set(spec["source_grounded_rules"])
     must = {
-        "sale_records_is_primary_financial_sale_fact_with_farm_and_actor_and_sale_business_date",
+        "sales_records_is_primary_financial_sale_fact_with_farm_and_actor_and_sale_business_date",
         "sale_with_credit_requires_customer_name_and_initial_credit_ledger_sale_row",
         "payment_entries_are_cash_facts_and_sale_entries_are_derived_receivable_amounts",
         "sale_edit_refuses_new_total_below_already_received_payments",
