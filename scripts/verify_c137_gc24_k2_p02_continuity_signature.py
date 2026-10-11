@@ -159,7 +159,7 @@ def main():
     a=ap.parse_args()
     certified=Path(a.certified_source_root)
     if (str(certified)!="/opt/renee-agrisuite-c137-gc"
-        or a.expected_certified_head!=CERT or a.year!=2025):
+        or a.expected_certified_head!=CERT_SHA or a.year!=2025):
         ap.error("P02_OFFLINE_SCOPE_GUARD")
     protect_self()
     baseline=certified/FILE
