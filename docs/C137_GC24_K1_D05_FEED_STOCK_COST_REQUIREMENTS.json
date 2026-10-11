@@ -1,0 +1,349 @@
+{
+  "version": "C137-GC24-K1-D05-FEED-STOCK-COST-REQUIREMENTS-0",
+  "checkpoint": "GC24CG_K1_D05",
+  "scope": "READONLY_SOURCE_REQUIREMENTS_ONLY",
+  "readiness": "FEED_RECEIPT_USED_COST_EVIDENCE_UNAPPROVED",
+  "as_of": "2026-10-11",
+  "selected_year": {
+    "year": 2025,
+    "start_date": "2025-01-01",
+    "end_date": "2025-12-31",
+    "technical_event_dates": "UNRESOLVED"
+  },
+  "preparation_parent_sha": "f33721bf64927461fee123730d0bb9b62cacf99c",
+  "certified_reports_sha": "322438870263825f9e739a12c4bd478983e67141",
+  "previous_d04_requirements_git_blob_sha1": "5be072cf0383641f437e865aa508649e3112358c",
+  "previous_d04_spec_sha256": {
+    "R1": "6a7427e6ca34ecec707318ccb644e8f92acd648130502fe276e50fc1f07ccf69",
+    "R2": "173e9136ea3ce342ac220fcf4786181dca77d1472b528b16c91595d8d9816761"
+  },
+  "previous_d03_spec_sha256": {
+    "R1": "6d0e142f51c92c80d7031dedb3e47897d7b029d67f05c1095a62287e35268a44",
+    "R2": "0a33b8f8cbe21dc49c7e24577141e5d837904fe2a3e3c6a35d86e5b6b539d6a8"
+  },
+  "original_2026_event_sha256": {
+    "R1": "e31421ee40ce25b16feb698313fcf337e74126a8e63d8c5dadeedf74e30165f2",
+    "R2": "985341ed4315788ee8f3b9d62b327da66d38fc63ea16d406c5c52bc9949d3dfe"
+  },
+  "legacy_used_stock_is_not_eligible_proof": {
+    "R1_candidate_used_rows": 1800,
+    "R2_candidate_used_rows": 3600,
+    "broiler_daily_feed_used_events": 0,
+    "scenario_classification": "ORIGINAL_2026_UNPROVEN"
+  },
+  "per_item_and_event_unknowns": {
+    "layer_feed_item_id": null,
+    "layer_feed_item_unit": null,
+    "broiler_feed_item_id": null,
+    "broiler_feed_item_unit": null,
+    "per_item_financial_classification": null,
+    "per_item_category_inventory_role": null,
+    "feed_category_and_farm_module": null,
+    "dated_layer_feed_consumption_quantities": null,
+    "dated_broiler_feed_consumption_quantities": null,
+    "layer_daily_record_ID_and_cycle": null,
+    "broiler_daily_record_ID_and_cycle": null,
+    "feed_receipt_business_dates": null,
+    "feed_receipt_quantities": null,
+    "feed_receipt_unit_costs": null,
+    "feed_receipt_exact_total_costs": null,
+    "feed_receipt_supplier_reference": null,
+    "feed_receipt_adjustment_provenance": null,
+    "feed_receipt_cost_correction_dates": null,
+    "opening_inventory_stock_quantity": null,
+    "opening_inventory_stock_value_and_source": null,
+    "daily_stock_balance_per_item": null,
+    "effective_used_movement_IDs": null,
+    "used_source_reversal_history": null,
+    "unit_of_measure_translation_to_stock_item_unit": null,
+    "allocation_source_cycle_attribution": null,
+    "pooled_stock_allocation_revisions": null,
+    "actual_R1_eligible_used_row_count": null,
+    "actual_R2_eligible_used_row_count": null,
+    "fully_costed_replay_evidence": null,
+    "current_valuation_fallback_used": null,
+    "monthly_total_feed_costs": null,
+    "monthly_total_operating_consumable_costs": null,
+    "expense_purchase_double_count_reconciliation": null,
+    "prefetch_overflow_fallback_evidence": null,
+    "before_2025_receipt_carryforward_policy": null
+  },
+  "certified_source_contracts": [
+    {
+      "id": "S01",
+      "file": "lib/daily_feed_sync.php",
+      "boundary": "single_daily_record_used_writer_and_edit_reversal",
+      "markers": [
+        "function sync_daily_feed_usage(",
+        "daily_feed_sync_authoritative_cycle_guard(",
+        "transaction_type = 'used'",
+        "stock_reverse_transaction(",
+        "stock_apply_movement(",
+        "'daily record feed consumption'"
+      ]
+    },
+    {
+      "id": "S02",
+      "file": "lib/stock_service.php",
+      "boundary": "canonical_mutation_snapshots_and_reversal",
+      "markers": [
+        "function stock_apply_movement(",
+        "record_reference_persistence_require_transaction(",
+        "'received', 'used'",
+        "stock_historical_unit_cost(",
+        "stock_movement_attribution_resolve(",
+        "stock_recalculate_current_unit_cost(",
+        "function stock_reverse_transaction(",
+        "stock_consumption_allocation_persistence_before_source_reversal(",
+        "stock_service_forget_consumption_economics_request_cache("
+      ]
+    },
+    {
+      "id": "S03",
+      "file": "lib/stock_costing.php",
+      "boundary": "dated_historical_cost_replay_and_fallback",
+      "markers": [
+        "function stock_weighted_cost_replay(",
+        "stock_effective_sql_predicate(",
+        "stock_receipt_cost_adjustment_total_sql(",
+        "ORDER BY t.transaction_date ASC, t.created_at ASC, t.id ASC",
+        "function stock_historical_unit_cost(",
+        "if ($replay['complete'] && $replay['unit_cost'] !== null)",
+        "return round(max(0.0, $fallback), 4)"
+      ]
+    },
+    {
+      "id": "S04",
+      "file": "lib/stock_reporting.php",
+      "boundary": "effective_vs_reversed_stock_rows",
+      "markers": [
+        "function stock_effective_sql_predicate(",
+        "is_reversed = 0 AND ",
+        "reversal_of_id IS NULL",
+        "function stock_effective_movement_rows("
+      ]
+    },
+    {
+      "id": "S05",
+      "file": "lib/stock_receipt_cost_adjustments.php",
+      "boundary": "append_only_receipt_cost_delta",
+      "markers": [
+        "function stock_receipt_cost_adjustment_total_sql(",
+        "stock_receipt_cost_adjustments",
+        "function stock_receipt_effective_total_cost_sql(",
+        "amount_delta"
+      ]
+    },
+    {
+      "id": "S06",
+      "file": "lib/inventory_financial.php",
+      "boundary": "purchase_is_cash_outlay_used_is_operating_cost",
+      "markers": [
+        "function inventory_financial_receipts(",
+        "t.transaction_type='received'",
+        "function inventory_operating_consumption_classifications(",
+        "'medication_vaccine'",
+        "'supplement'",
+        "'consumables'",
+        "Feed purchase remains inventory/cash spending; Feed cost enters Profitability when consumed"
+      ]
+    },
+    {
+      "id": "S07",
+      "file": "inventory.php",
+      "boundary": "manual_priced_received_writer",
+      "markers": [
+        "stock_apply_movement(",
+        "if ($type === 'received' && $incomingUnitCost === null)",
+        "financial_classification",
+        "$pdo->beginTransaction()"
+      ]
+    },
+    {
+      "id": "S08",
+      "file": "includes/inventory_permission_hardening.php",
+      "boundary": "delegated_item_priced_initial_receipt",
+      "markers": [
+        "function inventory_permission_handle_delegated_add_item(",
+        "stock_apply_movement(",
+        "'received'"
+      ]
+    },
+    {
+      "id": "S09",
+      "file": "poultry/layers_daily_record.php",
+      "boundary": "layer_daily_feed_canonical_writer",
+      "markers": [
+        "sync_daily_feed_usage(",
+        "daily_population_sync_mortality(",
+        "$pdo->beginTransaction()"
+      ]
+    },
+    {
+      "id": "S10",
+      "file": "poultry/broiler_daily_record.php",
+      "boundary": "broiler_daily_feed_canonical_writer",
+      "markers": [
+        "sync_daily_feed_usage(",
+        "daily_population_sync_mortality(",
+        "$pdo->beginTransaction()"
+      ]
+    },
+    {
+      "id": "S11",
+      "file": "lib/stock_consumption_economics.php",
+      "boundary": "posted_eligible_used_reader_and_prefetch_limit",
+      "markers": [
+        "function stock_consumption_economics_source_rows(",
+        "t.transaction_type='used'",
+        "t.total_cost IS NOT NULL",
+        "stock_feed_transaction_sql_predicate(",
+        "inventory_operating_consumption_classifications(",
+        "function stock_consumption_economics_prefetch_monthly_source_rows(",
+        "int $maxRows = 2048",
+        "count($parents) > $maxRows",
+        "return [];"
+      ]
+    },
+    {
+      "id": "S12",
+      "file": "lib/stock_consumption_source_resolver.php",
+      "boundary": "daily_source_tenancy_and_cycle_authority",
+      "markers": [
+        "function stock_consumption_source_resolver_definition(",
+        "'daily_layer_record'",
+        "'daily_broiler_record'",
+        "'linked_daily_record'",
+        "'inventory_manual'",
+        "'movement_authority'"
+      ]
+    },
+    {
+      "id": "S13",
+      "file": "lib/stock_consumption_allocation_service.php",
+      "boundary": "pooled_cost_parent_contract",
+      "markers": [
+        "function stock_consumption_allocation_service_parent_contract(",
+        "Only effective USED stock movements",
+        "Stock consumption already attributed to a production cycle",
+        "Consumed stock cost must be greater than zero",
+        "Daily-record stock usage requires authoritative source attribution"
+      ]
+    },
+    {
+      "id": "S14",
+      "file": "lib/stock_consumption_allocation_persistence.php",
+      "boundary": "revisions_and_atomic_allocation_reversal",
+      "markers": [
+        "function stock_consumption_allocation_persistence_before_source_reversal(",
+        "stock_consumption_allocation_revisions",
+        "stock_consumption_allocation_persistence_require_transaction("
+      ]
+    },
+    {
+      "id": "S15",
+      "file": "lib/stock_movement_attribution.php",
+      "boundary": "direct_cycle_and_pooled_scope_resolver",
+      "markers": [
+        "function stock_movement_attribution_resolve(",
+        "cycle_id",
+        "attribution_scope"
+      ]
+    },
+    {
+      "id": "S16",
+      "file": "management/profitability.php",
+      "boundary": "costs_expense_counted_only_once",
+      "markers": [
+        "Inventory purchases are not charged twice when stock is later sold or used.",
+        "Unallocated shared balances remain at their parent scope"
+      ]
+    }
+  ],
+  "observed_canonical_rules": [
+    "daily_record_feed_sync_requires_authoritative_locked_source_cycle",
+    "daily_record_source_has_type_and_ID_specific_to_layer_or_broiler",
+    "unchanged_daily_feed_used_transaction_is_idempotent",
+    "daily_feed_edit_reverses_old_used_before_replacement",
+    "daily_feed_used_posted_only_through_canonical_stock_service",
+    "stock_writes_require_caller_transaction_and_record_reference_authority",
+    "used_stock_cannot_exceed_current_available_quantity",
+    "receipt_unit_cost_nonnegative_and_exact_total_cost_snapshot_optional_for_authorized_source",
+    "stock_movements_snapshots_unit_cost_and_total_cost_by_business_date",
+    "ordinary_USED_outgoing_unit_cost_uses_historical_cost_and_may_fallback_to_current_valuation",
+    "explicit_outgoing_cost_override_reserved_for_slaughter_lot_sources",
+    "effective_stock_reporting_excludes_reversed_original_and_reversal_rows",
+    "receipt_corrections_use_append_only_total_cost_adjustments",
+    "historical_cost_replay_sorts_transaction_date_created_at_ID",
+    "replay_may_be_incomplete_or_negative_and_fallback_is_not_proof_of_actual_historical_price",
+    "feed_classification_uses_immutable_posted_transaction_financial_classification",
+    "feed_purchase_receipt_is_cash_spending_not_second_operating_expense",
+    "operating_consumption_classes_are_medication_supplement_consumables",
+    "reports_reader_selects_effective_USED_with_nonnull_total_cost_and_eligible_classification",
+    "2048_annual_prefetch_is_memory_optimization_overflow_returns_to_monthly_reads",
+    "daily_feed_stock_source_must_match_authoritative_cycle_to_allow_shared_allocation",
+    "positive_shared_cost_parent_requires_costed_effective_USED_without_direct_cycle",
+    "pooled_stock_allocation_revisions_and_reversal_share_caller_transaction",
+    "category_item_and_attribution_policy_are_shared_not_page_local",
+    "ledger_history_must_not_be_fabricated_or_deleted_for_benchmark"
+  ],
+  "future_proof_gates": [
+    "per_item_Layer_Broiler_feed_units_categories_and_financial_type_evidenced",
+    "nonzero_feed_consumption_must_reference_a_valid_selected_item",
+    "explicit_quantity_conversion_between_daily_form_and_inventory_item_unit",
+    "each_feed_USED_links_to_exact_one_dated_authoritative_daily_record",
+    "both_Layer_and_Broiler_flocks_have_evidence_backed_consumption_where_operating",
+    "priced_receipt_date_quantity_and_cost_precede_expected_stock_use",
+    "no_posted_use_can_exceed_physically_available_stock_at_posting",
+    "historical_dated_replay_must_remain_nonnegative_even_after_backdated_corrections",
+    "validate_exact_receipt_total_plus_append_only_cost_adjustments",
+    "detect_and_reject_historical_cost_fallback_for_unproven_synthetic_cost_accuracy",
+    "reconcile_stock_quantity_value_and_unit_cost_per_item_over_time",
+    "daily_feed_edit_reversal_must_not_leave_old_effective_used_or_allocations",
+    "each_effective_USED_is_counted_once_by_source_ID_and_classification",
+    "distinguish_stock_receipt_cash_spending_from_consumption_profitability_cost",
+    "do_not_create_duplicate_farm_expenses_for_stock_receipts",
+    "validate_broiler_feed_source_record_ids_and_module_tenancy",
+    "eligible_USED_row_count_must_be_counted_after_effectiveness_and_cost_filters",
+    "candidate_1800_3600_rows_are_not_proven_reports_eligible",
+    "shared_parent_requires_positive_cost_and_correct_authoritative_source_attribution",
+    "allocation_revision_provenance_must_survive_source_reversal",
+    "proof_of_2048_cap_normal_prefetch_and_overflow_monthly_fallback",
+    "monthly_profitability_reconciles_feed_operating_stock_and_unallocated_shared",
+    "no_2024_opening_receipt_or_value_without_separate_cross_period_policy",
+    "no_use_of_synthetic_broiler_feed_quantities_until_owner_approval",
+    "no_live_database_queries_imports_or_load_tests"
+  ],
+  "gates": {
+    "year_2025": "SELECTED_FOR_DESIGN_ONLY",
+    "event_date_policy": "UNAPPROVED",
+    "D02_layer_population": "UNAPPROVED",
+    "D03_layer_egg": "UNPROVEN",
+    "D04_broiler_cohorts": "UNAPPROVED",
+    "D05_feed_and_cost": "UNAPPROVED",
+    "D06_to_D12": "UNAPPROVED",
+    "new_v2_event_streams": "NOT_GENERATED",
+    "priced_receipt_input_approval": "NOT_GRANTED",
+    "reports_eligible_used_row_proof": "UNPROVEN",
+    "annual_prefetch_max_rows": 2048,
+    "overflow_behavior": "FALL_BACK_TO_MONTHLY_QUERIES",
+    "capacity_150_vu": "HOLD",
+    "capacity_200_vu": "PROHIBITED",
+    "database_mutation": "PROHIBITED",
+    "certified_source_mutation": "PROHIBITED"
+  },
+  "permissions": {
+    "documentation_and_offline_verifier": true,
+    "choose_feed_quantity": false,
+    "choose_item_prices": false,
+    "choose_inventory_initial_value": false,
+    "rewrite_2026_events": false,
+    "create_v2_events": false,
+    "change_php_writers": false,
+    "execute_php": false,
+    "touch_database": false,
+    "import_or_restore": false,
+    "deploy": false,
+    "run_load_tests": false
+  }
+}
