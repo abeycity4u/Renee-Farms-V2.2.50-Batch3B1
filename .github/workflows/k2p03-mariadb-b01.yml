@@ -1,9 +1,15 @@
 name: C137 GC24 K2-P03 isolated MariaDB B01
 
-# Manual-only by design. Do not add push, pull_request or schedule triggers.
-# A workflow_dispatch file normally must first exist on the default branch
-# for GitHub UI/API dispatch; publishing this branch does NOT run the test.
+# Explicit-authorization-only CI on the isolated branch.
+# GitHub workflow_dispatch requires the workflow on the default branch.
+# The alternative push trigger matches ONLY a new one-time approval file.
+# Updating this workflow itself will NOT trigger B01.
 on:
+  push:
+    branches:
+      - c137-gc24-k2p03-ci-mariadb-b01
+    paths:
+      - docs/C137_GC24_K2_P03_B01_EXECUTION_APPROVAL.txt
   workflow_dispatch:
     inputs:
       run_b01:
@@ -24,7 +30,12 @@ concurrency:
 
 jobs:
   b01-real-mariadb:
-    if: github.ref == 'refs/heads/c137-gc24-k2p03-ci-mariadb-b01' && inputs.run_b01 == 'RUN_ISOLATED_B01'
+    if: >-
+      github.ref == 'refs/heads/c137-gc24-k2p03-ci-mariadb-b01' &&
+      (
+        (github.event_name == 'workflow_dispatch' && inputs.run_b01 == 'RUN_ISOLATED_B01') ||
+        (github.event_name == 'push' && github.event.head_commit.message == 'ci-p04(run): authorize isolated B01')
+      )
     name: B01 canonical Layer continuity (real MariaDB)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -59,6 +70,17 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+
+      - name: Guard one-file authorization commit before running synthetic SQL
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git show -s --format=%s HEAD)" = 'ci-p04(run): authorize isolated B01'
+          test "$(git diff-tree --no-commit-id --name-only -r HEAD)" = 'docs/C137_GC24_K2_P03_B01_EXECUTION_APPROVAL.txt'
+          test -f docs/C137_GC24_K2_P03_B01_EXECUTION_APPROVAL.txt
+          test "$(cat docs/C137_GC24_K2_P03_B01_EXECUTION_APPROVAL.txt)" = 'CI_P04_B01_EXECUTION_APPROVED=YES'
+          echo 'CI_P04_BRANCH_AUTHORIZATION=PASS'
 
       - name: Set up PHP 8.2 for the verified source
         uses: shivammathur/setup-php@v2
