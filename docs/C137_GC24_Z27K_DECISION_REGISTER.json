@@ -1,0 +1,304 @@
+{
+  "version": "C137-GC24-Z27K-DECISION-REGISTER-0",
+  "as_of": "2026-10-11",
+  "certified_source_sha": "322438870263825f9e739a12c4bd478983e67141",
+  "preparation_parent_sha": "e050862fc75e8ead9193279c5b5f8a10983540ea",
+  "legacy_digest_sha256": {
+    "R1": "e31421ee40ce25b16feb698313fcf337e74126a8e63d8c5dadeedf74e30165f2",
+    "R2": "985341ed4315788ee8f3b9d62b327da66d38fc63ea16d406c5c52bc9949d3dfe"
+  },
+  "prior_z27j_review_sha256": {
+    "R1": "20af186b096ba4e0404fe20442eb3091c5e0db25c46da45cb8213bfbd358e83d",
+    "R2": "041a26508f5e6a2c3b3f7881740fd86bf35a05bec2a636fd76d658e205a35818"
+  },
+  "chosen_historical_year": null,
+  "legacy_events_mutated": false,
+  "execution_enabled": false,
+  "new_v2_event_stream": "NOT_GENERATED",
+  "new_v2_event_digest": "NOT_GENERATED",
+  "database_import_approved": false,
+  "load_test_150_vu": "HOLD",
+  "load_test_200_vu": "PROHIBITED",
+  "decision_register": [
+    {
+      "id": "D01",
+      "subject": "reporting_year",
+      "owner": "farm_owner_and_engineering",
+      "options": [
+        "independent_completed_2025_year_new_stream",
+        "2026_full_year_after_2026_12_31"
+      ],
+      "required_evidence": [
+        "explicit_full_year_choice",
+        "date_authority_across_every_event_kind",
+        "separate_new_stream_identifiers_and_digests"
+      ],
+      "depends_on": [],
+      "selected": null,
+      "approval": "NOT_GRANTED"
+    },
+    {
+      "id": "D02",
+      "subject": "layer_flows",
+      "owner": "farm_owner",
+      "options": [
+        "evidence_backed_layer_cycle_schedule"
+      ],
+      "required_evidence": [
+        "dated_opening_headcounts",
+        "bird_ages_and_acquisition_basis",
+        "rearing_production_phases_and_close_dates"
+      ],
+      "depends_on": [
+        "D01"
+      ],
+      "selected": null,
+      "approval": "NOT_GRANTED"
+    },
+    {
+      "id": "D03",
+      "subject": "layer_egg_production",
+      "owner": "farm_owner_and_engineering",
+      "options": [
+        "dated_daily_records_with_canonical_egg_pool"
+      ],
+      "required_evidence": [
+        "daily_eggs_lte_opening_flock",
+        "mortality_population_continuity",
+        "egg_pool_sale_order_and_automatic_allocations"
+      ],
+      "depends_on": [
+        "D02"
+      ],
+      "selected": null,
+      "approval": "NOT_GRANTED"
+    },
+    {
+      "id": "D04",
+      "subject": "broiler_cohorts",
+      "owner": "farm_owner_and_engineering",
+      "options": [
+        "evidence_backed_staggered_cohorts"
+      ],
+      "required_evidence": [
+        "acquisition_headcount_and_ages",
+        "growing_harvest_dates",
+        "explicit_sale_cycle_headcounts",
+        "never_negative_physical_population"
+      ],
+      "depends_on": [
+        "D01"
+      ],
+      "selected": null,
+      "approval": "NOT_GRANTED"
+    },
+    {
+      "id": "D05",
+      "subject": "priced_feed_stock",
+      "owner": "farm_owner_and_engineering",
+      "options": [
+        "daily_record_owned_feed_plus_distinct_manual_consumables",
+        "separately_justified_manual_stock_uses"
+      ],
+      "required_evidence": [
+        "distinct_layer_and_broiler_feed_items",
+        "dated_costed_receipts",
+        "exactly_one_feed_source_per_use",
+        "canonical_weighted_cost_replay"
+      ],
+      "depends_on": [
+        "D02",
+        "D04"
+      ],
+      "selected": null,
+      "approval": "NOT_GRANTED"
+    },
+    {
+      "id": "D06",
+      "subject": "tenancy_and_actor",
+      "owner": "system_owner_and_engineering",
+      "options": [
+        "isolated_authorized_actor_with_least_privilege"
+      ],
+      "required_evidence": [
+        "tenant_actor_IDs_verified",
+        "owner_delegated_inventory_and_sales_permissions",
+        "request_scope_and_tenant_isolation"
+      ],
+      "depends_on": [],
+      "selected": null,
+      "approval": "NOT_GRANTED"
+    },
+    {
+      "id": "D07",
+      "subject": "inventory_shared_writers",
+      "owner": "engineering",
+      "options": [
+        "one_canonical_category_and_item_write_boundary"
+      ],
+      "required_evidence": [
+        "owner_delegated_behavior_equivalent",
+        "role_financial_type_and_feed_validation",
+        "atomic_item_plus_receipt",
+        "rollback_and_reference_regression"
+      ],
+      "depends_on": [
+        "D06"
+      ],
+      "selected": null,
+      "approval": "NOT_GRANTED"
+    },
+    {
+      "id": "D08",
+      "subject": "sales_shared_writer",
+      "owner": "engineering",
+      "options": [
+        "one_transactional_canonical_sales_orchestrator"
+      ],
+      "required_evidence": [
+        "public_reference_payment_customer_receivable",
+        "general_inventory_and_sales_only_variants",
+        "slaughter_and_ruminant_regression",
+        "explicit_population_and_auto_egg_allocation"
+      ],
+      "depends_on": [
+        "D06"
+      ],
+      "selected": null,
+      "approval": "NOT_GRANTED"
+    },
+    {
+      "id": "D09",
+      "subject": "daily_record_writer",
+      "owner": "engineering",
+      "options": [
+        "shared_layer_broiler_save_edit_orchestration"
+      ],
+      "required_evidence": [
+        "cycle_date_age_opening_population_guards",
+        "feed_mortality_continuity_atomic",
+        "layer_egg_rebuild_on_edit",
+        "revision_delete_lock_order_regression"
+      ],
+      "depends_on": [
+        "D06",
+        "D07"
+      ],
+      "selected": null,
+      "approval": "NOT_GRANTED"
+    },
+    {
+      "id": "D10",
+      "subject": "shared_allocation_authority",
+      "owner": "engineering",
+      "options": [
+        "existing_persistence_and_revision_services_only"
+      ],
+      "required_evidence": [
+        "actual_parent_and_cycle_IDs",
+        "production_type_scope",
+        "authoritative_allocated_amounts",
+        "forbid_manual_layer_egg_allocations"
+      ],
+      "depends_on": [
+        "D08",
+        "D09"
+      ],
+      "selected": null,
+      "approval": "NOT_GRANTED"
+    },
+    {
+      "id": "D11",
+      "subject": "reports_eligibility",
+      "owner": "engineering",
+      "options": [
+        "posted_costed_eligible_used_row_audit"
+      ],
+      "required_evidence": [
+        "stock_receipt_costing_and_reversal_proof",
+        "true_R1_R2_eligible_counts",
+        "2048_prefetch_cap_proven",
+        "reconciled_monthly_economics"
+      ],
+      "depends_on": [
+        "D03",
+        "D04",
+        "D05",
+        "D10"
+      ],
+      "selected": null,
+      "approval": "NOT_GRANTED"
+    },
+    {
+      "id": "D12",
+      "subject": "isolated_database_import",
+      "owner": "system_owner",
+      "options": [
+        "separate_explicit_approval_only_after_review"
+      ],
+      "required_evidence": [
+        "all_other_decisions_approved",
+        "independent_V2_event_stream_and_digest",
+        "target_ID_and_offvolume_backup",
+        "rollback_and_post_import_verification"
+      ],
+      "depends_on": [
+        "D01",
+        "D02",
+        "D03",
+        "D04",
+        "D05",
+        "D06",
+        "D07",
+        "D08",
+        "D09",
+        "D10",
+        "D11"
+      ],
+      "selected": null,
+      "approval": "NOT_GRANTED"
+    }
+  ],
+  "implementation_phases": [
+    {
+      "id": "K0",
+      "description": "decision_register_and_source_review",
+      "status": "REVIEW_ONLY"
+    },
+    {
+      "id": "K1",
+      "description": "business_year_and_biology_decisions",
+      "status": "UNAPPROVED"
+    },
+    {
+      "id": "K2",
+      "description": "shared_category_and_item_writer_extraction",
+      "status": "NOT_AUTHORIZED"
+    },
+    {
+      "id": "K3",
+      "description": "shared_sales_transaction_orchestrator",
+      "status": "NOT_AUTHORIZED"
+    },
+    {
+      "id": "K4",
+      "description": "shared_daily_record_orchestrator",
+      "status": "NOT_AUTHORIZED"
+    },
+    {
+      "id": "K5",
+      "description": "independent_versioned_V2_event_model",
+      "status": "NOT_AUTHORIZED"
+    },
+    {
+      "id": "K6",
+      "description": "canonical_and_isolation_verification",
+      "status": "NOT_PERFORMED"
+    },
+    {
+      "id": "K7",
+      "description": "explicit_authorized_isolated_import",
+      "status": "WRITES_PROHIBITED"
+    }
+  ]
+}
