@@ -105,11 +105,6 @@ def main():
     print("R1_R2_DETERMINISM_AND_RECONCILIATION=PASS")
     print("R1_R2_OFFLINE_COMMANDS=PASS")
 
-    invalid_plans = [
-        common("R1")[:-1] + ["2027"],
-        common("R1")[:-3] + ["renee_c137_fixture", "--year", str(YEAR)],
-        ["--scenario", "R1", "--database", DB, "--farm-slug", FARM, "--year", str(YEAR)],
-    ]
     # Explicit, unambiguous negative tests.
     invalid_plans = [
         ["--dry-run", "--scenario", "R1", "--database", DB,
