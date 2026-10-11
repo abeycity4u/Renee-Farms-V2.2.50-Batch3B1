@@ -1,0 +1,185 @@
+{
+  "version": "C137-GC24-K1-D03-LAYER-EGG-AVAILABILITY-0",
+  "checkpoint": "GC24CG_K1_D03",
+  "readiness": "REQUIREMENTS_REVIEW_ONLY_EGG_PRODUCTION_UNAPPROVED",
+  "approved_scope": "OFFLINE_DESIGN_REVIEW_ONLY",
+  "reporting_window": {
+    "year": 2025,
+    "start": "2025-01-01",
+    "end": "2025-12-31",
+    "days": 365,
+    "technical_event_date_rules": "UNRESOLVED"
+  },
+  "preparation_parent_head": "5e1d1e403c279a84418e9ff29d11aa5039baef92",
+  "certified_reports_head": "322438870263825f9e739a12c4bd478983e67141",
+  "d02_requirements_git_blob": "3ded482cf99d9e96cc8806b7e8ebbb02672a7078",
+  "d02_spec_digests": {
+    "R1": "c3c63b0c41d739f43ecdcb738b8e91089c1d354768ce4aacf927cc3c72dafb80",
+    "R2": "28528c2853db293b3210c54ca32447731699120d34386ba210669ca304391fe9"
+  },
+  "d01_year_selection_git_blob": "db5ded90c63f35a59861e4e8a58ed07a0628b0db",
+  "original_2026_event_digests": {
+    "R1": "e31421ee40ce25b16feb698313fcf337e74126a8e63d8c5dadeedf74e30165f2",
+    "R2": "985341ed4315788ee8f3b9d62b327da66d38fc63ea16d406c5c52bc9949d3dfe"
+  },
+  "legacy_sales_only_not_production": {
+    "R1": {
+      "egg_crates_sold": 16419,
+      "max_daily_crates_sold": 54
+    },
+    "R2": {
+      "egg_crates_sold": 49269,
+      "max_daily_crates_sold": 144
+    }
+  },
+  "egg_pool_source": "DERIVED_FROM_DATED_LAYER_DAILY_RECORDS_AND_PRIOR_SALES_NOT_INDEPENDENT_LEDGER",
+  "production_model_unknowns": {
+    "layer_cycles_with_production_2025": null,
+    "per_cycle_first_production_date": null,
+    "per_cycle_last_production_date": null,
+    "daily_canonical_opening_stock": null,
+    "daily_bird_age_days": null,
+    "daily_mortality": null,
+    "daily_egg_production_count": null,
+    "daily_laying_rate_percent": null,
+    "daily_crates_produced": null,
+    "before_year_egg_pool_carry_forward": null,
+    "per_sale_egg_product_type": null,
+    "per_sale_egg_quantity": null,
+    "per_sale_unit_of_measure": null,
+    "per_sale_date_and_record_id": null,
+    "per_sale_direct_or_shared_cycle_scope": null,
+    "per_sale_unsold_pool_before_sale": null,
+    "per_sale_auto_allocated_quantity": null,
+    "per_sale_auto_allocated_amount": null,
+    "per_sale_allocation_result_status": null,
+    "negative_egg_pool_or_oversale_resolution": null,
+    "historical_edit_rebuild_policy": null,
+    "precision_rounding_and_reconciliation": null
+  },
+  "source_contracts": [
+    {
+      "id": "C01",
+      "file": "poultry/layers_daily_record.php",
+      "authority": "ACTIVE_LAYER_CYCLE_RECORD_DATE_OPENING_AGE_MORTALITY_EGGS",
+      "summary": "daily opening and bird age strictly positive; mortality and egg output not above opening; canonical population authority; derived rounded laying rate and two-decimal crates; save, feed sync, mortality and egg-allocation rebuild coordinated inside transaction"
+    },
+    {
+      "id": "C02",
+      "file": "lib/daily_population_continuity.php",
+      "authority": "HISTORICAL_POPULATION_CORRECTION",
+      "summary": "later canonical population changes reject prior mortality/egg counts exceeding revised opening; laying rate recalculated when opening changes"
+    },
+    {
+      "id": "C03",
+      "file": "lib/layer_egg_inventory.php",
+      "authority": "DERIVED_EGG_POOL_ORDERED_BY_DATE_AND_SALE_ID",
+      "summary": "production through sale date, sold quantity of earlier sales only; direct sale deducts from its cycle, shared sale from persisted allocation quantities or percent fallback; pool rounds four decimals and clamps negative available to zero"
+    },
+    {
+      "id": "C04",
+      "file": "lib/sales_allocation.php",
+      "authority": "AUTOMATIC_SHARED_EGG_REVENUE_AND_QUANTITY",
+      "summary": "sale unit conversion to crates; shared egg sale only automatic if available positive and sale quantity within available plus 0.01 crate; returns unallocated otherwise; chronological shared egg rebuild; direct sale is not auto-pooled"
+    },
+    {
+      "id": "C05",
+      "file": "management/sales_records.php",
+      "authority": "SALE_TRANSACTION_AND_STATUS_WARNING",
+      "summary": "sale creation/edit coordinates allocation rebuild inside sale transaction; a shared layer egg sale can be saved while unallocated and display a warning rather than being rejected"
+    },
+    {
+      "id": "C06",
+      "file": "lib/daily_feed_sync.php",
+      "authority": "SINGLE_FEED_USE_SOURCE",
+      "summary": "daily feed synchronization owns dated USED inventory movement and reverses edited old feed rather than duplicating manual stock use"
+    },
+    {
+      "id": "C07",
+      "file": "lib/sales_units.php",
+      "authority": "SALE_UNIT_INPUT_AND_LABEL",
+      "summary": "sale input unit is selected by presets or custom; egg crate converter separately allows only crate/tray, piece/egg, dozen; blank legacy unit means crates"
+    }
+  ],
+  "explicit_unit_policy": {
+    "eggs_per_crate": 30,
+    "daily_crates_stored_precision_decimals": 2,
+    "egg_pool_summary_precision_decimals": 4,
+    "shared_auto_sale_tolerance_crates": 0.01,
+    "convertible_sale_units": [
+      "",
+      "crate",
+      "crates",
+      "tray",
+      "trays",
+      "piece",
+      "pieces",
+      "egg",
+      "eggs",
+      "dozen",
+      "dozens"
+    ],
+    "unconvertible_units": "UNALLOCATED_NOT_GUESSED",
+    "precision_reconciliation": "PENDING_NO_NEW_PRECISION_POLICY_INVENTED"
+  },
+  "critical_distinctions": [
+    "same_date_production_is_included_in_pool_even_if_sale_was_posted_first",
+    "sale_order_uses_business_date_then_sale_id_not_entry_timestamp",
+    "direct_cycle_egg_sales_are_deducted_from_cycle_pool_but_financial_allocation_is_direct",
+    "shared_sales_deduct_by_persisted_allocated_quantity_or_percent_fallback",
+    "unrecognized_sale_unit_is_excluded_from_historical_pool_deductions_without_assumption",
+    "insufficient_shared_pool_returns_unallocated_it_does_not_automatically_reject_financial_sale",
+    "direct_sale_allocation_status_does_not_prove_date_matched_physical_egg_stock",
+    "clamped_negative_available_crates_can_mask_historical_oversale_in_returned_pool",
+    "stored_two_decimal_crates_cannot_be_treated_as_exact_raw_egg_counts_without_rounding_policy",
+    "layer_revenue_is_automatically_allocated_from_unsold_pool_no_manual_60_40",
+    "historical_daily_or_sale_edit_must_rebuild_all_affected_shared_sales_chronologically",
+    "early_2025_sales_may_need_justified_before_year_production_or_zero_opening_egg_pool_policy",
+    "egg_counts_flock_and_lay_rates_cannot_be_reverse_engineered_from_sale_targets",
+    "date_units_cycle_population_and_egg_pool_must_be_separately_approved_before_V2_events"
+  ],
+  "future_fixture_conditions": [
+    "owner_approved_layer_population_and_production_dates_from_D02",
+    "owner_approved_biologically_plausible_daily_egg_counts_and_bird_ages",
+    "canonical_opening_population_mortality_and_sale_date_consistency",
+    "per_cycle_cumulative_egg_production_less_than_or_equal_to_available_birds_each_day",
+    "explicit_2025_window_and_any_pre_year_initial_pool_policy",
+    "for_every_sale_convert_unit_to_crates_or_stop_and_remediate",
+    "for_every_sale_reconstruct_pool_with_original_ordering_and_no_negative_unexplained_stock",
+    "for_every_shared_sale_allocation_status_approved_and_reconciled",
+    "prevent_mixed_precision_hidden_oversale_without_explanation",
+    "regression_for_historical_daily_edits_sale_edits_date_moves_rebuild_and_manual_history",
+    "preserve_stock_feed_authority_and_transaction_integrity",
+    "do_not_count_manual_shared_egg_allocations_as_substitute_production"
+  ],
+  "unapproved_decisions": [
+    "D02",
+    "D03",
+    "D04",
+    "D05",
+    "D06",
+    "D07",
+    "D08",
+    "D09",
+    "D10",
+    "D11",
+    "D12"
+  ],
+  "permissions": {
+    "allow_documentation_only": true,
+    "choose_lay_rate": false,
+    "choose_bird_headcount": false,
+    "choose_daily_egg_production": false,
+    "generate_v2_events": false,
+    "convert_original_2026_events": false,
+    "run_canonical_php": false,
+    "modify_certified_source": false,
+    "modify_previous_decision_specs": false,
+    "access_database": false,
+    "write_database": false,
+    "deploy_or_import": false,
+    "start_load_tests": false,
+    "load_150_vu": "HOLD",
+    "load_200_vu": "PROHIBITED"
+  }
+}
