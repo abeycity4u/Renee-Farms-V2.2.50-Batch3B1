@@ -83,7 +83,7 @@ def validate_manifest(scenario, manifest):
     require(len(records) < 30000, "EVENT_CAP")
     calculated_digest = hashlib.sha256(
         "".join(
-            json.dumps(record, sort_keys=True, separators=(",", ":")) + "\\n"
+            json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n"
             for record in records
         ).encode()
     ).hexdigest()
