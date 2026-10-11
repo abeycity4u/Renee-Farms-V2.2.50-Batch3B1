@@ -1,0 +1,469 @@
+{
+  "version": "C137-GC24-K1-D10-ALLOCATION-REVISIONS-0",
+  "checkpoint": "GC24CG_K1_D10",
+  "scope": "READ_ONLY_OFFLINE_REQUIREMENTS",
+  "approval": "NOT_GRANTED",
+  "as_of": "2026-10-11",
+  "reporting": {
+    "year": 2025,
+    "start": "2025-01-01",
+    "end": "2025-12-31",
+    "event_date_policy": "UNAPPROVED"
+  },
+  "parent_prep_HEAD": "4095c2abfccee4899cb0e395fc683e4260993d71",
+  "protected_reports_HEAD": "322438870263825f9e739a12c4bd478983e67141",
+  "prior_D09_git_blob": "c391a3de0853468209afa9e2b8a40186b05374b4",
+  "prior_D09_spec_digest": {
+    "R1": "b07d009a87b0132fcd675e4aaf66e21a6594d086a871a6d84563c087c3128af6",
+    "R2": "013098e94b600544fb25651cb7154fb7e25e86096f70ebdb964b0e0a0bced94d"
+  },
+  "prior_D08_spec_digest": {
+    "R1": "929fd1cd4fcdba1ab999e3bd26eb566e77b815d59d61644cd7b01c2f4362f768",
+    "R2": "3294886470fc943a54bde83836d02fb9f336c2f221b581272cb9a5fbacfc822a"
+  },
+  "original_2026_event_digest": {
+    "R1": "e31421ee40ce25b16feb698313fcf337e74126a8e63d8c5dadeedf74e30165f2",
+    "R2": "985341ed4315788ee8f3b9d62b327da66d38fc63ea16d406c5c52bc9949d3dfe"
+  },
+  "db_label_reference_only": "renee_c137_gc24_http",
+  "tenant_slug_reference_only": "c137-gc24-synthetic",
+  "unknown_inputs": {
+    "target_tenant_ID": null,
+    "allocator_actor_ID": null,
+    "actor_expense_permission": null,
+    "actor_revenue_permission": null,
+    "actor_stock_cost_permission": null,
+    "expense_parent_IDs": null,
+    "expense_amounts": null,
+    "expense_dates": null,
+    "expense_farm_types": null,
+    "expense_production_types": null,
+    "expense_attribution_scopes": null,
+    "expense_feed_legacy_classification": null,
+    "expense_animal_allocation_conflicts": null,
+    "expense_allocated_cycle_IDs": null,
+    "expense_allocated_amounts": null,
+    "expense_unallocated_cents": null,
+    "expense_revision_numbers": null,
+    "expense_revision_reasons": null,
+    "sale_parent_IDs": null,
+    "sale_totals": null,
+    "sale_dates": null,
+    "sale_farm_types": null,
+    "sale_production_types": null,
+    "sale_direct_cycles": null,
+    "sale_auto_layer_egg_classification": null,
+    "sale_shared_scope": null,
+    "sale_target_cycles": null,
+    "sale_allocated_amounts": null,
+    "sale_unallocated_cents": null,
+    "sale_revision_numbers": null,
+    "sale_revision_rows": null,
+    "sale_causal_hash": null,
+    "sale_state_hash": null,
+    "sale_retained_shared_status": null,
+    "used_movement_IDs": null,
+    "used_movement_dates": null,
+    "used_movement_effectiveness": null,
+    "used_movement_total_cost": null,
+    "used_movement_financial_classification": null,
+    "used_movement_stock_item_IDs": null,
+    "used_movement_authoritative_source_type": null,
+    "used_movement_authoritative_source_ID": null,
+    "used_movement_source_cycle": null,
+    "used_movement_attribution_scope": null,
+    "used_movement_allocated_cycle_IDs": null,
+    "used_movement_allocated_amounts": null,
+    "used_movement_unallocated_amounts": null,
+    "used_movement_revision_numbers": null,
+    "used_movement_causal_hash": null,
+    "used_movement_state_hash": null,
+    "used_movement_reversal_versions": null,
+    "selected_cycle_start_dates": null,
+    "selected_cycle_end_dates": null,
+    "pre_cycle_justifications": null,
+    "revision_actor_provenance": null,
+    "legacy_expense_baseline_history": null,
+    "projection_revision_consistency": null,
+    "profitability_monthly_revenue_reconciliation": null,
+    "profitability_monthly_manual_expense_reconciliation": null,
+    "profitability_monthly_stock_cost_reconciliation": null,
+    "cash_feed_receipt_vs_consumption_reconciliation": null,
+    "farmwide_parent_row_counts": null,
+    "R1_real_eligible_used_count": null,
+    "R2_real_eligible_used_count": null,
+    "allocation_import_idempotency_policy": null,
+    "out_of_scope_farm_cycle_denial_results": null
+  },
+  "source_contracts": [
+    {
+      "id": "S01",
+      "file": "lib/shared_cost_contract.php",
+      "markers": [
+        "function shared_cost_contract_parent(",
+        "function shared_cost_contract_target(",
+        "function shared_cost_contract_conservation(",
+        "Shared cost allocations cannot exceed the parent cost.",
+        "function shared_cost_contract_assert_pre_cycle_reason("
+      ]
+    },
+    {
+      "id": "S02",
+      "file": "lib/financial_allocation_service.php",
+      "markers": [
+        "function financial_allocation_service_parent_contract(",
+        "function financial_allocation_service_target_contract(",
+        "function financial_allocation_service_validate_desired_rows(",
+        "Historical manual Feed expenses cannot be financially allocated.",
+        "An expense cannot be allocated to the same production cycle more than once."
+      ]
+    },
+    {
+      "id": "S03",
+      "file": "lib/financial_allocation_integrity.php",
+      "markers": [
+        "function financial_allocation_integrity_lock_state(",
+        "function financial_allocation_integrity_assert_parent_update(",
+        "function financial_allocation_integrity_assert_animal_mutation(",
+        "Financial allocation integrity validation requires an active transaction."
+      ]
+    },
+    {
+      "id": "S04",
+      "file": "lib/expense_revision_service.php",
+      "markers": [
+        "function expense_revision_service_require_transaction(",
+        "farm_expense_revisions is append-only",
+        "function expense_revision_service_latest(",
+        "function expense_revision_service_prepare_existing_mutation("
+      ]
+    },
+    {
+      "id": "S05",
+      "file": "lib/financial_allocation_persistence.php",
+      "markers": [
+        "function financial_allocation_persistence_retain_shared(",
+        "function financial_allocation_persistence_apply(",
+        "function financial_allocation_persistence_semantic_rows(",
+        "financial_allocation_persistence_write_projection(",
+        "expense_revision_service_prepare_existing_mutation(",
+        "Exact economic no-op must not manufacture a revision."
+      ]
+    },
+    {
+      "id": "S06",
+      "file": "lib/sale_revenue_allocation_service.php",
+      "markers": [
+        "function sale_revenue_allocation_service_parent_contract(",
+        "function sale_revenue_allocation_service_target_contract(",
+        "function sale_revenue_allocation_service_validate_desired_rows(",
+        "function sale_revenue_allocation_service_is_automatic_layer_egg(",
+        "A cycle-attributed sale cannot also use shared revenue allocation."
+      ]
+    },
+    {
+      "id": "S07",
+      "file": "lib/sale_revenue_allocation_provenance.php",
+      "markers": [
+        "function sale_revenue_allocation_provenance_build(",
+        "function sale_revenue_allocation_provenance_causal_rows(",
+        "function sale_revenue_allocation_provenance_state_rows(",
+        "'causal_fingerprint'",
+        "'state_fingerprint'"
+      ]
+    },
+    {
+      "id": "S08",
+      "file": "lib/sale_revenue_allocation_persistence.php",
+      "markers": [
+        "function sale_revenue_allocation_persistence_apply(",
+        "function sale_revenue_allocation_persistence_retain_shared(",
+        "function sale_revenue_allocation_persistence_append_revision(",
+        "function sale_revenue_allocation_persistence_assert_revision_consistency(",
+        "sales_allocation_revision_rows",
+        "manual_shared_revenue"
+      ]
+    },
+    {
+      "id": "S09",
+      "file": "lib/stock_consumption_allocation_service.php",
+      "markers": [
+        "function stock_consumption_allocation_service_is_effective_used(",
+        "function stock_consumption_allocation_service_parent_contract(",
+        "function stock_consumption_allocation_service_target_contract(",
+        "function stock_consumption_allocation_service_validate_desired_rows(",
+        "Consumed stock cost must be greater than zero",
+        "Daily-record stock usage requires authoritative source attribution"
+      ]
+    },
+    {
+      "id": "S10",
+      "file": "lib/stock_consumption_allocation_provenance.php",
+      "markers": [
+        "function stock_consumption_allocation_provenance_build(",
+        "function stock_consumption_allocation_provenance_causal_rows(",
+        "function stock_consumption_allocation_provenance_state_rows(",
+        "'causal_fingerprint'",
+        "'state_fingerprint'"
+      ]
+    },
+    {
+      "id": "S11",
+      "file": "lib/stock_consumption_allocation_persistence.php",
+      "markers": [
+        "function stock_consumption_allocation_persistence_retain_shared(",
+        "function stock_consumption_allocation_persistence_apply(",
+        "function stock_consumption_allocation_persistence_before_source_reversal(",
+        "function stock_consumption_allocation_persistence_assert_current_consistency(",
+        "function stock_consumption_allocation_persistence_insert_revision(",
+        "function stock_consumption_allocation_persistence_lock_parent("
+      ]
+    },
+    {
+      "id": "S12",
+      "file": "lib/profitability_unallocated_shared.php",
+      "markers": [
+        "This reader does NOT change Profit / Loss.",
+        "function profitability_unallocated_shared_summary(",
+        "'revenue_unallocated_cents'",
+        "'stock_feed_unallocated_cents'",
+        "'stock_operating_unallocated_cents'",
+        "Shared Operation",
+        "Unallocated"
+      ]
+    },
+    {
+      "id": "S13",
+      "file": "lib/stock_consumption_economics.php",
+      "markers": [
+        "function stock_consumption_economics_select_rows(",
+        "function stock_consumption_economics_source_rows(",
+        "function stock_consumption_economics_allocation_rows(",
+        "function stock_consumption_economics_summary(",
+        "Consumed-stock allocation exceeds its parent amount.",
+        "Unallocated remainder is an allocation state"
+      ]
+    },
+    {
+      "id": "S14",
+      "file": "lib/financial_allocation_workspace.php",
+      "markers": [
+        "function financial_allocation_workspace_snapshot(",
+        "function financial_allocation_workspace_can_access(",
+        "function financial_allocation_workspace_latest_revision(",
+        "'remaining_amount'",
+        "'allocated_amount'"
+      ]
+    },
+    {
+      "id": "S15",
+      "file": "lib/sale_revenue_allocation_workspace.php",
+      "markers": [
+        "function sale_revenue_allocation_workspace_snapshot(",
+        "function sale_revenue_allocation_workspace_can_access(",
+        "function sale_revenue_allocation_workspace_parent_is_eligible(",
+        "Reader / access / URL adapter only."
+      ]
+    },
+    {
+      "id": "S16",
+      "file": "lib/stock_consumption_allocation_workspace.php",
+      "markers": [
+        "function stock_consumption_allocation_workspace_snapshot(",
+        "function stock_consumption_allocation_workspace_can_manage(",
+        "function stock_consumption_allocation_workspace_latest_revision(",
+        "Reader / access adapter only."
+      ]
+    },
+    {
+      "id": "S17",
+      "file": "api/update_financial_allocation.php",
+      "markers": [
+        "require_http_method('POST');",
+        "require_csrf_token();",
+        "require_rate_limit(",
+        "financial_allocation_workspace_can_access(",
+        "financial_allocation_persistence_retain_shared(",
+        "financial_allocation_persistence_apply("
+      ]
+    },
+    {
+      "id": "S18",
+      "file": "api/update_sale_revenue_allocation.php",
+      "markers": [
+        "require_http_method('POST');",
+        "require_csrf_token();",
+        "require_rate_limit(",
+        "sale_revenue_allocation_workspace_can_access(",
+        "sale_revenue_allocation_persistence_retain_shared(",
+        "sale_revenue_allocation_persistence_apply("
+      ]
+    },
+    {
+      "id": "S19",
+      "file": "api/update_stock_consumption_allocation.php",
+      "markers": [
+        "require_http_method('POST');",
+        "require_csrf_token();",
+        "require_rate_limit(",
+        "stock_consumption_allocation_workspace_can_manage(",
+        "stock_consumption_allocation_persistence_retain_shared(",
+        "stock_consumption_allocation_persistence_apply("
+      ]
+    },
+    {
+      "id": "S20",
+      "file": "lib/stock_service.php",
+      "markers": [
+        "function stock_apply_movement(",
+        "function stock_reverse_transaction(",
+        "stock_consumption_allocation_persistence_before_source_reversal(",
+        "stock_recalculate_current_unit_cost(",
+        "stock_movement_attribution_resolve("
+      ]
+    }
+  ],
+  "source_rules": [
+    "shared_cost_contract_owns_source_neutral_scope_and_cent_conservation",
+    "manual_expense_parent_farm_expenses_not_new_child_expense",
+    "manual_expense_allocations_project_to_financial_allocations",
+    "manual_expense_immutable_history_is_farm_expense_revisions",
+    "manual_feed_expense_is_not_manual_allocation_eligible",
+    "already_direct_cycle_expense_is_not_manual_shared_parent",
+    "expense_animal_and_cycle_allocations_mutually_exclusive",
+    "expense_allocated_amount_is_authority_not_percentage",
+    "expense_revision_legacy_noop_does_not_manufacture_baseline",
+    "expense_canonical_noop_validates_revision_state",
+    "expense_ordinary_update_guarded_by_shared_allocation_integrity",
+    "manual_revenue_parent_sales_records_not_payment_cash",
+    "manual_revenue_projection_sales_allocations_not_parent_revenue",
+    "manual_revenue_revision_rows_and_append_only_audit",
+    "manual_revenue_excludes_direct_cycle_and_auto_layer_egg",
+    "revenue_provenance_causal_and_state_fingerprints",
+    "stock_cost_parent_is_effective_costed_used_only",
+    "stock_cost_parent_direct_cycle_is_not_shared",
+    "daily_feed_source_cycle_drift_is_not_allocatable",
+    "stock_cost_parent_reversal_is_lifecycle_closure",
+    "stock_cost_allocation_revisions_provenance_snapshots",
+    "stock_cost_allocation_does_not_write_stock_transactions",
+    "all_three_persistence_services_require_caller_transaction",
+    "all_three_API_paths_gate_POST_CSRF_rate_limits",
+    "expense_and_revenue_APIs_authorize_locked_parent",
+    "same_farm_target_cycle_and_scope_validation",
+    "meaningful_pre_cycle_reason_required",
+    "parent_equals_explicit_allocated_plus_visible_unallocated",
+    "explicit_retain_shared_is_business_decision",
+    "exact_semantic_noop_does_not_create_revision",
+    "Profitability_unallocated_shared_is_disclosure_only_not_PL",
+    "shared_operation_is_attribution_not_unallocated_state",
+    "stock_economics_farmwide_parent_once_cycle_decomposed",
+    "cash_feed_receipt_separate_from_consumed_feed_expense",
+    "workspace_adapters_do_not_write_canonical_state"
+  ],
+  "future_evidence": [
+    "approve_actual_tenant_user_and_permissions_D06",
+    "approve_2025_reporting_dated_parent_facts_and_carryforwards",
+    "reconcile_D03_layer_egg_auto_allocation_without_manual_split",
+    "reject_direct_cycle_revenue_expense_and_used_parents_from_shared_allocations",
+    "exclude_historical_manual_feed_expenses_and_animal_overlap",
+    "verify_stock_used_effective_status_actual_cost_and_source_ID",
+    "prove_daily_record_source_attribution_matches_stock_cost_cycle",
+    "prove_target_cycles_same_farm_eligible_type_and_historical_period",
+    "pre_cycle_target_requires_non_placeholder_explanation",
+    "validate_nonnegative_positive_allocation_cents_and_rounding",
+    "reject_duplicate_target_cycles_and_overallocation",
+    "prove_parent_amount_equals_allocated_plus_unallocated_in_cents",
+    "never_auto_split_unallocated_or_use_fake_60_40_percentages",
+    "approve_real_amounts_per_cycle_from_primary_evidence",
+    "verify_expense_revision_noop_canonical_chain_and_legacy_baseline",
+    "verify_revenue_revision_snapshots_and_causal_fingerprints",
+    "verify_stock_revision_snapshots_and_causal_fingerprints",
+    "verify_revision_user_reason_and_tenant_audit",
+    "reject_out_of_band_projected_current_row_tampering",
+    "prove_source_reversal_closes_allocations_atomically",
+    "prove_no_duplicate_expense_stock_cost_source_charge",
+    "prove_cash_feed_receipt_separate_from_consumption",
+    "farmwide_stock_cost_effective_parent_once_not_cycle_duplicate",
+    "Profitability_unallocated_reader_is_disclosure_not_new_PL",
+    "prove_monthly_revenue_parent_conservation_and_disclosure",
+    "prove_monthly_manual_cost_conservation_and_disclosure",
+    "prove_monthly_stock_cost_conservation_and_disclosure",
+    "test_cross_tenant_actor_permission_CSRF_rate_limit_denials",
+    "test_locked_parent_concurrent_revision_updates",
+    "test_exact_semantic_noops_do_not_bump_versions",
+    "preserve_frozen_original_2026_event_digest_and_no_V2_events",
+    "no_PHP_DB_import_deploy_or_load_testing_in_D10"
+  ],
+  "conservation_invariants": [
+    "expense_parent_conservation",
+    "revenue_parent_conservation",
+    "used_stock_parent_conservation",
+    "unallocated_remainder_not_extra_source",
+    "expense_cycle_and_animal_mutually_exclusive",
+    "auto_egg_vs_manual_revenue_separate",
+    "direct_cycle_vs_shared_parent_separate",
+    "reversed_used_parent_excluded",
+    "revision_audit_append_only",
+    "reversal_closes_allocation_without_deleting_audit"
+  ],
+  "domain_separation": {
+    "expense": {
+      "parent": "farm_expenses",
+      "projection": "financial_allocations",
+      "history": "farm_expense_revisions"
+    },
+    "revenue": {
+      "parent": "sales_records",
+      "projection": "sales_allocations",
+      "history": "sales_allocation_revisions + sales_allocation_revision_rows",
+      "automatic_layer_egg": "EXCLUDED"
+    },
+    "stock": {
+      "parent": "effective USED stock_transactions",
+      "projection": "stock_consumption_allocations",
+      "history": "stock_consumption_allocation_revisions",
+      "reversal": "CLOSE_IN_SOURCE_TRANSACTION"
+    }
+  },
+  "gates": {
+    "D01_reporting_year": "2025_DESIGN_ONLY",
+    "D01_date_policy": "UNAPPROVED",
+    "D02_layer": "UNAPPROVED",
+    "D03_egg": "UNPROVEN",
+    "D04_broiler": "UNAPPROVED",
+    "D05_feed": "UNAPPROVED",
+    "D06_actor": "UNAPPROVED",
+    "D07_inventory": "UNAPPROVED",
+    "D08_sales": "UNAPPROVED",
+    "D09_daily": "UNAPPROVED",
+    "D10_allocation": "UNAPPROVED",
+    "D11_D12": "UNAPPROVED",
+    "actual_allocation_rows": "NOT_CREATED",
+    "actual_revision_rows": "NOT_CREATED",
+    "runtime_reconciliation": "UNPROVEN",
+    "V2_events": "NOT_GENERATED",
+    "DB_connections": 0,
+    "DB_writes": 0,
+    "capacity_150_VU": "HOLD",
+    "capacity_200_VU": "PROHIBITED"
+  },
+  "permissions": {
+    "read_only_review": true,
+    "choose_allocation_amounts": false,
+    "choose_allocation_percentages": false,
+    "create_expense_allocations": false,
+    "create_revenue_allocations": false,
+    "create_stock_allocations": false,
+    "retain_shared_runtime": false,
+    "change_source_parent": false,
+    "alter_revision_history": false,
+    "modify_PHP": false,
+    "run_PHP": false,
+    "connect_to_DB": false,
+    "write_DB": false,
+    "create_V2_events": false,
+    "import_fixture": false,
+    "deploy": false,
+    "run_load_test": false
+  }
+}
