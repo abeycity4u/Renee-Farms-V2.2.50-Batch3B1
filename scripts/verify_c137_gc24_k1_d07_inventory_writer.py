@@ -230,7 +230,7 @@ def negative_tests(spec):
             raise Blocked("D07_FAKE_ITEM_APPROVAL_ACCEPTED")
     for category,key,value in (
         ("permissions","create_stock_item",True),
-        ("permissions","write_database",True),
+        ("permissions","connect_database",True),
         ("gates","D07_inventory_writer","APPROVED"),
         ("gates","capacity_200_VU","ALLOWED"),
     ):
@@ -238,7 +238,7 @@ def negative_tests(spec):
         wrong[category][key] = value
         try:
             validate(wrong)
-        except (Blocked, KeyError):
+        except Blocked:
             pass
         else:
             raise Blocked("D07_WRITE_PERMISSION_TAMPER_ACCEPTED")
