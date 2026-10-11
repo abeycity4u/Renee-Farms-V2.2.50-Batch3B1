@@ -36,7 +36,7 @@ jobs:
         (github.event_name == 'workflow_dispatch' && inputs.run_b03 == 'RUN_ISOLATED_B03') ||
         (github.event_name == 'push' && github.event.head_commit.message == 'ci-p04(run): authorize isolated B03')
       )
-    name: B03 canonical Layer continuity (real MariaDB)
+    name: B03 canonical Ruminant species continuity (real MariaDB)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
 
