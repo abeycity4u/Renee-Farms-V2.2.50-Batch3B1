@@ -32,11 +32,14 @@ class Plan:
         self.totals = Counter()
         self.parent_allocated = Counter()
         self.child_allocated = Counter()
+        # Internal planned-event stream; never persisted or sent to a database.
+        self.records = []
 
     def emit(self, kind, date, identifier, **properties):
         record = {"kind": kind, "date": date, "ref": identifier, **properties}
         self.sha.update((json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n").encode())
         self.count[kind] += 1
+        self.records.append(record)
 
     def financial(self, kind, date, identifier, amount_cents, **properties):
         assert isinstance(amount_cents, int) and amount_cents >= 0
@@ -57,7 +60,7 @@ class Plan:
             self.child_allocated[kind] += portion
 
 
-def build(scenario):
+def build(scenario, *, include_records=False):
     if scenario not in SCENARIOS:
         raise ValueError("UNAPPROVED_SCENARIO")
     volume = SCENARIOS[scenario]
@@ -154,7 +157,7 @@ def build(scenario):
                for k in KIND_KEYS)
     assert (volume["used_stock"] <= PREFETCH_CAP) == (scenario == "R1")
 
-    return {
+    return dict({
         "scenario": scenario,
         "database": DB,
         "farm_slug": FARM,
@@ -173,7 +176,7 @@ def build(scenario):
         "canonical_business_validation": "PENDING",
         "data_insertion": "PROHIBITED",
         "backup_verification": "PENDING",
-    }
+    }, **({"records": p.records} if include_records else {}))
 
 
 def main():
