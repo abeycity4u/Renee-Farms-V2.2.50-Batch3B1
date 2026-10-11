@@ -1,0 +1,523 @@
+{
+  "version": "C137-GC24-K1-D12-IMPORT-AUTHORITY-GATES-0",
+  "checkpoint": "GC24CG_K1_D12",
+  "scope": "OFFLINE_READONLY_PRE_IMPORT_AUTHORIZATION_REQUIREMENTS",
+  "review_status": "PENDING_NODE_A_D12_REVIEW",
+  "as_of": "2026-10-11",
+  "reporting": {
+    "selected_year": 2025,
+    "start": "2025-01-01",
+    "end": "2025-12-31",
+    "date_policy": "UNAPPROVED"
+  },
+  "preparation_parent_sha": "d5e78b1b6f140b477d276627b2f6dd2fc0f079f0",
+  "certified_reports_sha": "322438870263825f9e739a12c4bd478983e67141",
+  "prior_D11_git_blob_sha1": "6e6ce4ed0f4af9a76bb637c1f5c1c2f3f56bf342",
+  "prior_D11_specs_sha256": {
+    "R1": "5de70a178ca4660eba53346f7dc43fb47302322511369261cdb1773cd7c17600",
+    "R2": "d424fc5bfc773619aaeadb6a245b1c5cea85c6a36b86d3cecb11bb8c7a413023"
+  },
+  "prior_D10_specs_sha256": {
+    "R1": "9ac9355b16253ad2f110d499798cf9243c721e6dfeefd59e71cb210b54f14c12",
+    "R2": "37781fbde25095e6c667557c3f835151ab6f3817573c9af2d73d33c8f019abea"
+  },
+  "original_2026_event_sha256": {
+    "R1": "e31421ee40ce25b16feb698313fcf337e74126a8e63d8c5dadeedf74e30165f2",
+    "R2": "985341ed4315788ee8f3b9d62b327da66d38fc63ea16d406c5c52bc9949d3dfe"
+  },
+  "protection_register_as_previously_reported_not_reverified": {
+    "certified_checkout": "/opt/renee-agrisuite-c137-gc",
+    "preparation_checkout": "/opt/renee-c137-z23-dryrun-src",
+    "isolated_database_reference_only": "renee_c137_gc24_http",
+    "synthetic_slug_reference_only": "c137-gc24-synthetic",
+    "original_fixture_database": "renee_c137_fixture",
+    "protected_restore_database": "renee_c137_gc24_restore_z25",
+    "offvolume_encrypted_backup_label": "C137_GC24_Z25A_20261011T072212Z_31149.sql.enc",
+    "node_A_private_IP": "172.31.40.149",
+    "node_B_private_IP": "172.31.35.250",
+    "node_C_private_IP": "172.31.32.62",
+    "verified_in_this_checkpoint": "NOT_ACCESSED_ONLY_PRIOR_CONTEXT_REFERENCE"
+  },
+  "unresolved_import_and_capacity_facts": {
+    "2025_row_event_date_source_evidence": null,
+    "2025_approved_preperiod_bird_baselines": null,
+    "2025_approved_preperiod_inventory_baselines": null,
+    "2025_approved_preperiod_credit_balances": null,
+    "D02_actual_layer_cycle_schedule": null,
+    "D03_actual_daily_egg_supply": null,
+    "D04_actual_broiler_acquisition_cohorts": null,
+    "D05_approved_feed_item_prices": null,
+    "D05_actual_inventory_received_rows": null,
+    "D05_historical_valuation_proof": null,
+    "D06_isolated_tenant_farm_id": null,
+    "D06_isolated_actor_user_ids": null,
+    "D06_tenant_permission_matrix": null,
+    "D07_inventory_writer_runtime_proof": null,
+    "D08_sales_writer_runtime_proof": null,
+    "D08_receivable_payment_order": null,
+    "D08_population_exits": null,
+    "D09_daily_record_writer_runtime_proof": null,
+    "D09_continuity_sourceId_mismatch_resolution": null,
+    "D09_historical_edit_rebase_proof": null,
+    "D10_allocation_revisions_runtime_proof": null,
+    "D10_profitability_parent_conservation": null,
+    "D11_R1_2025_eligible_used_rows": null,
+    "D11_R2_2025_eligible_used_rows": null,
+    "D11_2048_boundary_runtime_observation": null,
+    "D11_2049_monthly_fallback_runtime_observation": null,
+    "R1_V2_new_event_stream": null,
+    "R2_V2_new_event_stream": null,
+    "R1_V2_new_event_digest": null,
+    "R2_V2_new_event_digest": null,
+    "approved_farm_slug_real_database_identity": null,
+    "approved_synthetic_data_manifest_hash": null,
+    "approved_fixture_generator_code_hash": null,
+    "approved_fixture_generator_maintainer": null,
+    "approved_fixture_schema_expected_head": null,
+    "approved_fixture_schema_migration_drift": null,
+    "approved_fixture_client_test_auth": null,
+    "isolation_DB_current_users": null,
+    "isolation_DB_grants_READWRITE": null,
+    "isolation_DB_outbound_production_connectivity": null,
+    "isolation_Node_B_identity_and_DB_verification": null,
+    "isolation_Node_C_identity_and_load_verification": null,
+    "isolated_runtime_exact_source_commit": null,
+    "protected_original_DB_fixture_guard": null,
+    "protected_restore_DB_guard": null,
+    "protected_backup_verified_restore": null,
+    "protected_backup_current_sha256": null,
+    "protected_backup_encryption_access": null,
+    "rollback_backup_timestamp_and_hash": null,
+    "rollback_operator_identity": null,
+    "rollback_restore_script_and_criteria": null,
+    "rollback_recovery_target": null,
+    "proof_first_dataset_write_scope": null,
+    "proof_transaction_outer_rollback_on_failure": null,
+    "proof_idempotence_new_fixture_replay": null,
+    "proof_partial_commit_recovery": null,
+    "proof_undeletable_original_fixture_ids": null,
+    "proof_tenant_local_record_ownership": null,
+    "per_scenario_full_business_record_counts": null,
+    "per_scenario_layer_mortality_balances": null,
+    "per_scenario_broiler_population_balances": null,
+    "per_scenario_feed_used_balances": null,
+    "per_scenario_cash_receivables_balances": null,
+    "per_scenario_sale_population_allocations": null,
+    "per_scenario_inventory_stock_valuation": null,
+    "per_scenario_revenue_expense_stock_revisions": null,
+    "per_scenario_monthly_reports_reconciliation": null,
+    "per_scenario_eligible_used_counters": null,
+    "source_to_runtime_hash_manifest": null,
+    "certified_source_rebased_or_immutable_resolution": null,
+    "2025_V2_import_command_separately_approved": null,
+    "2025_V2_import_operator_separately_approved": null,
+    "2025_V2_import_cutover_window": null,
+    "test_only_payment_email_cron_flags": null,
+    "credentials_and_secrets_not_logged": null,
+    "proof_NO_production_API_identity": null,
+    "capacity_baseline_request_mix": null,
+    "25_VU_performance_after_import": null,
+    "50_VU_performance_after_import": null,
+    "75_VU_performance_after_import": null,
+    "100_VU_performance_after_import": null,
+    "125_VU_performance_after_import": null,
+    "capacity_150_VU_decision": null,
+    "capacity_200_VU_decision": null,
+    "final_operator_signoff_date": null,
+    "final_acceptance_risk_decision": null
+  },
+  "source_contracts": [
+    {
+      "id": "S01",
+      "file": "docs/ga-hardening/MAX_CAPACITY_TEST_PLAN.md",
+      "boundary": "preexisting_isolated_capacity_policy_only",
+      "markers": [
+        "EXECUTION PENDING ISOLATED CAPACITY ENVIRONMENT",
+        "synthetic/disposable farm data",
+        "no production credentials",
+        "Do not generate maximum-capacity load from the application server itself.",
+        "HTTP failure rate < 1%",
+        "HTTP failure rate >= 2%",
+        "PRODUCTION_MAX_LOAD_TEST=PROHIBITED"
+      ]
+    },
+    {
+      "id": "S02",
+      "file": "docs/ga-hardening/MAX_CAPACITY_ENVIRONMENT_SPEC.md",
+      "boundary": "preexisting_environment_isolation_credentials_and_stop_gates",
+      "markers": [
+        "PROVISIONING PENDING",
+        "no production credentials",
+        "no production cron jobs",
+        "no production API secrets",
+        "synthetic/disposable farm data only",
+        "MAX_CAPACITY_EXECUTION=NOT_STARTED",
+        "PRODUCTION_MAX_LOAD_TEST=PROHIBITED"
+      ]
+    },
+    {
+      "id": "S03",
+      "file": "docs/ga-hardening/MAX_CAPACITY_EVIDENCE_TEMPLATE.md",
+      "boundary": "preexisting_capacity_evidence_template_not_execution_authority",
+      "markers": [
+        "Status: TEMPLATE",
+        "Production target: NO",
+        "Synthetic/disposable data only: YES",
+        "HTTP failure rate < 1%",
+        "HTTP failure rate >= 2%",
+        "No passwords, session cookies, CSRF tokens"
+      ]
+    },
+    {
+      "id": "S04",
+      "file": "scripts/ga_dr_post_restore_verify.php",
+      "boundary": "runtime_DR_script_connects_to_isolated_restored_DB_do_not_run_in_D12",
+      "markers": [
+        "GA_DR_ISOLATED_RESTORE",
+        "Run ONLY against an isolated restored database/environment",
+        "schema_migrations",
+        "users_without_farm",
+        "stock_transactions_without_farm",
+        "DR_POST_RESTORE="
+      ]
+    },
+    {
+      "id": "S05",
+      "file": "scripts/run_migrations.php",
+      "boundary": "schema_mutation_is_distinct_from_offline_preflight_and_forbidden_now",
+      "markers": [
+        "CREATE TABLE IF NOT EXISTS schema_migrations",
+        "glob(__DIR__ . '/../migrations/*.sql')",
+        "$pdo->beginTransaction();",
+        "$pdo->commit();",
+        "$pdo->rollBack();",
+        "Migrations complete."
+      ]
+    },
+    {
+      "id": "S06",
+      "file": "scripts/verify_c137_reports_prefetch_contract.php",
+      "boundary": "read_only_SQL_runtime_script_contacts_different_C137_fixture_forbidden_now",
+      "markers": [
+        "No production credentials, writes, migrations or load tests.",
+        "root-protected, read-only credential JSON",
+        "'OVERFLOW_FALLBACK'",
+        "'REPORTS_SQL_REDUCTION_CONTRACT'",
+        "'SECOND_FARM_FINANCIAL_ISOLATION'"
+      ]
+    },
+    {
+      "id": "S07",
+      "file": "management/reports.php",
+      "boundary": "authenticated_tenant_reports_entry_and_session_boundary",
+      "markers": [
+        "requireBusinessReportAccess();",
+        "$tenantFarmId = requireCurrentFarmId();",
+        "release_readonly_session_lock();",
+        "farm_intelligence_monthly_series("
+      ]
+    },
+    {
+      "id": "S08",
+      "file": "lib/stock_consumption_economics.php",
+      "boundary": "real_eligible_used_row_and_2048_overflow_are_runtime_evidence",
+      "markers": [
+        "function stock_consumption_economics_source_rows(",
+        "int $maxRows = 2048",
+        "if (count($parents) > $maxRows)",
+        "t.total_cost IS NOT NULL"
+      ]
+    },
+    {
+      "id": "S09",
+      "file": "lib/stock_service.php",
+      "boundary": "stock_transaction_writer_and_reversal_owner",
+      "markers": [
+        "function stock_apply_movement(",
+        "function stock_reverse_transaction(",
+        "stock_consumption_allocation_persistence_before_source_reversal("
+      ]
+    },
+    {
+      "id": "S10",
+      "file": "lib/daily_population_continuity.php",
+      "boundary": "D09_preview_sourceID_mismatch_open_does_not_certify_biology",
+      "markers": [
+        "function daily_population_continuity_preview(",
+        "function daily_population_continuity_apply(",
+        "bool $forUpdate = false",
+        "$sourceId"
+      ]
+    },
+    {
+      "id": "S11",
+      "file": "lib/sale_revenue_allocation_persistence.php",
+      "boundary": "revisioned_revenue_allocation_owned_by_shared_service",
+      "markers": [
+        "function sale_revenue_allocation_persistence_apply(",
+        "function sale_revenue_allocation_persistence_append_revision(",
+        "function sale_revenue_allocation_persistence_require_transaction("
+      ]
+    },
+    {
+      "id": "S12",
+      "file": "lib/daily_feed_sync.php",
+      "boundary": "saved_daily_source_before_consumption_sync",
+      "markers": [
+        "function sync_daily_feed_usage(",
+        "function delete_daily_feed_usage(",
+        "daily_feed_sync_authoritative_cycle_guard("
+      ]
+    },
+    {
+      "id": "S13",
+      "file": "includes/readonly_session.php",
+      "boundary": "read_only_report_lock_release",
+      "markers": [
+        "function release_readonly_session_lock(): bool",
+        "session_write_close();"
+      ]
+    }
+  ],
+  "authorization_checklist": [
+    {
+      "id": "G01",
+      "title": "SOURCE_AND_BRANCH_LOCK",
+      "evidence_required": "pin certified Reports HEAD, remote preparation HEAD and clean worktrees; import must never run from protected certified checkout",
+      "status": "BLOCKED_PENDING_SEPARATE_EVIDENCE_AND_APPROVAL"
+    },
+    {
+      "id": "G02",
+      "title": "ISOLATION_AND_PROTECTED_ASSETS",
+      "evidence_required": "independently prove Node A/B/C identities, intended isolated target DB, least privilege, no production/fixture/restore DB routes",
+      "status": "BLOCKED_PENDING_SEPARATE_EVIDENCE_AND_APPROVAL"
+    },
+    {
+      "id": "G03",
+      "title": "RESTORE_POINT_AND_RECOVERY",
+      "evidence_required": "verify protected off-volume encrypted backup integrity and a separately authorized isolated restoration proof; no overwrites of protected databases",
+      "status": "BLOCKED_PENDING_SEPARATE_EVIDENCE_AND_APPROVAL"
+    },
+    {
+      "id": "G04",
+      "title": "2025_EVENT_DATE_AND_HISTORICAL_CONTEXT",
+      "evidence_required": "approve new 2025 dates/cohort start, opening inventory, receipts and payments; preserve original 2026 event streams",
+      "status": "BLOCKED_PENDING_SEPARATE_EVIDENCE_AND_APPROVAL"
+    },
+    {
+      "id": "G05",
+      "title": "TENANT_AND_ACTOR",
+      "evidence_required": "prove actual target tenant and authorized synthetic actor against D06 farm and module permissions, no borrowed production credentials",
+      "status": "BLOCKED_PENDING_SEPARATE_EVIDENCE_AND_APPROVAL"
+    },
+    {
+      "id": "G06",
+      "title": "POPULATION_EGGS_DAILY_RECORDS",
+      "evidence_required": "approve D02-D04/D09 source facts, reconcile mortality, exits and egg pools and investigate D09 sourceId mismatch",
+      "status": "BLOCKED_PENDING_SEPARATE_EVIDENCE_AND_APPROVAL"
+    },
+    {
+      "id": "G07",
+      "title": "COSTED_STOCK_AND_SALES",
+      "evidence_required": "approve D05/D07 receipts, valued inventory, D08 sales/receivables and physical effects using canonical owners",
+      "status": "BLOCKED_PENDING_SEPARATE_EVIDENCE_AND_APPROVAL"
+    },
+    {
+      "id": "G08",
+      "title": "FINANCIAL_RECONCILIATION",
+      "evidence_required": "approve D10 revision lineage, cents conservation, unallocated disclosure and profit/cash distinctions",
+      "status": "BLOCKED_PENDING_SEPARATE_EVIDENCE_AND_APPROVAL"
+    },
+    {
+      "id": "G09",
+      "title": "REPORTING_ELIGIBILITY",
+      "evidence_required": "independently count actual 2025 eligible effective costed USED by farm/month, differentiate SQL nonnull vs receipt-backed positive cost",
+      "status": "BLOCKED_PENDING_SEPARATE_EVIDENCE_AND_APPROVAL"
+    },
+    {
+      "id": "G10",
+      "title": "NO_SIDE_EFFECT_DRY_RUN_PLAN",
+      "evidence_required": "design a separately reviewed future dry run that does no SQL connection or write until explicitly authorized; dry-run flags alone are not evidence",
+      "status": "BLOCKED_PENDING_SEPARATE_EVIDENCE_AND_APPROVAL"
+    },
+    {
+      "id": "G11",
+      "title": "IMPORT_TRANSACTION_AND_REVERSIBILITY",
+      "evidence_required": "verify future importer design is scoped, replay-idempotent, transactional, auditable and has documented failure/rollback/recovery evidence",
+      "status": "BLOCKED_PENDING_SEPARATE_EVIDENCE_AND_APPROVAL"
+    },
+    {
+      "id": "G12",
+      "title": "SEPARATE_EXPLICIT_APPROVAL",
+      "evidence_required": "require separate written user authorization for import operator, exact command, target DB, source SHA, fixture digest, backup and window",
+      "status": "BLOCKED_PENDING_SEPARATE_EVIDENCE_AND_APPROVAL"
+    },
+    {
+      "id": "G13",
+      "title": "POST_IMPORT_RUNTIME_CERTIFICATION",
+      "evidence_required": "only after separately authorized import, verify source-driven, month-wise runtime balances and count; no capacity results inferred",
+      "status": "BLOCKED_PENDING_SEPARATE_EVIDENCE_AND_APPROVAL"
+    },
+    {
+      "id": "G14",
+      "title": "CAPACITY_TIER_APPROVAL",
+      "evidence_required": "retain 150 VU HOLD and 200 VU PROHIBITED; a capacity series needs independent approval, stop thresholds and isolated evidence",
+      "status": "BLOCKED_PENDING_SEPARATE_EVIDENCE_AND_APPROVAL"
+    },
+    {
+      "id": "G15",
+      "title": "STOP_ON_UNKNOWN_OR_INTEGRITY_CHANGE",
+      "evidence_required": "any unknown identity, parent source, protected asset, backup mismatch, D09 continuity failure or auth breach blocks import",
+      "status": "BLOCKED_PENDING_SEPARATE_EVIDENCE_AND_APPROVAL"
+    }
+  ],
+  "source_grounded_rules": [
+    "source_K1_D01_to_D11_reviews_are_not_import_permissions",
+    "2025_design_year_selection_not_timestamp_remap",
+    "immutable_original_2026_R1_R2_digests_check_every_gate",
+    "preparation_branch_not_certified_application_runtime",
+    "certified_Reports_source_must_remain_clean_and_unchanged",
+    "K1_D12_no_live_or_isolated_DB_connections",
+    "K1_D12_only_read_git_source_text_and_prior_d11_doc",
+    "no_fixture_generator_or_import_script_authored_in_D12",
+    "offline_Python_dry_run_means_document_contract_check_not_live_import_preflight",
+    "PHP_migration_runner_is_executable_schema_writer_not_safe_offline_check",
+    "disaster_recovery_verifier_read_only_but_connects_to_DB_and_is_forbidden_now",
+    "existing_C137_Reports_verifier_selects_isolated_DB_not_GC24_authorization",
+    "isolated_capacity_plan_template_is_not_execution_approval",
+    "protected_production_DB_original_C137_fixture_restore_DB_offvolume_backup_untouched",
+    "node_A_preparation_checkout_only_write_allowed_via_guarded_git",
+    "original_R1_and_R2_event_digests_must_remain_unchanged",
+    "proposed_V2_R1_R2_streams_have_no_digest_or_events",
+    "approved_2025_event_dates_and_preperiod_opening_facts_absent",
+    "no_synthetic_tenant_or_actor_credentials_created_or_proven",
+    "D09_sourceId_parameter_mismatch_source_confirmed_runtime_unproven",
+    "source_grounded_population_feed_sales_and_allocations_not_implementation_approved",
+    "actual_2025_costed_used_eligibility_unmeasured",
+    "SQL_nonnull_total_cost_not_equivalent_to_positive_receipt_backed_realism",
+    "annual_2048_row_cache_cap_not_required_fake_data_size",
+    "over_2048_source_prefetch_falls_back_not_truncates_months",
+    "allocation_conservation_requires_amounts_and_real_revision_proof",
+    "separate_historical_correction_source_rollback_and_rebuild_required",
+    "explicit_consent_needed_before_any_future_fixture_generation_or_import",
+    "no_dry_run_invocation_can_be_renamed_to_hide_mutation",
+    "no_prod_email_payment_credential_or_cron_in_isolated_runtime",
+    "no_stress_from_Node_A_or_on_production",
+    "capacity_150_VU_HOLD_200_VU_PROHIBITED_GC24",
+    "historical_preexisting_125_VU_metrics_not_representative_C137_fixture",
+    "future_verification_and_rollback_require_named_operator_and_evidence",
+    "separate_approval_for_runtime_data_probes_before_DB_connection",
+    "no_automatic_permission_granted_by_completion_of_D12",
+    "future_importer_commit_requires_new_review"
+  ],
+  "required_future_evidence": [
+    "read_only_compare_D01_D11_lineage_with_D12_gate_matrix",
+    "obtain_explicit_2025_date_policy_for_each_event_type",
+    "obtain_real_baseline_age_cohort_and_inventory_carryforward",
+    "obtain_receipt_derived_feed_prices_and_stock_valuation",
+    "obtain_tenant_and_actor_permissions_in_isolated_target",
+    "obtain_D09_canonical_continuity_sourceId_targeted_runtime_verification",
+    "prove_actual_source_rows_are_accepted_by_canonical_writers",
+    "inspect_new_importer_code_only_after_separate_scope_approval",
+    "design_generator_event_schema_and_verifiable_digest_after_approval",
+    "prove_no_ad_hoc_SQL_bypass_to_achieve_2048_USED_rows",
+    "prove_sale_funds_debt_and_physical_exits_are_consistent",
+    "prove_layer_egg_revenue_uses_real_daily_egg_pool",
+    "prove_effective_used_reversals_and_stock_source_ownership",
+    "prove_manual_expense_sale_revenue_stock_cost_revisions_and_noops",
+    "prove_monthly_cents_parent_conservation_and_Profitability_total",
+    "prove_report_2025_eligible_used_count_per_farm_R1_R2",
+    "separately_validate_backups_by_isolated_restore_after_authorization",
+    "ensure_no_original_fixture_restore_or_production_DATABASE_targets",
+    "prove_target_connection_network_boundary_and_grants",
+    "prove_source_Runtime_SHA_integrity_manifest",
+    "preserve_protected_offvolume_backup_and_hash",
+    "prove_future_import_dry_run_has_ZERO_database_actions",
+    "unless_separately_authorized_write_ramp_no_new_client_actions",
+    "test_failure_atomicity_and_replay_idempotence_in_authorized_fixture",
+    "record_backup_restore_rollback_commands_only_after_operator_review",
+    "verify_no_tokens_credentials_email_or_payment_production_dependencies",
+    "obtain_separate_explicit_approval_of_import_ID_tenant_target_and_window",
+    "publish_post_import_balance_and_monthly_report_diff_after_approval",
+    "approve_capacity_ramp_separately_after_representative_dataset",
+    "proof_stop_conditions_resource_threshold_and_actual_durations",
+    "no_auto_run_150_VU_or_200_VU_when_D12_closes",
+    "maintain_two_scenario_original_digests_and_no_V2_generation_D12",
+    "do_not_run_any_PHP_migration_dr_verifier_C137_SQL_helper",
+    "now",
+    "preserve_verified_K1_D01_D11_close_no_retests_without_regression"
+  ],
+  "approval_boundary": {
+    "D12_offline_requirements_review_can_close": true,
+    "fixture_generator_write_permission": false,
+    "fixture_generator_run_permission": false,
+    "any_SQL_inspection_permission": false,
+    "any_import_dry_run_permission": false,
+    "any_import_permission": false,
+    "any_DB_restore_permission": false,
+    "any_capacity_load_permission": false,
+    "explicit_separate_user_decision_required": true,
+    "successful_static_verifier_is_not_runtime_authorization": true
+  },
+  "gates": {
+    "D01_to_D11_requirements": "CLOSED_OFFLINE_ONLY",
+    "D12_requirements": "PENDING_NODE_A",
+    "D01_event_date_policy": "UNAPPROVED",
+    "D02_layer_biology": "UNAPPROVED",
+    "D03_egg_availability": "UNPROVEN",
+    "D04_broiler_biology": "UNAPPROVED",
+    "D05_feed_costing": "UNAPPROVED",
+    "D06_isolated_tenant_actor": "UNAPPROVED",
+    "D07_inventory_writer": "UNAPPROVED",
+    "D08_sales_writer": "UNAPPROVED",
+    "D09_daily_writer": "UNAPPROVED",
+    "D09_continuity_runtime": "UNPROVEN",
+    "D10_financial_revision": "UNAPPROVED",
+    "D11_REPORTS_2025_eligibility": "UNCOUNTED",
+    "D11_capacity_evidence": "UNPROVEN",
+    "D12_fixture_generation": "NOT_AUTHORIZED",
+    "D12_import": "NOT_AUTHORIZED",
+    "D12_import_dry_run": "NOT_AUTHORIZED",
+    "D12_backup_restore": "NOT_AUTHORIZED",
+    "D12_DB_read": "NOT_AUTHORIZED",
+    "R1_V2_events": "NOT_GENERATED",
+    "R2_V2_events": "NOT_GENERATED",
+    "existing_original_2026_events": "FROZEN_UNCHANGED",
+    "D12_source_PHP_execution": 0,
+    "D12_database_connections": 0,
+    "D12_database_writes": 0,
+    "D12_imports": 0,
+    "D12_load_tests": 0,
+    "load_150_VU": "HOLD",
+    "load_200_VU": "PROHIBITED"
+  },
+  "permissions": {
+    "offline_doc_review_only": true,
+    "run_application_PHP": false,
+    "run_migrations": false,
+    "run_DR_verifier": false,
+    "run_C137_DB_verifier": false,
+    "query_any_database": false,
+    "connect_Node_B": false,
+    "connect_Node_C": false,
+    "create_synthetic_tenant": false,
+    "create_synthetic_actor": false,
+    "generate_V2_events": false,
+    "create_or_update_inventory": false,
+    "create_Daily_Records": false,
+    "create_Sales": false,
+    "create_allocations": false,
+    "execute_import": false,
+    "execute_import_dry_run": false,
+    "execute_rollback_or_restore": false,
+    "copy_production_data": false,
+    "access_production_secrets": false,
+    "alter_certified_source": false,
+    "alter_existing_preparation_files": false,
+    "load_test_25_to_125_VU": false,
+    "load_test_150_VU": false,
+    "load_test_200_VU": false,
+    "deploy_runtime": false,
+    "grant_approval_from_D12_PASS": false
+  }
+}
