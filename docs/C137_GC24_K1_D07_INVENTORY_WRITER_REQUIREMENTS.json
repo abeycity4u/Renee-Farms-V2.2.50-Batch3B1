@@ -1,0 +1,365 @@
+{
+  "version": "C137-GC24-K1-D07-INVENTORY-WRITER-REQUIREMENTS-0",
+  "checkpoint": "GC24CG_K1_D07",
+  "scope": "OFFLINE_READ_ONLY_SOURCE_REQUIREMENTS",
+  "readiness": "D07_WRITER_AUTHORITY_UNAPPROVED",
+  "selected_year": {
+    "year": 2025,
+    "start": "2025-01-01",
+    "end": "2025-12-31",
+    "event_date_policy": "UNRESOLVED"
+  },
+  "preparation_parent_head": "18dc2476b5675f442a23dc3d2326c9e0d1378619",
+  "certified_reports_head": "322438870263825f9e739a12c4bd478983e67141",
+  "as_of": "2026-10-11",
+  "prior_d06_blob_sha1": "c50ba051dbb6e6da88b0de5ffa4d51ab252d5c08",
+  "prior_d06_spec_sha256": {
+    "R1": "fdebc8ef7e2ef694721a62ff4cd15f416ab855c777ccc33c59e320daa2c2e940",
+    "R2": "ca29f1602575204c060f13904868fce14001760d6fc61f46e7420b08afd7958c"
+  },
+  "original_2026_event_sha256": {
+    "R1": "e31421ee40ce25b16feb698313fcf337e74126a8e63d8c5dadeedf74e30165f2",
+    "R2": "985341ed4315788ee8f3b9d62b327da66d38fc63ea16d406c5c52bc9949d3dfe"
+  },
+  "isolated_target_database_reference_only": "renee_c137_gc24_http",
+  "isolated_tenant_slug_reference_only": "c137-gc24-synthetic",
+  "per_category_item_unknowns": {
+    "target_tenant_immutable_farm_id": null,
+    "fixture_authorized_actor_id": null,
+    "fixture_actor_permissions": null,
+    "fixture_tenant_modules": null,
+    "fixture_tenant_status": null,
+    "fixture_inventory_category_count": null,
+    "fixture_category_names": null,
+    "fixture_category_farm_types": null,
+    "fixture_category_financial_types": null,
+    "fixture_category_inventory_roles": null,
+    "fixture_category_units": null,
+    "fixture_category_existing_vs_new_identifiers": null,
+    "item_count_layer_feed": null,
+    "item_count_broiler_feed": null,
+    "item_count_general": null,
+    "item_names": null,
+    "item_category_ids": null,
+    "item_farm_types": null,
+    "item_feed_usage": null,
+    "item_default_production_types": null,
+    "item_units": null,
+    "item_min_stock_quantities": null,
+    "item_initial_stock_quantities": null,
+    "item_receipt_dates": null,
+    "item_receipt_actual_unit_costs": null,
+    "item_receipt_exact_total_costs": null,
+    "initial_receipt_source_references": null,
+    "item_requested_cycle_ids_for_usage": null,
+    "category_module_compatibility": null,
+    "sales_only_general_inventory_specialist_behavior": null,
+    "deferred_item_activation_status": null,
+    "item_slaughter_output_provenance": null,
+    "item_category_role_history": null,
+    "item_inventory_balance_reconciliation": null,
+    "manual_api_used_row_source_policy": null,
+    "overlap_daily_feed_use_duplicate_prevention": null,
+    "direct_vs_shared_stock_attribution": null,
+    "backdated_stock_cost_replay_requirements": null,
+    "idempotent_item_creation_request_identity": null,
+    "item_name_uniqueness_per_farm_policy": null,
+    "category_name_uniqueness_per_farm_policy": null,
+    "actor_permission_deny_matrix": null,
+    "legacy_category_redirect_test": null,
+    "transaction_rollback_test": null,
+    "out_of_scope_cross_farm_denial": null,
+    "post_fixture_stock_receipt_cost_eligibility": null
+  },
+  "canonical_source_contracts": [
+    {
+      "id": "S01",
+      "file": "inventory.php",
+      "boundary": "privileged_category_item_form_and_receipt",
+      "markers": [
+        "if (isset($_POST['add_category']))",
+        "INSERT INTO inventory_categories",
+        "inventory_category_role_contract_errors(",
+        "if (isset($_POST['add_item']))",
+        "inventory_category_item_contract_errors(",
+        "inventory_category_role_item_contract_errors(",
+        "inventory_category_role_initial_stock_errors(",
+        "inventory_category_role_min_stock_errors(",
+        "INSERT INTO stock_items",
+        "VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, 0)",
+        "stock_apply_movement(",
+        "allowedInventoryFarmTypes("
+      ]
+    },
+    {
+      "id": "S02",
+      "file": "includes/inventory_permission_hardening.php",
+      "boundary": "separate_delegated_add_item_bridge_and_permissions",
+      "markers": [
+        "function inventory_permission_handle_delegated_add_item(",
+        "inventory_permission_user_can_access_farm_type(",
+        "if ($farmType === 'both'",
+        "allowedFarmTypes()",
+        "inventory_category_item_contract_errors(",
+        "inventory_category_role_item_contract_errors(",
+        "inventory_category_role_initial_stock_errors(",
+        "INSERT INTO stock_items",
+        "stock_apply_movement(",
+        "require_valid_csrf_post(",
+        "inventory_add_new_item",
+        "update_stock",
+        "The selected category does not belong to this farm."
+      ]
+    },
+    {
+      "id": "S03",
+      "file": "lib/inventory_financial.php",
+      "boundary": "category_farm_financial_and_feed_usage_authority",
+      "markers": [
+        "function inventory_financial_classifications(",
+        "function inventory_category_item_contract_errors(",
+        "function inventory_category_allows_item_farm_type(",
+        "Layer Feed and Broiler Feed items must use Farm Type Poultry.",
+        "Financial Type Feed requires Layer Feed, Broiler Feed or Ruminant Feed usage.",
+        "function inventory_normalize_default_production_type(",
+        "function inventory_financial_receipts("
+      ]
+    },
+    {
+      "id": "S04",
+      "file": "lib/inventory_category_role.php",
+      "boundary": "category_role_and_slaughter_provenance",
+      "markers": [
+        "function inventory_category_role_contract_errors(",
+        "function inventory_category_role_item_contract_errors(",
+        "function inventory_category_role_transition_errors(",
+        "function inventory_category_role_initial_stock_errors(",
+        "Initial Stock must be 0 for a Slaughter Output item.",
+        "inventory_category_slaughter_output_role()",
+        "function inventory_category_role_stock_movement_errors("
+      ]
+    },
+    {
+      "id": "S05",
+      "file": "lib/stock_service.php",
+      "boundary": "canonical_receipts_used_snapshots_and_reversal",
+      "markers": [
+        "function stock_apply_movement(",
+        "record_reference_persistence_require_transaction(",
+        "stock_movement_attribution_resolve(",
+        "SELECT si.*",
+        "WHERE si.id = ? AND si.farm_id = ?",
+        "Insufficient stock. Available:",
+        "INSERT INTO stock_transactions",
+        "stock_historical_unit_cost(",
+        "function stock_reverse_transaction(",
+        "stock_consumption_allocation_persistence_before_source_reversal(",
+        "stock_recalculate_current_unit_cost("
+      ]
+    },
+    {
+      "id": "S06",
+      "file": "lib/stock_movement_attribution.php",
+      "boundary": "cycle_attribution_from_inventory_and_active_source",
+      "markers": [
+        "function stock_movement_attribution_resolve(",
+        "Feed production attribution must match its inventory feed category.",
+        "The selected production cycle does not belong to this farm.",
+        "'shared'",
+        "attribution_scope"
+      ]
+    },
+    {
+      "id": "S07",
+      "file": "api/update_stock.php",
+      "boundary": "JSON_stock_update_route_with_permissions_and_CSrf",
+      "markers": [
+        "require_http_method('POST')",
+        "require_csrf_token()",
+        "require_rate_limit('update_stock'",
+        "hasPermission($userType, 'inventory')",
+        "hasPermission($userType, 'update_stock')",
+        "SELECT * FROM stock_items WHERE id = ? AND farm_id = ? FOR UPDATE",
+        "stock_apply_movement(",
+        "'inventory_api'"
+      ]
+    },
+    {
+      "id": "S08",
+      "file": "includes/inventory_category_legacy_redirect.php",
+      "boundary": "retired_category_routes_cannot_write",
+      "markers": [
+        "Compatibility adapter for retired standalone Inventory Category routes.",
+        "must never implement their own category SQL.",
+        "$method === 'GET'",
+        "? 302",
+        ": 303",
+        "'/inventory.php?manage_categories=1'"
+      ]
+    },
+    {
+      "id": "S09",
+      "file": "includes/permission_catalog.php",
+      "boundary": "tenant_role_granular_inventory_permission",
+      "markers": [
+        "'inventory_add_new_item'",
+        "'update_stock'",
+        "'inventory'"
+      ]
+    },
+    {
+      "id": "S10",
+      "file": "config.php",
+      "boundary": "session_tenant_role_and_module_scope",
+      "markers": [
+        "function requireCurrentFarmId()",
+        "function allowedFarmTypes(",
+        "function allowedInventoryFarmTypes(",
+        "function allowedFeedCategories(",
+        "function currentUserRoles(",
+        "u.farm_id = ?"
+      ]
+    },
+    {
+      "id": "S11",
+      "file": "lib/stock_costing.php",
+      "boundary": "dated_effective_costs_not_arbitrary_zeros",
+      "markers": [
+        "function stock_weighted_cost_replay(",
+        "function stock_historical_unit_cost(",
+        "stock_effective_sql_predicate(",
+        "ORDER BY t.transaction_date ASC, t.created_at ASC, t.id ASC"
+      ]
+    },
+    {
+      "id": "S12",
+      "file": "lib/daily_feed_sync.php",
+      "boundary": "daily_feed_authority_on_used_movement",
+      "markers": [
+        "function sync_daily_feed_usage(",
+        "daily_feed_sync_authoritative_cycle_guard(",
+        "stock_reverse_transaction(",
+        "stock_apply_movement("
+      ]
+    },
+    {
+      "id": "S13",
+      "file": "includes/tenant_provisioning.php",
+      "boundary": "farm_creation_requires_own_authority_not_inventory_side_effect",
+      "markers": [
+        "function tenant_provisioning_create(",
+        "tenant_provisioning_assert_transaction("
+      ]
+    },
+    {
+      "id": "S14",
+      "file": "lib/record_reference_persistence.php",
+      "boundary": "ledger_reference_and_write_transaction_contract",
+      "markers": [
+        "function record_reference_persistence_require_transaction(",
+        "function record_reference_persistence_insert_new("
+      ]
+    }
+  ],
+  "observed_source_rules": [
+    "two_distinct_item_add_writers_exist_privileged_inventory_and_delegated_bridge",
+    "both_item_add_writers_implement_duplicated_parsing_validation_and_insert_SQL",
+    "both_item_add_writers_use_shared_category_item_and_category_role_validation",
+    "category_writer_is_in_inventory_page_retired_category_routes_redirect_only",
+    "category_creation_is_privileged_and_validates_farm_type_financial_type_role",
+    "category_identity_and_selection_are_farm_scoped_by_farm_id",
+    "item_financial_classification_is_derived_from_selected_category",
+    "feed_financial_classification_must_match_layer_broiler_ruminant_feed_usage",
+    "layer_broiler_feed_inventory_items_use_poultry_farm_type",
+    "slaughter_output_category_requires_general_usage_and_forbids_manual_initial_stock",
+    "slaughter_output_received_and_USED_sources_are_restricted_by_inventory_role",
+    "new_item_is_inserted_with_zero_current_stock_before_initial_receipt",
+    "positive_initial_quantity_goes_through_canonical_stock_apply_movement",
+    "stock_ledger_requires_caller_transaction_and_persists_public_reference",
+    "stock_ledger_rejects_insufficient_quantity_and_invalid_farm_item",
+    "stock_ledger_snapshots_unit_cost_total_cost_effective_date_source_attribution",
+    "stock_movements_are_append_reversal_based_not_update_in_place_corrections",
+    "manual_inventory_browser_update_and_JSON_API_use_canonical_stock_service",
+    "manual_API_stock_update_requires_POST_CSRF_permission_and_rate_limit",
+    "delegated_inventory_add_requires_inventory_View_and_inventory_add_new_item",
+    "delegated_add_item_is_intercepted_at_init_before_legacy_privileged_form",
+    "specialist_category_archive_restore_and_purge_are_admin_only",
+    "delegated_item_farm_scope_can_differ_from_admin_allowedInventoryFarmTypes",
+    "delegated_add_uses_allowedFarmTypes_while_privileged_add_uses_allowedInventoryFarmTypes",
+    "legacy_category_redirect_does_not_create_category",
+    "item_creation_initial_unit_cost_may_be_zero_even_though_real_price_evidence_is_required_for_V2_cost_accuracy",
+    "daily_feed_USAGE_is_not_a_manual_inventory_new_item_creation_substitute",
+    "published_PHP_contracts_do_not_yet_expose_a_single_shared_item_create_service"
+  ],
+  "observed_discrepancy_to_review": {
+    "name": "ALLOWED_FARM_TYPE_SET_MISMATCH",
+    "privileged_path": "inventory.php checks allowedInventoryFarmTypes()",
+    "delegated_path": "includes/inventory_permission_hardening.php checks allowedFarmTypes() plus inventory_permission_user_can_access_farm_type",
+    "possible_implication": "General/Sales inventory delegated item creation may not match admin pathway",
+    "severity": "NEEDS_FUTURE_RUNTIME_VERIFICATION_NO_UNAPPROVED_CHANGE",
+    "proof_state": "SOURCE_ONLY_NOT_RUNTIME_CERTIFIED"
+  },
+  "future_implementation_requirements": [
+    "approve_tenant_and_actor_D06_before_any_provision_or_stock_mutation",
+    "choose_one_shared_category_item_creation_contract_only_after_source_architecture_review",
+    "canonicalize_both_privileged_and_delegated_item_create_paths_without_parallel_business_SQL",
+    "preserve_existing_category_role_validation_and_financial_classification_policy",
+    "respect_immutable_farms_id_while_category_item_queries_remain_farm_scoped",
+    "preserve_current_catalog_View_Add_Update_Stock_permissions_and_admin_only_actions",
+    "regression_for_general_sales_only_inventory_admin_vs_specialist_paths",
+    "regression_for_both_farm_type_specialist_vs_two_module_permission",
+    "reject_foreign_farm_category_and_item_ids",
+    "reject_foreign_farm_cycle_and_stock_usage_attribution",
+    "reject_slaughter_output_manual_initial_receipt_and_category_role_reclassification",
+    "all_new_items_begin_at_zero_ledger_stock_then_authorized_received_movement",
+    "no_direct_stock_transactions_INSERT_outside_shared_ledger",
+    "preserve_exact_real_purchase_cost_and_business_date_provenance",
+    "reject_arbitrary_cost_zero_as_evidence_of_real_feed_purchase",
+    "allow_zero_quantity_inventory_creation_only_if_dated_supply_plan_approved",
+    "avoid_direct_stock_balance_mutation_outside_canonical_stock_service",
+    "no_duplicate_feed_used_for_daily_record_consumption",
+    "transactional_item_insert_plus_initial_RECEIVED_or_rollback",
+    "prove_actual_effective_received_and_used_rows_for_D05_and_D11",
+    "prove_action_authorization_CSrf_rate_limits_for_browser_and_API_paths",
+    "prove_legacy_category_routes_remain_redirects_not_new_writers",
+    "prove_recent_worktree_and_pinned_certified_head_before any future implementation",
+    "deterministic_and_auditable_source_IDs_not_guessed_identity",
+    "no_2025_beginning_stock_without_approved_pre_year_source_policy",
+    "never_rewrite_or_repurpose_frozen_2026_event_streams"
+  ],
+  "gates": {
+    "D01_reporting_period": "2025_DESIGN_ONLY",
+    "D01_event_dates": "UNAPPROVED",
+    "D02_layer_biology": "UNAPPROVED",
+    "D03_layer_egg_pool": "UNPROVEN",
+    "D04_broiler_populations": "UNAPPROVED",
+    "D05_feed_costs": "UNAPPROVED",
+    "D06_tenant_actor": "UNAPPROVED",
+    "D07_inventory_writer": "UNAPPROVED",
+    "D08_to_D12": "UNAPPROVED",
+    "actual_category_item_records": "NOT_CREATED",
+    "actual_stock_movements": "NOT_CREATED",
+    "runtime_authorization": "NOT_TESTED",
+    "new_V2_events": "NOT_GENERATED",
+    "database_connections": "0",
+    "database_writes": "0",
+    "capacity_150_VU": "HOLD",
+    "capacity_200_VU": "PROHIBITED"
+  },
+  "permissions": {
+    "offline_documentation_only": true,
+    "create_category": false,
+    "create_stock_item": false,
+    "approve_stock_quantities": false,
+    "approve_unit_costs": false,
+    "modify_application_PHP": false,
+    "consolidate_writers": false,
+    "run_PHP": false,
+    "connect_database": false,
+    "write_database": false,
+    "generate_V2_events": false,
+    "import_restore": false,
+    "deploy": false,
+    "run_load_test": false
+  }
+}
