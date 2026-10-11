@@ -1,0 +1,390 @@
+{
+  "version": "C137-GC24-K1-D06-TENANT-ACTOR-BOUNDARY-0",
+  "checkpoint": "GC24CG_K1_D06",
+  "scope": "OFFLINE_DOCUMENTATION_AND_STATIC_SOURCE_PROBES_ONLY",
+  "readiness": "D06_TENANT_ACTOR_AUTHORITY_UNAPPROVED",
+  "as_of": "2026-10-11",
+  "selected_reporting_window": {
+    "year": 2025,
+    "start": "2025-01-01",
+    "end": "2025-12-31",
+    "date_policy": "PENDING"
+  },
+  "preparation_parent_head": "e3bac113be5c0fd14a9fb318e16a921023c62204",
+  "certified_reports_source_head": "322438870263825f9e739a12c4bd478983e67141",
+  "prior_d05_spec_git_blob_sha1": "9efeada390c09c122413d9f02ac83ee0a128b72b",
+  "prior_d05_spec_sha256": {
+    "R1": "ccad5a76825380d083991c8c305cf17dcdd3f6d11e35e8a76f58f816684741bf",
+    "R2": "58d4c14965a64b1fca1a8b0494ef7ae0763e9ec6a442e628d2044c239ac51930"
+  },
+  "original_2026_event_sha256": {
+    "R1": "e31421ee40ce25b16feb698313fcf337e74126a8e63d8c5dadeedf74e30165f2",
+    "R2": "985341ed4315788ee8f3b9d62b327da66d38fc63ea16d406c5c52bc9949d3dfe"
+  },
+  "isolated_database_name_reference_only": "renee_c137_gc24_http",
+  "synthetic_slug_reference_only": "c137-gc24-synthetic",
+  "ids_and_actor_state_unknown": {
+    "V2_target_farm_id": null,
+    "V2_target_farm_slug": null,
+    "target_farm_existing_or_new": null,
+    "target_farm_owner_user_ID": null,
+    "fixture_operator_ID": null,
+    "fixture_operator_role_list": null,
+    "fixture_session_farm_id": null,
+    "fixture_auth_session_provenance": null,
+    "poultry_module_subscription_entitlement": null,
+    "sales_module_entitlement": null,
+    "inventory_capability": null,
+    "production_cycles_management_permission": null,
+    "layer_daily_record_add_permission": null,
+    "broiler_daily_record_add_permission": null,
+    "inventory_item_add_permission": null,
+    "stock_received_permission": null,
+    "sales_add_permission": null,
+    "receivables_payment_permission": null,
+    "manual_expense_add_permission": null,
+    "admin_versus_specialist_actor_selection": null,
+    "payment_or_billing_recovery_scope": null,
+    "tenant_creation_business_approval": null,
+    "tenant_creation_subscription_plan": null,
+    "tenant_creation_role_limit": null,
+    "tenant_creation_credentials": null,
+    "tenant_creation_password_policy": null,
+    "tenant_creation_email_state": null,
+    "cross_farm_denial_scenario": null,
+    "same_farm_object_authorization_matrix": null,
+    "foreign_farm_cycle_ID_probe": null,
+    "foreign_farm_item_ID_probe": null,
+    "foreign_farm_sale_ID_probe": null,
+    "foreign_farm_daily_record_ID_probe": null,
+    "unauthorized_role_mutation_denial_proof": null,
+    "disabled_module_denial_proof": null,
+    "suspended_account_access_denial_proof": null,
+    "CSRF_negative_test_proof": null,
+    "replay_or_idempotent_actor_context": null,
+    "audit_actor_ID_provenance": null,
+    "Node_A_only_offline_verifier_actor": null,
+    "import_execution_actor": null,
+    "canary_roll_back_user_scope": null
+  },
+  "source_contracts": [
+    {
+      "id": "S01",
+      "file": "config.php",
+      "contract": "tenant_session_id_and_role_binding",
+      "markers": [
+        "function getCurrentFarmId()",
+        "function requireCurrentFarmId()",
+        "function currentUserRoles()",
+        "u.farm_id = ?",
+        "function hasRole(",
+        "function isPlatformOwner()",
+        "function requireLogin()"
+      ]
+    },
+    {
+      "id": "S02",
+      "file": "includes/farm_profile.php",
+      "contract": "immutable_farm_id_not_slug",
+      "markers": [
+        "farms.id is the immutable tenant key",
+        "Changing farms.slug must never",
+        "function farm_profile_load("
+      ]
+    },
+    {
+      "id": "S03",
+      "file": "includes/tenant_provisioning.php",
+      "contract": "tenant_and_farm_admin_creation_transaction",
+      "markers": [
+        "function tenant_provisioning_assert_transaction(",
+        "function tenant_provisioning_create(",
+        "tenant_provisioning_ensure_farm_admin_role(",
+        "subscription_record_capture("
+      ]
+    },
+    {
+      "id": "S04",
+      "file": "includes/functions.php",
+      "contract": "tenant_entitlement_and_permission_overrides",
+      "markers": [
+        "function hasPermission(",
+        "current_farm_has_entitlement(",
+        "if (hasRole('farm_admin')) return true;",
+        "if ($module === 'permissions' || $module === 'users') return false;",
+        "permission_catalog_applicable_for_farm(",
+        "SELECT farm_id, allowed FROM permissions WHERE farm_id IN (0, ?)"
+      ]
+    },
+    {
+      "id": "S05",
+      "file": "includes/permission_catalog.php",
+      "contract": "role_and_tenant_module_permission_catalog",
+      "markers": [
+        "function permission_catalog_applicable_for_farm(",
+        "function permission_catalog_applicable(",
+        "function permission_catalog_flat(",
+        "farm_entitlement_has("
+      ]
+    },
+    {
+      "id": "S06",
+      "file": "includes/farm_entitlement_runtime.php",
+      "contract": "subscription_gate_prior_legacy_permission",
+      "markers": [
+        "subscription_lifecycle_request_guard(",
+        "user_can_access_entitled_module(",
+        "farm_entitlement_runtime_deny(",
+        "'/poultry/layers_daily_record.php'",
+        "'/management/sales_records.php'"
+      ]
+    },
+    {
+      "id": "S07",
+      "file": "includes/permission_runtime.php",
+      "contract": "runtime_view_and_post_action_denial",
+      "markers": [
+        "function permission_runtime_has(",
+        "function permission_runtime_existing_daily_record(",
+        "function permission_runtime_deny(",
+        "'poultry_daily_layer_add'",
+        "'poultry_daily_broiler_add'",
+        "'sales_add'"
+      ]
+    },
+    {
+      "id": "S08",
+      "file": "includes/user_management_tenant_guard.php",
+      "contract": "team_edit_target_membership",
+      "markers": [
+        "function user_management_tenant_guard(",
+        "requireCurrentFarmId(",
+        "SELECT id FROM users WHERE id = ? AND farm_id = ?",
+        "Tenant farm not found."
+      ]
+    },
+    {
+      "id": "S09",
+      "file": "management/users.php",
+      "contract": "tenant_selected_user_admin_scope",
+      "markers": [
+        "requireLogin();",
+        "$farmId = requireCurrentFarmId();",
+        "slug <> 'owner'",
+        "AND farm_id = ?",
+        "enforceTenantRoleLimits("
+      ]
+    },
+    {
+      "id": "S10",
+      "file": "includes/platform_owner_tenant_view.php",
+      "contract": "owner_read_only_selected_farm_context",
+      "markers": [
+        "never mutate session farm",
+        "function platform_owner_tenant_by_id(",
+        "function platform_owner_tenant_from_request(",
+        "isPlatformOwner()"
+      ]
+    },
+    {
+      "id": "S11",
+      "file": "includes/csrf.php",
+      "contract": "browser_request_token_validation",
+      "markers": [
+        "function csrf_request_is_valid(",
+        "function require_valid_csrf_post(",
+        "csrf_request_token("
+      ]
+    },
+    {
+      "id": "S12",
+      "file": "includes/legacy_api_view_permissions.php",
+      "contract": "api_read_permission_guards",
+      "markers": [
+        "Legacy API/read-route permission bridge",
+        "hasPermission(getUserType()",
+        "legacyApiRequiredPermission"
+      ]
+    },
+    {
+      "id": "S13",
+      "file": "lib/production_cycle_service.php",
+      "contract": "farm_scoped_cycle_writer_and_cycle_guard",
+      "markers": [
+        "function production_cycle_create_v3(",
+        "production_cycle_assert_farm_id(",
+        "AND farm_id = ?",
+        "function production_cycle_get("
+      ]
+    },
+    {
+      "id": "S14",
+      "file": "lib/stock_service.php",
+      "contract": "farm_scoped_inventory_movement",
+      "markers": [
+        "function stock_apply_movement(",
+        "stock_movement_attribution_resolve(",
+        "WHERE id = ? AND farm_id = ?",
+        "function stock_reverse_transaction("
+      ]
+    },
+    {
+      "id": "S15",
+      "file": "lib/sale_population_effects.php",
+      "contract": "farm_scoped_sale_physical_effect",
+      "markers": [
+        "function sale_population_effect_sync(",
+        "FROM sales_records",
+        "AND farm_id=?",
+        "production_population_lock_cycle("
+      ]
+    },
+    {
+      "id": "S16",
+      "file": "poultry/layers_daily_record.php",
+      "contract": "layer_tenant_and_cycle_scope",
+      "markers": [
+        "requireLogin();",
+        "$tenantFarmId = requireCurrentFarmId();",
+        "production_type = 'layer'",
+        "farm_id = ?",
+        "sync_daily_feed_usage("
+      ]
+    },
+    {
+      "id": "S17",
+      "file": "poultry/broiler_daily_record.php",
+      "contract": "broiler_tenant_and_cycle_scope",
+      "markers": [
+        "requireLogin();",
+        "$tenantFarmId = requireCurrentFarmId();",
+        "production_type = 'broiler'",
+        "farm_id = ?",
+        "sync_daily_feed_usage("
+      ]
+    },
+    {
+      "id": "S18",
+      "file": "management/sales_records.php",
+      "contract": "tenant_sales_and_granular_sales_action",
+      "markers": [
+        "requireLogin();",
+        "$tenantFarmId = requireCurrentFarmId();",
+        "hasPermission(getUserType(), 'sales_add')",
+        "sale_population_effect_sync("
+      ]
+    },
+    {
+      "id": "S19",
+      "file": "includes/subscription_lifecycle.php",
+      "contract": "tenant_subscription_status_guard",
+      "markers": [
+        "function subscription_lifecycle_request_guard(",
+        "subscription_lifecycle_refresh_farm(",
+        "subscription_status"
+      ]
+    },
+    {
+      "id": "S20",
+      "file": "init.php",
+      "contract": "central_entitlement_permissions_csrf_order",
+      "markers": [
+        "'/includes/farm_entitlement_runtime.php'",
+        "'/includes/csrf.php'",
+        "'/includes/permission_runtime.php'",
+        "'/includes/user_management_tenant_guard.php'"
+      ]
+    }
+  ],
+  "observed_rules": [
+    "farms_id_is_immutable_tenant_key_slug_is_not_tenant_database_primary_key",
+    "session_farm_id_is_page_level_tenant_scope_and_missing_farm_redirects",
+    "current_user_roles_query_joins_user_to_session_farm_id",
+    "platform_owner_role_checks_are_distinct_from_farm_admin",
+    "tenant_permission_row_overrides_global_default_permission",
+    "catalog_checks_role_applicability_and_target_tenant_entitlement",
+    "subscription_lifecycle_entitlement_runs_before_legacy_role_permission_bypass",
+    "granular_route_actions_distinguish_View_Add_Edit_Delete",
+    "non_admin_specialists_cannot_receive_permission_or_user_administration",
+    "team_user_edit_requires_user_ID_and_matching_selected_farm",
+    "platform_owner_can_select_tenant_for_user_management_with_explicit_farm_validation",
+    "platform_owner_read_only_selected_tenant_view_does_not_impersonate_session_identity",
+    "tenant_creation_is_shared_transactional_provisioning_with_entitlement_and_admin_role",
+    "browser_csrf_is_separate_from_authentication_and_permissions",
+    "legacy_api_read_routes_apply_View_permission_gate",
+    "poultry_daily_records_scope_farm_and_cycle_and_delegate_feed_to_shared_writer",
+    "sales_records_scopes_farm_and_uses_separate_action_permissions",
+    "cycle_and_inventory_services_bind_mutations_to_farm_id",
+    "sale_population_effect_service_validates_sale_farm_and_cycle_before_projection",
+    "protected_billing_recovery_actor_is_not_a_general_operational_import_identity",
+    "php_bootstrap_has_DB_connection_so_no_PHP_execution_in_this_offline_step"
+  ],
+  "future_verification_requirements": [
+    "owner_approved_isolated_target_tenant_binding_by_immutable_farms_ID",
+    "explicit_unique_test_tenant_and_NonOwner_user_before_any_write_authorization",
+    "no_reuse_of_production_accounts_or_creds_for_fixture_generation",
+    "test_operator_must_match_selected_tenant_and_proven_permissions",
+    "session_claimed_farm_ID_must_be_reconciled_to_durable_logged_in_user_farm",
+    "test_actor_permission_matrix_for_cycle_inventory_daily_sales_expenses",
+    "test_entitlements_cover_poultry_inventory_sales_modules_without_bypass",
+    "deny_cross_farm_cycle_ID_even_if_valid_in_other_tenant",
+    "deny_cross_farm_stock_item_and_stock_movement_ID",
+    "deny_cross_farm_sale_and_population_effect_ID",
+    "deny_cross_farm_daily_record_ID",
+    "deny_read_and_write_access_for_unauthorized_specialist_actor",
+    "deny_mutations_when_module_suspended_or_not_entitled",
+    "deny_CSRF_invalid_OR_missing_token_browser_state_change",
+    "deny_user_role_assignment_to_other_tenant",
+    "no_platform_owner_impersonation_or_session_farm_switch_as_a_shortcut",
+    "do_not_conflate_platform_owner_readonly_tenant_view_with_write_capability",
+    "only_canonical_transaction_owning_services_can_authorize_mutations",
+    "all_mutation_audit_user_IDs_must_identify_a_real_authorized_actor",
+    "no_API_or_background_writer_may_bypass_tenant_or_permission_checks",
+    "verify_role_limits_and_subscription_state_for_any_proposed_tenant",
+    "verify_negative_tests_against_fresh_isolated_fixture_only_after_explicit_approval",
+    "no_user_password_token_personal_data_or_IDs_in_this_design_document",
+    "save_historical_prod_GA_and_protected_fixture_guards_prior_to_any_future_test",
+    "keep_150_VU_HOLD_and_200_VU_PROHIBITED_until_capacity_certification"
+  ],
+  "technical_cautions": [
+    "source_php_static_markers_are_not_runtime_cross_tenant_penetration_results",
+    "config_requireCurrentFarmId_checks_session_ID_but_does_not_alone_prove_actor_membership",
+    "platform_owner_bypass_does_not_mean_unapproved_fixture_writes_are_safe",
+    "farm_admin_permission_bypass_must_not_bypass_subscription_or_module_policy",
+    "backend_route_and_canonical_service_authorization_both_require_runtime_proof",
+    "same_farm_foreign_object_IDs_must_be_rejected_in_future_negative_test_matrix"
+  ],
+  "gates": {
+    "D01_year_selection": "2025_DESIGN_ONLY",
+    "D01_event_date_policy": "UNAPPROVED",
+    "D02_layer_biology": "UNAPPROVED",
+    "D03_egg_pool": "UNPROVEN",
+    "D04_broiler_biology": "UNAPPROVED",
+    "D05_feed_cost": "UNAPPROVED",
+    "D06_tenant_actor": "UNAPPROVED",
+    "D07_to_D12": "UNAPPROVED",
+    "actual_tenant_record": "NOT_CREATED",
+    "actor_credentials": "NOT_CREATED",
+    "runtime_permission_proof": "NOT_EXECUTED",
+    "fresh_fixture_events": "NOT_GENERATED",
+    "database": "NO_CONNECTIONS_OR_WRITES",
+    "capacity_150": "HOLD",
+    "capacity_200": "PROHIBITED"
+  },
+  "permissions": {
+    "document_offline_review_only": true,
+    "choose_farm_ID": false,
+    "create_tenant": false,
+    "create_user": false,
+    "generate_credentials": false,
+    "modify_role_policy": false,
+    "modify_entitlement": false,
+    "run_php": false,
+    "connect_to_database": false,
+    "write_database": false,
+    "modify_certified_source": false,
+    "generate_fixture_events": false,
+    "import_or_deploy": false,
+    "execute_load_test": false
+  }
+}
