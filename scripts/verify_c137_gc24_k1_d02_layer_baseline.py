@@ -220,7 +220,7 @@ def inspect_sources(root, override=None):
         )
         for index, expr in enumerate(MARKERS[path]):
             demand(re.search(expr, content, re.IGNORECASE | re.DOTALL) is not None,
-                   "CANONICAL_CONTRACT_DRIFT_" + path.replace("/", "_").upper() +
+                   "CANONICAL_CONTRACT_DRIFT_" + "_".join(path.split("/")).upper() +
                    "_" + str(index))
         results[path] = len(MARKERS[path])
     return results
