@@ -1,0 +1,143 @@
+{
+  "schema_version": "C137-GC24-K1-D02-LAYER-BASELINE-REQUIREMENTS-0",
+  "checkpoint": "GC24CG_K1_D02",
+  "status": "REQUIREMENTS_CAPTURED_BIOLOGICAL_INPUTS_UNAPPROVED",
+  "category": "DESIGN_ONLY_NO_FIXTURE_EVENTS",
+  "pinned_as_of": "2026-10-11",
+  "selected_reporting_window": {
+    "start": "2025-01-01",
+    "end": "2025-12-31",
+    "inclusive_days": 365,
+    "approved_scope": "YEAR_SELECTION_ONLY"
+  },
+  "prior_preparation_head": "cc186fa7799c048236a76c8dd58fcbd75c472e91",
+  "certified_reports_source_sha": "322438870263825f9e739a12c4bd478983e67141",
+  "prior_k1_d01_selection_blob_sha1": "db5ded90c63f35a59861e4e8a58ed07a0628b0db",
+  "prior_k1_d01_spec_sha256": {
+    "R1": "abf6ab785d80eef17af38cc36b036737b2ea08024b550a1202773964ca49dff8",
+    "R2": "53b84e596c910473471b21926e634cb13d52e45bfe45c515b21e50dc0ff12091"
+  },
+  "original_2026_event_sha256": {
+    "R1": "e31421ee40ce25b16feb698313fcf337e74126a8e63d8c5dadeedf74e30165f2",
+    "R2": "985341ed4315788ee8f3b9d62b327da66d38fc63ea16d406c5c52bc9949d3dfe"
+  },
+  "legacy_scenario_layer_labels_only": [
+    "layer-a",
+    "layer-b"
+  ],
+  "layer_cycle_count_for_v2": null,
+  "per_cycle_unknowns": {
+    "cycle_code": null,
+    "start_date": null,
+    "expected_end_date": null,
+    "opening_headcount": null,
+    "bird_unit_cost": null,
+    "acquisition_type": null,
+    "acquisition_date": null,
+    "acquired_quantity": null,
+    "bird_age_days": null,
+    "acquisition_total_cost": null,
+    "acquisition_source_name": null,
+    "acquisition_reference_no": null,
+    "acquisition_request_token": null,
+    "initial_biological_phase": null,
+    "transition_to_production_date": null,
+    "close_date": null,
+    "rearing_cost_provenance": null,
+    "production_entry_headcount": null
+  },
+  "production_date_before_2025_if_needed": "NOT_DECIDED_REQUIRES_CROSS_PERIOD_DEPENDENCY_REVIEW",
+  "source_facts": [
+    {
+      "id": "S1",
+      "file": "lib/production_cycle_service.php",
+      "marker": "production_cycle_create_v3",
+      "rule": "creates active cycle with canonical cycle_opening baseline; opening_headcount nonnegative"
+    },
+    {
+      "id": "S2",
+      "file": "lib/production_population.php",
+      "marker": "production_population_establish_baseline",
+      "rule": "cycle_opening baseline date equals cycle start; baseline quantity equals cycle opening_headcount; later projected population cannot go negative"
+    },
+    {
+      "id": "S3",
+      "file": "lib/poultry_cycle_onboarding.php",
+      "marker": "poultry_cycle_onboarding_record_initial",
+      "rule": "separate acquisition record and initial explicit phase; acquired quantity > 0; age_days >= 1; purchased POL must start production"
+    },
+    {
+      "id": "S4",
+      "file": "lib/poultry_cycle_acquisition.php",
+      "marker": "poultry_acquisition_record",
+      "rule": "layer acquisition type is purchased, purchased_point_of_lay or internal_transfer; purchased total cost required; dates within cycle and not after first phase start"
+    },
+    {
+      "id": "S5",
+      "file": "lib/poultry_cycle_lifecycle.php",
+      "marker": "poultry_lifecycle_transition_phase",
+      "rule": "layer phases rearing then production only; phase transition after initial phase start"
+    },
+    {
+      "id": "S6",
+      "file": "lib/daily_population_continuity.php",
+      "marker": "daily_population_continuity_expected_opening",
+      "rule": "V3 daily opening is derived from population boundary snapshot rather than assumed acquisition total"
+    },
+    {
+      "id": "S7",
+      "file": "poultry/layers_daily_record.php",
+      "marker": "egg_production",
+      "rule": "active layer cycle date, opening and bird age positive; egg_production <= opening_stock; mortality <= opening_stock; crate count round eggs/30 to 2 decimals"
+    },
+    {
+      "id": "S8",
+      "file": "lib/poultry_production_entry_snapshots.php",
+      "marker": "poultry_production_entry_candidate",
+      "rule": "approval of production-entry economics is separate and source-derived; no invented rearing investment"
+    }
+  ],
+  "required_design_checks": [
+    "cycle_creation_must_use_canonical_baseline",
+    "acquisition_entry_is_not_itself_a_population_baseline",
+    "reconcile_acquired_quantity_with_opening_headcount_from_authoritative_sources",
+    "no_duplicate_acquisition_population_credit",
+    "initial_age_and_phase_physically_justified",
+    "point_of_lay_purchase_starts_in_production",
+    "purchased_flock_has_actual_total_acquisition_cost",
+    "rearing_to_production_requires_explicit_later_transition",
+    "date_window_must_include_all_applicable_acquisition_and_phase_dates",
+    "2025_reporting_year_does_not_choose_2025_cycle_start",
+    "opening_stock_is_dated_canonical_population_before_movements",
+    "later_population_projection_must_remain_nonnegative",
+    "daily_mortality_cannot_exceed_opening_stock",
+    "daily_eggs_cannot_exceed_opening_stock",
+    "no_assumed_laying_percent_or_flock_size_from_sale_targets",
+    "future_production_entry_economics_provenance_requires_separate_review"
+  ],
+  "unresolved_owner_evidence": [
+    "how_many_distinct_layer_cycles_per_scenario",
+    "flock_entry_and_acquisition_date_for_each_cycle",
+    "opening_population_and_source_acquisition_quantity_per_cycle",
+    "bird_age_days_at_acquisition",
+    "acquisition_type_and_source_name",
+    "actual_total_cost_for_purchased_flock",
+    "initial_phase_and_transition_dates",
+    "expected_end_or_close_dates",
+    "biology_and_daily_continuity_schedule",
+    "cross_period_inputs_if_birds_acquired_before_2025"
+  ],
+  "gate_status": {
+    "D01_YEAR_SELECTION": "SELECTED_DESIGN_ONLY",
+    "D01_EVENT_DATE_RULES": "PENDING",
+    "D02_LAYER_BASELINE": "UNAPPROVED",
+    "D03_LAYER_EGG_PRODUCTION": "UNAPPROVED",
+    "D04_TO_D12": "UNAPPROVED",
+    "NEW_V2_EVENT_MODEL": "NOT_GENERATED",
+    "CANONICAL_PHP_WRITERS": "NOT_EXECUTED",
+    "DATABASE_IMPORT": "PROHIBITED",
+    "SOURCE_MODIFICATION": "PROHIBITED",
+    "LOAD_150_VU": "HOLD",
+    "LOAD_200_VU": "PROHIBITED"
+  }
+}
