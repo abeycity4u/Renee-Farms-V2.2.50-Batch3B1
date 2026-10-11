@@ -1,0 +1,133 @@
+name: C137 GC24 K2-P03 isolated MariaDB B03
+
+# Explicit-authorization-only CI on the isolated branch.
+# GitHub workflow_dispatch requires the workflow on the default branch.
+# The alternative push trigger matches ONLY a new one-time approval file.
+# Updating this workflow itself will NOT trigger B03.
+on:
+  push:
+    branches:
+      - c137-gc24-k2p03-ci-mariadb-b03
+    paths:
+      - docs/C137_GC24_K2_P03_B03_EXECUTION_APPROVAL.txt
+  workflow_dispatch:
+    inputs:
+      run_b03:
+        description: 'Explicitly authorize disposable GitHub-hosted B03 execution'
+        required: true
+        type: choice
+        default: DO_NOT_RUN
+        options:
+          - DO_NOT_RUN
+          - RUN_ISOLATED_B03
+
+permissions:
+  contents: read
+
+concurrency:
+  group: k2p03-b03-mariadb-isolated
+  cancel-in-progress: false
+
+jobs:
+  b03-real-mariadb:
+    if: >-
+      github.ref == 'refs/heads/c137-gc24-k2p03-ci-mariadb-b03' &&
+      (
+        (github.event_name == 'workflow_dispatch' && inputs.run_b03 == 'RUN_ISOLATED_B03') ||
+        (github.event_name == 'push' && github.event.head_commit.message == 'ci-p04(run): authorize isolated B03')
+      )
+    name: B03 canonical Layer continuity (real MariaDB)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    env:
+      CI_K2P03_SCENARIO_ALLOWED: 'B03'
+      CI_DB_HOST: '127.0.0.1'
+      CI_DB_PORT: '3306'
+      CI_DB_NAME: 'renee_k2p03_ci_b03'
+      CI_DB_USER: 'ci_k2p03'
+      # Disposable synthetic-only credentials. No GitHub/AWS secrets are used.
+      CI_DB_PASSWORD: 'ci-only-nonsecret-b03'
+
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: ci-only-root-nonsecret-b03
+          MARIADB_DATABASE: renee_k2p03_ci_b03
+          MARIADB_USER: ci_k2p03
+          MARIADB_PASSWORD: ci-only-nonsecret-b03
+        ports:
+          - 127.0.0.1:3306:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - name: Checkout isolated branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 2  # Needed to inspect exactly the triggering commit's changed path.
+
+      - name: Guard one-file authorization commit before running synthetic SQL
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git show -s --format=%s HEAD)" = 'ci-p04(run): authorize isolated B03'
+          test "$(git diff-tree --no-commit-id --name-only -r HEAD)" = 'docs/C137_GC24_K2_P03_B03_EXECUTION_APPROVAL.txt'
+          test -f docs/C137_GC24_K2_P03_B03_EXECUTION_APPROVAL.txt
+          test "$(cat docs/C137_GC24_K2_P03_B03_EXECUTION_APPROVAL.txt)" = 'CI_P04_B03_EXECUTION_APPROVED=YES'
+          echo 'CI_P04_BRANCH_AUTHORIZATION=PASS'
+
+      - name: Set up PHP 8.2 for the verified source
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_mysql
+          coverage: none
+
+      - name: Install disposable-schema client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends mariadb-client
+
+      - name: Guard the exact ephemeral database before importing schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = 'true'
+          test "$RUNNER_ENVIRONMENT" = 'github-hosted'
+          test "$GITHUB_REPOSITORY" = 'abeycity4u/Renee-Farms-V2.2.50-Batch3B1'
+          test "$GITHUB_REF" = 'refs/heads/c137-gc24-k2p03-ci-mariadb-b03'
+          test "$CI_DB_HOST" = '127.0.0.1'
+          test "$CI_DB_PORT" = '3306'
+          test "$CI_DB_NAME" = 'renee_k2p03_ci_b03'
+          test "$CI_DB_USER" = 'ci_k2p03'
+          test "$CI_K2P03_SCENARIO_ALLOWED" = 'B03'
+          test "$CI_DB_PASSWORD" = 'ci-only-nonsecret-b03'
+          test -f database_schema.sql
+          test "$(MYSQL_PWD="$CI_DB_PASSWORD" mariadb --protocol=TCP --host="$CI_DB_HOST" --port="$CI_DB_PORT" --user="$CI_DB_USER" --database="$CI_DB_NAME" --batch --skip-column-names --execute="SELECT DATABASE()")" = "$CI_DB_NAME"
+          test "$(MYSQL_PWD="$CI_DB_PASSWORD" mariadb --protocol=TCP --host="$CI_DB_HOST" --port="$CI_DB_PORT" --user="$CI_DB_USER" --database="$CI_DB_NAME" --batch --skip-column-names --execute="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()")" = '0'
+          echo 'EPHEMERAL_DATABASE_IDENTITY=PASS'
+          echo 'EPHEMERAL_SCHEMA_INITIAL_EMPTY=PASS'
+
+      - name: Initialize fresh schema only on ephemeral MariaDB
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The schema contains DROP TABLE statements. The preceding guard
+          # proves we are in an empty, explicitly named CI-only database.
+          MYSQL_PWD="$CI_DB_PASSWORD" mariadb --protocol=TCP --host="$CI_DB_HOST" --port="$CI_DB_PORT" --user="$CI_DB_USER" --database="$CI_DB_NAME" < database_schema.sql
+          echo 'EPHEMERAL_SCHEMA_IMPORT=COMPLETE'
+
+      - name: Run B03 real-database integration test
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -l tests/integration/k2p03_b03_real_mariadb.php
+          php tests/integration/k2p03_b03_real_mariadb.php
