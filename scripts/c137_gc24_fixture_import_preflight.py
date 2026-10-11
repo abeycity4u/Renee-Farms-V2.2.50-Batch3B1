@@ -8,6 +8,7 @@ writers must be integrated and audited before a future separate authorization.
 import argparse
 import collections
 import datetime as dt
+import hashlib
 import json
 import re
 import sys
@@ -80,6 +81,14 @@ def validate_manifest(scenario, manifest):
     records = manifest.get("records")
     require(isinstance(records, list), "NO_EVENT_STREAM")
     require(len(records) < 30000, "EVENT_CAP")
+    calculated_digest = hashlib.sha256(
+        "".join(
+            json.dumps(record, sort_keys=True, separators=(",", ":")) + "\\n"
+            for record in records
+        ).encode()
+    ).hexdigest()
+    require(calculated_digest == manifest["event_digest_sha256"],
+            "EVENT_STREAM_DIGEST_MISMATCH")
 
     unique = set()
     parents = {}
