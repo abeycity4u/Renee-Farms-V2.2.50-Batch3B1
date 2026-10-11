@@ -1,0 +1,358 @@
+{
+  "version": "C137-GC24-K2-P03B-DB-READINESS-0",
+  "checkpoint": "GC24CG_K2_P03_STAGE_B",
+  "scope": "OFFLINE_ISOLATED_RUNTIME_TEST_AUTHORIZATION_PREPARATION",
+  "review_status": "PENDING_NODE_A_OFFLINE_VERIFICATION",
+  "date": "2026-10-11",
+  "lineage": {
+    "parent_k2_p02_head": "1f2a22f668788e075adce8ec0fee0d6b2648f924",
+    "protected_reports_head": "322438870263825f9e739a12c4bd478983e67141",
+    "unchanged_k1_k2p01_preparation_head": "0d290c1f25b4bdb186f4cefbc61b7ade1bbcdf49",
+    "k2_p02_php_blob": "9503771b47c6c2fe26bb3237da69a17874e724a3",
+    "frozen_k1_d12_blob": "8e131d1fb4d8996d5462cc46bd8045172bb39308",
+    "k1_d12_node_a": "PASS_OFFLINE_REPORTED",
+    "k2_p01_node_a": "PASS_OFFLINE_REPORTED",
+    "k2_p02_node_a": "PASS_OFFLINE_REPORTED",
+    "k2_p03_stage_a_user_reported": "PASS_NO_DB",
+    "stage_a_assertions": {
+      "fake_pdo_behavior": 38,
+      "canonical_source_contract": 14,
+      "runtime_integration_contract": 38,
+      "prior_php_lint_files": 5
+    },
+    "stage_a_repeated_in_stage_b": false
+  },
+  "source_contracts": [
+    {
+      "path": "lib/daily_population_continuity.php",
+      "blob": "9503771b47c6c2fe26bb3237da69a17874e724a3",
+      "markers": [
+        "function daily_population_continuity_preview(",
+        "?int $sourceId = null",
+        "function daily_population_continuity_apply(",
+        "daily_population_continuity_canonical_preview("
+      ]
+    },
+    {
+      "path": "lib/daily_population_boundary.php",
+      "blob": "38b346a177788a439355cd18205ab16c47065310",
+      "markers": [
+        "function daily_population_boundary_snapshots(",
+        "daily_population_boundary_apply_pending_mortality(",
+        "function daily_population_boundary_active_movements("
+      ]
+    },
+    {
+      "path": "lib/production_population.php",
+      "blob": "fff1b3e663bb0845c34ccf734a52f6c92eaae706",
+      "markers": [
+        "function production_population_state(",
+        "production_population_baselines",
+        "production_population_movements"
+      ]
+    },
+    {
+      "path": "lib/production_population_projection.php",
+      "blob": "c4cdae4c193b624a7469915e0451d41fef1b2f4b",
+      "markers": [
+        "function production_population_projection_active_locked(",
+        "function production_population_projection_active_snapshot(",
+        "function production_population_projection_sync("
+      ]
+    },
+    {
+      "path": "poultry/layers_daily_record.php",
+      "blob": "87b7c6ace9bd577ad2303ea4aa50312a780412d2",
+      "markers": [
+        "daily_population_continuity_apply(",
+        "sync_daily_feed_usage(",
+        "sales_rebuild_layer_egg_allocations("
+      ]
+    },
+    {
+      "path": "poultry/broiler_daily_record.php",
+      "blob": "2a797c7fec45d3f78e7b2f01cb72531b1c416699",
+      "markers": [
+        "daily_population_continuity_apply(",
+        "sync_daily_feed_usage(",
+        "daily_population_sync_mortality("
+      ]
+    },
+    {
+      "path": "ruminant/ruminant_daily_record.php",
+      "blob": "27c6755f0ef9491a7019f94b6a62b602e8e8dcaa",
+      "markers": [
+        "daily_population_continuity_apply(",
+        "sync_daily_feed_usage(",
+        "daily_population_sync_mortality("
+      ]
+    },
+    {
+      "path": "lib/daily_feed_sync.php",
+      "blob": "752707749fea0583249ec600bb5d624d416b8a47",
+      "markers": [
+        "function sync_daily_feed_usage(",
+        "stock_reverse_transaction(",
+        "stock_apply_movement("
+      ]
+    },
+    {
+      "path": "lib/daily_population_sync.php",
+      "blob": "ff4b045000910af222c5203347419c7a7cb66e6a",
+      "markers": [
+        "function daily_population_sync_mortality(",
+        "production_population_projection_sync("
+      ]
+    },
+    {
+      "path": "lib/sales_allocation.php",
+      "blob": "1a701fff059189b6a9ad3fe1a190188be958a96b",
+      "markers": [
+        "function sales_rebuild_layer_egg_allocations(",
+        "function sales_auto_allocate_layer_egg("
+      ]
+    }
+  ],
+  "future_approval_prerequisites": [
+    {
+      "id": "target_host_identity",
+      "description": "Independently establish exact isolated test DB host and network route; not Node B by assumption",
+      "value": null,
+      "status": "EVIDENCE_REQUIRED"
+    },
+    {
+      "id": "target_database_name",
+      "description": "Exact new disposable isolated database identity; no protected fixture, restore, shared staging or production database",
+      "value": null,
+      "status": "EVIDENCE_REQUIRED"
+    },
+    {
+      "id": "database_grants",
+      "description": "Least-privilege actor and schema-specific CREATE/READ/WRITE capabilities separately approved",
+      "value": null,
+      "status": "EVIDENCE_REQUIRED"
+    },
+    {
+      "id": "application_test_root",
+      "description": "Exact noncertified isolated runtime checkout with source HEAD and nonproduction config",
+      "value": null,
+      "status": "EVIDENCE_REQUIRED"
+    },
+    {
+      "id": "verified_no_production_network_route",
+      "description": "Evidence network/credentials cannot reach production or protected databases",
+      "value": null,
+      "status": "EVIDENCE_REQUIRED"
+    },
+    {
+      "id": "tenant_farm_and_actor",
+      "description": "Dedicated synthetic tenant, farm/cycle/actor permission and cross-tenant denial matrix",
+      "value": null,
+      "status": "EVIDENCE_REQUIRED"
+    },
+    {
+      "id": "source_and_schema_contract",
+      "description": "Exact schema version, eligible PHP runtime and source SHA integrity proof",
+      "value": null,
+      "status": "EVIDENCE_REQUIRED"
+    },
+    {
+      "id": "test_ledger_baseline",
+      "description": "Dated layer/broiler/ruminant V3 baselines and planned movement sources",
+      "value": null,
+      "status": "EVIDENCE_REQUIRED"
+    },
+    {
+      "id": "source_record_ids",
+      "description": "Actual synthetic daily row IDs and matching projection source IDs, not guessed",
+      "value": null,
+      "status": "EVIDENCE_REQUIRED"
+    },
+    {
+      "id": "test_data_authorization",
+      "description": "Explicit approval to create minimal isolated test records and transaction writes",
+      "value": null,
+      "status": "EVIDENCE_REQUIRED"
+    },
+    {
+      "id": "recovery_point",
+      "description": "Verified test-only rollback/reseed or approved encrypted backup evidence; no protected restore",
+      "value": null,
+      "status": "EVIDENCE_REQUIRED"
+    },
+    {
+      "id": "failure_atomicity_method",
+      "description": "Planned rollback and replay/idempotence checks without leaving durable damage",
+      "value": null,
+      "status": "EVIDENCE_REQUIRED"
+    },
+    {
+      "id": "audit_and_reconciliation",
+      "description": "Expected ledger movement, daily stock, Feed, egg-sale and mortality reconciliation",
+      "value": null,
+      "status": "EVIDENCE_REQUIRED"
+    },
+    {
+      "id": "operator_window_and_stop",
+      "description": "Named operator, explicit execution window, abort conditions, stop and containment procedure",
+      "value": null,
+      "status": "EVIDENCE_REQUIRED"
+    },
+    {
+      "id": "secrets_and_integrations",
+      "description": "No production API keys, mail, payments, cron, session secrets or monitoring callbacks",
+      "value": null,
+      "status": "EVIDENCE_REQUIRED"
+    },
+    {
+      "id": "explicit_runtime_approval",
+      "description": "Separate written user authorization naming actual host, DB, tenant, commands and allowed writes",
+      "value": null,
+      "status": "EVIDENCE_REQUIRED"
+    }
+  ],
+  "future_runtime_test_cases": [
+    {
+      "id": "B01",
+      "title": "canonical_layer_opening",
+      "preconditions": "V3 layer baseline, saved Daily Record source ID and pending mortality",
+      "assertion": "Canonical snapshot selected; later openings rebased; original mortality unchanged",
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "B02",
+      "title": "broiler_mixed_exits",
+      "preconditions": "V3 Broiler baseline with dated Sale, Slaughter and Transfer movements",
+      "assertion": "Later opening and closing derive from canonical physical movement order without double-counting",
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "B03",
+      "title": "ruminant_species_scope",
+      "preconditions": "Ruminant cycle with multiple animal_type rows; saved source identity",
+      "assertion": "Only the intended species' later Daily Records are corrected",
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "B04",
+      "title": "legacy_preview_fallback",
+      "preconditions": "Legacy cycle without canonical V3 baseline and preview call omitting source ID",
+      "assertion": "Legacy opening chain remains compatible; no unintended canonical write",
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "B05",
+      "title": "layer_eggs_revenue",
+      "preconditions": "Layer later-date eggs, historical egg allocation and corrected opening",
+      "assertion": "Eggs cannot exceed opening, laying rate recalculates, egg-sales allocation conserves pool",
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "B06",
+      "title": "invalid_future_mortality",
+      "preconditions": "Later daily mortality exceeds corrected canonical opening",
+      "assertion": "Explicit rejection; single transaction rolls back all daily/feed/mortality/allocations",
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "B07",
+      "title": "negative_canonical_balance",
+      "preconditions": "Historical physical movement would yield a negative later population",
+      "assertion": "Boundary guard blocks; no persisted negative population and no partially committed source",
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "B08",
+      "title": "mortality_replay_reversal",
+      "preconditions": "Same Daily Record mortality corrected repeatedly and replayed",
+      "assertion": "Versioned source projection/reversal idempotence, no duplicated physical reductions",
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "B09",
+      "title": "feed_and_stock_atomicity",
+      "preconditions": "Daily feed usage and stock item with receipts/valuations",
+      "assertion": "Linked USED/reversal source ownership intact; failed transaction reverses no stock without counterpart",
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "B10",
+      "title": "tenant_role_and_csrf",
+      "preconditions": "Two unrelated synthetic tenant farms, actors, cycles, records and role boundaries",
+      "assertion": "Unauthorized cross-farm, wrong-role and CSRF operations denied without data alteration",
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "B11",
+      "title": "rollback_at_mid_writer",
+      "preconditions": "Controlled failure between continuity, feed, mortality and Layer egg-sales rebuild",
+      "assertion": "Entire caller-owned transaction rolled back; all ledgers unchanged",
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    {
+      "id": "B12",
+      "title": "concurrent_correction_locks",
+      "preconditions": "Two isolated concurrent edits targeting one cycle/date",
+      "assertion": "Consistent lock order, one authoritative result or safe conflict, no silent overwrite",
+      "status": "NOT_RUN",
+      "evidence": null
+    }
+  ],
+  "protected_assets": {
+    "certified_checkout": "/opt/renee-agrisuite-c137-gc",
+    "original_preparation_checkout": "/opt/renee-c137-z23-dryrun-src",
+    "prior_p02_checkout": "/opt/renee-c137-k2-p02-src",
+    "stage_b_source_only_checkout": "/opt/renee-c137-k2-p03b-src",
+    "protected_fixture_db": "renee_c137_fixture",
+    "protected_restore_db": "renee_c137_gc24_restore_z25",
+    "offvolume_backup_label": "C137_GC24_Z25A_20261011T072212Z_31149.sql.enc",
+    "unknown_active_test_database": null,
+    "data_plane_identity_status": "NOT_INSPECTED_OR_AUTHORIZED"
+  },
+  "gates": {
+    "prior_d12_authorization_gates": 15,
+    "prior_d12_unknown_inputs": 86,
+    "prior_d12_import_gates": "ALL_BLOCKED",
+    "readiness_review": "PENDING_NODE_A",
+    "future_db_authorization": "NOT_GRANTED",
+    "future_test_data_authorization": "NOT_GRANTED",
+    "runtime_test_suite": "NOT_EXECUTED",
+    "runtime_outcome": "UNPROVEN",
+    "database_connections": 0,
+    "database_reads": 0,
+    "database_writes": 0,
+    "php_executed": 0,
+    "migrations": 0,
+    "restores": 0,
+    "fixture_imports": 0,
+    "load_tests": 0,
+    "capacity_150_vu": "HOLD",
+    "capacity_200_vu": "PROHIBITED"
+  },
+  "permissions": {
+    "read_frozen_docs_and_php_as_text": true,
+    "execute_php_or_tests": false,
+    "database_connection": false,
+    "database_read": false,
+    "database_write": false,
+    "schema_migration": false,
+    "fixture_seed_or_import": false,
+    "backup_or_restore": false,
+    "copy_prod_credentials": false,
+    "deploy_application_php": false,
+    "contact_node_b_or_node_c": false,
+    "load_test_150_vu": false,
+    "load_test_200_vu": false
+  }
+}
