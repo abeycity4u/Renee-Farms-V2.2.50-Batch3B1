@@ -1,0 +1,250 @@
+{
+  "version": "C137-GC24-K2-P01-READINESS-ENTRY-0",
+  "checkpoint": "GC24CG_K2_P01",
+  "scope": "READONLY_SOURCE_TRIAGE_AND_GATE_PRIORITIZATION",
+  "status": "PREIMPLEMENTATION_DESIGN_ONLY",
+  "as_of": "2026-10-11",
+  "prior_preparation_head": "501bc6b6c2a86833aff151e0b003d18def20cfea",
+  "protected_certified_head": "322438870263825f9e739a12c4bd478983e67141",
+  "prior_D12_json_blob_sha1": "8e131d1fb4d8996d5462cc46bd8045172bb39308",
+  "prior_D12_specs_sha256": {
+    "R1": "0f9c108376a850439e26540bc9c011da7df4f430bc1e691d050bdabc9ccf27f7",
+    "R2": "3ff116b4d8f2c29c59f8f4c9d7d2ae19093574431c8aa4f3ea5bbce8cdd2b73c"
+  },
+  "prior_D11_specs_sha256": {
+    "R1": "5de70a178ca4660eba53346f7dc43fb47302322511369261cdb1773cd7c17600",
+    "R2": "d424fc5bfc773619aaeadb6a245b1c5cea85c6a36b86d3cecb11bb8c7a413023"
+  },
+  "original_2026_event_sha256": {
+    "R1": "e31421ee40ce25b16feb698313fcf337e74126a8e63d8c5dadeedf74e30165f2",
+    "R2": "985341ed4315788ee8f3b9d62b327da66d38fc63ea16d406c5c52bc9949d3dfe"
+  },
+  "prior_node_A_offline_completion": {
+    "D01_to_D12": "USER_PROVIDED_PASS_EVIDENCE",
+    "D12": "GC24CG_K1_D12_NODE_A=PASS",
+    "not_live_implementation_approval": true
+  },
+  "prior_D12_authorization": {
+    "all_15_gates": "BLOCKED_PENDING_SEPARATE_EVIDENCE_AND_APPROVAL",
+    "prior_facts_unknown_count": 86,
+    "import": "NOT_AUTHORIZED",
+    "import_dry_run": "NOT_AUTHORIZED",
+    "database_read": "NOT_AUTHORIZED",
+    "capacity_150_VU": "HOLD",
+    "capacity_200_VU": "PROHIBITED"
+  },
+  "source_contracts": [
+    {
+      "path": "lib/daily_population_continuity.php",
+      "markers": [
+        "function daily_population_continuity_preview(",
+        "bool $forUpdate = false",
+        "$sourceId",
+        "daily_population_continuity_canonical_preview(",
+        "function daily_population_continuity_apply(",
+        "true,\n            $sourceId",
+        "if ($sourceId === null || $sourceId <= 0)"
+      ]
+    },
+    {
+      "path": "poultry/layers_daily_record.php",
+      "markers": [
+        "daily_population_continuity_apply(",
+        "sync_daily_feed_usage(",
+        "daily_population_sync_mortality(",
+        "sales_rebuild_layer_egg_allocations(",
+        "$pdo->beginTransaction();",
+        "$pdo->commit();"
+      ]
+    },
+    {
+      "path": "poultry/broiler_daily_record.php",
+      "markers": [
+        "daily_population_continuity_apply(",
+        "sync_daily_feed_usage(",
+        "daily_population_sync_mortality(",
+        "$pdo->beginTransaction();",
+        "$pdo->commit();"
+      ]
+    },
+    {
+      "path": "lib/daily_population_boundary.php",
+      "markers": [
+        "function daily_population_boundary_build_snapshots(",
+        "function daily_population_boundary_active_movements(",
+        "function daily_population_boundary_snapshots("
+      ]
+    }
+  ],
+  "technical_finding": {
+    "id": "D09_CONTINUITY_PREVIEW_SOURCEID_SIGNATURE_MISMATCH",
+    "source_path": "lib/daily_population_continuity.php",
+    "source_git_blob_sha1": "acbbae9a9796b8d87e4bb6cd1fc069ed3623aabc",
+    "preview_function": "daily_population_continuity_preview",
+    "source_level_preview_declares_sourceId": false,
+    "source_level_preview_reads_sourceId": true,
+    "source_level_apply_passes_tenth_argument_sourceId": true,
+    "source_level_canonical_rejects_absent_sourceId": true,
+    "reason": "Preview references an unbound local $sourceId. Canonical preview returns null for missing/nonpositive source ID, so legacy fallback may be used, subject to PHP error-handling behavior.",
+    "runtime_effect": "NOT_PROVEN",
+    "proposed_future_narrow_fix": "Append optional ?int $sourceId = null after bool $forUpdate = false in preview function signature; preserve call sites and shared transaction ordering.",
+    "source_patch_allowed_now": false,
+    "PHP_execution_allowed_now": false,
+    "runtime_test_allowed_now": false
+  },
+  "next_steps": [
+    {
+      "id": "P01-A",
+      "priority": 1,
+      "title": "Pin continuity source-signature remediation design",
+      "reason": "Source-confirmed D09 preview does not declare sourceId; canonical path requires it",
+      "phase": "READ_ONLY_DESIGN",
+      "status": "DOCUMENTED_PATCH_NOT_AUTHORIZED",
+      "depends": [
+        "D09"
+      ]
+    },
+    {
+      "id": "P01-B",
+      "priority": 2,
+      "title": "Approve 2025 per-event date and pre-period context",
+      "reason": "Calendar selection alone is not source dates, cohort ages or stock carryforward",
+      "phase": "FUTURE_EVIDENCE",
+      "status": "BLOCKED",
+      "depends": [
+        "D01",
+        "D02",
+        "D04",
+        "D05"
+      ]
+    },
+    {
+      "id": "P01-C",
+      "priority": 3,
+      "title": "Ground dated biology, receipts, stock and sales",
+      "reason": "Layer eggs, Broiler populations, historical feed costs, physical exits and receivables are unknown",
+      "phase": "FUTURE_EVIDENCE",
+      "status": "BLOCKED",
+      "depends": [
+        "D02",
+        "D03",
+        "D04",
+        "D05",
+        "D07",
+        "D08",
+        "D09"
+      ]
+    },
+    {
+      "id": "P01-D",
+      "priority": 4,
+      "title": "Verify isolated actor, tenant and protection boundaries",
+      "reason": "Synthetic farm identity, actor, backup and DB safety are references, not approved active facts",
+      "phase": "FUTURE_AUTHORIZATION",
+      "status": "BLOCKED",
+      "depends": [
+        "D06",
+        "D12"
+      ]
+    },
+    {
+      "id": "P01-E",
+      "priority": 5,
+      "title": "Validate allocation conservation and Reports eligibility",
+      "reason": "Actual cents, 2025 receipt-backed USED source counts and monthly reconciliations not measured",
+      "phase": "FUTURE_EVIDENCE",
+      "status": "BLOCKED",
+      "depends": [
+        "D10",
+        "D11"
+      ]
+    },
+    {
+      "id": "P01-F",
+      "priority": 6,
+      "title": "Seek separate importer and load-test authorizations",
+      "reason": "D12 review passes cannot grant database access, fixture creation/import, restore or capacity tier",
+      "phase": "FUTURE_EXPLICIT_USER_DECISION",
+      "status": "BLOCKED",
+      "depends": [
+        "D12"
+      ]
+    }
+  ],
+  "future_regression_matrix": [
+    {
+      "case": "signature_compatibility",
+      "future_proof": "Confirm preview optional trailing ?int $sourceId = null after bool $forUpdate=false; preserve all existing earlier arguments",
+      "runtime": "NOT_RUN"
+    },
+    {
+      "case": "canonical_V3_exact_source",
+      "future_proof": "With authorized isolated V3 baseline and saved Daily Record ID, confirm canonical preview receives the saved record ID and applies authoritative population snapshots",
+      "runtime": "NOT_RUN"
+    },
+    {
+      "case": "legacy_without_source_id",
+      "future_proof": "With authorized isolated legacy cycle, absence of sourceId preserves old legacy contract without warnings or changed unrelated row data",
+      "runtime": "NOT_RUN"
+    },
+    {
+      "case": "corrected_historical_mortality",
+      "future_proof": "Verify later daily opening rebases, later mortality remains source-owned; rollback on invalid negative population",
+      "runtime": "NOT_RUN"
+    },
+    {
+      "case": "sale_slaughter_transfer_boundary",
+      "future_proof": "Verify same-date movement ordering and physical exits are incorporated without double-counted mortality",
+      "runtime": "NOT_RUN"
+    },
+    {
+      "case": "layer_egg_revenue_replay",
+      "future_proof": "Verify Layer egg production bound, derived laying rate, revenue allocation rebuild, and transaction rollback semantics",
+      "runtime": "NOT_RUN"
+    },
+    {
+      "case": "broiler_feed_stock_rollback",
+      "future_proof": "Verify feed USED and mortality projections remain atomic with Daily Record save",
+      "runtime": "NOT_RUN"
+    },
+    {
+      "case": "tenant_and_permissions",
+      "future_proof": "Reject cross-farm record IDs, invalid cycle and unauthorized actors",
+      "runtime": "NOT_RUN"
+    }
+  ],
+  "future_permission_required": "SEPARATE_EXPLICIT_USER_APPROVAL_BEFORE_SOURCE_PATCH_OR_RUNTIME_CHECK",
+  "gates": {
+    "K1_offline_review": "CLOSED_FROM_USER_NODE_A_EVIDENCE",
+    "K2_P01_source_review": "PENDING_NODE_A",
+    "D09_runtime_continuity": "UNPROVEN",
+    "D01_2025_event_dates": "UNAPPROVED",
+    "D06_tenant_actor": "UNAPPROVED",
+    "D05_feed_receipt_cost": "UNAPPROVED",
+    "D11_real_eligible_USED": "UNCOUNTED",
+    "D12_import": "NOT_AUTHORIZED",
+    "D12_db_read": "NOT_AUTHORIZED",
+    "D12_fixture_generator": "NOT_AUTHORIZED",
+    "new_V2_events": "NOT_GENERATED",
+    "PHP_executed": 0,
+    "database_connections": 0,
+    "database_writes": 0,
+    "source_PHP_changes": 0,
+    "load_tests": 0,
+    "capacity_150_VU": "HOLD",
+    "capacity_200_VU": "PROHIBITED"
+  },
+  "permissions": {
+    "offline_readonly_doc_verifier": true,
+    "modify_certified_PHP": false,
+    "modify_preparation_PHP": false,
+    "execute_PHP": false,
+    "read_database": false,
+    "write_database": false,
+    "create_fixture": false,
+    "import_fixture": false,
+    "restore_backup": false,
+    "run_load_test": false,
+    "approve_runtime_issue": false
+  }
+}
