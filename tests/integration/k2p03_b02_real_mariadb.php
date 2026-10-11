@@ -293,12 +293,18 @@ try {
     k2p03_ci_equal(197, (int)b02_row($pdo, $dailyIds[2])['opening_stock'], 'day three opening rolled back');
     k2p03_ci_equal(130, b02_balance($pdo, $farmId, $donor), 'original donor ledger restored');
     k2p03_ci_equal(40, b02_balance($pdo, $farmId, $recipient), 'recipient transfer still balanced');
+    k2p03_ci_equal(3, b02_active_count($pdo, $farmId, $donor, 'mortality'), 'three original active Broiler mortality movements restored');
     k2p03_ci_equal(
-        1,
-        b02_active_count($pdo, $farmId, $donor, 'mortality')
-        + b02_active_count($pdo, $farmId, $recipient, 'mortality') >= 1 ? 1 : 0,
-        'mortality movement remains present'
+        7,
+        (int)$pdo->query('SELECT COUNT(*) FROM production_population_movements')->fetchColumn(),
+        'rollback removed mortality reversal and version two; seven original movement rows remain'
     );
+    $original = production_population_projection_active_snapshot(
+        $pdo, $farmId, 'daily_broiler_record', $dailyIds[0]
+    );
+    k2p03_ci_check(is_array($original), 'original target movement still active after rollback');
+    k2p03_ci_equal(1, (int)$original['source_version'], 'original source version remains one after rollback');
+    k2p03_ci_equal(-2, (int)$original['quantity_delta'], 'original mortality delta restored after rollback');
 
     echo 'K2_P03_B02_REAL_MARIADB=PASS' . PHP_EOL;
 } catch (Throwable $error) {
