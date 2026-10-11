@@ -1,0 +1,387 @@
+{
+  "version": "C137-GC24-K1-D09-DAILY-RECORD-WRITER-0",
+  "checkpoint": "GC24CG_K1_D09",
+  "scope": "OFFLINE_READONLY_REVIEW_ONLY",
+  "readiness": "DAILY_RECORD_RUNTIME_AND_BIOLOGY_UNAPPROVED",
+  "planning_as_of": "2026-10-11",
+  "reporting": {
+    "year": 2025,
+    "start": "2025-01-01",
+    "end": "2025-12-31",
+    "dates_approved": false
+  },
+  "preparation_parent": "3d5da697d26813a15e956fe9a727c33c0dd550af",
+  "certified_source_head": "322438870263825f9e739a12c4bd478983e67141",
+  "prior_d08_blob": "b54a007e03ae2026c94fbef8dcf7e1a45fe0e9c1",
+  "prior_d08_spec_sha256": {
+    "R1": "929fd1cd4fcdba1ab999e3bd26eb566e77b815d59d61644cd7b01c2f4362f768",
+    "R2": "3294886470fc943a54bde83836d02fb9f336c2f221b581272cb9a5fbacfc822a"
+  },
+  "prior_d07_spec_sha256": {
+    "R1": "48267cd7c330243200cebfd837bd541dbb3aa44f51a72d9107ab52695417a63d",
+    "R2": "991d5c5f14ffa462613744d4fd1491dbf6da2e83050a0e81f1c9dcf7a54d39c7"
+  },
+  "original_2026_digests": {
+    "R1": "e31421ee40ce25b16feb698313fcf337e74126a8e63d8c5dadeedf74e30165f2",
+    "R2": "985341ed4315788ee8f3b9d62b327da66d38fc63ea16d406c5c52bc9949d3dfe"
+  },
+  "reference_only": {
+    "database": "renee_c137_gc24_http",
+    "tenant_slug": "c137-gc24-synthetic"
+  },
+  "unknown_inputs": {
+    "tenant_farm_id": null,
+    "actor_user_id": null,
+    "layer_cycle_ids": null,
+    "broiler_cycle_ids": null,
+    "layer_cycle_start": null,
+    "broiler_cycle_start": null,
+    "layer_daily_dates": null,
+    "broiler_daily_dates": null,
+    "layer_opening_flock": null,
+    "broiler_opening_flock": null,
+    "layer_age_days": null,
+    "broiler_age_days": null,
+    "layer_daily_mortality": null,
+    "broiler_daily_mortality": null,
+    "layer_egg_produced": null,
+    "layer_laying_rate": null,
+    "layer_crates_recorded": null,
+    "layer_daily_feed_quantity": null,
+    "broiler_daily_feed_quantity": null,
+    "layer_feed_item_id": null,
+    "broiler_feed_item_id": null,
+    "feed_unit_conversion": null,
+    "layer_water_liters": null,
+    "broiler_water_liters": null,
+    "layer_medication": null,
+    "broiler_medication": null,
+    "record_remarks": null,
+    "record_identity_keys": null,
+    "same_day_population_sale_effects": null,
+    "same_day_population_slaughter_effects": null,
+    "dated_transfer_effects": null,
+    "mortality_movement_ids": null,
+    "mortality_movement_versions": null,
+    "feed_used_transaction_ids": null,
+    "feed_used_reversal_ids": null,
+    "later_daily_opening_balances": null,
+    "later_record_mortality": null,
+    "historical_egg_sale_allocations": null,
+    "historical_egg_pool": null,
+    "manual_lifecycle_phases": null,
+    "record_delete_target_ids": null,
+    "delete_reconciliation_plan": null,
+    "legacy_cycle_fallback_policy": null,
+    "out_of_period_population_policy": null,
+    "pre_2025_stock_carryforward": null,
+    "bird_age_progression_rule": null,
+    "laying_curve_evidence": null,
+    "broiler_feed_curve_evidence": null,
+    "feed_receipts_price_provenance": null,
+    "daily_record_role_permissions": null,
+    "CSRF_runtime_evidence": null,
+    "historical_edit_lock_order": null,
+    "zero_population_daily_record_policy": null,
+    "duplicate_date_idempotency": null,
+    "continuity_preview_sourceId_contract": null,
+    "delete_historical_rebase_effects": null
+  },
+  "contracts": [
+    {
+      "id": "S01",
+      "file": "poultry/layers_daily_record.php",
+      "markers": [
+        "requireCurrentFarmId();",
+        "verify_csrf_token(",
+        "production_type = 'layer' AND status = 'active'",
+        "Opening stock and bird age must be greater than zero.",
+        "Mortality cannot exceed opening stock.",
+        "Egg production cannot exceed the opening flock for a single day.",
+        "round(($eggProduction / $openingStock) * 100, 2)",
+        "round($eggProduction / 30, 2)",
+        "daily_population_continuity_expected_opening(",
+        "INSERT INTO layer_daily_records",
+        "UPDATE layer_daily_records SET",
+        "$pdo->beginTransaction();",
+        "daily_population_continuity_apply(",
+        "sync_daily_feed_usage(",
+        "daily_population_sync_mortality(",
+        "sales_rebuild_layer_egg_allocations(",
+        "$pdo->commit();"
+      ]
+    },
+    {
+      "id": "S02",
+      "file": "poultry/broiler_daily_record.php",
+      "markers": [
+        "requireCurrentFarmId();",
+        "verify_csrf_token(",
+        "production_type = 'broiler' AND status = 'active'",
+        "Opening stock and bird age must be greater than zero.",
+        "Mortality cannot exceed opening stock.",
+        "daily_population_continuity_expected_opening(",
+        "INSERT INTO broiler_daily_records",
+        "UPDATE broiler_daily_records SET",
+        "$pdo->beginTransaction();",
+        "daily_population_continuity_apply(",
+        "sync_daily_feed_usage(",
+        "daily_population_sync_mortality(",
+        "$pdo->commit();"
+      ]
+    },
+    {
+      "id": "S03",
+      "file": "lib/daily_population_continuity.php",
+      "markers": [
+        "function daily_population_continuity_expected_opening(",
+        "function daily_population_continuity_later_rows(",
+        "function daily_population_continuity_canonical_preview(",
+        "function daily_population_continuity_preview(",
+        "function daily_population_continuity_apply(",
+        "daily_population_boundary_snapshots(",
+        "The existing egg production on ",
+        "The existing mortality on ",
+        "The corrected population would leave no opening",
+        "Daily population continuity must be applied inside"
+      ]
+    },
+    {
+      "id": "S04",
+      "file": "lib/daily_population_boundary.php",
+      "markers": [
+        "function daily_population_boundary_build_snapshots(",
+        "function daily_population_boundary_active_movements(",
+        "function daily_population_boundary_snapshots(",
+        "'opening_quantity' => $opening",
+        "'closing_quantity' => $running",
+        "Canonical population history becomes negative"
+      ]
+    },
+    {
+      "id": "S05",
+      "file": "lib/daily_population_sync.php",
+      "markers": [
+        "function daily_population_mortality_source_type(",
+        "'daily_layer_record'",
+        "'daily_broiler_record'",
+        "function daily_population_sync_mortality(",
+        "production_population_projection_sync(",
+        "function daily_population_remove_mortality("
+      ]
+    },
+    {
+      "id": "S06",
+      "file": "lib/production_population_projection.php",
+      "markers": [
+        "function production_population_projection_active_snapshot(",
+        "function production_population_projection_sync(",
+        "function production_population_projection_active_locked(",
+        "function production_population_projection_desired("
+      ]
+    },
+    {
+      "id": "S07",
+      "file": "lib/production_population.php",
+      "markers": [
+        "function production_population_state(",
+        "function production_population_project_delta_locked(",
+        "This population change would make a later recorded population balance negative.",
+        "function production_population_establish_baseline("
+      ]
+    },
+    {
+      "id": "S08",
+      "file": "lib/daily_feed_sync.php",
+      "markers": [
+        "function daily_feed_sync_authoritative_cycle_guard(",
+        "function sync_daily_feed_usage(",
+        "function delete_daily_feed_usage(",
+        "stock_reverse_transaction(",
+        "stock_apply_movement(",
+        "$pdo->inTransaction()",
+        "The saved Daily Record cycle does not match the feed synchronization request."
+      ]
+    },
+    {
+      "id": "S09",
+      "file": "lib/stock_consumption_source_resolver.php",
+      "markers": [
+        "function stock_consumption_source_resolver_definition(",
+        "'daily_layer_record'",
+        "'daily_broiler_record'",
+        "'linked_daily_record'",
+        "function stock_consumption_source_resolver_resolve("
+      ]
+    },
+    {
+      "id": "S10",
+      "file": "api/delete_record.php",
+      "markers": [
+        "require_http_method('POST')",
+        "require_csrf_token()",
+        "require_rate_limit('delete_record'",
+        "poultry_daily_layer_delete",
+        "poultry_daily_broiler_delete",
+        "delete_daily_feed_usage(",
+        "daily_population_remove_mortality(",
+        "DELETE FROM layer_daily_records",
+        "DELETE FROM broiler_daily_records",
+        "sales_rebuild_layer_egg_allocations(",
+        "$pdo->commit();"
+      ]
+    },
+    {
+      "id": "S11",
+      "file": "includes/permission_runtime.php",
+      "markers": [
+        "function permission_runtime_existing_daily_record(",
+        "'poultry_daily_layer_add'",
+        "'poultry_daily_broiler_add'",
+        "'poultry_daily_layer_edit'",
+        "'poultry_daily_broiler_edit'",
+        "isset($_POST['save_record'])"
+      ]
+    },
+    {
+      "id": "S12",
+      "file": "lib/daily_record_workspace_scope.php",
+      "markers": [
+        "function daily_record_workspace_scope(",
+        "'all_records_mode'",
+        "function daily_record_workspace_distinct_days(",
+        "'activity_label' => 'This Month'"
+      ]
+    },
+    {
+      "id": "S13",
+      "file": "lib/layer_egg_inventory.php",
+      "markers": [
+        "function layer_egg_pool_before_sale(",
+        "function layer_egg_daily_crates_sql(",
+        "LAYER_EGGS_PER_CRATE",
+        "function layer_egg_sale_quantity_crates("
+      ]
+    },
+    {
+      "id": "S14",
+      "file": "lib/sales_allocation.php",
+      "markers": [
+        "function sales_rebuild_layer_egg_allocations(",
+        "function sales_auto_allocate_layer_egg(",
+        "ORDER BY sale_date,id"
+      ]
+    },
+    {
+      "id": "S15",
+      "file": "lib/production_cycle_service.php",
+      "markers": [
+        "function production_cycle_get(",
+        "function production_cycle_create_v3(",
+        "production_population_establish_baseline(",
+        "function production_cycle_close_v3("
+      ]
+    }
+  ],
+  "observed_source_rules": [
+    "two_independent_page_local_daily_record_insert_update_writers",
+    "both_pages_validate_tenant_cycle_CSRF_and_biology_bounds",
+    "layer_derives_crates_and_laying_rate_from_egg_count",
+    "V3_daily_opening_uses_canonical_population_boundary",
+    "legacy_fallback_uses_previous_daily_closing",
+    "source_upsert_continuity_feed_mortality_under_one_transaction",
+    "layer_daily_record_rebuilds_egg_sale_allocations",
+    "broiler_daily_record_does_not_generate_eggs",
+    "continuity_rebases_later_opening_without_editing_later_mortality_feed_water",
+    "continuity_blocks_later_egg_or_mortality_above_opening",
+    "dated_canonical_boundaries_include_nonmortality_movements",
+    "daily_mortality_projection_is_versioned_and_source_owned",
+    "daily_feed_uses_linked_source_lock_and_canonical_stock_movements",
+    "daily_feed_unchanged_is_idempotent_and_changed_is_reversed",
+    "daily_delete_reverses_feed_and_mortality_before_row_removal",
+    "layer_daily_delete_rebuilds_shared_egg_allocations",
+    "DELETE_requires_POST_CSRF_permissions_and_tenant_scope",
+    "current_stock_and_monthly_activity_are_distinct",
+    "continuity_preview_has_sourceId_signature_inconsistency",
+    "source_findings_not_runtime_proof"
+  ],
+  "future_proofs": [
+    "approve_2025_day_level_dates_biology_and_cross_period_policy",
+    "approve_layer_and_broiler_cycle_sources_and_positive_starting_birds",
+    "validate_record_date_between_cycle_start_and_valid_end",
+    "validate_positive_bird_age_and_opening_flock",
+    "validate_nonnegative_mortality_and_egg_max_opening",
+    "prove_replay_of_physical_exits_and_mortality_before_each_date",
+    "prove_opening_balance_at_later_records_after_sales_slaughter_and_transfers",
+    "reject_later_zero_opening_and_excess_mortality",
+    "reject_later_layer_egg_above_updated_opening",
+    "reconcile_layer_egg_rounding_and_later_sales",
+    "preserve_unchanged_later_mortality_feed_water_and_eggs",
+    "test_historical_edit_downstream_rebase_consistency",
+    "trace_and_resolve_daily_population_continuity_preview_sourceId_argument_mismatch",
+    "no_runtime_assumption_from_static_continuity_source_probes",
+    "validate_single_durable_mortality_projection_and_revision_reversal",
+    "prove_source_lock_before_daily_feed_USE_and_costed_inventory",
+    "validate_idempotent_feed_and_old_use_reversal_after_edit",
+    "verify_delete_of_historical_daily_record_does_not_leave_later_opening_inconsistent",
+    "verify_layer_delete_rebuilds_sale_revenue_allocations",
+    "validate_broiler_cannot_create_egg_stock",
+    "validate_tenant_CSRF_and_separate_add_edit_delete_permissions",
+    "prove_concurrent_same_day_upsert_does_not_duplicate_source",
+    "reject_cross_farm_cycle_record_feed_item_ID",
+    "prove_2025_initial_age_cohort_and_feed_quantity_evidence",
+    "preserve_original_2026_digests_and_event_dates",
+    "avoid_duplicate_SQL_and_permission_policies_in_future_shared_service",
+    "no_source_changes_without_separate_runtime_review_authorization",
+    "no_database_creation_import_deploy_or_load_test_in_D09"
+  ],
+  "unverified_source_issue": {
+    "id": "CONTINUITY_PREVIEW_SOURCEID_MISMATCH",
+    "file": "lib/daily_population_continuity.php",
+    "preview_declares_sourceId": false,
+    "preview_body_uses_sourceId": true,
+    "apply_passes_extra_sourceId": true,
+    "runtime_status": "NOT_TESTED",
+    "fix_authority": "NOT_GRANTED"
+  },
+  "gates": {
+    "D01_year": "2025_DESIGN_ONLY",
+    "D01_event_dates": "UNAPPROVED",
+    "D02_layer": "UNAPPROVED",
+    "D03_egg": "UNPROVEN",
+    "D04_broiler": "UNAPPROVED",
+    "D05_feed": "UNAPPROVED",
+    "D06_actor": "UNAPPROVED",
+    "D07_inventory": "UNAPPROVED",
+    "D08_sales": "UNAPPROVED",
+    "D09_daily": "UNAPPROVED",
+    "D10_D12": "UNAPPROVED",
+    "runtime_continuity": "UNPROVEN",
+    "new_V2_events": "NOT_GENERATED",
+    "database_connections": 0,
+    "database_writes": 0,
+    "load_150_VU": "HOLD",
+    "load_200_VU": "PROHIBITED"
+  },
+  "permissions": {
+    "offline_review_only": true,
+    "choose_record_dates": false,
+    "choose_bird_quantities": false,
+    "choose_bird_age": false,
+    "choose_feed_quantities": false,
+    "choose_egg_production": false,
+    "create_daily_records": false,
+    "update_daily_records": false,
+    "delete_daily_records": false,
+    "write_stock_used": false,
+    "write_mortality": false,
+    "rebuild_egg_allocations": false,
+    "modify_PHP": false,
+    "connect_database": false,
+    "write_database": false,
+    "generate_events": false,
+    "import_fixture": false,
+    "deploy": false,
+    "run_load_tests": false
+  }
+}
