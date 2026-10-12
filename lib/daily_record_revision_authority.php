@@ -117,6 +117,33 @@ if (!function_exists('daily_record_revision_validate_scope')) {
     }
 }
 
+if (!function_exists('daily_record_revision_parse_expected')) {
+    /**
+     * Parse the original browser revision without lossy integer coercion.
+     * In particular, absent, "0", negatives, decimals, exponent strings and
+     * values beyond PHP_INT_MAX are conflicts, not current-version guesses.
+     */
+    function daily_record_revision_parse_expected(mixed $raw): int
+    {
+        if (is_int($raw)) {
+            return daily_record_revision_expected($raw);
+        }
+        if (!is_string($raw) || preg_match('/^[1-9][0-9]*$/D', $raw) !== 1) {
+            throw new DailyRecordRevisionConflict(
+                'The Daily Record edit is out of date. Reload it before saving.'
+            );
+        }
+        $max = (string)(PHP_INT_MAX - 1);
+        if (strlen($raw) > strlen($max) ||
+            (strlen($raw) === strlen($max) && strcmp($raw, $max) > 0)) {
+            throw new DailyRecordRevisionConflict(
+                'The Daily Record edit is out of date. Reload it before saving.'
+            );
+        }
+        return daily_record_revision_expected((int)$raw);
+    }
+}
+
 if (!function_exists('daily_record_revision_expected')) {
     function daily_record_revision_expected(int $expectedRevision): int
     {
