@@ -427,9 +427,9 @@ try {
             'only one compensating reversal and one version-two movement added');
         $finalA=production_population_state($pdo,$farmId,$cycleA,'2026-09-23');
         $finalB=production_population_state($pdo,$farmId,$cycleB,'2026-09-23');
-        k2p03_ci_equal(87,(int)$finalA['closing_quantity'],
+        k2p03_ci_equal(87,(int)$finalA['quantity'],
             'corrected Layer cycle canonical close 87');
-        k2p03_ci_equal(97,(int)$finalB['closing_quantity'],
+        k2p03_ci_equal(97,(int)$finalB['quantity'],
             'independent Layer cycle canonical close 97');
     } finally {
         if ($pdo->inTransaction()) {
