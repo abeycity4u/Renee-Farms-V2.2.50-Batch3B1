@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * C137 GC24 K2/P03 B10 R4 — synthetic multi-tenant, role and CSRF guards.
+ * C137 GC24 K2/P03 B10 R5 — synthetic multi-tenant, role and CSRF guards.
  * Uses real app permission/CSRF functions and real shared tenant-source
  * resolution against one disposable GitHub Actions MariaDB schema.
  *
@@ -46,7 +46,7 @@ function b10_snapshot(PDO $db,array $farms): array
  * Return only predefined diagnostic categories; never expose raw child output,
  * SQL, parameters, user data, credentials, tokens, paths or stack traces.
  */
-function b10_r4_failure_family(string $raw): string
+function b10_r5_failure_family(string $raw): string
 {
     if ($raw==='') return 'EMPTY';
     if (str_contains($raw,'Expected role grant missing.')) return 'EXPECTED_ROLE_GRANT_MISSING';
@@ -62,7 +62,7 @@ function b10_r4_failure_family(string $raw): string
     return 'OTHER_REDACTED';
 }
 
-function b10_r4_marker(string $stdout,string $marker,string $pattern): string
+function b10_r5_marker(string $stdout,string $marker,string $pattern): string
 {
     // Only self-authored marker names/patterns may be passed here.
     $regex='/'.preg_quote($marker,'/').'=('.$pattern.')/';
@@ -73,19 +73,19 @@ function b10_r4_marker(string $stdout,string $marker,string $pattern): string
     return 'ABSENT';
 }
 
-function b10_r4_worker_evidence(
+function b10_r5_worker_evidence(
     string $mode,int $exit,string $stdout,string $stderr
 ): string {
     // $mode belongs to a fixed fixture allowlist, not user-controlled input.
     return 'mode='.$mode
         .' exit='.$exit
-        .' stage='.b10_r4_marker($stdout,'B10_R4_WORKER_STAGE','[A-Z_]{1,32}')
-        .' http='.b10_r4_marker($stdout,'B10_WORKER_HTTP_STATUS','[0-9]{3}')
-        .' failure_class='.b10_r4_marker($stdout,'FAILURE_CLASS','[A-Za-z_]{1,64}')
-        .' failure_family='.b10_r4_marker($stdout,'B10_R4_EXCEPTION_FAMILY','[A-Z_]{1,64}')
-        .' stderr_family='.b10_r4_failure_family(trim($stderr))
-        .' last_loaded='.b10_r4_marker($stdout,'B10_R4_LAST_LOADED_MODULE','[A-Z_]{1,40}')
-        .' redirect_category='.b10_r4_marker($stdout,'B10_R4_REDIRECT_CATEGORY','[A-Z_]{1,32}');
+        .' stage='.b10_r5_marker($stdout,'B10_R5_WORKER_STAGE','[A-Z_]{1,32}')
+        .' http='.b10_r5_marker($stdout,'B10_WORKER_HTTP_STATUS','[0-9]{3}')
+        .' failure_class='.b10_r5_marker($stdout,'FAILURE_CLASS','[A-Za-z_]{1,64}')
+        .' failure_family='.b10_r5_marker($stdout,'B10_R5_EXCEPTION_FAMILY','[A-Z_]{1,64}')
+        .' stderr_family='.b10_r5_failure_family(trim($stderr))
+        .' last_loaded='.b10_r5_marker($stdout,'B10_R5_LAST_LOADED_MODULE','[A-Z_]{1,40}')
+        .' redirect_category='.b10_r5_marker($stdout,'B10_R5_REDIRECT_CATEGORY','[A-Z_]{1,32}');
 }
 
 
@@ -94,7 +94,7 @@ function b10_r4_worker_evidence(
  * Output comes exclusively from fixed allowlists, not loaded filenames,
  * redirect URLs, request parameters, tokens or raw PHP headers.
  */
-function b10_r4_last_loaded_module(): string
+function b10_r5_last_loaded_module(): string
 {
     $modules = [
         'init.php' => 'INIT',
@@ -140,7 +140,7 @@ function b10_r4_last_loaded_module(): string
     return $last;
 }
 
-function b10_r4_redirect_category(): string
+function b10_r5_redirect_category(): string
 {
     foreach (headers_list() as $header) {
         if (stripos($header, 'Location:') !== 0) continue;
@@ -192,14 +192,14 @@ function b10_worker(array $argv): never
     foreach([
         'DB_HOST'=>'127.0.0.1','DB_USER'=>'ci_k2p03',
         'DB_PASS'=>(string)getenv('CI_DB_PASSWORD'),
-        'DB_NAME'=>'renee_k2p03_ci_b10_r4'
+        'DB_NAME'=>'renee_k2p03_ci_b10_r5'
     ] as $k=>$v) putenv($k.'='.$v);
     $_SERVER['DOCUMENT_ROOT']=dirname(__DIR__,2);
     $_SERVER['SCRIPT_NAME']='/tests/integration/k2p03_b10_real_mariadb.php';
     $_SERVER['REQUEST_METHOD']='GET';
     $_SERVER['REMOTE_ADDR']='127.0.0.1';
 
-    echo 'B10_R4_WORKER_STAGE=CONFIG_BOOTSTRAP'.PHP_EOL;
+    echo 'B10_R5_WORKER_STAGE=CONFIG_BOOTSTRAP'.PHP_EOL;
     // The real config creates the local PDO connection. Bind the same
     // variable globally so app permission helpers use the isolated DB.
     global $pdo;
@@ -207,28 +207,52 @@ function b10_worker(array $argv): never
     if (session_status() !== PHP_SESSION_ACTIVE) {
         throw new RuntimeException('Isolated worker production session not active.');
     }
+    // Load the ORIGINAL shared binding/enforcement helpers while the
+    // disposable test session is unauthenticated. The module's file-scope
+    // guard consequently does not reject a yet-unbound synthetic actor.
+    // After binding below, explicitly run that SAME shared enforcement
+    // function. init.php's require_once will not re-evaluate the module.
+    if (isset($_SESSION['user_id'])) {
+        throw new RuntimeException('Synthetic worker was already authenticated.');
+    }
+    require_once dirname(__DIR__,2).'/includes/password_security.php';
     http_response_code(200);
     register_shutdown_function(static function ():void {
         echo "\nB10_WORKER_HTTP_STATUS=".http_response_code()."\n";
-        echo "B10_R4_LAST_LOADED_MODULE=".b10_r4_last_loaded_module()."\n";
-        echo "B10_R4_REDIRECT_CATEGORY=".b10_r4_redirect_category()."\n";
+        echo "B10_R5_LAST_LOADED_MODULE=".b10_r5_last_loaded_module()."\n";
+        echo "B10_R5_REDIRECT_CATEGORY=".b10_r5_redirect_category()."\n";
     });
-    echo 'B10_R4_WORKER_STAGE=ACTOR_BINDING'.PHP_EOL;
+    echo 'B10_R5_WORKER_STAGE=ACTOR_BINDING'.PHP_EOL;
     // Install the synthetic actor BEFORE init.php evaluates/caches roles.
     $_SESSION['user_id']=$actor;
     $_SESSION['farm_id']=$farm;
-    $q=$pdo->prepare('SELECT user_type FROM users WHERE id=? AND farm_id=?');
+    $q=$pdo->prepare('SELECT user_type,password FROM users WHERE id=? AND farm_id=?');
     $q->execute([$actor,$farm]);
-    $role=(string)($q->fetchColumn()?:'');
-    if($role==='') throw new RuntimeException('Actor is not part of its tenant.');
-    $_SESSION['user_type']=$role;
+    $actorAccount=$q->fetch(PDO::FETCH_ASSOC);
+    if(!is_array($actorAccount)
+        || (string)($actorAccount['user_type']??'')===''
+        || (string)($actorAccount['password']??'')==='') {
+        throw new RuntimeException('Actor is not part of its tenant.');
+    }
+    $_SESSION['user_type']=(string)$actorAccount['user_type'];
     $_SESSION['csrf_token']=str_repeat('a',64);
+    // Reproduce the legitimate production credential-bound session using
+    // the original central helpers, not a hand-built duplicate hash.
+    // Direct enforcement is essential because password_security.php has
+    // already been loaded once to obtain the binder in this same worker.
+    password_security_bind_authenticated_session($actorAccount);
+    password_security_enforce_authenticated_session($pdo);
+    if(session_status()!==PHP_SESSION_ACTIVE
+        || (string)($_SESSION['credential_session_fingerprint']??'')==='') {
+        throw new RuntimeException('Synthetic credential-bound session not active.');
+    }
+    echo 'B10_R5_SESSION_BOUND=YES'.PHP_EOL;
     // Use the production bootstrap order: init.php loads functions before
     // permission_runtime dispatch. Loading functions.php first would invert
     // that dependency and can evaluate a partial permission stack.
-    echo 'B10_R4_WORKER_STAGE=APP_INIT'.PHP_EOL;
+    echo 'B10_R5_WORKER_STAGE=APP_INIT'.PHP_EOL;
     require_once dirname(__DIR__,2).'/init.php';
-    echo 'B10_R4_WORKER_STAGE=GUARD_DISPATCH'.PHP_EOL;
+    echo 'B10_R5_WORKER_STAGE=GUARD_DISPATCH'.PHP_EOL;
 
     if($mode==='allowed_manager'||$mode==='role_denied'){
         $granted=permission_runtime_has('poultry_daily_layer_edit');
@@ -323,7 +347,7 @@ function b10_exec_worker(string $mode,array $ids): array
         // Fixed-shape sanitized diagnostics only; NEVER print raw child
         // stdout/stderr, token values, SQL, credentials or stack traces.
         fwrite(STDERR,
-            'B10_R4_WORKER_PROCESS_FAILURE '.b10_r4_worker_evidence(
+            'B10_R5_WORKER_PROCESS_FAILURE '.b10_r5_worker_evidence(
                 $mode,$exit,(string)$out,(string)$err
             ).PHP_EOL
         );
@@ -334,7 +358,7 @@ function b10_exec_worker(string $mode,array $ids): array
 
 try {
     k2p03_ci_require_environment(
-        'c137-gc24-k2p03-ci-mariadb-b10-r4','B10R4','renee_k2p03_ci_b10_r4'
+        'c137-gc24-k2p03-ci-mariadb-b10-r5','B10R5','renee_k2p03_ci_b10_r5'
     );
     if(($argv[1]??'')==='--worker') {
         b10_worker($argv);
@@ -350,7 +374,7 @@ try {
         k2p03_ci_blob($root.'/database_schema.sql'),
         'original 69-table SQL Git blob remains pinned'
     );
-    $pdo=k2p03_ci_connection('renee_k2p03_ci_b10_r4');
+    $pdo=k2p03_ci_connection('renee_k2p03_ci_b10_r5');
     $stage='TWO_SYNTHETIC_TENANTS_AND_ACTORS';
     $farm=[];$cycles=[];$records=[];$users=[];
     foreach(['alpha','beta'] as $name) {
@@ -462,10 +486,14 @@ try {
         $result=b10_exec_worker($mode,$ids);
         if(!str_contains($result['output'],$needle)
             || !str_contains($result['output'],'B10_WORKER_HTTP_STATUS='.$http)) {
-            fwrite(STDERR,'B10_R4_WORKER_GUARD_MISMATCH '.b10_r4_worker_evidence(
+            fwrite(STDERR,'B10_R5_WORKER_GUARD_MISMATCH '.b10_r5_worker_evidence(
                 $mode,(int)$result['exit'],(string)$result['output'],''
             ).PHP_EOL);
         }
+        k2p03_ci_check(
+            str_contains($result['output'],'B10_R5_SESSION_BOUND=YES'),
+            $label.' — original credential-bound session verified'
+        );
         k2p03_ci_check(str_contains($result['output'],$needle),
             $label.' — authentic shared guard result');
         k2p03_ci_check(
@@ -489,12 +517,12 @@ try {
         'including malicious role grant, original policy rows unchanged');
     k2p03_ci_equal($baseline,b10_snapshot($pdo,array_values($farm)),
         'final eight-table cross-farm authorization invariants');
-    echo 'K2_P03_B10_R4_REAL_MARIADB=PASS'.PHP_EOL;
+    echo 'K2_P03_B10_R5_REAL_MARIADB=PASS'.PHP_EOL;
 } catch(Throwable $e) {
     if($pdo instanceof PDO&&$pdo->inTransaction()) $pdo->rollBack();
     fwrite(STDERR,'FAILURE_STAGE='.$stage.PHP_EOL);
     fwrite(STDERR,'FAILURE_CLASS='.get_class($e).PHP_EOL);
-    fwrite(STDERR,'B10_R4_EXCEPTION_FAMILY='.b10_r4_failure_family($e->getMessage()).PHP_EOL);
-    fwrite(STDERR,'K2_P03_B10_R4_REAL_MARIADB=FAIL'.PHP_EOL);
+    fwrite(STDERR,'B10_R5_EXCEPTION_FAMILY='.b10_r5_failure_family($e->getMessage()).PHP_EOL);
+    fwrite(STDERR,'K2_P03_B10_R5_REAL_MARIADB=FAIL'.PHP_EOL);
     exit(1);
 }
