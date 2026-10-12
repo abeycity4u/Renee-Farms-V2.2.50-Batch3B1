@@ -115,7 +115,7 @@ try {
     try {
         $additionId = production_population_record_movement(
             $pdo,$farmId,$cycleId,'adjustment_in','2026-09-22',
-            20,'adjustment',null,1,'b06-synthetic-day2-intake',
+            20,'adjustment',null,1,'b0600000000000000000000000000001',
             'Synthetic same-day intake isolates later mortality guard',null
         );
         k2p03_ci_check($additionId > 0,
