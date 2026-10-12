@@ -548,6 +548,27 @@ function b12_controller(): void
             'exactly one active source-owned feed USED movement');
         k2p03_ci_check(!$pdo->inTransaction(),
             'controller has no open MariaDB transaction');
+        // Reconcile even when the outcome is an UNSAFE double commit.
+        // A coherent final ledger does not excuse a silent stale overwrite.
+        $observedMortality = (int)$target['mortality'];
+        $observedBags = (float)$target['feed_consumption_bags'];
+        k2p03_ci_equal(-$observedMortality,
+            (int)$activeMovements[0]['quantity_delta'],
+            'persisted active physical movement matches final source');
+        k2p03_ci_equal(number_format($observedBags,2,'.',''),
+            (string)$liveFeed[0]['quantity'],
+            'persisted active stock USED matches final source');
+        k2p03_ci_equal(number_format(18-$observedBags,2,'.',''),
+            (string)b12_row($pdo,$farm,'stock_items',$feed)['current_stock'],
+            'persisted physical feed balance reconciles after contention');
+        k2p03_ci_equal(29-$observedMortality,
+            (int)production_population_state($pdo,$farm,$cycle,'2026-09-23')['quantity'],
+            'persisted flock reconciles after contention');
+        foreach ([$ids[1],$ids[2]] as $later) {
+            k2p03_ci_equal(30-$observedMortality,
+                (int)b12_row($pdo,$farm,'layer_daily_records',$later)['opening_stock'],
+                'persisted later opening reconciles after contention');
+        }
 
         /*
          * Important: a second successful write from the same PRE-edit state
