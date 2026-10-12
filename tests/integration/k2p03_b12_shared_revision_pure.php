@@ -83,6 +83,63 @@ try {
     }
 
     b12_revision_pure_check(
+        daily_record_revision_parse_record_id('42') === 42,
+        'immutable browser-loaded record ID parses exactly'
+    );
+    b12_revision_pure_check(
+        daily_record_revision_parse_record_id(7) === 7,
+        'typed positive record ID accepted'
+    );
+    foreach ([
+        null, false, 0, -1, 1.2, [], '', '0', '00', '01',
+        ' 1', '+1', '-1', '1.0', '1e3', "1\n", str_repeat('9', 60),
+    ] as $candidate) {
+        b12_revision_pure_reject(
+            static fn() => daily_record_revision_parse_record_id($candidate),
+            'ambiguous, missing or overflow record ID rejected'
+        );
+    }
+
+    b12_revision_pure_check(
+        daily_record_revision_parse_write_intent('create', null, null) === [
+            'mode' => 'create', 'record_id' => null,
+            'expected_revision' => null,
+        ],
+        'new record requires explicit CREATE without edit tokens'
+    );
+    b12_revision_pure_check(
+        daily_record_revision_parse_write_intent('create', '', '')['mode']
+            === 'create',
+        'blank HTML create tokens accepted without inferring edit'
+    );
+    b12_revision_pure_check(
+        daily_record_revision_parse_write_intent('edit', '23', '5') === [
+            'mode' => 'edit', 'record_id' => 23,
+            'expected_revision' => 5,
+        ],
+        'EDIT preserves immutable client row ID and client revision'
+    );
+    foreach ([
+        [null, null, null],
+        ['update', '23', '5'],
+        ['EDIT', '23', '5'],
+        ['create', '23', null],
+        ['create', null, '1'],
+        ['create', '0', '0'],
+        ['edit', null, '1'],
+        ['edit', '23', null],
+        ['edit', '23', '0'],
+        ['edit', '0', '1'],
+        ['edit', '023', '1'],
+        ['edit', '23', '01'],
+    ] as $tokens) {
+        b12_revision_pure_reject(
+            static fn() => daily_record_revision_parse_write_intent(...$tokens),
+            'missing/mismatched CREATE or EDIT client tokens rejected'
+        );
+    }
+
+    b12_revision_pure_check(
         daily_record_revision_validate_scope(
             1, 2, 3, '2026-09-21', false, null
         ) === null,
