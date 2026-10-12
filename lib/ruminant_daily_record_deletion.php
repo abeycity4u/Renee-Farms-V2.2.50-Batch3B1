@@ -36,7 +36,11 @@ if (!function_exists('ruminant_daily_record_delete_canonical')) {
         }
 
         try {
-            $pdo->beginTransaction();
+            if (!$pdo->beginTransaction()) {
+                throw new RuntimeException(
+                    'Ruminant Daily Record deletion could not begin its transaction.'
+                );
+            }
 
             /*
              * Lock the authoritative source before any linked feed/stock
