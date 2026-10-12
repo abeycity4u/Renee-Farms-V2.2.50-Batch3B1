@@ -134,6 +134,7 @@ function b12_worker(array $args): void
     $waitMs = 0;
     $conn = 0;
     $staleMortality = null;
+    $workerFailed = false;
     try {
         if (!in_array($role, ['A', 'B'], true)
             || !is_dir($dir) || $farm <= 0 || $cycle <= 0
@@ -233,13 +234,14 @@ function b12_worker(array $args): void
         if (!$conflict) {
             fwrite(STDERR, 'B12_WORKER_FAILURE_ROLE=' . $role . PHP_EOL);
             fwrite(STDERR, 'B12_WORKER_FAILURE_CLASS=' . get_class($e) . PHP_EOL);
-            exit(1);
+            $workerFailed = true;
         }
     } finally {
         if ($pdo instanceof PDO && $pdo->inTransaction()) {
             $pdo->rollBack();
         }
     }
+    if ($workerFailed) exit(1);
 }
 
 function b12_seed(PDO $pdo): array
