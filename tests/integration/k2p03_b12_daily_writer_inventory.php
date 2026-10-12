@@ -10,7 +10,7 @@ declare(strict_types=1);
  * routines and external callers require an independent manual audit.
  */
 $root = dirname(__DIR__, 2);
-$dirs = ['api', 'includes', 'inventory', 'lib', 'management', 'poultry', 'ruminant'];
+$dirs = ['account', 'admin', 'api', 'billing', 'includes', 'inventory', 'lib', 'management', 'poultry', 'ruminant'];
 $expected = [
     'api/delete_record.php',
     'lib/daily_population_continuity.php',
@@ -24,6 +24,15 @@ $identity = '~\b(?:layer_daily_records|broiler_daily_records|ruminant_daily_reco
 $found = [];
 $errors = [];
 $read = 0;
+
+// Also inspect top-level runtime entry points; they are outside module dirs.
+$topLevel = glob($root . DIRECTORY_SEPARATOR . '*.php') ?: [];
+$rootCandidates = [];
+foreach ($topLevel as $fileName) {
+    if (is_file($fileName)) {
+        $rootCandidates[] = $fileName;
+    }
+}
 
 foreach ($dirs as $dir) {
     $base = $root . DIRECTORY_SEPARATOR . $dir;
@@ -67,6 +76,21 @@ foreach ($dirs as $dir) {
             preg_match_all($pattern, $sourceSql . "\n" . $source, $matches);
             $found[$relative] = array_values(array_unique($matches[0] ?? []));
         }
+    }
+}
+// Root PHP files are inspected by the same textual SQL rule. No includes
+// or application routes are executed by this verifier.
+foreach ($rootCandidates as $fileName) {
+    $relative = basename($fileName);
+    $source = file_get_contents($fileName);
+    if (!is_string($source)) {
+        $errors[] = 'Unreadable root file: ' . $relative;
+        continue;
+    }
+    ++$read;
+    if (preg_match($identity, $source) && preg_match($pattern, $source)) {
+        preg_match_all($pattern, $source, $matches);
+        $found[$relative] = array_values(array_unique($matches[0] ?? []));
     }
 }
 ksort($found, SORT_STRING);
