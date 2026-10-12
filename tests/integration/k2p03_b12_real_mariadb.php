@@ -405,6 +405,7 @@ function b12_controller(): void
     $dir = null;
     $processes = [];
     $failed = false;
+    $passed = false;
     try {
         b12_env();
         $pdo = k2p03_ci_connection(B12_DB);
@@ -465,6 +466,17 @@ function b12_controller(): void
         $stage = 'BOUNDED_WORKER_RESULTS';
         b12_wait($dir, 'A_RESULT');
         b12_wait($dir, 'B_RESULT');
+        foreach ($processes as $role => $proc) {
+            $until = microtime(true) + 4.0;
+            do {
+                $procStatus = proc_get_status($proc);
+                if (!$procStatus['running']) break;
+                usleep(20000);
+            } while (microtime(true) < $until);
+            k2p03_ci_check(!$procStatus['running'] &&
+                (int)$procStatus['exitcode'] === 0,
+                'independent worker ' . $role . ' exited successfully');
+        }
         $resultA = json_decode(
             (string)file_get_contents($dir.'/A_RESULT'),true,512,JSON_THROW_ON_ERROR
         );
@@ -573,7 +585,7 @@ function b12_controller(): void
                 (int)b12_row($pdo,$farm,'layer_daily_records',$later)['opening_stock'],
                 'downstream opening is based on the sole successful correction');
         }
-        echo 'K2_P03_B12_REAL_MARIADB=PASS'.PHP_EOL;
+        $passed = true;
     } catch (Throwable $e) {
         fwrite(STDERR,'FAILURE_STAGE='.$stage.PHP_EOL);
         fwrite(STDERR,'FAILURE_CLASS='.get_class($e).PHP_EOL);
@@ -585,6 +597,7 @@ function b12_controller(): void
         echo 'B12_LOCAL_WORKER_CLEANUP=COMPLETE'.PHP_EOL;
     }
     if ($failed) exit(1);
+    if ($passed) echo 'K2_P03_B12_REAL_MARIADB=PASS'.PHP_EOL;
 }
 
 $role = $argv[1] ?? '';
