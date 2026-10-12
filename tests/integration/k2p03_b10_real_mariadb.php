@@ -68,15 +68,15 @@ function b10_worker(array $argv): never
     $_SERVER['REQUEST_METHOD']='GET';
     $_SERVER['REMOTE_ADDR']='127.0.0.1';
 
-    // The actual config starts session, connects only to guarded localhost DB,
-    // and defines verify_csrf_token(), getCurrentFarmId(), and roles.
+    // The real config creates the local PDO connection. Bind the same
+    // variable globally so app permission helpers use the isolated DB.
+    global $pdo;
     require_once dirname(__DIR__,2).'/config.php';
-    require_once dirname(__DIR__,2).'/includes/functions.php';
     http_response_code(200);
     register_shutdown_function(static function ():void {
         echo "\nB10_WORKER_HTTP_STATUS=".http_response_code()."\n";
     });
-    global $pdo;
+    // Install the synthetic actor BEFORE init.php evaluates/caches roles.
     $_SESSION['user_id']=$actor;
     $_SESSION['farm_id']=$farm;
     $q=$pdo->prepare('SELECT user_type FROM users WHERE id=? AND farm_id=?');
@@ -85,6 +85,7 @@ function b10_worker(array $argv): never
     if($role==='') throw new RuntimeException('Actor is not part of its tenant.');
     $_SESSION['user_type']=$role;
     $_SESSION['csrf_token']=str_repeat('a',64);
+    require_once dirname(__DIR__,2).'/includes/functions.php';
 
     if($mode==='allowed_manager'||$mode==='role_denied'){
         $granted=permission_runtime_has('poultry_daily_layer_edit');
