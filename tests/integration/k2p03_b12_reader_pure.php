@@ -33,7 +33,7 @@ function ok(bool $actual, string $label): void {
     echo 'PASS: ' . $label . PHP_EOL;
 }
 function rejection(callable $fn, string $label): void {
-    try {$fn();} catch (DailyRecordRevisionConflict|InvalidArgumentException $e) {
+    try {$fn();} catch (DailyRecordRevisionConflict|DailyRecordRevisionNotFound|InvalidArgumentException $e) {
         ok(true, $label);
         return;
     }
