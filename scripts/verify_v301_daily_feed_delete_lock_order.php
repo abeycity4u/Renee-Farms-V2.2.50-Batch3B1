@@ -242,14 +242,14 @@ $check(
 
 $check(
     'RUMINANT_ADMIN_USES_SHARED_DELETE_SERVICE',
-    preg_match('/ruminant_daily_record_delete_canonical\\s*\\(/', $ruminant) === 1
+    str_contains($ruminant, 'ruminant_daily_record_delete_canonical(')
     && !str_contains($ruminant, 'DELETE FROM ruminant_daily_records')
     && !str_contains($ruminant, 'delete_daily_feed_usage(')
 );
 
 $check(
     'RUMINANT_DELEGATE_USES_SHARED_DELETE_SERVICE',
-    preg_match('/ruminant_daily_record_delete_canonical\\s*\\(/', $ruminantPermissionRuntime) === 1
+    str_contains($ruminantPermissionRuntime, 'ruminant_daily_record_delete_canonical(')
     && str_contains($ruminantPermissionRuntime, "permission_runtime_has('ruminant_daily_delete')")
     && str_contains($ruminantPermissionRuntime, 'verify_csrf_token(')
     && !str_contains($ruminantPermissionRuntime, 'DELETE FROM ruminant_daily_records')
