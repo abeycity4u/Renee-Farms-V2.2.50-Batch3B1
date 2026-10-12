@@ -79,7 +79,7 @@ try {
     $stage = 'SYNTHETIC_CANONICAL_FIXTURE';
     $pdo->exec(
         "INSERT INTO farms(name, slug)
-         VALUES ('K2P03 B11 future mortality', 'k2p03-b11-synthetic')"
+         VALUES ('K2P03 B11 mid-writer rollback', 'k2p03-b11-synthetic')"
     );
     $farmId = (int)$pdo->lastInsertId();
     k2p03_ci_check($farmId > 0, 'one synthetic B11 farm persisted');
@@ -116,7 +116,7 @@ try {
         $additionId = production_population_record_movement(
             $pdo,$farmId,$cycleId,'adjustment_in','2026-09-22',
             20,'adjustment',null,1,'b1100000000000000000000000000001',
-            'Synthetic same-day intake isolates later mortality guard',null
+            'Synthetic same-day intake keeps the revised later mortality valid',null
         );
         k2p03_ci_check($additionId > 0,
             'durable synthetic day-two population addition recorded');
@@ -390,6 +390,11 @@ try {
             k2p03_ci_equal(1,count(b11_snapshot(
                 $pdo,$farmId,'sales_allocations'
             )),$point.' pooled egg sale has exactly one cycle allocation');
+            k2p03_ci_check(
+                $before['sales_allocations']!==
+                    b11_snapshot($pdo,$farmId,'sales_allocations'),
+                $point.' real automatic allocator deleted/recreated its rows inside transaction'
+            );
             k2p03_ci_equal($before['sales_records'],
                 b11_snapshot($pdo,$farmId,'sales_records'),
                 $point.' original egg-sale source revenue never rewritten');
