@@ -19,7 +19,7 @@ $month = $_GET['month'] ?? date('Y-m');
 $yearMonth = date('Y-m', strtotime($month));
 $selectedCycleId = isset($_GET['cycle_id']) ? (int)$_GET['cycle_id'] : 0;
 $monthSelectorDate = date('Y-m-d', strtotime($yearMonth . '-' . min((int)date('d'), (int)date('t', strtotime($yearMonth . '-01')))));
-$canDeleteRecords = isPlatformOwner() || hasRole('farm_admin');
+$canDeleteRecords = permission_runtime_has('ruminant_daily_delete');
 $canEditRecords = $canDeleteRecords || hasRole('ruminant_manager');
 $managedTypes = ['cattle', 'goat', 'sheep', 'other'];
 $tenantFarmId = requireCurrentFarmId();
@@ -57,7 +57,7 @@ $workspaceScope = daily_record_workspace_scope(
     $selectedCycleId
 );
 
-// Handle delete request (admin/owner only).
+// Handle delete request (authorized role; delegated route intercepts first).
 // This page keeps its existing authorization/CSRF/redirect contract;
 // the shared service alone owns the canonical business transaction.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_record']) && $canDeleteRecords) {
