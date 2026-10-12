@@ -6,10 +6,11 @@ declare(strict_types=1);
  * Not imported by application routes and not connected to GitHub Actions.
  * This script is PREPARED BUT NOT EXECUTED by the source-only step.
  * Run only under separately reviewed source verification authorization.
- * Known source paths include the delegated Ruminant delete in
- * includes/permission_runtime.php and the three cycle-start seed inserts in
- * management/production_cycles.php. The delegated delete's missing canonical
- * mortality reversal is a separately documented unresolved finding.
+ * The formerly duplicated privileged and delegated Ruminant delete
+ * statements are now centralized in lib/ruminant_daily_record_deletion.php.
+ * The delegated runtime and privileged route remain source-level callers,
+ * but no longer contain direct DELETE FROM ruminant_daily_records SQL.
+ * Cycle-start seed INSERTs in management/production_cycles.php remain.
  * Static SQL matching does not prove completeness: dynamic SQL, stored
  * routines and external callers require an independent manual audit.
  */
@@ -17,8 +18,8 @@ $root = dirname(__DIR__, 2);
 $dirs = ['account', 'admin', 'api', 'billing', 'includes', 'inventory', 'lib', 'management', 'poultry', 'ruminant'];
 $expected = [
     'api/delete_record.php',
-    'includes/permission_runtime.php',
     'lib/daily_population_continuity.php',
+    'lib/ruminant_daily_record_deletion.php',
     'management/production_cycles.php',
     'poultry/broiler_daily_record.php',
     'poultry/layers_daily_record.php',
