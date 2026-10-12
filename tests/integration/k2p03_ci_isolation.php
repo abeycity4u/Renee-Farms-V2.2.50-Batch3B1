@@ -19,6 +19,11 @@ function k2p03_ci_require_environment(
             'database' => 'renee_k2p03_ci_b02',
             'password' => 'ci-only-nonsecret-b02',
         ],
+        'B06R1' => [
+            'branch' => 'c137-gc24-k2p03-ci-mariadb-b06-r1',
+            'database' => 'renee_k2p03_ci_b06_r1',
+            'password' => 'ci-only-nonsecret-b06-r1',
+        ],
         'B06' => [
             'branch' => 'c137-gc24-k2p03-ci-mariadb-b06',
             'database' => 'renee_k2p03_ci_b06',
@@ -97,7 +102,7 @@ function k2p03_ci_equal($expected, $actual, string $label): void
 
 function k2p03_ci_connection(string $database): PDO
 {
-    if (!in_array($database, ['renee_k2p03_ci_b02', 'renee_k2p03_ci_b03', 'renee_k2p03_ci_b04', 'renee_k2p03_ci_b05', 'renee_k2p03_ci_b06'], true)) {
+    if (!in_array($database, ['renee_k2p03_ci_b02', 'renee_k2p03_ci_b03', 'renee_k2p03_ci_b04', 'renee_k2p03_ci_b05', 'renee_k2p03_ci_b06', 'renee_k2p03_ci_b06_r1'], true)) {
         throw new RuntimeException('The requested CI schema is not approved.');
     }
 
