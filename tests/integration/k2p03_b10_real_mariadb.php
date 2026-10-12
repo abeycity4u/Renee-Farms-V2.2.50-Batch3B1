@@ -96,6 +96,8 @@ function b10_worker(array $argv): never
         }
         if($granted) throw new RuntimeException('Unexpected role grant.');
         echo 'B10_WRONG_ROLE_DENIED=YES'.PHP_EOL;
+        // POST is the mutating request boundary; GET denial redirects.
+        $_SERVER['REQUEST_METHOD']='POST';
         permission_runtime_deny('Permission denied.');
         throw new RuntimeException('Permission deny returned.');
     }
