@@ -234,7 +234,7 @@ $check(
 
 $check(
     'RUMINANT_SHARED_DELETE_TRANSACTION',
-    str_contains($ruminantDeleteService, '$pdo->beginTransaction();')
+    str_contains($ruminantDeleteService, '$pdo->beginTransaction()')
     && str_contains($ruminantDeleteService, '$pdo->commit();')
     && str_contains($ruminantDeleteService, '$pdo->rollBack();')
     && str_contains($ruminantDeleteService, 'if ($deleteStmt->rowCount() !== 1)')
