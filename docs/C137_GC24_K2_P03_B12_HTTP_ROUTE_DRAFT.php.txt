@@ -1,0 +1,41 @@
+<?php
+declare(strict_types=1);
+
+/**
+ * B12 SOURCE-ONLY HTTP route draft. NEVER DEPLOY OR RENAME TO api/*.php.
+ * Not an active route; preactivation failures in existing requireLogin() and
+ * init.php subscription/session redirect paths must be resolved centrally.
+ * The first two statements deliberately stop execution even if misrouted.
+ */
+http_response_code(503);
+exit;
+
+// FUTURE ROUTE ONLY AFTER SEPARATELY APPROVED SCHEMA/CAS/JSON-AUTH GATES.
+// Expected eventual path: api/daily_record_revision_read.php
+require_once dirname(__DIR__) . '/init.php';
+require_once __DIR__ . '/api_helpers.php';
+require_once dirname(__DIR__) . '/lib/daily_record_revision_api_adapter.php';
+
+// Existing requireLogin() redirects (HTML) on invalid/suspended accounts.
+// JSON APIs need a canonical account/subscription validation path capable of
+// returning 401/403 JSON, without duplicating/reimplementing account SQL.
+// This illustrative guest guard is NOT sufficient for invalid active sessions,
+// because init.php may also end a request before reaching this code.
+if (!isLoggedIn()) {
+    send_json(['success' => false, 'code' => 'authentication_required',
+        'error' => 'Please sign in.'], 401);
+}
+requireLogin(); // BLOCKED until canonical JSON-capable account guard is agreed.
+
+// Explicit GET only. Adapter returns 405 and does not query for other methods.
+// Never pass a client farm_id; adapter resolves the trusted session farm.
+// Scope probes are not CREATE reservations. Exact ID loads still require Edit.
+$result = daily_record_revision_api_handle(
+    $pdo,
+    strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? '')),
+    $_GET
+);
+
+// Existing send_json() provides JSON, HTTP status and Cache-Control: no-store.
+// No echo/HTML, ad hoc SQL, revision fabrication, or database writes here.
+send_json($result['body'], $result['http_status']);
