@@ -105,7 +105,7 @@ check_section() {
         echo "FAIL=INVENTORY_${section}_${kind}"
         exit 1
     fi
-    echo "PASS=INVENTORY_$section_$kind | value=$first,$second"
+    echo "PASS=INVENTORY_${section}_${kind} | value=$first,$second"
 }
 for kind in layer broiler ruminant; do
     # Section 07: one repeated NULL-cycle logical key, one excess row.
