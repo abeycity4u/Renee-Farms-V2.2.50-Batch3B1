@@ -3,6 +3,7 @@
 require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/../lib/daily_feed_sync.php');
 require_once(__DIR__ . '/../lib/daily_population_sync.php');
+require_once(__DIR__ . '/../lib/ruminant_daily_record_deletion.php');
 require_once(__DIR__ . '/../lib/daily_population_continuity.php');
 require_once(__DIR__ . '/../lib/daily_record_workspace_scope.php');
 require_once(__DIR__ . '/../lib/ruminant_daily_record_mortality_summary.php');
@@ -56,56 +57,38 @@ $workspaceScope = daily_record_workspace_scope(
     $selectedCycleId
 );
 
-// Handle delete request (admin/owner only)
+// Handle delete request (admin/owner only).
+// This page keeps its existing authorization/CSRF/redirect contract;
+// the shared service alone owns the canonical business transaction.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_record']) && $canDeleteRecords) {
-    if (!verify_csrf_token($_POST['csrf_token'] ?? '')) { http_response_code(419); exit('Invalid request token.'); }
-    $recordId = (int)($_POST['record_id'] ?? 0);
-
-    if ($recordId > 0) {
-        $recordCheck = $pdo->prepare("SELECT animal_type FROM ruminant_daily_records WHERE id = ? AND farm_id = ?");
-        $recordCheck->execute([$recordId, $tenantFarmId]);
-        $record = $recordCheck->fetch();
-
-        if ($record && in_array(strtolower($record['animal_type']), $managedTypes, true)) {
-            try {
-                $pdo->beginTransaction();
-                /*
-                 * Establish the authoritative Daily Record -> stock lock
-                 * order before touching downstream population projection.
-                 */
-                delete_daily_feed_usage(
-                    $pdo,
-                    $tenantFarmId,
-                    $recordId,
-                    'daily_ruminant_record'
-                );
-
-                daily_population_remove_mortality(
-                    $pdo,
-                    $tenantFarmId,
-                    'daily_ruminant_record',
-                    $recordId,
-                    (int)$_SESSION['user_id']
-                );
-                $deleteStmt = $pdo->prepare("DELETE FROM ruminant_daily_records WHERE id = ? AND farm_id = ?");
-                $deleteStmt->execute([$recordId, $tenantFarmId]);
-                if ($deleteStmt->rowCount() !== 1) {
-                    throw new RuntimeException('The daily record could not be deleted.');
-                }
-                $pdo->commit();
-                $_SESSION['success'] = "Ruminant daily record deleted successfully.";
-            } catch (Throwable $e) {
-                if ($pdo->inTransaction()) $pdo->rollBack();
-                $_SESSION['error'] = safeUserExceptionMessage($e, 'The daily record could not be deleted.');
-            }
-        } else {
-            $_SESSION['error'] = "Daily record not found or you do not have permission to delete it.";
-        }
-    } else {
-        $_SESSION['error'] = "Invalid daily record.";
+    if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
+        http_response_code(419);
+        exit('Invalid request token.');
     }
 
-    header("Location: ruminant_daily_record.php?month=" . $month . "&cycle_id=" . (int)$selectedCycleId);
+    $recordId = (int)($_POST['record_id'] ?? 0);
+    if ($recordId > 0) {
+        try {
+            ruminant_daily_record_delete_canonical(
+                $pdo,
+                $tenantFarmId,
+                $recordId,
+                isset($_SESSION['user_id'])
+                    ? (int)$_SESSION['user_id']
+                    : null
+            );
+            $_SESSION['success'] = 'Ruminant daily record deleted successfully.';
+        } catch (Throwable $e) {
+            $_SESSION['error'] = safeUserExceptionMessage(
+                $e,
+                'The daily record could not be deleted.'
+            );
+        }
+    } else {
+        $_SESSION['error'] = 'Invalid daily record.';
+    }
+
+    header('Location: ruminant_daily_record.php?month=' . $month . '&cycle_id=' . (int)$selectedCycleId);
     exit();
 }
 
