@@ -54,7 +54,7 @@ function b06_one(PDO $pdo, int $farmId, string $table, int $id): array
 
 try {
     k2p03_ci_require_environment(
-        'c137-gc24-k2p03-ci-mariadb-b06', 'B06', 'renee_k2p03_ci_b06'
+        'c137-gc24-k2p03-ci-mariadb-b06-r1', 'B06R1', 'renee_k2p03_ci_b06_r1'
     );
     $root = dirname(__DIR__, 2);
     k2p03_ci_equal(
@@ -69,7 +69,7 @@ try {
     );
 
     $stage = 'DISPOSABLE_DATABASE';
-    $pdo = k2p03_ci_connection('renee_k2p03_ci_b06');
+    $pdo = k2p03_ci_connection('renee_k2p03_ci_b06_r1');
     require_once $root . '/lib/daily_population_continuity.php';
     require_once $root . '/lib/daily_population_sync.php';
     require_once $root . '/lib/daily_feed_sync.php';
