@@ -85,7 +85,10 @@ function b10_worker(array $argv): never
     if($role==='') throw new RuntimeException('Actor is not part of its tenant.');
     $_SESSION['user_type']=$role;
     $_SESSION['csrf_token']=str_repeat('a',64);
-    require_once dirname(__DIR__,2).'/includes/functions.php';
+    // Use the production bootstrap order: init.php loads functions before
+    // permission_runtime dispatch. Loading functions.php first would invert
+    // that dependency and can evaluate a partial permission stack.
+    require_once dirname(__DIR__,2).'/init.php';
 
     if($mode==='allowed_manager'||$mode==='role_denied'){
         $granted=permission_runtime_has('poultry_daily_layer_edit');
