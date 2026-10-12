@@ -118,9 +118,14 @@ function b10_worker(array $argv): never
             daily_feed_sync_authoritative_cycle_guard(
                 $pdo,$farm,$target,$cycle,'daily_layer_record'
             );
-        } catch(Throwable $e) {
+        } catch(RuntimeException $e) {
             $pdo->rollBack();
-            // Shared service throws instead of producing an HTTP response.
+            // Only the shared resolver's explicit source-not-found denial
+            // qualifies. A database error or unrelated exception must fail.
+            if($e->getMessage()!==
+                'The authoritative Daily Record linked to this stock movement was not found.') {
+                throw $e;
+            }
             echo 'B10_FOREIGN_RECORD_SOURCE_REJECTED=YES'.PHP_EOL;
             exit(0);
         }
