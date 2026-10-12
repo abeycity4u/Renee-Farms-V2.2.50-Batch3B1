@@ -1,0 +1,98 @@
+name: C137 GC24 K2-P03 B12 one-use synthetic schema evidence
+
+# A NEW isolated schema-evidence run. Never dispatches/reruns the old B12 CI.
+# Source/workflow commits cannot trigger execution.
+on:
+  push:
+    branches:
+      - c137-gc24-k2p03-b12-schema-evidence-once
+    paths:
+      - docs/C137_GC24_K2_P03_B12_SCHEMA_EXECUTION_APPROVAL.txt
+
+permissions:
+  contents: read
+
+concurrency:
+  group: k2p03-b12-schema-evidence-once
+  cancel-in-progress: false
+
+jobs:
+  b12-schema-evidence:
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/c137-gc24-k2p03-b12-schema-evidence-once' &&
+      github.event.head_commit.message == 'ci-b12(schema-run): authorize one synthetic schema evidence' &&
+      github.run_attempt == 1
+    name: Disposable synthetic MariaDB schema evidence only
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CI_DB_HOST: '127.0.0.1'
+      CI_DB_PORT: '3306'
+      CI_DB_NAME: 'renee_b12_schema_synthetic_once'
+      CI_DB_USER: 'ci_schema'
+      CI_DB_PASSWORD: 'synthetic-only-b12-schema-once'
+
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: synthetic-only-root-b12-schema-once
+          MARIADB_DATABASE: renee_b12_schema_synthetic_once
+          MARIADB_USER: ci_schema
+          MARIADB_PASSWORD: synthetic-only-b12-schema-once
+        ports:
+          - 127.0.0.1:3306:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - name: Checkout exactly this isolated synthetic test branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+
+      - name: Fail closed on one-use approval and protected environment guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          approval='docs/C137_GC24_K2_P03_B12_SCHEMA_EXECUTION_APPROVAL.txt'
+          test "$GITHUB_ACTIONS" = 'true'
+          test "$RUNNER_ENVIRONMENT" = 'github-hosted'
+          test "$GITHUB_REPOSITORY" = 'abeycity4u/Renee-Farms-V2.2.50-Batch3B1'
+          test "$GITHUB_REF" = 'refs/heads/c137-gc24-k2p03-b12-schema-evidence-once'
+          test "$GITHUB_RUN_ATTEMPT" = '1'
+          test "$(git show -s --format=%s HEAD)" = 'ci-b12(schema-run): authorize one synthetic schema evidence'
+          test "$(git diff-tree --no-commit-id --name-only -r HEAD)" = "$approval"
+          test "$(git diff-tree --no-commit-id --name-only --diff-filter=A -r HEAD)" = "$approval"
+          test "$(sed -n '1p' "$approval")" = 'CI_B12_NEW_SCHEMA_EXECUTION_APPROVED=YES'
+          test "$(sed -n '2p' "$approval")" = "CI_B12_SCHEMA_APPROVED_PARENT=$(git rev-parse HEAD^)"
+          test "$(wc -l < "$approval" | tr -d ' ')" = '2'
+          test "$(git hash-object database_schema.sql)" = 'e77f287d62c5812a3d55dc23b5b20f5d167db389'
+          test "$(git hash-object tests/integration/k2p03_b12_schema_evidence_synthetic.sh)" = 'bad4e82eea139d1df4ae74c9d5850564861ce418'
+          test "$(git hash-object docs/C137_GC24_K2_P03_B12_READONLY_SCHEMA_INVENTORY.sql)" = '6dd5614edb2dae2432d9e8628b43ba53177e7133'
+          test "$CI_DB_HOST" = '127.0.0.1'
+          test "$CI_DB_PORT" = '3306'
+          test "$CI_DB_NAME" = 'renee_b12_schema_synthetic_once'
+          test "$CI_DB_USER" = 'ci_schema'
+          test "$CI_DB_PASSWORD" = 'synthetic-only-b12-schema-once'
+          echo 'B12_NEW_ONE_USE_APPROVAL_GUARD=PASS'
+          echo 'PROTECTED_DATABASE_CONNECTIONS=NONE'
+
+      - name: Install disposable schema MariaDB client
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends mariadb-client
+
+      - name: Run synthetic-only schema and nullable cycle evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n tests/integration/k2p03_b12_schema_evidence_synthetic.sh
+          bash tests/integration/k2p03_b12_schema_evidence_synthetic.sh
