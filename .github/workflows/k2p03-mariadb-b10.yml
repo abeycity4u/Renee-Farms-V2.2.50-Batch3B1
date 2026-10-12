@@ -96,7 +96,7 @@ jobs:
           test "$CI_DB_PASSWORD" = 'ci-only-nonsecret-b10'
           test "$(git hash-object database_schema.sql)" = 'e77f287d62c5812a3d55dc23b5b20f5d167db389'
           test "$(git hash-object lib/daily_population_continuity.php)" = '9503771b47c6c2fe26bb3237da69a17874e724a3'
-          test "$(git hash-object tests/integration/k2p03_b10_real_mariadb.php)" = 'cabe96805b546ffa5669663dae9ffc9241eeee5b'
+          test "$(git hash-object tests/integration/k2p03_b10_real_mariadb.php)" = '024d9d4e1b6efa675755dabb3441c1189dadee41'
           test "$(git hash-object tests/integration/k2p03_ci_isolation.php)" = '9ade617de6e272e4e95eb25816cb1a76e7cb586d'
           test "$(MYSQL_PWD="$CI_DB_PASSWORD" mariadb --protocol=TCP --host="$CI_DB_HOST" --port="$CI_DB_PORT" --user="$CI_DB_USER" --database="$CI_DB_NAME" --batch --skip-column-names --execute="SELECT DATABASE()")" = "$CI_DB_NAME"
           test "$(MYSQL_PWD="$CI_DB_PASSWORD" mariadb --protocol=TCP --host="$CI_DB_HOST" --port="$CI_DB_PORT" --user="$CI_DB_USER" --database="$CI_DB_NAME" --batch --skip-column-names --execute="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()")" = '0'
