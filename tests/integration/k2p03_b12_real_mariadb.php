@@ -402,6 +402,7 @@ function b12_controller(): void
     $pdo = null;
     $dir = null;
     $processes = [];
+    $failed = false;
     try {
         b12_env();
         $pdo = k2p03_ci_connection(B12_DB);
@@ -575,12 +576,13 @@ function b12_controller(): void
         fwrite(STDERR,'FAILURE_STAGE='.$stage.PHP_EOL);
         fwrite(STDERR,'FAILURE_CLASS='.get_class($e).PHP_EOL);
         fwrite(STDERR,'K2_P03_B12_REAL_MARIADB=FAIL'.PHP_EOL);
-        exit(1);
+        $failed = true;
     } finally {
         if ($pdo instanceof PDO && $pdo->inTransaction()) $pdo->rollBack();
         b12_cleanup($dir, $processes);
         echo 'B12_LOCAL_WORKER_CLEANUP=COMPLETE'.PHP_EOL;
     }
+    if ($failed) exit(1);
 }
 
 $role = $argv[1] ?? '';
