@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * C137 GC24 K2/P03 B10 — synthetic multi-tenant, role and CSRF guards.
+ * C137 GC24 K2/P03 B10 R1 — synthetic multi-tenant, role and CSRF guards.
  * Uses real app permission/CSRF functions and real shared tenant-source
  * resolution against one disposable GitHub Actions MariaDB schema.
  *
@@ -61,7 +61,7 @@ function b10_worker(array $argv): never
     foreach([
         'DB_HOST'=>'127.0.0.1','DB_USER'=>'ci_k2p03',
         'DB_PASS'=>(string)getenv('CI_DB_PASSWORD'),
-        'DB_NAME'=>'renee_k2p03_ci_b10'
+        'DB_NAME'=>'renee_k2p03_ci_b10_r1'
     ] as $k=>$v) putenv($k.'='.$v);
     $_SERVER['DOCUMENT_ROOT']=dirname(__DIR__,2);
     $_SERVER['SCRIPT_NAME']='/tests/integration/k2p03_b10_real_mariadb.php';
@@ -187,7 +187,7 @@ function b10_exec_worker(string $mode,array $ids): array
 
 try {
     k2p03_ci_require_environment(
-        'c137-gc24-k2p03-ci-mariadb-b10','B10','renee_k2p03_ci_b10'
+        'c137-gc24-k2p03-ci-mariadb-b10-r1','B10R1','renee_k2p03_ci_b10_r1'
     );
     if(($argv[1]??'')==='--worker') {
         b10_worker($argv);
@@ -203,7 +203,7 @@ try {
         k2p03_ci_blob($root.'/database_schema.sql'),
         'original 69-table SQL Git blob remains pinned'
     );
-    $pdo=k2p03_ci_connection('renee_k2p03_ci_b10');
+    $pdo=k2p03_ci_connection('renee_k2p03_ci_b10_r1');
     $stage='TWO_SYNTHETIC_TENANTS_AND_ACTORS';
     $farm=[];$cycles=[];$records=[];$users=[];
     foreach(['alpha','beta'] as $name) {
@@ -242,7 +242,7 @@ try {
             'INSERT INTO roles(code,name) VALUES (?,?)'
         )->execute([$role,'B10 '.$role]);
     }
-    $allRoles=$pdo->query("SELECT id,code FROM roles")->fetchAll(PDO::FETCH_KEY_PAIR);
+    $allRoles=$pdo->query("SELECT code,id FROM roles")->fetchAll(PDO::FETCH_KEY_PAIR);
     foreach([
         'alpha'=>['admin'=>'farm_admin','manager'=>'poultry_manager'],
         'beta'=>['manager'=>'poultry_manager','sales'=>'sales_rep']
@@ -336,11 +336,11 @@ try {
         'including malicious role grant, original policy rows unchanged');
     k2p03_ci_equal($baseline,b10_snapshot($pdo,array_values($farm)),
         'final eight-table cross-farm authorization invariants');
-    echo 'K2_P03_B10_REAL_MARIADB=PASS'.PHP_EOL;
+    echo 'K2_P03_B10_R1_REAL_MARIADB=PASS'.PHP_EOL;
 } catch(Throwable $e) {
     if($pdo instanceof PDO&&$pdo->inTransaction()) $pdo->rollBack();
     fwrite(STDERR,'FAILURE_STAGE='.$stage.PHP_EOL);
     fwrite(STDERR,'FAILURE_CLASS='.get_class($e).PHP_EOL);
-    fwrite(STDERR,'K2_P03_B10_REAL_MARIADB=FAIL'.PHP_EOL);
+    fwrite(STDERR,'K2_P03_B10_R1_REAL_MARIADB=FAIL'.PHP_EOL);
     exit(1);
 }
