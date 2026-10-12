@@ -25,6 +25,16 @@ $ruminant =
         $root . '/ruminant/ruminant_daily_record.php'
     );
 
+$ruminantPermissionRuntime =
+    file_get_contents(
+        $root . '/includes/permission_runtime.php'
+    );
+
+$ruminantDeleteService =
+    file_get_contents(
+        $root . '/lib/ruminant_daily_record_deletion.php'
+    );
+
 $persistence =
     file_get_contents(
         $root . '/lib/stock_consumption_allocation_persistence.php'
@@ -36,6 +46,10 @@ if (
     !is_string($api)
     ||
     !is_string($ruminant)
+    ||
+    !is_string($ruminantPermissionRuntime)
+    ||
+    !is_string($ruminantDeleteService)
     ||
     !is_string($persistence)
 ) {
@@ -190,56 +204,56 @@ $check(
 
 /*
  * ------------------------------------------------------------
- * Ruminant delete route.
+ * Ruminant delete: one shared service for both role paths.
+ * Source lock -> feed/stock -> population reversal -> DELETE.
  * ------------------------------------------------------------
  */
 
-$ruminantBoundary =
-    strpos(
-        $ruminant,
-        '// Get all records for the month'
-    );
-
-$ruminantDeleteBlock =
-    $ruminantBoundary === false
-        ? ''
-        : substr(
-            $ruminant,
-            0,
-            $ruminantBoundary
-        );
+$ruminantLock =
+    strpos($ruminantDeleteService, 'LIMIT 1 FOR UPDATE');
 
 $ruminantFeed =
-    strpos(
-        $ruminantDeleteBlock,
-        'delete_daily_feed_usage('
-    );
+    strpos($ruminantDeleteService, 'delete_daily_feed_usage(');
 
 $ruminantPopulation =
-    strpos(
-        $ruminantDeleteBlock,
-        'daily_population_remove_mortality('
-    );
+    strpos($ruminantDeleteService, 'daily_population_remove_mortality(');
 
 $ruminantSourceDelete =
-    strpos(
-        $ruminantDeleteBlock,
-        'DELETE FROM ruminant_daily_records'
-    );
+    strpos($ruminantDeleteService, 'DELETE FROM ruminant_daily_records');
 
 $check(
     'RUMINANT_SOURCE_STOCK_POPULATION_DELETE_ORDER',
-    $ruminantFeed !== false
-    &&
-    $ruminantPopulation !== false
-    &&
-    $ruminantSourceDelete !== false
-    &&
-    $ruminantFeed < $ruminantPopulation
-    &&
-    $ruminantPopulation < $ruminantSourceDelete
+    $ruminantLock !== false
+    && $ruminantFeed !== false
+    && $ruminantPopulation !== false
+    && $ruminantSourceDelete !== false
+    && $ruminantLock < $ruminantFeed
+    && $ruminantFeed < $ruminantPopulation
+    && $ruminantPopulation < $ruminantSourceDelete
 );
 
+$check(
+    'RUMINANT_SHARED_DELETE_TRANSACTION',
+    str_contains($ruminantDeleteService, '$pdo->beginTransaction();')
+    && str_contains($ruminantDeleteService, '$pdo->commit();')
+    && str_contains($ruminantDeleteService, '$pdo->rollBack();')
+    && str_contains($ruminantDeleteService, 'if ($deleteStmt->rowCount() !== 1)')
+);
+
+$check(
+    'RUMINANT_ADMIN_USES_SHARED_DELETE_SERVICE',
+    preg_match('/ruminant_daily_record_delete_canonical\\s*\\(/', $ruminant) === 1
+    && !str_contains($ruminant, 'DELETE FROM ruminant_daily_records')
+    && !str_contains($ruminant, 'delete_daily_feed_usage(')
+);
+
+$check(
+    'RUMINANT_DELEGATE_USES_SHARED_DELETE_SERVICE',
+    preg_match('/ruminant_daily_record_delete_canonical\\s*\\(/', $ruminantPermissionRuntime) === 1
+    && str_contains($ruminantPermissionRuntime, "permission_runtime_has('ruminant_daily_delete')")
+    && str_contains($ruminantPermissionRuntime, 'verify_csrf_token(')
+    && !str_contains($ruminantPermissionRuntime, 'DELETE FROM ruminant_daily_records')
+);
 
 /*
  * ------------------------------------------------------------
