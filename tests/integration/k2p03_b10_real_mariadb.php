@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * C137 GC24 K2/P03 B10 R1 — synthetic multi-tenant, role and CSRF guards.
+ * C137 GC24 K2/P03 B10 R2 — synthetic multi-tenant, role and CSRF guards.
  * Uses real app permission/CSRF functions and real shared tenant-source
  * resolution against one disposable GitHub Actions MariaDB schema.
  *
@@ -41,6 +41,51 @@ function b10_snapshot(PDO $db,array $farms): array
     return $map;
 }
 
+
+/**
+ * Return only predefined diagnostic categories; never expose raw child output,
+ * SQL, parameters, user data, credentials, tokens, paths or stack traces.
+ */
+function b10_r2_failure_family(string $raw): string
+{
+    if ($raw==='') return 'EMPTY';
+    if (str_contains($raw,'Expected role grant missing.')) return 'EXPECTED_ROLE_GRANT_MISSING';
+    if (str_contains($raw,'Actor is not part of its tenant.')) return 'ACTOR_TENANT_IDENTITY';
+    if (str_contains($raw,'Unrecognized isolated CI scenario.')) return 'ISOLATION_GUARD';
+    if (str_contains($raw,'SQLSTATE[')) return 'DATABASE_SQLSTATE';
+    if (str_contains($raw,'Call to undefined function')) return 'UNDEFINED_FUNCTION';
+    if (str_contains($raw,'Undefined array key')) return 'UNDEFINED_ARRAY_KEY';
+    if (str_contains($raw,'Undefined variable')) return 'UNDEFINED_VARIABLE';
+    if (str_contains($raw,'session_start()')||str_contains($raw,'session_')) return 'PHP_SESSION_DIAGNOSTIC';
+    if (str_contains($raw,'Failed opening required')||str_contains($raw,'Failed to open stream')) return 'PHP_INCLUDE_DIAGNOSTIC';
+    if (str_contains($raw,'Fatal error')||str_contains($raw,'Uncaught')) return 'PHP_FATAL_OTHER';
+    return 'OTHER_REDACTED';
+}
+
+function b10_r2_marker(string $stdout,string $marker,string $pattern): string
+{
+    // Only self-authored marker names/patterns may be passed here.
+    $regex='/'.preg_quote($marker,'/').'=('.$pattern.')/';
+    if (preg_match_all($regex,$stdout,$matches)!==false
+        && isset($matches[1]) && count($matches[1])>0) {
+        return (string)end($matches[1]);
+    }
+    return 'ABSENT';
+}
+
+function b10_r2_worker_evidence(
+    string $mode,int $exit,string $stdout,string $stderr
+): string {
+    // $mode belongs to a fixed fixture allowlist, not user-controlled input.
+    return 'mode='.$mode
+        .' exit='.$exit
+        .' stage='.b10_r2_marker($stdout,'B10_R2_WORKER_STAGE','[A-Z_]{1,32}')
+        .' http='.b10_r2_marker($stdout,'B10_WORKER_HTTP_STATUS','[0-9]{3}')
+        .' failure_class='.b10_r2_marker($stdout,'FAILURE_CLASS','[A-Za-z_]{1,64}')
+        .' failure_family='.b10_r2_marker($stdout,'B10_R2_EXCEPTION_FAMILY','[A-Z_]{1,64}')
+        .' stderr_family='.b10_r2_failure_family(trim($stderr));
+}
+
 function b10_worker(array $argv): never
 {
     $mode=(string)($argv[2]??'');
@@ -61,13 +106,14 @@ function b10_worker(array $argv): never
     foreach([
         'DB_HOST'=>'127.0.0.1','DB_USER'=>'ci_k2p03',
         'DB_PASS'=>(string)getenv('CI_DB_PASSWORD'),
-        'DB_NAME'=>'renee_k2p03_ci_b10_r1'
+        'DB_NAME'=>'renee_k2p03_ci_b10_r2'
     ] as $k=>$v) putenv($k.'='.$v);
     $_SERVER['DOCUMENT_ROOT']=dirname(__DIR__,2);
     $_SERVER['SCRIPT_NAME']='/tests/integration/k2p03_b10_real_mariadb.php';
     $_SERVER['REQUEST_METHOD']='GET';
     $_SERVER['REMOTE_ADDR']='127.0.0.1';
 
+    echo 'B10_R2_WORKER_STAGE=CONFIG_BOOTSTRAP'.PHP_EOL;
     // The real config creates the local PDO connection. Bind the same
     // variable globally so app permission helpers use the isolated DB.
     global $pdo;
@@ -76,6 +122,7 @@ function b10_worker(array $argv): never
     register_shutdown_function(static function ():void {
         echo "\nB10_WORKER_HTTP_STATUS=".http_response_code()."\n";
     });
+    echo 'B10_R2_WORKER_STAGE=ACTOR_BINDING'.PHP_EOL;
     // Install the synthetic actor BEFORE init.php evaluates/caches roles.
     $_SESSION['user_id']=$actor;
     $_SESSION['farm_id']=$farm;
@@ -88,7 +135,9 @@ function b10_worker(array $argv): never
     // Use the production bootstrap order: init.php loads functions before
     // permission_runtime dispatch. Loading functions.php first would invert
     // that dependency and can evaluate a partial permission stack.
+    echo 'B10_R2_WORKER_STAGE=APP_INIT'.PHP_EOL;
     require_once dirname(__DIR__,2).'/init.php';
+    echo 'B10_R2_WORKER_STAGE=GUARD_DISPATCH'.PHP_EOL;
 
     if($mode==='allowed_manager'||$mode==='role_denied'){
         $granted=permission_runtime_has('poultry_daily_layer_edit');
@@ -180,14 +229,21 @@ function b10_exec_worker(string $mode,array $ids): array
     fclose($pipes[1]);fclose($pipes[2]);
     $exit=proc_close($proc);
     if($exit!==0||trim((string)$err)!=='') {
-        throw new RuntimeException('B10 worker failed: '.$mode);
+        // Fixed-shape sanitized diagnostics only; NEVER print raw child
+        // stdout/stderr, token values, SQL, credentials or stack traces.
+        fwrite(STDERR,
+            'B10_R2_WORKER_PROCESS_FAILURE '.b10_r2_worker_evidence(
+                $mode,$exit,(string)$out,(string)$err
+            ).PHP_EOL
+        );
+        throw new RuntimeException('B10 worker process failed.');
     }
     return ['output'=>(string)$out,'exit'=>$exit];
 }
 
 try {
     k2p03_ci_require_environment(
-        'c137-gc24-k2p03-ci-mariadb-b10-r1','B10R1','renee_k2p03_ci_b10_r1'
+        'c137-gc24-k2p03-ci-mariadb-b10-r2','B10R2','renee_k2p03_ci_b10_r2'
     );
     if(($argv[1]??'')==='--worker') {
         b10_worker($argv);
@@ -203,7 +259,7 @@ try {
         k2p03_ci_blob($root.'/database_schema.sql'),
         'original 69-table SQL Git blob remains pinned'
     );
-    $pdo=k2p03_ci_connection('renee_k2p03_ci_b10_r1');
+    $pdo=k2p03_ci_connection('renee_k2p03_ci_b10_r2');
     $stage='TWO_SYNTHETIC_TENANTS_AND_ACTORS';
     $farm=[];$cycles=[];$records=[];$users=[];
     foreach(['alpha','beta'] as $name) {
@@ -313,6 +369,12 @@ try {
     ];
     foreach($cases as [$label,$mode,$ids,$needle,$http]) {
         $result=b10_exec_worker($mode,$ids);
+        if(!str_contains($result['output'],$needle)
+            || !str_contains($result['output'],'B10_WORKER_HTTP_STATUS='.$http)) {
+            fwrite(STDERR,'B10_R2_WORKER_GUARD_MISMATCH '.b10_r2_worker_evidence(
+                $mode,(int)$result['exit'],(string)$result['output'],''
+            ).PHP_EOL);
+        }
         k2p03_ci_check(str_contains($result['output'],$needle),
             $label.' — authentic shared guard result');
         k2p03_ci_check(
@@ -336,11 +398,12 @@ try {
         'including malicious role grant, original policy rows unchanged');
     k2p03_ci_equal($baseline,b10_snapshot($pdo,array_values($farm)),
         'final eight-table cross-farm authorization invariants');
-    echo 'K2_P03_B10_R1_REAL_MARIADB=PASS'.PHP_EOL;
+    echo 'K2_P03_B10_R2_REAL_MARIADB=PASS'.PHP_EOL;
 } catch(Throwable $e) {
     if($pdo instanceof PDO&&$pdo->inTransaction()) $pdo->rollBack();
     fwrite(STDERR,'FAILURE_STAGE='.$stage.PHP_EOL);
     fwrite(STDERR,'FAILURE_CLASS='.get_class($e).PHP_EOL);
-    fwrite(STDERR,'K2_P03_B10_R1_REAL_MARIADB=FAIL'.PHP_EOL);
+    fwrite(STDERR,'B10_R2_EXCEPTION_FAMILY='.b10_r2_failure_family($e->getMessage()).PHP_EOL);
+    fwrite(STDERR,'K2_P03_B10_R2_REAL_MARIADB=FAIL'.PHP_EOL);
     exit(1);
 }
