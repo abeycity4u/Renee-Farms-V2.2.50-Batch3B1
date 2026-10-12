@@ -4,8 +4,8 @@ declare(strict_types=1);
 /**
  * B12 source-only, read-only Daily Record writer inventory.
  * Not imported by application routes and not connected to GitHub Actions.
- * This script is PREPARED BUT NOT EXECUTED by the source-only step.
- * Run only under separately reviewed source verification authorization.
+ * Designed for explicitly authorized local source-only verification.
+ * Never imports application runtime, configuration, database or routes.
  * The formerly duplicated privileged and delegated Ruminant delete
  * statements are now centralized in lib/ruminant_daily_record_deletion.php.
  * The delegated runtime and privileged route remain source-level callers,
@@ -31,6 +31,46 @@ $identity = '~\b(?:layer_daily_records|broiler_daily_records|ruminant_daily_reco
 $found = [];
 $errors = [];
 $read = 0;
+$revisionCallers = [];
+
+/*
+ * Named exceptions to the direct-table SQL match rule.
+ * The tenant purge uses a closed table-list plus dynamic DELETE; the dormant
+ * revision authority uses closed table definitions with dynamic UPDATE/DELETE.
+ * Record these explicitly, and fail closed if their inspected signatures move.
+ * This is NOT a guarantee against unrecognized dynamic or external writers.
+ */
+$dynamicExceptions = [
+    'management/farms.php' => [
+        'classification' => 'PLATFORM_OWNER_TENANT_PURGE',
+        'signatures' => [
+            'function deleteFarmRows(',
+            'DELETE FROM {$table} WHERE farm_id = ?',
+            'function deleteFarmData(',
+            'deleteFarmRows($pdo, $table, $farmId);',
+            'deleteFarmData($pdo, $farmId);',
+            'requirePlatformOwner();',
+            'farmHasProtectedCommercialHistory(',
+            "'layer_daily_records'",
+            "'broiler_daily_records'",
+            "'ruminant_daily_records'",
+        ],
+    ],
+    'lib/daily_record_revision_authority.php' => [
+        'classification' => 'DORMANT_SHARED_REVISION_SERVICE',
+        'signatures' => [
+            'function daily_record_revision_definitions(',
+            'function daily_record_revision_lock_and_compare(',
+            'function daily_record_revision_write(',
+            'function daily_record_revision_delete_locked(',
+            "'UPDATE ' . \$config['table']",
+            "'DELETE FROM ' . \$config['table']",
+            "'layer_daily_records'",
+            "'broiler_daily_records'",
+            "'ruminant_daily_records'",
+        ],
+    ],
+];
 
 // Also inspect top-level runtime entry points; they are outside module dirs.
 $topLevel = glob($root . DIRECTORY_SEPARATOR . '*.php') ?: [];
@@ -64,6 +104,10 @@ foreach ($dirs as $dir) {
             continue;
         }
         ++$read;
+        if ($relative !== 'lib/daily_record_revision_authority.php'
+            && preg_match('~\bdaily_record_revision_(?:write|delete_locked|lock_and_compare)\s*\(~', $source)) {
+            $revisionCallers[] = $relative;
+        }
         if (!preg_match($identity, $source)) {
             continue;
         }
@@ -95,11 +139,37 @@ foreach ($rootCandidates as $fileName) {
         continue;
     }
     ++$read;
+    if (preg_match('~\bdaily_record_revision_(?:write|delete_locked|lock_and_compare)\s*\(~', $source)) {
+        $revisionCallers[] = $relative;
+    }
     if (preg_match($identity, $source) && preg_match($pattern, $source)) {
         preg_match_all($pattern, $source, $matches);
         $found[$relative] = array_values(array_unique($matches[0] ?? []));
     }
 }
+$dynamicErrors = [];
+foreach ($dynamicExceptions as $path => $contract) {
+    $source = file_get_contents($root . DIRECTORY_SEPARATOR . $path);
+    if (!is_string($source)) {
+        $dynamicErrors[] = 'Unreadable named dynamic exception: ' . $path;
+        continue;
+    }
+    foreach ($contract['signatures'] as $signature) {
+        if (!str_contains($source, $signature)) {
+            $dynamicErrors[] = 'Dynamic exception signature missing: '
+                . $path . ' | ' . $signature;
+        }
+    }
+    echo 'DYNAMIC_EXCEPTION=' . $path . ' | '
+        . $contract['classification'] . PHP_EOL;
+}
+$revisionCallers = array_values(array_unique($revisionCallers));
+sort($revisionCallers, SORT_STRING);
+foreach ($revisionCallers as $path) {
+    $dynamicErrors[] = 'Unexpected active revision-service caller: ' . $path;
+    echo 'UNEXPECTED_REVISION_CALLER=' . $path . PHP_EOL;
+}
+echo 'DORMANT_REVISION_CALLER_COUNT=' . count($revisionCallers) . PHP_EOL;
 ksort($found, SORT_STRING);
 $actual = array_keys($found);
 $new = array_values(array_diff($actual, $expected));
@@ -116,12 +186,13 @@ foreach ($new as $path) {
 foreach ($missing as $path) {
     echo 'EXPECTED_WRITER_MISSING=' . $path . PHP_EOL;
 }
-foreach ($errors as $error) {
+foreach (array_merge($errors, $dynamicErrors) as $error) {
     echo 'SCAN_ERROR=' . $error . PHP_EOL;
 }
-if ($new || $missing || $errors || $read === 0) {
+if ($new || $missing || $errors || $dynamicErrors || $read === 0) {
     echo 'B12_WRITER_INVENTORY=FAIL_CLOSED' . PHP_EOL;
     exit(1);
 }
 echo 'B12_WRITER_INVENTORY=KNOWN_PATHS_MATCH' . PHP_EOL;
+echo 'NAMED_DYNAMIC_EXCEPTION_AUDIT=PASS' . PHP_EOL;
 echo 'DYNAMIC_SQL_AND_EXTERNAL_CALLERS=MANUAL_REVIEW_REQUIRED' . PHP_EOL;
