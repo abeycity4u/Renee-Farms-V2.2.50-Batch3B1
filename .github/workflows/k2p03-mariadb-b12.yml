@@ -115,7 +115,7 @@ jobs:
           test "$(git hash-object lib/stock_service.php)" = 'b9e7b021020ffaa92fa201800572451f8762d520'
           test "$(git hash-object lib/sales_allocation.php)" = '1a701fff059189b6a9ad3fe1a190188be958a96b'
           test "$(git hash-object tests/integration/k2p03_ci_isolation.php)" = '6f783f07bc46811bb53a1b3c9b40262341ed771f'
-          test "$(git hash-object tests/integration/k2p03_b12_real_mariadb.php)" = 'ad46274857310175b34c61e6caf9882fdea5df0a'
+          test "$(git hash-object tests/integration/k2p03_b12_real_mariadb.php)" = '0558720c8b7912f0c22476cf298c0ac219b1899c'
           test "$(MYSQL_PWD="$CI_DB_PASSWORD" mariadb --protocol=TCP --host="$CI_DB_HOST" --port="$CI_DB_PORT" --user="$CI_DB_USER" --database="$CI_DB_NAME" --batch --skip-column-names --execute="SELECT DATABASE()")" = "$CI_DB_NAME"
           test "$(MYSQL_PWD="$CI_DB_PASSWORD" mariadb --protocol=TCP --host="$CI_DB_HOST" --port="$CI_DB_PORT" --user="$CI_DB_USER" --database="$CI_DB_NAME" --batch --skip-column-names --execute="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_type='BASE TABLE'")" = '0'
           echo 'EPHEMERAL_DATABASE_IDENTITY=PASS'
