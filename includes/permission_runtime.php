@@ -224,28 +224,27 @@ if (permission_runtime_ends_with($path, '/poultry/layers_daily_record.php')) {
                 $_SESSION['error'] = 'Invalid daily record.';
             } else {
                 $farmId = requireCurrentFarmId();
-                $managedTypes = ['cattle', 'goat', 'sheep', 'other'];
-                $recordStmt = $pdo->prepare('SELECT animal_type FROM ruminant_daily_records WHERE id = ? AND farm_id = ? LIMIT 1');
-                $recordStmt->execute([$recordId, $farmId]);
-                $animalType = strtolower((string)($recordStmt->fetchColumn() ?: ''));
-
-                if (!in_array($animalType, $managedTypes, true)) {
-                    $_SESSION['error'] = 'Daily record not found or you do not have permission to delete it.';
-                } else {
-                    try {
-                        $pdo->beginTransaction();
-                        delete_daily_feed_usage($pdo, $farmId, $recordId, 'daily_ruminant_record');
-                        $deleteStmt = $pdo->prepare('DELETE FROM ruminant_daily_records WHERE id = ? AND farm_id = ?');
-                        $deleteStmt->execute([$recordId, $farmId]);
-                        if ($deleteStmt->rowCount() !== 1) {
-                            throw new RuntimeException('The daily record could not be deleted.');
-                        }
-                        $pdo->commit();
-                        $_SESSION['success'] = 'Ruminant daily record deleted successfully.';
-                    } catch (Throwable $e) {
-                        if ($pdo->inTransaction()) $pdo->rollBack();
-                        $_SESSION['error'] = safeUserExceptionMessage($e, 'The daily record could not be deleted.');
-                    }
+                try {
+                    /*
+                     * Delegated managers use the exact same source -> stock
+                     * -> population -> deletion transaction as Farm Admin.
+                     * Permission and CSRF remain enforced before this call.
+                     */
+                    require_once dirname(__DIR__) . '/lib/ruminant_daily_record_deletion.php';
+                    ruminant_daily_record_delete_canonical(
+                        $pdo,
+                        $farmId,
+                        $recordId,
+                        isset($_SESSION['user_id'])
+                            ? (int)$_SESSION['user_id']
+                            : null
+                    );
+                    $_SESSION['success'] = 'Ruminant daily record deleted successfully.';
+                } catch (Throwable $e) {
+                    $_SESSION['error'] = safeUserExceptionMessage(
+                        $e,
+                        'The daily record could not be deleted.'
+                    );
                 }
             }
 
