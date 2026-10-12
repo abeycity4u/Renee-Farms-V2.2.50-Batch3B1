@@ -1,0 +1,121 @@
+name: C137 GC24 K2-P03 isolated MariaDB B11
+
+# Exact one-file approval push only. Implementation pushes cannot run B11.
+# No workflow_dispatch or default-branch automatic integration execution.
+on:
+  push:
+    branches:
+      - c137-gc24-k2p03-ci-mariadb-b11
+    paths:
+      - docs/C137_GC24_K2_P03_B11_EXECUTION_APPROVAL.txt
+
+permissions:
+  contents: read
+
+concurrency:
+  group: k2p03-b11-mariadb-isolated
+  cancel-in-progress: false
+
+jobs:
+  b11-real-mariadb:
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/c137-gc24-k2p03-ci-mariadb-b11' &&
+      github.event.head_commit.message == 'ci-p04(run): authorize isolated B11'
+    name: B11 four-point mid-writer rollback (real MariaDB)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CI_K2P03_SCENARIO_ALLOWED: 'B11'
+      CI_DB_HOST: '127.0.0.1'
+      CI_DB_PORT: '3306'
+      CI_DB_NAME: 'renee_k2p03_ci_b11'
+      CI_DB_USER: 'ci_k2p03'
+      CI_DB_PASSWORD: 'ci-only-nonsecret-b11'
+
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: ci-only-root-nonsecret-b11
+          MARIADB_DATABASE: renee_k2p03_ci_b11
+          MARIADB_USER: ci_k2p03
+          MARIADB_PASSWORD: ci-only-nonsecret-b11
+        ports:
+          - 127.0.0.1:3306:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - name: Checkout exact isolated B11 source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+
+      - name: Fail-closed one-file B11 authorization guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = 'refs/heads/c137-gc24-k2p03-ci-mariadb-b11'
+          test "$(git show -s --format=%s HEAD)" = 'ci-p04(run): authorize isolated B11'
+          test "$(git diff-tree --no-commit-id --name-only -r HEAD)" = 'docs/C137_GC24_K2_P03_B11_EXECUTION_APPROVAL.txt'
+          test "$(git diff-tree --no-commit-id --name-only --diff-filter=A -r HEAD)" = 'docs/C137_GC24_K2_P03_B11_EXECUTION_APPROVAL.txt'
+          test "$(cat docs/C137_GC24_K2_P03_B11_EXECUTION_APPROVAL.txt)" = 'CI_P04_B11_EXECUTION_APPROVED=YES'
+          echo 'CI_P04_B11_BRANCH_AUTHORIZATION=PASS'
+
+      - name: Set up PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_mysql
+          coverage: none
+
+      - name: Install MariaDB client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends mariadb-client
+
+      - name: Verify exact ephemeral empty database and pinned source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = 'true'
+          test "$RUNNER_ENVIRONMENT" = 'github-hosted'
+          test "$GITHUB_REPOSITORY" = 'abeycity4u/Renee-Farms-V2.2.50-Batch3B1'
+          test "$GITHUB_REF" = 'refs/heads/c137-gc24-k2p03-ci-mariadb-b11'
+          test "$CI_K2P03_SCENARIO_ALLOWED" = 'B11'
+          test "$CI_DB_HOST" = '127.0.0.1'
+          test "$CI_DB_PORT" = '3306'
+          test "$CI_DB_NAME" = 'renee_k2p03_ci_b11'
+          test "$CI_DB_USER" = 'ci_k2p03'
+          test "$CI_DB_PASSWORD" = 'ci-only-nonsecret-b11'
+          test "$(git hash-object database_schema.sql)" = 'e77f287d62c5812a3d55dc23b5b20f5d167db389'
+          test "$(git hash-object lib/daily_population_continuity.php)" = '9503771b47c6c2fe26bb3237da69a17874e724a3'
+          test "$(git hash-object tests/integration/k2p03_b11_real_mariadb.php)" = '8f9a25181dea81ce63ef00e41f5e42efb0d16c1c'
+          test "$(git hash-object tests/integration/k2p03_ci_isolation.php)" = 'd36374e048ed04d77008934b42dcb0c70421816c'
+          test "$(MYSQL_PWD="$CI_DB_PASSWORD" mariadb --protocol=TCP --host="$CI_DB_HOST" --port="$CI_DB_PORT" --user="$CI_DB_USER" --database="$CI_DB_NAME" --batch --skip-column-names --execute="SELECT DATABASE()")" = "$CI_DB_NAME"
+          test "$(MYSQL_PWD="$CI_DB_PASSWORD" mariadb --protocol=TCP --host="$CI_DB_HOST" --port="$CI_DB_PORT" --user="$CI_DB_USER" --database="$CI_DB_NAME" --batch --skip-column-names --execute="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()")" = '0'
+          echo 'EPHEMERAL_DATABASE_IDENTITY=PASS'
+          echo 'EPHEMERAL_SCHEMA_INITIAL_EMPTY=PASS'
+          echo 'PINNED_SOURCE_AND_SCHEMA=PASS'
+
+      - name: Import schema only to guarded empty disposable database
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This dump contains DROP TABLE statements; the prior exact-host,
+          # source-blob and empty-schema guards are mandatory.
+          MYSQL_PWD="$CI_DB_PASSWORD" mariadb --protocol=TCP --host="$CI_DB_HOST" --port="$CI_DB_PORT" --user="$CI_DB_USER" --database="$CI_DB_NAME" < database_schema.sql
+          echo 'EPHEMERAL_SCHEMA_IMPORT=COMPLETE'
+
+      - name: PHP syntax and B11 real-MariaDB integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -l tests/integration/k2p03_b11_real_mariadb.php
+          php tests/integration/k2p03_b11_real_mariadb.php
