@@ -15,6 +15,10 @@ declare(strict_types=1);
  */
 require_once __DIR__ . '/daily_record_revision_form_tokens.php';
 
+if (!class_exists('DailyRecordRevisionNotFound', false)) {
+    final class DailyRecordRevisionNotFound extends RuntimeException {}
+}
+
 if (!function_exists('daily_record_revision_reader_cycle')) {
     function daily_record_revision_reader_cycle(mixed $rawCycle): ?int
     {
@@ -146,9 +150,14 @@ if (!function_exists('daily_record_revision_reader_resolve_exact')) {
     function daily_record_revision_reader_resolve_exact(
         string $type, int $farmId, array $plan, array $rows
     ): array {
+        if (count($rows) === 0) {
+            throw new DailyRecordRevisionNotFound(
+                'The Daily Record is no longer available.'
+            );
+        }
         if (count($rows) !== 1 || !is_array($rows[0])) {
             throw new DailyRecordRevisionConflict(
-                'The Daily Record is unavailable or ambiguous. Reload the selection.'
+                'The Daily Record is ambiguous. Reload the selection.'
             );
         }
         $row = $rows[0];
