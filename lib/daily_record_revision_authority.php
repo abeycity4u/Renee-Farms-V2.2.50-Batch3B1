@@ -86,6 +86,74 @@ if (!function_exists('daily_record_revision_require_transaction')) {
     }
 }
 
+/**
+ * Future form contract: CREATE and EDIT are different client intentions.
+ * This pure parser is intentionally dormant until the three-table revision
+ * migration, immutable row-token presentation, and transactional writers
+ * are implemented. It does NOT authorize or perform a database mutation.
+ */
+if (!function_exists('daily_record_revision_parse_record_id')) {
+    function daily_record_revision_parse_record_id(mixed $raw): int
+    {
+        if (is_int($raw)) {
+            if ($raw > 0) {
+                return $raw;
+            }
+        } elseif (is_string($raw) &&
+            preg_match('/^[1-9][0-9]*$/D', $raw) === 1) {
+            $max = (string)PHP_INT_MAX;
+            if (strlen($raw) < strlen($max) ||
+                (strlen($raw) === strlen($max) && strcmp($raw, $max) <= 0)) {
+                return (int)$raw;
+            }
+        }
+        throw new DailyRecordRevisionConflict(
+            'The Daily Record identity is out of date. Reload it before saving.'
+        );
+    }
+}
+
+if (!function_exists('daily_record_revision_parse_write_intent')) {
+    /**
+     * EDIT requires immutable row identity and originally loaded revision.
+     * CREATE requires both tokens absent; do not infer EDIT from a later
+     * server-side date lookup or silently overwrite an existing record.
+     * The caller remains responsible for farm, cycle, date, species, CSRF,
+     * role, create uniqueness and the entire business transaction.
+     *
+     * @return array{mode:string,record_id:?int,expected_revision:?int}
+     */
+    function daily_record_revision_parse_write_intent(
+        mixed $mode,
+        mixed $recordId,
+        mixed $expectedRevision
+    ): array {
+        if ($mode === 'create') {
+            if (!in_array($recordId, [null, ''], true) ||
+                !in_array($expectedRevision, [null, ''], true)) {
+                throw new DailyRecordRevisionConflict(
+                    'The Daily Record form is out of date. Reload it before saving.'
+                );
+            }
+            return [
+                'mode' => 'create',
+                'record_id' => null,
+                'expected_revision' => null,
+            ];
+        }
+        if ($mode !== 'edit') {
+            throw new DailyRecordRevisionConflict(
+                'The Daily Record form is out of date. Reload it before saving.'
+            );
+        }
+        return [
+            'mode' => 'edit',
+            'record_id' => daily_record_revision_parse_record_id($recordId),
+            'expected_revision' => daily_record_revision_parse_expected($expectedRevision),
+        ];
+    }
+}
+
 if (!function_exists('daily_record_revision_validate_scope')) {
     function daily_record_revision_validate_scope(
         int $farmId,
