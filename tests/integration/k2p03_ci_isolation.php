@@ -19,6 +19,11 @@ function k2p03_ci_require_environment(
             'database' => 'renee_k2p03_ci_b02',
             'password' => 'ci-only-nonsecret-b02',
         ],
+        'B04' => [
+            'branch' => 'c137-gc24-k2p03-ci-mariadb-b04',
+            'database' => 'renee_k2p03_ci_b04',
+            'password' => 'ci-only-nonsecret-b04',
+        ],
         'B03' => [
             'branch' => 'c137-gc24-k2p03-ci-mariadb-b03',
             'database' => 'renee_k2p03_ci_b03',
@@ -82,7 +87,7 @@ function k2p03_ci_equal($expected, $actual, string $label): void
 
 function k2p03_ci_connection(string $database): PDO
 {
-    if (!in_array($database, ['renee_k2p03_ci_b02', 'renee_k2p03_ci_b03'], true)) {
+    if (!in_array($database, ['renee_k2p03_ci_b02', 'renee_k2p03_ci_b03', 'renee_k2p03_ci_b04'], true)) {
         throw new RuntimeException('The requested CI schema is not approved.');
     }
 
@@ -119,7 +124,7 @@ function k2p03_ci_connection(string $database): PDO
     );
     foreach ([
         'farms', 'production_cycles', 'production_population_baselines',
-        'production_population_movements', 'broiler_daily_records',
+        'production_population_movements', 'layer_daily_records', 'broiler_daily_records',
         'sales_records', 'sale_population_effects',
         'ruminant_daily_records',
         'poultry_slaughter_batches', 'production_population_transfers',
