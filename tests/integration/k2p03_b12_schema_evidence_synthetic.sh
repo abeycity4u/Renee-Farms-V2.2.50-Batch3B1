@@ -102,7 +102,7 @@ echo "SOURCE_READONLY_INVENTORY_EXECUTED=PASS"
 check_section() {
     local section="$1" kind="$2" first="$3" second="$4"
     if ! grep -Fxq "$(printf '%s\t%s\t%s\t%s' "$section" "$kind" "$first" "$second")" "$output"; then
-        echo "FAIL=INVENTORY_$section_$kind"
+        echo "FAIL=INVENTORY_${section}_${kind}"
         exit 1
     fi
     echo "PASS=INVENTORY_$section_$kind | value=$first,$second"
