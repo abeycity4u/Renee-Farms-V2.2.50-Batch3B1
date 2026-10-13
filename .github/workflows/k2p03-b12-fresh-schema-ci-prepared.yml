@@ -1,0 +1,162 @@
+name: C137 B12 fresh disposable schema preflight (one-use)
+
+# PREPARED / DORMANT: merely committing this workflow never runs it.
+# A separately reviewed, exact one-file approval commit is REQUIRED.
+# Never recycle B12 run 38233373699 or the older schema-evidence approvals.
+on:
+  push:
+    branches:
+      - c137-gc24-k2p03-b12-fresh-schema-ci-prepared
+    paths:
+      - docs/C137_GC24_K2_P03_B12_FRESH_SCHEMA_EXECUTION_APPROVAL.txt
+
+permissions:
+  contents: read
+
+concurrency:
+  group: c137-b12-fresh-schema-preflight-single-use
+  cancel-in-progress: false
+
+jobs:
+  disposable-schema-preflight:
+    name: B12 isolated synthetic schema identity (not tenant-data certification)
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/c137-gc24-k2p03-b12-fresh-schema-ci-prepared' &&
+      github.event.head_commit.message == 'ci-b12(fresh-schema-run): authorize one disposable schema preflight' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CI_DB_HOST: '127.0.0.1'
+      CI_DB_NAME: 'renee_b12_disposable_ci20261013_01'
+      CI_DB_OWNER_USER: 'b12_schema_owner'
+      CI_DB_OWNER_PASSWORD: 'synthetic-only-owner-b12-preflight'
+      CI_DB_ROOT_PASSWORD: 'synthetic-only-root-b12-preflight'
+      CI_DB_READER_USER: 'b12_schema_reader'
+      CI_DB_READER_PASSWORD: 'synthetic-only-reader-b12-preflight'
+
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: synthetic-only-root-b12-preflight
+          MARIADB_ROOT_HOST: '%'
+          MARIADB_DATABASE: renee_b12_disposable_ci20261013_01
+          MARIADB_USER: b12_schema_owner
+          MARIADB_PASSWORD: synthetic-only-owner-b12-preflight
+        ports:
+          - 127.0.0.1:3306:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - name: Checkout the exact approved disposable test commit
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+
+      - name: Verify one-use approval, source identity and protected boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          approval='docs/C137_GC24_K2_P03_B12_FRESH_SCHEMA_EXECUTION_APPROVAL.txt'
+          test "$GITHUB_ACTIONS" = 'true'
+          test "$RUNNER_ENVIRONMENT" = 'github-hosted'
+          test "$GITHUB_REPOSITORY" = 'abeycity4u/Renee-Farms-V2.2.50-Batch3B1'
+          test "$GITHUB_REF" = 'refs/heads/c137-gc24-k2p03-b12-fresh-schema-ci-prepared'
+          test "$GITHUB_RUN_ATTEMPT" = '1'
+          test "$(git show -s --format=%s HEAD)" = 'ci-b12(fresh-schema-run): authorize one disposable schema preflight'
+          test "$(git diff-tree --no-commit-id --name-only -r HEAD)" = "$approval"
+          test "$(git diff-tree --no-commit-id --name-only --diff-filter=A -r HEAD)" = "$approval"
+          test "$(wc -l < "$approval" | tr -d ' ')" = '2'
+          test "$(sed -n '1p' "$approval")" = 'CI_B12_FRESH_SCHEMA_APPROVED=YES'
+          test "$(sed -n '2p' "$approval")" = "CI_B12_FRESH_SCHEMA_APPROVED_PARENT=$(git rev-parse HEAD^)"
+          test "$(git hash-object database_schema.sql)" = 'e77f287d62c5812a3d55dc23b5b20f5d167db389'
+          test "$(git hash-object docs/C137_GC24_K2_P03_B12_READONLY_SCHEMA_INVENTORY.sql)" = '6dd5614edb2dae2432d9e8628b43ba53177e7133'
+          test "$(git hash-object scripts/k2p03_b12_schema_readonly_gate.php)" = '6584d52ea4334a48f7a5d92d7be9ec0391933a84'
+          test "$CI_DB_HOST" = '127.0.0.1'
+          test "$CI_DB_NAME" = 'renee_b12_disposable_ci20261013_01'
+          test "$CI_DB_OWNER_USER" = 'b12_schema_owner'
+          test "$CI_DB_READER_USER" = 'b12_schema_reader'
+          echo 'B12_FRESH_APPROVAL_GUARD=PASS'
+          echo 'PROTECTED_DATABASE_CONNECTIONS=NONE'
+
+      - name: Install isolated PHP and MariaDB client
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_mysql
+          coverage: none
+
+      - name: Verify offline gate before touching disposable database
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -l scripts/k2p03_b12_schema_readonly_gate.php
+          php scripts/k2p03_b12_schema_readonly_gate.php --lint-only
+          if php scripts/k2p03_b12_schema_readonly_gate.php --run >/dev/null 2>&1; then
+            echo 'UNAUTHORIZED_DATABASE_GATE=FAIL'
+            exit 1
+          fi
+          echo 'UNAUTHORIZED_DATABASE_GATE=PASS'
+
+      - name: Install disposable-only MariaDB client
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends mariadb-client
+
+      - name: Confirm empty service and import pinned synthetic schema only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CI_DB_HOST" = '127.0.0.1'
+          test "$CI_DB_NAME" = 'renee_b12_disposable_ci20261013_01'
+          tables="$(MYSQL_PWD="$CI_DB_OWNER_PASSWORD" mariadb --protocol=TCP --host=127.0.0.1 --port=3306 --user="$CI_DB_OWNER_USER" --database="$CI_DB_NAME" --batch --skip-column-names --execute="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_type='BASE TABLE'")"
+          test "$tables" = '0'
+          echo 'DISPOSABLE_DATABASE_INITIAL_EMPTY=PASS'
+          MYSQL_PWD="$CI_DB_OWNER_PASSWORD" mariadb --protocol=TCP --host=127.0.0.1 --port=3306 --user="$CI_DB_OWNER_USER" --database="$CI_DB_NAME" < database_schema.sql
+          echo 'DISPOSABLE_SCHEMA_IMPORT=PASS'
+
+      - name: Create and check SELECT-only disposable identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CI_DB_NAME" = 'renee_b12_disposable_ci20261013_01'
+          MYSQL_PWD="$CI_DB_ROOT_PASSWORD" mariadb --protocol=TCP --host=127.0.0.1 --port=3306 --user=root --database="$CI_DB_NAME" --batch --skip-column-names --execute="CREATE USER 'b12_schema_reader'@'%' IDENTIFIED BY 'synthetic-only-reader-b12-preflight'; GRANT SELECT ON \`renee_b12_disposable_ci20261013_01\`.* TO 'b12_schema_reader'@'%';"
+          grants="$(MYSQL_PWD="$CI_DB_READER_PASSWORD" mariadb --protocol=TCP --host=127.0.0.1 --port=3306 --user="$CI_DB_READER_USER" --database="$CI_DB_NAME" --batch --skip-column-names --execute='SHOW GRANTS')"
+          echo "$grants" | grep -Fq 'GRANT SELECT ON'
+          if echo "$grants" | grep -Eqi 'GRANT (ALL|INSERT|UPDATE|DELETE|ALTER|CREATE|DROP|SUPER)'; then
+            echo 'READONLY_GRANTS=FAIL'
+            exit 1
+          fi
+          identity="$(MYSQL_PWD="$CI_DB_READER_PASSWORD" mariadb --protocol=TCP --host=127.0.0.1 --port=3306 --user="$CI_DB_READER_USER" --database="$CI_DB_NAME" --batch --skip-column-names --execute='SELECT DATABASE()')"
+          test "$identity" = "$CI_DB_NAME"
+          echo 'READONLY_GRANTS_AND_IDENTITY=PASS'
+
+      - name: Execute the existing reviewed 11-section SELECT-only inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          secret_file="$RUNNER_TEMP/b12-fresh-readonly-password"
+          trap 'rm -f "$secret_file"' EXIT
+          printf '%s\n' "$CI_DB_READER_PASSWORD" > "$secret_file"
+          export B12_SCHEMA_APPROVED_RUN='YES_ONE_DISPOSABLE_READONLY_CLONE'
+          export B12_SCHEMA_PROVENANCE_VERIFIED='YES'
+          export B12_SCHEMA_READONLY_GRANTS_VERIFIED='YES'
+          export B12_SCHEMA_HOST='127.0.0.1'
+          export B12_SCHEMA_DATABASE="$CI_DB_NAME"
+          export B12_SCHEMA_USER="$CI_DB_READER_USER"
+          export B12_SCHEMA_PASSWORD_FILE="$secret_file"
+          php scripts/k2p03_b12_schema_readonly_gate.php --run
+          echo 'B12_DISPOSABLE_SCHEMA_PREFLIGHT=COMPLETE'
+          echo 'REAL_TENANT_DATA_INSPECTED=NO'
+          echo 'REVISION_MIGRATION_EXECUTED=NO'
+          echo 'B12_CONCURRENCY_CERTIFIED=NO'
