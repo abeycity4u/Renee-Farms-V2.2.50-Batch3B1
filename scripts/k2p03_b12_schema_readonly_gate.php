@@ -37,6 +37,12 @@ $raw = file_get_contents($path);
 if (!is_string($raw) || $raw === '') {
     b12_schema_audit_abort('PINNED_SQL_MISSING');
 }
+if (!hash_equals(
+    'fe9e80cfb836f593b146cf9adf269a15a78ab9a192e5292fc02376d02becbfd7',
+    hash('sha256', $raw)
+)) {
+    b12_schema_audit_abort('PINNED_SQL_CHECKSUM_CHANGED');
+}
 
 // The audited inventory uses only standalone '--' comments and SELECT.
 // Fail closed if that contract changes (e.g., executable block comments).
