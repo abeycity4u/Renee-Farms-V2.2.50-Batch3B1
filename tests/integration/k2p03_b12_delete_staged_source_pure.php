@@ -51,7 +51,7 @@ try {
     b12_delete_stage_check(
         str_contains($common,'$pdo->rollBack();')&&
         str_contains($common,'$pdo->commit()')&&
-        str_contains($common,"if ($type === 'layer')"),
+        str_contains($common,'if ($type === \'layer\')'),
         'rollback and Layer-only sales rebuild retained'
     );
 
