@@ -109,9 +109,20 @@
             controller.invalidate();
         }
         function isReady() {
-            return readyTicket !== null &&
-                controller.isCurrent(readyTicket) &&
-                controller.isReady();
+            if (readyTicket === null) return false;
+            // An external date/species change may happen before its change
+            // listener fires. Clear original hidden edit tokens immediately
+            // rather than merely reporting "not ready".
+            if (!controller.isCurrent(readyTicket)) {
+                invalidate();
+                return false;
+            }
+            if (!controller.isReady()) {
+                readyTicket = null;
+                readyMode = null;
+                return false;
+            }
+            return true;
         }
         function guard(ticket, callback) {
             if (typeof callback !== 'function' || ticket !== readyTicket ||
