@@ -7,6 +7,7 @@
 
 require_once __DIR__ . '/functions.php';
 require_once dirname(__DIR__) . '/lib/daily_feed_sync.php';
+require_once dirname(__DIR__) . '/lib/daily_record_revision_cutover_gate.php';
 
 if (!function_exists('permission_runtime_privileged')) {
 function permission_runtime_privileged(): bool
@@ -46,6 +47,41 @@ function permission_runtime_deny(string $message = 'You do not have permission t
     }
     http_response_code(403);
     exit($message);
+}
+}
+
+/**
+ * Central B12 future operation-permission decision. With the safety fuse off,
+ * preserve today's legacy POST-time lookup unchanged. Once the full cutover
+ * is separately approved, derive permission ONLY from explicit browser
+ * intent; the transaction-bound save gate then verifies immutable identity.
+ */
+if (!function_exists('permission_runtime_daily_save_permission')) {
+function permission_runtime_daily_save_permission(PDO $pdo, string $type): string
+{
+    if (daily_record_revision_cutover_enabled()) {
+        require_once dirname(__DIR__) . '/lib/daily_record_revision_capabilities.php';
+        try {
+            $intent = daily_record_revision_parse_write_intent(
+                $_POST['write_intent'] ?? null,
+                $_POST['record_id'] ?? null,
+                $_POST['expected_revision'] ?? null
+            );
+            return daily_record_revision_operation_permission($type, $intent['mode']);
+        } catch (DailyRecordRevisionConflict $error) {
+            permission_runtime_deny('Daily Record form identity is stale. Reload the selection.');
+        }
+    }
+    $capabilities = [
+        'layer' => ['add'=>'poultry_daily_layer_add', 'edit'=>'poultry_daily_layer_edit'],
+        'broiler' => ['add'=>'poultry_daily_broiler_add', 'edit'=>'poultry_daily_broiler_edit'],
+        'ruminant' => ['add'=>'ruminant_daily_add', 'edit'=>'ruminant_daily_edit'],
+    ];
+    if (!isset($capabilities[$type])) {
+        permission_runtime_deny('Invalid Daily Record operation.');
+    }
+    return permission_runtime_existing_daily_record($pdo, $type)
+        ? $capabilities[$type]['edit'] : $capabilities[$type]['add'];
 }
 }
 
@@ -177,7 +213,7 @@ if (permission_runtime_ends_with($path, '/poultry/layers_daily_record.php')) {
         'delete' => permission_runtime_has('poultry_daily_layer_delete'),
     ];
     if ($method === 'POST' && isset($_POST['save_record'])) {
-        $required = permission_runtime_existing_daily_record($pdo, 'layer') ? 'poultry_daily_layer_edit' : 'poultry_daily_layer_add';
+        $required = permission_runtime_daily_save_permission($pdo, 'layer');
         if (!permission_runtime_has($required)) permission_runtime_deny('You do not have permission to save this Layer daily record.');
     }
 } elseif (permission_runtime_ends_with($path, '/poultry/broiler_daily_record.php')) {
@@ -187,7 +223,7 @@ if (permission_runtime_ends_with($path, '/poultry/layers_daily_record.php')) {
         'delete' => permission_runtime_has('poultry_daily_broiler_delete'),
     ];
     if ($method === 'POST' && isset($_POST['save_record'])) {
-        $required = permission_runtime_existing_daily_record($pdo, 'broiler') ? 'poultry_daily_broiler_edit' : 'poultry_daily_broiler_add';
+        $required = permission_runtime_daily_save_permission($pdo, 'broiler');
         if (!permission_runtime_has($required)) permission_runtime_deny('You do not have permission to save this Broiler daily record.');
     }
 } elseif (permission_runtime_ends_with($path, '/poultry/layer_feeds.php') || permission_runtime_ends_with($path, '/poultry/broiler_feeds.php')) {
@@ -202,7 +238,7 @@ if (permission_runtime_ends_with($path, '/poultry/layers_daily_record.php')) {
         'delete' => permission_runtime_has('ruminant_daily_delete'),
     ];
     if ($method === 'POST' && isset($_POST['save_record'])) {
-        $required = permission_runtime_existing_daily_record($pdo, 'ruminant') ? 'ruminant_daily_edit' : 'ruminant_daily_add';
+        $required = permission_runtime_daily_save_permission($pdo, 'ruminant');
         if (!permission_runtime_has($required)) permission_runtime_deny('You do not have permission to save this Ruminant daily record.');
     }
     if ($method === 'POST' && isset($_POST['delete_record'])) {
