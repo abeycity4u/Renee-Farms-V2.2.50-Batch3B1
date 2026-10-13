@@ -26,6 +26,9 @@ if (!daily_record_revision_cutover_enabled()) {
     ], 503);
 }
 
+// Reuse the existing per-session API limiter; no new auth/rate policy.
+require_rate_limit('daily_record_revision_read', 120, 60);
+
 require_once __DIR__ . '/../lib/daily_record_revision_api_adapter.php';
 $result = daily_record_revision_api_handle(
     $pdo,
