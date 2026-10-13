@@ -39,7 +39,7 @@ final class B12GatePDO extends PDO
     public mixed $cycleRow = '11';
     public array $scopeRows = [];
     public array $trace = [];
-    public array $sourceRow = [
+    public mixed $sourceRow = [
         'id'=>'19','farm_id'=>'7','cycle_id'=>'11','record_date'=>'2026-10-13',
         'record_revision'=>'4','animal_type'=>'goat'
     ];
@@ -131,7 +131,7 @@ try {
     );
     b12_gate_ok(count($stale->trace)===1, 'stale edit obtains source lock without writing');
     $missing = new B12GatePDO();
-    $missing->sourceRow = [];
+    $missing->sourceRow = false;
     b12_gate_reject(
         fn()=>daily_record_revision_prepare_save($missing,'layer',7,11,'2026-10-13',null,b12_gate_tokens('edit'),$auth),
         DailyRecordRevisionConflict::class,'deleted edit source denied'
@@ -180,7 +180,7 @@ try {
         DailyRecordRevisionConflict::class,'create cannot reuse identity'
     );
     b12_gate_reject(
-        fn()=>daily_record_revision_save_contract('ruminant',7,11,'2026-10-13','sheep',$tokens),
+        fn()=>daily_record_revision_save_contract('ruminant',7,11,'2026-10-13','sheep',array_replace(b12_gate_tokens('edit'), ['original_animal_type'=>'goat'])),
         DailyRecordRevisionConflict::class,'ruminant selection does not match original animal type'
     );
     b12_gate_reject(
