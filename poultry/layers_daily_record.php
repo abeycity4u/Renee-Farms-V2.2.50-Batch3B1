@@ -787,7 +787,8 @@ $_SESSION['success'] = "Daily record saved successfully!"
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <form method="POST" id="recordForm">
-                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>">
+                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>
+                    <?php require_once __DIR__ . '/../lib/daily_record_revision_form_controls.php'; echo daily_record_revision_pending_form_controls('layer'); ?>">
                     <div class="modal-header">
                         <h5 class="modal-title" id="modalTitle">Layer Daily Record</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
