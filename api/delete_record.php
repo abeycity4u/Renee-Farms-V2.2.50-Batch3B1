@@ -5,6 +5,7 @@ require_once(__DIR__ . '/api_helpers.php');
 require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/../lib/daily_feed_sync.php');
 require_once(__DIR__ . '/../lib/daily_population_sync.php');
+require_once(__DIR__ . '/../lib/daily_record_revision_authority.php');
 require_once(__DIR__ . '/../lib/sales_allocation.php');
 requireLogin();
 require_http_method('POST');
@@ -44,16 +45,20 @@ if (!isPlatformOwner() && !hasRole('farm_admin')) {
 try {
     $farmId = requireCurrentFarmId();
     $pdo->beginTransaction();
-    if ($type === 'layer') {
-        $recordStmt = $pdo->prepare("SELECT record_date FROM layer_daily_records WHERE id=? AND farm_id=? LIMIT 1");
-        $recordStmt->execute([(int)$id,$farmId]);
-        $layerRecordDate = $recordStmt->fetchColumn();
-        $stmt = $pdo->prepare("DELETE FROM layer_daily_records WHERE id = ? AND farm_id = ?");
-        $sourceType = 'daily_layer_record';
-    } else {
-        $stmt = $pdo->prepare("DELETE FROM broiler_daily_records WHERE id = ? AND farm_id = ?");
-        $sourceType = 'daily_broiler_record';
-    }
+    // Lock the exact farm-qualified source before reversing feed, stock or
+    // mortality; no date-only probe or unprotected pretransaction read.
+    $lockedRecord = daily_record_revision_lock_source_for_delete(
+        $pdo, (string)$type, $farmId, (int)$id
+    );
+    $layerRecordDate = $type === 'layer'
+        ? (string)$lockedRecord['record_date'] : null;
+    $sourceType = $type === 'layer'
+        ? 'daily_layer_record' : 'daily_broiler_record';
+    $stmt = $pdo->prepare(
+        $type === 'layer'
+            ? 'DELETE FROM layer_daily_records WHERE id = ? AND farm_id = ?'
+            : 'DELETE FROM broiler_daily_records WHERE id = ? AND farm_id = ?'
+    );
 
     // Restore inventory and remove the canonical mortality projection
     // before deleting the durable Daily Record source. All operations share
