@@ -1,0 +1,61 @@
+-- B12 AUDIT ONLY. READ-ONLY SQL; REVIEW TABLES/FARM SCOPES BEFORE EXECUTION.
+-- DO NOT APPLY IN PRODUCTION WITHOUT EXPLICIT AUTHORIZATION.
+-- 1. Current revision column presence (expect 0 on pinned database_schema.sql baseline).
+SELECT table_name, column_name, column_type, is_nullable
+FROM information_schema.columns
+WHERE table_schema = DATABASE()
+  AND table_name IN ('layer_daily_records','broiler_daily_records','ruminant_daily_records')
+  AND column_name IN ('record_revision','cycle_id','farm_id','record_date','animal_type')
+ORDER BY table_name, ordinal_position;
+
+-- 2. NULL-cycle duplicate identities. Every result row blocks uniqueness migration.
+SELECT 'layer' AS kind, farm_id, record_date, COUNT(*) AS row_count
+FROM layer_daily_records WHERE cycle_id IS NULL
+GROUP BY farm_id, record_date HAVING COUNT(*) > 1;
+SELECT 'broiler' AS kind, farm_id, record_date, COUNT(*) AS row_count
+FROM broiler_daily_records WHERE cycle_id IS NULL
+GROUP BY farm_id, record_date HAVING COUNT(*) > 1;
+SELECT 'ruminant' AS kind, farm_id, record_date, LOWER(TRIM(animal_type)) AS species, COUNT(*) AS row_count
+FROM ruminant_daily_records WHERE cycle_id IS NULL
+GROUP BY farm_id, record_date, LOWER(TRIM(animal_type)) HAVING COUNT(*) > 1;
+
+-- 3. All-cycle identities, including NULL, to detect normalized-species collisions.
+SELECT farm_id, record_date, COALESCE(cycle_id,0) AS cycle_key, COUNT(*) AS row_count
+FROM layer_daily_records
+GROUP BY farm_id, record_date, COALESCE(cycle_id,0) HAVING COUNT(*) > 1;
+SELECT farm_id, record_date, COALESCE(cycle_id,0) AS cycle_key, COUNT(*) AS row_count
+FROM broiler_daily_records
+GROUP BY farm_id, record_date, COALESCE(cycle_id,0) HAVING COUNT(*) > 1;
+SELECT farm_id, record_date, COALESCE(cycle_id,0) AS cycle_key,
+       LOWER(TRIM(animal_type)) AS species, COUNT(*) AS row_count
+FROM ruminant_daily_records
+GROUP BY farm_id, record_date, COALESCE(cycle_id,0), LOWER(TRIM(animal_type))
+HAVING COUNT(*) > 1;
+
+-- 4. Cross-tenant/orphan cycle references (FK to id alone cannot guarantee farm).
+SELECT 'layer' AS kind, d.id, d.farm_id, d.cycle_id, c.farm_id AS cycle_farm_id
+FROM layer_daily_records d LEFT JOIN production_cycles c ON c.id=d.cycle_id
+WHERE d.cycle_id IS NOT NULL AND (c.id IS NULL OR d.farm_id <> c.farm_id);
+SELECT 'broiler' AS kind, d.id, d.farm_id, d.cycle_id, c.farm_id AS cycle_farm_id
+FROM broiler_daily_records d LEFT JOIN production_cycles c ON c.id=d.cycle_id
+WHERE d.cycle_id IS NOT NULL AND (c.id IS NULL OR d.farm_id <> c.farm_id);
+SELECT 'ruminant' AS kind, d.id, d.farm_id, d.cycle_id, c.farm_id AS cycle_farm_id
+FROM ruminant_daily_records d LEFT JOIN production_cycles c ON c.id=d.cycle_id
+WHERE d.cycle_id IS NOT NULL AND (c.id IS NULL OR d.farm_id <> c.farm_id);
+
+-- 5. Simulate ON DELETE SET NULL collisions if any cycle is deleted.
+-- NOTE: joins below reveal each NULL legacy identity potentially conflicting
+-- with an attached cycle's record. Multiple attached cycles same farm/date
+-- also collide with one another when a deletion affects them together.
+SELECT 'layer' AS kind, x.farm_id, x.record_date, COUNT(*) AS eventual_null_rows
+FROM layer_daily_records x
+GROUP BY x.farm_id, x.record_date HAVING COUNT(*) > 1;
+SELECT 'broiler' AS kind, x.farm_id, x.record_date, COUNT(*) AS eventual_null_rows
+FROM broiler_daily_records x
+GROUP BY x.farm_id, x.record_date HAVING COUNT(*) > 1;
+SELECT 'ruminant' AS kind, x.farm_id, x.record_date,
+       LOWER(TRIM(x.animal_type)) AS species, COUNT(*) AS eventual_null_rows
+FROM ruminant_daily_records x
+GROUP BY x.farm_id, x.record_date, LOWER(TRIM(x.animal_type)) HAVING COUNT(*) > 1;
+
+-- No UPDATE, INSERT, DELETE, ALTER, locks, or transaction state changes.
