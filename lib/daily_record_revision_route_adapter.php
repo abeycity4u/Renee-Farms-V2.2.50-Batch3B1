@@ -202,3 +202,36 @@ if (!function_exists('daily_record_revision_route_save')) {
         );
     }
 }
+
+/**
+ * Source-only staged transaction owner used by all three form routes.
+ * A future AJAX submit must preserve unsaved fields on 409 rather than
+ * redirecting to a blank page. This function does NOT emit a response.
+ */
+if (!function_exists('daily_record_revision_route_transaction')) {
+    function daily_record_revision_route_transaction(
+        PDO $pdo, string $type, int $farmId, int $actorId,
+        ?int $cycleId, string $recordDate, ?string $animalType,
+        array $post, array $facts
+    ): array {
+        if ($pdo->inTransaction()) {
+            throw new LogicException('Daily Record route already owns a transaction.');
+        }
+        if (!$pdo->beginTransaction()) {
+            throw new RuntimeException('Cannot begin Daily Record transaction.');
+        }
+        try {
+            $result = daily_record_revision_route_save(
+                $pdo, $type, $farmId, $actorId,
+                $cycleId, $recordDate, $animalType, $post, $facts
+            );
+            if (!$pdo->commit()) {
+                throw new RuntimeException('Daily Record transaction could not be committed.');
+            }
+            return $result;
+        } catch (Throwable $error) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            throw $error;
+        }
+    }
+}
