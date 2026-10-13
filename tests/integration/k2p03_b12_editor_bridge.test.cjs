@@ -49,6 +49,7 @@ function build(type, overrides={}) {
             return m&&tokens[m[1]]?[tokens[m[1]]]:[];
         },
         addEventListener(name,fn){(events[name]??=[]).push(fn);},
+        listenerCount(name){return (events[name]||[]).length;},
         dispatch(name,event={preventDefault(){this.prevented=true;},prevented:false}){
             for(const fn of events[name]||[])fn(event);
             return event;
@@ -64,7 +65,10 @@ function build(type, overrides={}) {
     });
     const editor=win.ReneeDailyRecordRevisionEditor.createEditor({
         type,form,cycleId:overrides.cycleId??'11',request:reader,
-        onReady:r=>ready.push(r),onBlocked:e=>blocked.push(e),
+        onReady:r=>{
+            ready.push(r);
+            if (overrides.failReady) throw new Error('Injected rendering failure');
+        },onBlocked:e=>blocked.push(e),
     });
     return {editor,inputs,tokens,form,ready,blocked};
 }
@@ -187,6 +191,21 @@ const absent=()=>({success:true,mode:'scope',
         assert.equal(r.status,'blocked');
         assert.equal(v.editor.isReady(),false);
         assert.equal(v.tokens.write_intent.value,'');
+    });
+    await check('a rendering callback exception revokes loaded revision',async()=>{
+        const v=build('layer',{failReady:true});
+        const result=await v.editor.select();
+        assert.equal(result.status,'blocked');
+        assert.equal(v.tokens.record_id.value,'');
+        assert.equal(v.tokens.expected_revision.value,'');
+        assert.equal(v.editor.isReady(),false);
+    });
+    await check('binding submit guard twice does not duplicate listener',async()=>{
+        const v=build('broiler');
+        v.editor.bind();
+        v.editor.bind();
+        assert.equal(v.form.listenerCount('submit'),1);
+        assert.equal(v.form.listenerCount('reset'),1);
     });
     await check('invalid cycle selector is rejected at setup',async()=>{
         assert.throws(()=>build('layer',{cycleId:'0'}));
