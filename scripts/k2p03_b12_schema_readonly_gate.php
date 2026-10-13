@@ -77,11 +77,11 @@ foreach ($statements as $i => $sql) {
 }
 
 if ($mode === '--lint-only') {
-    echo "B12_SCHEMA_SOURCE_GATE=PASS\\n";
-    echo "READONLY_SELECT_SECTIONS=11\\n";
-    echo "DATABASE_CONNECTIONS=0\\n";
-    echo "DATABASE_QUERIES=0\\n";
-    echo "SOURCE_SQL_SHA256=" . hash('sha256', $raw) . "\\n";
+    echo "B12_SCHEMA_SOURCE_GATE=PASS\n";
+    echo "READONLY_SELECT_SECTIONS=11\n";
+    echo "DATABASE_CONNECTIONS=0\n";
+    echo "DATABASE_QUERIES=0\n";
+    echo "SOURCE_SQL_SHA256=" . hash('sha256', $raw) . "\n";
     exit(0);
 }
 
@@ -103,7 +103,7 @@ if ($host !== '127.0.0.1' ||
     !extension_loaded('pdo_mysql')) {
     b12_schema_audit_abort('NON_DISPOSABLE_TARGET_OR_CREDENTIALS');
 }
-$password = rtrim((string)file_get_contents($secretFile), "\\r\\n");
+$password = rtrim((string)file_get_contents($secretFile), "\r\n");
 if ($password === '') {
     b12_schema_audit_abort('EMPTY_DATABASE_SECRET');
 }
@@ -124,8 +124,8 @@ try {
     if ($pdo->query('SELECT DATABASE()')->fetchColumn() !== $db) {
         b12_schema_audit_abort('DATABASE_IDENTITY_MISMATCH');
     }
-    echo "B12_SCHEMA_DATABASE_IDENTITY=PASS\\n";
-    echo "B12_SCHEMA_SELECT_SECTIONS=11\\n";
+    echo "B12_SCHEMA_DATABASE_IDENTITY=PASS\n";
+    echo "B12_SCHEMA_SELECT_SECTIONS=11\n";
     foreach ($statements as $i => $sql) {
         $rows = $pdo->query($sql)->fetchAll();
         if (count($rows) > 300) {
@@ -137,7 +137,7 @@ try {
             echo json_encode($row, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . PHP_EOL;
         }
     }
-    echo "B12_SCHEMA_PREFLIGHT=COMPLETE_READONLY\\n";
+    echo "B12_SCHEMA_PREFLIGHT=COMPLETE_READONLY\n";
 } catch (Throwable $error) {
     // Do not echo SQL, connection strings, credentials or raw PDO errors.
     b12_schema_audit_abort('CONNECTION_OR_INVENTORY_ERROR_' . get_class($error));
