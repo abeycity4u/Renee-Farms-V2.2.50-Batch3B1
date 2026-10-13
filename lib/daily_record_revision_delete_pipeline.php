@@ -60,10 +60,16 @@ if (!function_exists('daily_record_revision_delete_contract')) {
         $revision = daily_record_revision_parse_expected($post['expected_revision']);
         $cycleId = $post['original_cycle_id'] === ''
             ? null : daily_record_revision_parse_record_id($post['original_cycle_id']);
-        $species = daily_record_revision_validate_scope(
-            $farmId, $id, $cycleId, $post['original_record_date'],
-            (bool)$def['animal_type'], $post['original_animal_type']
-        );
+        try {
+            $species = daily_record_revision_validate_scope(
+                $farmId, $id, $cycleId, $post['original_record_date'],
+                (bool)$def['animal_type'], $post['original_animal_type']
+            );
+        } catch (InvalidArgumentException $error) {
+            throw new DailyRecordRevisionConflict(
+                'The Daily Record delete scope is invalid. Reload it.', 0, $error
+            );
+        }
         if ($def['animal_type'] && !in_array(
             $species, ['cattle','goat','sheep','other'], true
         )) {
