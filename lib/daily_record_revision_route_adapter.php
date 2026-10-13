@@ -235,3 +235,56 @@ if (!function_exists('daily_record_revision_route_transaction')) {
         }
     }
 }
+
+/**
+ * Future B12 XHR route endpoint envelope. An ordinary form POST must NOT
+ * reach this after activation: the synchronized JS bridge must intercept
+ * submit so 409 leaves the user's original inputs in place. No redirect.
+ * Called only behind the hard-disabled source cutover gate.
+ */
+if (!function_exists('daily_record_revision_route_dispatch_json')) {
+    function daily_record_revision_route_dispatch_json(
+        PDO $pdo, string $type, int $farmId, int $actorId,
+        ?int $cycleId, string $recordDate, ?string $animalType,
+        array $post, array $facts
+    ): never {
+        $status = 200;
+        try {
+            $saved = daily_record_revision_route_transaction(
+                $pdo, $type, $farmId, $actorId,
+                $cycleId, $recordDate, $animalType, $post, $facts
+            );
+            $body = [
+                'success' => true,
+                'record_id' => $saved['record_id'],
+                'record_revision' => $saved['record_revision'],
+                'continuity_affected' => $saved['continuity_affected'],
+            ];
+        } catch (DailyRecordRevisionPermissionDenied $error) {
+            $status = 403;
+            $body = ['success'=>false,'code'=>'forbidden',
+                     'error'=>'You do not have permission to save this Daily Record.'];
+        } catch (DailyRecordRevisionConflict $error) {
+            $status = 409;
+            $body = ['success'=>false,'code'=>'record_conflict',
+                     'error'=>'The Daily Record changed. Keep your draft and reload the record before retrying.'];
+        } catch (InvalidArgumentException $error) {
+            $status = 422;
+            $body = ['success'=>false,'code'=>'invalid_record',
+                     'error'=>'Invalid Daily Record data. Review the form before retrying.'];
+        } catch (PDOException $error) {
+            $status = 503;
+            $body = ['success'=>false,'code'=>'storage_unavailable',
+                     'error'=>'Daily Record saving is temporarily unavailable. Keep your draft.'];
+        } catch (Throwable $error) {
+            $status = 500;
+            $body = ['success'=>false,'code'=>'save_failed',
+                     'error'=>'The Daily Record could not be saved. Keep your draft.'];
+        }
+        http_response_code($status);
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        echo json_encode($body, JSON_THROW_ON_ERROR);
+        exit;
+    }
+}
