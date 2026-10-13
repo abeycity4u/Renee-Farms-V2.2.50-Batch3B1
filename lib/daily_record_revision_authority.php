@@ -2,12 +2,12 @@
 declare(strict_types=1);
 
 /**
- * B12 — shared Daily Record revision authority (SOURCE-ONLY, NOT WIRED).
+ * B12 — shared Daily Record authority (revision CAS remains SOURCE-ONLY).
  *
  * This deliberately DOES NOT load config.php, start/commit transactions,
  * mutate external population/stock/sales ledgers, or grant permissions.
  *
- * Requires the FUTURE, separately approved three-table record_revision
+ * Revision CAS requires the FUTURE, separately approved three-table record_revision
  * migration and browser expected-id/revision wiring before any caller uses it.
  *
  * One edit sequence, owned by the authorized caller's PDO transaction:
@@ -83,6 +83,57 @@ if (!function_exists('daily_record_revision_require_transaction')) {
                 'Daily Record revision authority requires a caller-owned transaction.'
             );
         }
+    }
+}
+
+/**
+ * Lock the exact tenant-owned Daily Record source before DELETE side effects.
+ * This operation needs NO revision schema and is safe for today's tables.
+ *
+ * A source-first deletion lock is NOT a substitute for the later B12
+ * client-loaded expected_revision check: all edit/create paths still need a
+ * coordinated revision-aware cutover before stale edits are certified safe.
+ */
+if (!function_exists('daily_record_revision_lock_source_for_delete')) {
+    function daily_record_revision_lock_source_for_delete(
+        PDO $pdo,
+        string $type,
+        int $farmId,
+        int $recordId
+    ): array {
+        daily_record_revision_require_transaction($pdo);
+        if ($farmId < 1 || $recordId < 1) {
+            throw new InvalidArgumentException('Invalid Daily Record source identity.');
+        }
+        $config = daily_record_revision_definition($type);
+        $columns = 'id, record_date, cycle_id';
+        if ($config['animal_type']) {
+            $columns .= ', animal_type';
+        }
+        $stmt = $pdo->prepare(
+            'SELECT ' . $columns . ' FROM ' . $config['table'] .
+            ' WHERE id = ? AND farm_id = ? LIMIT 1 FOR UPDATE'
+        );
+        if ($stmt === false) {
+            throw new RuntimeException('Daily Record source lock unavailable.');
+        }
+        $stmt->execute([$recordId, $farmId]);
+        $record = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($record) || (int)($record['id'] ?? 0) !== $recordId) {
+            throw new DailyRecordRevisionConflict(
+                'The Daily Record is no longer available. Reload the page.'
+            );
+        }
+        if ($config['animal_type'] && !in_array(
+            strtolower(trim((string)($record['animal_type'] ?? ''))),
+            ['cattle', 'goat', 'sheep', 'other'],
+            true
+        )) {
+            throw new DailyRecordRevisionConflict(
+                'The Daily Record species is not supported. Reload the page.'
+            );
+        }
+        return $record;
     }
 }
 
