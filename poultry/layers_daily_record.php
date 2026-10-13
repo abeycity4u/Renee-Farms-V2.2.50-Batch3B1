@@ -4,6 +4,7 @@ require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/../lib/daily_feed_sync.php');
 require_once(__DIR__ . '/../lib/daily_population_sync.php');
 require_once(__DIR__ . '/../lib/daily_population_continuity.php');
+require_once(__DIR__ . '/../lib/daily_record_revision_cutover_gate.php');
 require_once(__DIR__ . '/../lib/daily_record_workspace_scope.php');
 require_once(__DIR__ . '/../lib/sales_allocation.php');
 requireLogin();
@@ -228,6 +229,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
         $calculatedLayingRate = round(($eggProduction / $openingStock) * 100, 2);
         $calculatedCrates = round($eggProduction / 30, 2);
+
+        // B12 FUTURE CUTOVER ONLY. Hard-disabled for this source release:
+        // all seven writers, revision DDL and browser AJAX must flip together.
+        if (daily_record_revision_cutover_enabled()) {
+            require_once __DIR__ . '/../lib/daily_record_revision_route_adapter.php';
+            daily_record_revision_route_dispatch_json(
+                $pdo, 'layer', $tenantFarmId, (int)($_SESSION['user_id'] ?? 0),
+                $cycleIdForSave, $recordDate, null, $_POST, [
+                    'opening_stock' => $openingStock,
+                    'mortality' => $mortality,
+                    'feed_consumption' => $feedConsumption,
+                    'feed_item_id' => $feedItemId,
+                    'water_consumption' => $waterConsumption,
+                    'birds_age' => $birdsAge,
+                    'egg_production' => $eggProduction,
+                    'crates_count' => $calculatedCrates,
+                    'laying_rate' => $calculatedLayingRate,
+                ]
+            );
+        }
 
         // V3 cycles use canonical population. Legacy cycles retain the previous-record chain.
         if ($cycleIdForSave !== null) {
