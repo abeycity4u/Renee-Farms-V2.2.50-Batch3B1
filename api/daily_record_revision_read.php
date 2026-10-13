@@ -1,6 +1,6 @@
-<?php require_once dirname(__DIR__) . '/init.php'; ?>
 <?php
 declare(strict_types=1);
+require_once dirname(__DIR__) . '/init.php';
 
 /**
  * B12 staged authenticated, read-only scope/exact Daily Record endpoint.
