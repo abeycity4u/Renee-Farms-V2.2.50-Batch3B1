@@ -177,19 +177,28 @@
 
             // Do not allow a stale asynchronous result to fill ANY business
             // fields or show side panels belonging to a newer selection.
-            if (result.mode === 'edit') {
-                fillRecord(result.record);
-                if (animal) animal.disabled = true;
-            } else {
-                if (animal) animal.disabled = false;
+            try {
+                if (result.mode === 'edit') {
+                    fillRecord(result.record);
+                    if (animal) animal.disabled = true;
+                } else {
+                    if (animal) animal.disabled = false;
+                }
+                if (hiddenAnimal) hiddenAnimal.value = animal.value;
+                notify(options.onReady, {
+                    mode: result.mode,
+                    record: result.record,
+                    ticket: result.ticket,
+                    guard: fn => guard(result.ticket, fn)
+                });
+            } catch (_) {
+                // A field-render or page-panel error must not leave a
+                // submittable revision token on a partially rendered form.
+                if (requestNumber !== thisRequest) return {status:'stale'};
+                invalidate();
+                notify(options.onBlocked, {reason:'render_failure'});
+                return {status:'blocked'};
             }
-            if (hiddenAnimal) hiddenAnimal.value = animal.value;
-            notify(options.onReady, {
-                mode: result.mode,
-                record: result.record,
-                ticket: result.ticket,
-                guard: fn => guard(result.ticket, fn)
-            });
             if (!isReady()) {
                 invalidate();
                 notify(options.onBlocked, {reason:'selection_changed'});
@@ -209,7 +218,10 @@
         // Capture-phase guard executes before legacy normalization handlers.
         // Future activation MUST retire legacy edit/existence listeners: a
         // capture listener alone cannot make legacy POST-time UPSERT safe.
+        let bound = false;
         function bind() {
+            if (bound) return;
+            bound = true;
             form.addEventListener('submit', handleSubmit, true);
             form.addEventListener('reset', invalidate);
             date.addEventListener('change', invalidate);
