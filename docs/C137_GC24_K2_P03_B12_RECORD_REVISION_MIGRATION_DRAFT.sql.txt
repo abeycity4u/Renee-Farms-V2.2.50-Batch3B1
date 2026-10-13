@@ -1,0 +1,58 @@
+-- RENEE AGRISUITE / B12 — UNAPPROVED REVISION SCHEMA DRAFT.
+-- SOURCE-ONLY REFERENCE, NOT AN EXECUTABLE MIGRATION.
+-- DO NOT rename to migrations/092_*.sql.
+-- DO NOT feed this file to mysql, scripts/run_migrations.php, or cPanel.
+-- All ALTER lines below are intentionally commented out.
+--
+-- Migration motivation: a persisted monotonic revision is necessary to
+-- reject stale client-loaded Layer/Broiler/Ruminant editor updates and deletes.
+-- Data/DDL/permissions/browser cutover is not yet certified.
+--
+-- CANDIDATE ONLY, not authority to execute (one DDL statement per table):
+-- ALTER TABLE `layer_daily_records` ADD COLUMN `record_revision` BIGINT UNSIGNED NOT NULL DEFAULT 1;
+-- ALTER TABLE `broiler_daily_records` ADD COLUMN `record_revision` BIGINT UNSIGNED NOT NULL DEFAULT 1;
+-- ALTER TABLE `ruminant_daily_records` ADD COLUMN `record_revision` BIGINT UNSIGNED NOT NULL DEFAULT 1;
+--
+-- No unique index, foreign-key, cycle-delete or data-rewrite change is in
+-- scope. Existing records would receive revision 1 at cutover, subject to
+-- guarded approval and a separately reviewed compatible migration strategy.
+--
+-- Why a normal numbered migration must not be shipped yet:
+-- 1. scripts/run_migrations.php auto-discovers *.sql files in migrations/.
+-- 2. MariaDB DDL has implicit commits. Altering three tables is not atomic.
+-- 3. Its duplicate-column ignore policy cannot prove an existing column has
+--    the exact required BIGINT UNSIGNED NOT NULL DEFAULT 1 definition.
+-- 4. A crash after one/two ALTERs leaves a partial state, not a rollback.
+-- 5. Database row inventories and client CAS writer/browser readiness are
+--    still open; a green synthetic CI run cannot certify tenant data.
+--
+-- Preflight before a future separately approved isolated execution:
+-- [ ] Independently verify clone identity, provenance, privileges and scope.
+-- [ ] Use existing SELECT-only eleven-section inventory + strict FK DDL
+--     attestation; verify real aggregate NULL-cycle duplicate and cross-tenant
+--     counts, source triggers, indexes, data types, MariaDB version.
+-- [ ] Review cycle-delete SET NULL behavior and legacy NULL identity policy.
+-- [ ] Validate all three tables and existing column definitions with
+--     lib/daily_record_revision_schema_plan.php on trusted metadata.
+-- [ ] Confirm source read/write APIs, all seven writers, delegated delete,
+--     continuity, cycle seeding and three browser modals ready together.
+-- [ ] Review active connection/session drain, backup, rollback/restore and
+--     DDL lock/timeouts before any physical schema change.
+-- [ ] Test first in separately approved disposable MariaDB, including
+--     partial-after-first/second-ALTER recovery and postconditions.
+-- [ ] Obtain explicit release approval. Do not infer it from "proceed".
+--
+-- Roll-forward/recovery rule: if a single ALTER succeeds before later ones
+-- fail, STOP all rollout; inspect exact per-table definitions and DO NOT
+-- blindly rerun the generic migration runner. A manual recovery script must
+-- be separately reviewed/authorized and target only verified missing tables.
+-- Do not mark schema_migrations as applied until all three definitions and
+-- the release's writer/browser readiness are independently certified.
+--
+-- After physical migration, record_revision >= 1 must be constrained to the
+-- PHP-safe CAS protocol; the current shared helpers reject client values at
+-- or above PHP_INT_MAX. No-op edit and derivative continuity corrections
+-- still require version handling. Stage rollout must not permit old writers
+-- to continue writing without incrementing revision.
+--
+-- NO LIVE DATABASE WAS QUERIED; THIS FILE IS NOT A READINESS CERTIFICATE.
