@@ -74,7 +74,10 @@ if (!function_exists('daily_record_revision_schema_revision_valid')) {
         }
         $rawDefault = trim((string)$column['column_default']);
         if ($rawDefault !== '1' && $rawDefault !== "'1'") return false;
-        if (!daily_record_revision_schema_column_matches($column, 'revision', 'NO')) {
+        if (!isset($column['column_type'], $column['is_nullable']) ||
+            !is_string($column['column_type']) ||
+            !is_string($column['is_nullable']) ||
+            strtoupper(trim($column['is_nullable'])) !== 'NO') {
             return false;
         }
         return preg_match(
@@ -144,8 +147,12 @@ if (!function_exists('daily_record_revision_schema_candidate_plan')) {
     function daily_record_revision_schema_candidate_plan(array $schema): array
     {
         $tables = daily_record_revision_schema_tables();
-        if (array_keys($schema) !== array_keys($tables)) {
-            throw new DomainException('B12 requires exact, ordered three-table metadata.');
+        $supplied = array_keys($schema);
+        $required = array_keys($tables);
+        sort($supplied, SORT_STRING);
+        sort($required, SORT_STRING);
+        if ($supplied !== $required) {
+            throw new DomainException('B12 requires metadata for exactly the three Daily Record tables.');
         }
         $states = [];
         foreach ($tables as $table => $_constraintName) {
