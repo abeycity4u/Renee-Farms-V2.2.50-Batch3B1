@@ -28,7 +28,7 @@ function b12_schema_audit_abort(string $reason): never
 }
 
 $mode = $argv[1] ?? '--lint-only';
-if (!in_array($mode, ['--lint-only', '--run'], true) || count($argv) !== 2) {
+if (!in_array($mode, ['--lint-only', '--run'], true) || count($argv) > 2) {
     b12_schema_audit_abort('USE_EXPLICIT_LINT_ONLY_OR_RUN');
 }
 
