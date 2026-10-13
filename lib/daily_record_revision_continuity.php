@@ -26,6 +26,7 @@ if (!function_exists('daily_record_revision_apply_continuity_change')) {
         array $change
     ): void {
         daily_record_revision_require_transaction($pdo);
+        $type = strtolower(trim($type));
         $definition = daily_record_revision_definition($type);
         foreach (['id', 'record_date', 'old_opening_stock', 'new_opening_stock'] as $key) {
             if (!array_key_exists($key, $change)) {
