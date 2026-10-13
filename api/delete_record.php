@@ -6,6 +6,7 @@ require_once(__DIR__ . '/../includes/functions.php');
 require_once(__DIR__ . '/../lib/daily_feed_sync.php');
 require_once(__DIR__ . '/../lib/daily_population_sync.php');
 require_once(__DIR__ . '/../lib/daily_record_revision_authority.php');
+require_once(__DIR__ . '/../lib/daily_record_revision_cutover_gate.php');
 require_once(__DIR__ . '/../lib/sales_allocation.php');
 requireLogin();
 require_http_method('POST');
@@ -39,6 +40,53 @@ if (!isPlatformOwner() && !hasRole('farm_admin')) {
         || !hasPermission(getUserType(), $deletePermission)
     ) {
         send_json(['success' => false, 'error' => 'View and Delete permissions are required for this daily record.'], 403);
+    }
+}
+
+
+/*
+ * B12 FUTURE coordinated cutover only. This fuse is compile-time hard-off.
+ * The existing privileged/delegated permission, CSRF, POST and rate-limit
+ * checks above remain mandatory. Never synthesize expected_revision from a
+ * fresh DELETE-time row lookup: it must be browser-loaded identity.
+ */
+if (daily_record_revision_cutover_enabled()) {
+    require_once __DIR__ . '/../lib/daily_record_revision_delete_pipeline.php';
+    try {
+        $farmId = requireCurrentFarmId();
+        $actorId = (int)($_SESSION['user_id'] ?? 0);
+        $authorizeDelete = static function(
+            string $module, string $view, string $operation
+        ): bool {
+            return isPlatformOwner() || hasRole('farm_admin') || (
+                checkAccess($module) &&
+                hasPermission(getUserType(), $view) &&
+                hasPermission(getUserType(), $operation)
+            );
+        };
+        $deleted = daily_record_revision_delete_transaction(
+            $pdo, (string)$type, $farmId, $actorId, $_POST, $authorizeDelete
+        );
+        send_json([
+            'success'=>true, 'message'=>'Record deleted successfully.',
+            'record_id'=>$deleted['record_id'],
+        ]);
+    } catch (DailyRecordRevisionPermissionDenied $error) {
+        send_json(['success'=>false, 'code'=>'forbidden',
+            'error'=>'You do not have permission to delete this record.'], 403);
+    } catch (DailyRecordRevisionConflict $error) {
+        send_json(['success'=>false, 'code'=>'record_conflict',
+            'error'=>'The record changed. Reload before deleting.'], 409);
+    } catch (InvalidArgumentException $error) {
+        send_json(['success'=>false, 'code'=>'invalid_delete_request',
+            'error'=>'Invalid record selection. Reload before deleting.'], 422);
+    } catch (Throwable $error) {
+        log_app_error('delete_record_revision_failed', [
+            'type' => (string)$type,
+            'exception' => get_class($error),
+        ]);
+        send_json(['success'=>false, 'code'=>'delete_failed',
+            'error'=>'Unable to delete the record. Try again later.'], 500);
     }
 }
 
