@@ -16,6 +16,7 @@ declare(strict_types=1);
  */
 require_once __DIR__ . '/daily_feed_sync.php';
 require_once __DIR__ . '/daily_population_sync.php';
+require_once __DIR__ . '/daily_record_revision_authority.php';
 
 if (!function_exists('ruminant_daily_record_delete_canonical')) {
     function ruminant_daily_record_delete_canonical(
@@ -47,22 +48,12 @@ if (!function_exists('ruminant_daily_record_delete_canonical')) {
              * movements. Re-validate species and tenant WITHIN the lock;
              * pretransaction read permissions or UI snapshots are not trusted.
              */
-            $recordStmt = $pdo->prepare(
-                'SELECT id, animal_type FROM ruminant_daily_records'
-                . ' WHERE id = ? AND farm_id = ? LIMIT 1 FOR UPDATE'
+            daily_record_revision_lock_source_for_delete(
+                $pdo,
+                'ruminant',
+                $farmId,
+                $recordId
             );
-            $recordStmt->execute([$recordId, $farmId]);
-            $record = $recordStmt->fetch(PDO::FETCH_ASSOC);
-
-            if (!is_array($record) || !in_array(
-                strtolower(trim((string)$record['animal_type'])),
-                ['cattle', 'goat', 'sheep', 'other'],
-                true
-            )) {
-                throw new RuntimeException(
-                    'Daily record not found or you do not have permission to delete it.'
-                );
-            }
 
             delete_daily_feed_usage(
                 $pdo,
