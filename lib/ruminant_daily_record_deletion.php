@@ -17,13 +17,15 @@ declare(strict_types=1);
 require_once __DIR__ . '/daily_feed_sync.php';
 require_once __DIR__ . '/daily_population_sync.php';
 require_once __DIR__ . '/daily_record_revision_authority.php';
+require_once __DIR__ . '/daily_record_revision_cutover_gate.php';
 
 if (!function_exists('ruminant_daily_record_delete_canonical')) {
     function ruminant_daily_record_delete_canonical(
         PDO $pdo,
         int $farmId,
         int $recordId,
-        ?int $actorId
+        ?int $actorId,
+        ?array $post = null
     ): void {
         if ($farmId <= 0 || $recordId <= 0) {
             throw new InvalidArgumentException(
@@ -34,6 +36,34 @@ if (!function_exists('ruminant_daily_record_delete_canonical')) {
             throw new LogicException(
                 'Ruminant Daily Record deletion owns its transaction.'
             );
+        }
+
+        /*
+         * B12 FUTURE cutover, hard-disabled until schema, browser identity
+         * tokens and every writer move together. Both privileged and
+         * delegated callers pass the originally submitted form values;
+         * neither creates revision tokens from a fresh database read.
+         */
+        if (daily_record_revision_cutover_enabled()) {
+            require_once __DIR__ . '/daily_record_revision_delete_pipeline.php';
+            if ($post === null || $actorId === null) {
+                throw new DailyRecordRevisionConflict(
+                    'The Daily Record delete form is incomplete.'
+                );
+            }
+            $authorized = static function(
+                string $module, string $view, string $permission
+            ): bool {
+                return function_exists('checkAccess')
+                    && function_exists('permission_runtime_has')
+                    && checkAccess($module)
+                    && permission_runtime_has($view)
+                    && permission_runtime_has($permission);
+            };
+            daily_record_revision_delete_transaction(
+                $pdo, 'ruminant', $farmId, $actorId, $post, $authorized
+            );
+            return;
         }
 
         try {
