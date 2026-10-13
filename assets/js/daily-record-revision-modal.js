@@ -199,8 +199,98 @@
             }
         }
 
+
+        /*
+         * Future shared API loader. request(params) must return the normalized
+         * JSON body from the dormant PHP revision API adapter. It is injected:
+         * this source-only module never contacts an endpoint on its own.
+         *
+         * scope => absent: authorize browser CREATE intent only (not a DB
+         * reservation); scope => unique: fetch that exact persisted ID and
+         * its ORIGINAL revision. A failed/malformed/ambiguous scope or exact
+         * read must not promote a stale EDIT into CREATE. The caller MUST
+         * check isCurrent(result.ticket) AND isReady() synchronously before
+         * applying record fields or any async side panels, and block form
+         * submission when result.status !== 'ready'.
+         */
+        function apiParameters(ticket, mode, recordId) {
+            const request = {
+                mode, type,
+                cycle_id: ticket.scope.cycle_id,
+                record_date: ticket.scope.record_date
+            };
+            if (type === 'ruminant') {
+                request.animal_type = ticket.scope.animal_type;
+            }
+            if (mode === 'exact') request.record_id = recordId;
+            return Object.freeze(request);
+        }
+
+        function apiData(payload, mode) {
+            if (!payload || typeof payload !== 'object' ||
+                payload.success !== true || payload.mode !== mode ||
+                !payload.data || typeof payload.data !== 'object' ||
+                Array.isArray(payload.data)) {
+                throw new Error('Daily Record lookup failed. Reload and review.');
+            }
+            return payload.data;
+        }
+
+        async function loadSelection(request) {
+            if (typeof request !== 'function') {
+                throw new Error('The Daily Record reader is unavailable.');
+            }
+            const ticket = begin();
+            try {
+                const scopeData = apiData(
+                    await request(apiParameters(ticket, 'scope')), 'scope'
+                );
+                if (!isCurrent(ticket)) return Object.freeze({ status: 'stale', ticket });
+
+                if (scopeData.status === 'absent') {
+                    if (scopeData.record_id !== null || !allowCreate(ticket)) {
+                        throw new Error('Invalid Daily Record CREATE scope.');
+                    }
+                    return Object.freeze({
+                        status: 'ready', mode: 'create', record: null, ticket
+                    });
+                }
+                if (scopeData.status !== 'unique') {
+                    throw new Error('Daily Record selection is ambiguous.');
+                }
+                const expectedId = decimal(scopeData.record_id, maxId);
+                const exact = apiData(
+                    await request(apiParameters(ticket, 'exact', expectedId)), 'exact'
+                );
+                if (!isCurrent(ticket)) return Object.freeze({ status: 'stale', ticket });
+
+                const record = exact.record;
+                const tokens = exact.form_tokens;
+                if (!record || typeof record !== 'object' ||
+                    Array.isArray(record) || !tokens || typeof tokens !== 'object' ||
+                    Array.isArray(tokens) || decimal(record.id, maxId) !== expectedId ||
+                    decimal(tokens.record_id, maxId) !== expectedId ||
+                    !sameScope(ticket.scope, normalizeScope(type, record)) ||
+                    !loadEdit(ticket, tokens)) {
+                    throw new Error('Exact Daily Record identity is inconsistent.');
+                }
+                return Object.freeze({ status: 'ready', mode: 'edit', record, ticket });
+            } catch (_) {
+                // No automatic CREATE fallback, even on 404, 409 or transport
+                // failure. Clear ONLY revision tokens, not user-entered fields.
+                if (active && active !== ticket) {
+                    return Object.freeze({ status: 'stale', ticket });
+                }
+                if (active === ticket) reject(ticket);
+                return Object.freeze({ status: 'blocked', ticket });
+            }
+        }
+
         invalidate();
-        return Object.freeze({ begin, isCurrent, allowCreate, loadEdit, reject, invalidate, isReady });
+        return Object.freeze({
+            begin, isCurrent, allowCreate, loadEdit, loadSelection,
+            reject, invalidate, isReady
+        });
     }
 
     global.ReneeDailyRecordRevisionModal = Object.freeze({ createController });
