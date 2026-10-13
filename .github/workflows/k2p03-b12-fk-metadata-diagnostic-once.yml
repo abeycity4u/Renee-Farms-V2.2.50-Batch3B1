@@ -1,0 +1,121 @@
+name: C137 B12 FK metadata visibility (one-use isolated synthetic)
+
+# DORMANT until a separately reviewed one-file approval commit on this branch.
+# No dispatch, pull-request, original B12 run, protected database or AWS node.
+on:
+  push:
+    branches:
+      - c137-gc24-k2p03-b12-fk-metadata-diagnostic-20261013
+    paths:
+      - docs/C137_GC24_K2_P03_B12_FK_METADATA_DIAGNOSTIC_APPROVAL.txt
+
+permissions:
+  contents: read
+
+concurrency:
+  group: b12-fk-meta-one-use-isolated
+  cancel-in-progress: false
+
+jobs:
+  investigate-fk-visibility:
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/c137-gc24-k2p03-b12-fk-metadata-diagnostic-20261013' &&
+      github.event.head_commit.message == 'ci-b12(fk-meta): authorize one isolated reader visibility diagnostic' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CI_DB_HOST: '127.0.0.1'
+      CI_DB_NAME: 'renee_b12_disposable_fkmeta_20261013'
+      CI_DB_OWNER_USER: 'b12_owner'
+      CI_DB_OWNER_PASSWORD: 'synthetic-fk-owner-20261013'
+      CI_DB_READER_USER: 'b12_reader'
+      CI_DB_READER_PASSWORD: 'synthetic-fk-reader-20261013'
+      CI_DB_ROOT_PASSWORD: 'synthetic-fk-root-20261013'
+
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: synthetic-fk-root-20261013
+          MARIADB_ROOT_HOST: '%'
+          MARIADB_DATABASE: renee_b12_disposable_fkmeta_20261013
+          MARIADB_USER: b12_owner
+          MARIADB_PASSWORD: synthetic-fk-owner-20261013
+        ports:
+          - 127.0.0.1:3306:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - name: Checkout exact isolated approved source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+
+      - name: Guard one-use approval and pinned source before synthetic database access
+        shell: bash
+        run: |
+          set -euo pipefail
+          approval='docs/C137_GC24_K2_P03_B12_FK_METADATA_DIAGNOSTIC_APPROVAL.txt'
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$GITHUB_REPOSITORY" = abeycity4u/Renee-Farms-V2.2.50-Batch3B1
+          test "$GITHUB_REF" = refs/heads/c137-gc24-k2p03-b12-fk-metadata-diagnostic-20261013
+          test "$GITHUB_RUN_ATTEMPT" = 1
+          test "$(git show -s --format=%s HEAD)" = 'ci-b12(fk-meta): authorize one isolated reader visibility diagnostic'
+          test "$(git diff-tree --no-commit-id --name-only -r HEAD)" = "$approval"
+          test "$(git diff-tree --no-commit-id --name-only --diff-filter=A -r HEAD)" = "$approval"
+          test "$(wc -l < "$approval" | tr -d ' ')" = 2
+          test "$(sed -n '1p' "$approval")" = 'CI_B12_FK_META_DIAGNOSTIC_APPROVED=YES'
+          test "$(sed -n '2p' "$approval")" = "CI_B12_FK_META_APPROVED_PARENT=$(git rev-parse HEAD^)"
+          test "$(git hash-object database_schema.sql)" = e77f287d62c5812a3d55dc23b5b20f5d167db389
+          test "$(git hash-object docs/C137_GC24_K2_P03_B12_READONLY_SCHEMA_INVENTORY.sql)" = 6dd5614edb2dae2432d9e8628b43ba53177e7133
+          test "$(git hash-object scripts/k2p03_b12_schema_readonly_gate.php)" = 361e23098eab24fa258bca7773086c11f0c07dc1
+          test "$(git hash-object tests/integration/k2p03_b12_fk_metadata_visibility_diagnostic.sh)" = 9bf9974fd2a01cae5d984a7e2c117d495663f954
+          test "$CI_DB_HOST" = '127.0.0.1'
+          test "$CI_DB_NAME" = 'renee_b12_disposable_fkmeta_20261013'
+          test "$CI_DB_OWNER_USER" = 'b12_owner'
+          test "$CI_DB_READER_USER" = 'b12_reader'
+          echo "B12_FK_META_ONE_USE_GUARD=PASS"
+          echo "PROTECTED_DATABASE_CONNECTIONS=NONE"
+
+      - name: Install isolated PHP and verify fail-closed runner without DB access
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_mysql
+          coverage: none
+
+      - name: PHP lint, SQL lint and shell syntax, no database calls
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -l scripts/k2p03_b12_schema_readonly_gate.php
+          php scripts/k2p03_b12_schema_readonly_gate.php --lint-only
+          bash -n tests/integration/k2p03_b12_fk_metadata_visibility_diagnostic.sh
+          if php scripts/k2p03_b12_schema_readonly_gate.php --run >/dev/null 2>&1; then
+            echo "UNAUTHORIZED_RUN_REJECTED=FAIL"
+            exit 1
+          fi
+          echo "UNAUTHORIZED_RUN_REJECTED=PASS"
+
+      - name: Install MariaDB client for synthetic disposable service
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -qq -y --no-install-recommends mariadb-client
+
+      - name: Diagnose metadata visibility in fresh disposable MariaDB only
+        shell: bash
+        env:
+          B12_DIAGNOSTIC_APPROVAL_GUARD: PASS
+        run: |
+          set -euo pipefail
+          bash tests/integration/k2p03_b12_fk_metadata_visibility_diagnostic.sh
