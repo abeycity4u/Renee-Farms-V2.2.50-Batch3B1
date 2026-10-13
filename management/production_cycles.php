@@ -7,6 +7,7 @@ require_once(__DIR__ . '/../lib/poultry_cycle_lifecycle.php');
 require_once(__DIR__ . '/../lib/poultry_cycle_acquisition.php');
 require_once(__DIR__ . '/../lib/poultry_cycle_onboarding.php');
 require_once(__DIR__ . '/../lib/production_cycle_service.php');
+require_once(__DIR__ . '/../lib/daily_record_revision_cutover_gate.php');
 require_once(__DIR__ . '/../lib/production_population_intelligence.php');
 requireLogin();
 requireBusinessReportAccess();
@@ -324,7 +325,22 @@ try {
                         (int)$openingHeadcountRaw;
 
                         // Seed opening record on cycle start date so daily pages can continue immediately.
-                        if ($farmType === 'poultry' && $productionType === 'layer') {
+                        // B12 FUTURE ONLY: the hard-off fuse ensures this cannot
+                        // mix revision-seeded entries with legacy non-CAS writers.
+                        if (daily_record_revision_cutover_enabled()) {
+                            require_once __DIR__ . '/../lib/daily_record_revision_cycle_seed.php';
+                            daily_record_revision_seed_cycle_entry(
+                                $pdo,
+                                $tenantFarmId,
+                                $newCycleId,
+                                $startDate,
+                                $openingHeadcount,
+                                max(1, (int)$startAgeDays),
+                                isset($_SESSION['user_id'])
+                                    ? (int)$_SESSION['user_id']
+                                    : null
+                            );
+                        } elseif ($farmType === 'poultry' && $productionType === 'layer') {
                             $seedStmt = $pdo->prepare(
                                 'INSERT INTO layer_daily_records
                                 (farm_id, cycle_id, record_date, opening_stock, mortality, feed_consumption_bags, water_consumption_liters, medications, egg_production, crates_count, laying_rate, birds_age, remarks, user_id)
