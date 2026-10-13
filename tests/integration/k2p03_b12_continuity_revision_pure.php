@@ -71,6 +71,11 @@ try {
         $layer->bound[0] === [95, 80.52, 19, 7, 11, '2026-10-13', 100, PHP_INT_MAX - 1],
         'layer immutable scope and source-opening guard'
     );
+    $mixedCase = new B12ContinuityPDO();
+    daily_record_revision_apply_continuity_change(
+        $mixedCase, ' Layer ', 7, 11, null, $base + ['new_laying_rate' => 80.52]
+    );
+    b12_continuity_assert(str_contains($mixedCase->queries[0], 'laying_rate = ?'), 'type normalization preserves Layer rate');
     $broiler = new B12ContinuityPDO();
     daily_record_revision_apply_continuity_change($broiler, 'broiler', 7, 11, null, $base);
     b12_continuity_assert(str_contains($broiler->queries[0], 'UPDATE broiler_daily_records'), 'broiler table');
