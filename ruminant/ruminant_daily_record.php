@@ -5,6 +5,7 @@ require_once(__DIR__ . '/../lib/daily_feed_sync.php');
 require_once(__DIR__ . '/../lib/daily_population_sync.php');
 require_once(__DIR__ . '/../lib/ruminant_daily_record_deletion.php');
 require_once(__DIR__ . '/../lib/daily_population_continuity.php');
+require_once(__DIR__ . '/../lib/daily_record_revision_cutover_gate.php');
 require_once(__DIR__ . '/../lib/daily_record_workspace_scope.php');
 require_once(__DIR__ . '/../lib/ruminant_daily_record_mortality_summary.php');
 requireLogin();
@@ -356,6 +357,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_record'])) {
         header('Location: ruminant_daily_record.php?month=' . urlencode($month) . '&cycle_id=' . (int)$selectedCycleId);
         exit();
     }
+    // B12 FUTURE CUTOVER ONLY. The hard-disabled source fuse prevents
+    // partial migration of Ruminant group mortality and feed movements.
+    if (daily_record_revision_cutover_enabled()) {
+        require_once __DIR__ . '/../lib/daily_record_revision_route_adapter.php';
+        daily_record_revision_route_dispatch_json(
+            $pdo, 'ruminant', $tenantFarmId, (int)($_SESSION['user_id'] ?? 0),
+            $cycleIdForSave, $recordDate, $animalType, $_POST, [
+                'opening_stock' => $openingStock,
+                'mortality' => $mortality,
+                'feed_consumption' => $feedConsumption,
+                'feed_item_id' => $feedItemId,
+                'water_consumption' => $waterConsumption,
+                'tag_no' => $tagNo,
+            ]
+        );
+    }
+
     if ($cycleIdForSave !== null) {
         $canonicalExpected =
             daily_population_continuity_expected_opening(
