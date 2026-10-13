@@ -76,7 +76,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_record']) && $
                 $recordId,
                 isset($_SESSION['user_id'])
                     ? (int)$_SESSION['user_id']
-                    : null
+                    : null,
+                $_POST
             );
             $_SESSION['success'] = 'Ruminant daily record deleted successfully.';
         } catch (Throwable $e) {
