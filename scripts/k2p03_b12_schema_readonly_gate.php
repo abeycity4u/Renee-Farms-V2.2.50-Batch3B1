@@ -61,6 +61,46 @@ function b12_schema_audit_has_cycle_fk_rules(array $rows): bool
     return true;
 }
 
+/**
+ * For SELECT-only roles, MariaDB may hide REFERENTIAL_CONSTRAINTS but
+ * expose the same table's read-only SHOW CREATE TABLE metadata.
+ * The table and FK names are a closed map; none come from HTTP input.
+ */
+function b12_schema_audit_cycle_fk_ddl_matches(string $table, string $ddl): bool
+{
+    $constraints = [
+        'layer_daily_records' => 'fk_layer_cycle',
+        'broiler_daily_records' => 'fk_broiler_cycle',
+        'ruminant_daily_records' => 'fk_ruminant_cycle',
+    ];
+    if (!isset($constraints[$table]) || $ddl === '') {
+        return false;
+    }
+    $name = preg_quote($constraints[$table], '/');
+    $pattern = '/\bCONSTRAINT\s+\x60?' . $name
+        . '\x60?\s+FOREIGN\s+KEY\s*\(\s*\x60?cycle_id\x60?\s*\)'
+        . '\s+REFERENCES\s+\x60?production_cycles\x60?\s*\(\s*\x60?id\x60?\s*\)'
+        . '\s+ON\s+DELETE\s+SET\s+NULL\b/i';
+    return preg_match($pattern, $ddl) === 1;
+}
+
+function b12_schema_audit_cycle_fk_ddl_attest(PDO $pdo): bool
+{
+    foreach (['layer_daily_records', 'broiler_daily_records',
+              'ruminant_daily_records'] as $table) {
+        $stmt = $pdo->query('SHOW CREATE TABLE ' . chr(96) . $table . chr(96));
+        $row = $stmt === false ? false : $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)
+            || !is_string($row['Create Table'] ?? null)
+            || !b12_schema_audit_cycle_fk_ddl_matches(
+                $table, $row['Create Table']
+            )) {
+            return false;
+        }
+    }
+    return true;
+}
+
 $mode = $argv[1] ?? '--lint-only';
 if (!in_array($mode, ['--lint-only', '--run'], true) || count($argv) > 2) {
     b12_schema_audit_abort('USE_EXPLICIT_LINT_ONLY_OR_RUN');
@@ -135,6 +175,23 @@ if ($mode === '--lint-only') {
     if (b12_schema_audit_has_cycle_fk_rules($wrongDelete)) {
         b12_schema_audit_abort('CYCLE_FK_WRONG_DELETE_RULE_ACCEPTED');
     }
+    $validDdl = 'CREATE TABLE layer_daily_records ('
+        . ' CONSTRAINT fk_layer_cycle FOREIGN KEY (cycle_id)'
+        . ' REFERENCES production_cycles (id) ON DELETE SET NULL)';
+    if (!b12_schema_audit_cycle_fk_ddl_matches(
+        'layer_daily_records', $validDdl
+    ) || b12_schema_audit_cycle_fk_ddl_matches(
+        'broiler_daily_records', $validDdl
+    ) || b12_schema_audit_cycle_fk_ddl_matches(
+        'layer_daily_records',
+        str_replace('ON DELETE SET NULL', 'ON DELETE CASCADE', $validDdl)
+    ) || b12_schema_audit_cycle_fk_ddl_matches(
+        'layer_daily_records',
+        str_replace('FOREIGN KEY (cycle_id)', 'FOREIGN KEY (farm_id)', $validDdl)
+    )) {
+        b12_schema_audit_abort('CYCLE_FK_DDL_PARSER_CONTRACT_FAILED');
+    }
+    echo "CYCLE_FK_DDL_PARSER_CONTRACT=PASS\n";
     echo "CYCLE_FK_RESULT_FAIL_CLOSED=PASS\n";
     echo "B12_SCHEMA_SOURCE_GATE=PASS\n";
     echo "READONLY_SELECT_SECTIONS=11\n";
@@ -190,9 +247,15 @@ try {
         if (count($rows) > 300) {
             b12_schema_audit_abort('METADATA_RESULT_TOO_LARGE');
         }
-        if ($labels[$i] === '05_FOREIGN_KEY_DELETE_RULES' &&
-            !b12_schema_audit_has_cycle_fk_rules($rows)) {
-            b12_schema_audit_abort('CYCLE_FK_METADATA_MISSING_OR_INCOMPATIBLE');
+        if ($labels[$i] === '05_FOREIGN_KEY_DELETE_RULES') {
+            echo 'FK_REFERENCE_METADATA_ROWS=' . count($rows) . PHP_EOL;
+            if (b12_schema_audit_has_cycle_fk_rules($rows)) {
+                echo "CYCLE_FK_ATTESTATION=REFERENTIAL_CONSTRAINTS_PASS\n";
+            } elseif (b12_schema_audit_cycle_fk_ddl_attest($pdo)) {
+                echo "CYCLE_FK_ATTESTATION=READONLY_SHOW_CREATE_TABLE_PASS\n";
+            } else {
+                b12_schema_audit_abort('CYCLE_FK_METADATA_MISSING_OR_INCOMPATIBLE');
+            }
         }
         echo 'SECTION=' . $labels[$i] . PHP_EOL;
         foreach ($rows as $row) {
