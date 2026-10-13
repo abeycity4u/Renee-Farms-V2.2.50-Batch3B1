@@ -273,7 +273,8 @@ if (permission_runtime_ends_with($path, '/poultry/layers_daily_record.php')) {
                         $recordId,
                         isset($_SESSION['user_id'])
                             ? (int)$_SESSION['user_id']
-                            : null
+                            : null,
+                        $_POST
                     );
                     $_SESSION['success'] = 'Ruminant daily record deleted successfully.';
                 } catch (Throwable $e) {
