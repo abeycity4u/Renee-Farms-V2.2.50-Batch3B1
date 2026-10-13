@@ -267,7 +267,8 @@
                 const record = exact.record;
                 const tokens = exact.form_tokens;
                 if (!record || typeof record !== 'object' ||
-                    Array.isArray(record) || !tokens || typeof tokens !== 'object' ||
+                    Array.isArray(record) || record.is_population_activity_only ||
+                    !tokens || typeof tokens !== 'object' ||
                     Array.isArray(tokens) || decimal(record.id, maxId) !== expectedId ||
                     decimal(tokens.record_id, maxId) !== expectedId ||
                     !sameScope(ticket.scope, normalizeScope(type, record)) ||
