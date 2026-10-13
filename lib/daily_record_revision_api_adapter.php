@@ -17,6 +17,7 @@ declare(strict_types=1);
  * No SQL mutations or application side effects are performed here.
  */
 require_once __DIR__ . '/daily_record_revision_reader.php';
+require_once __DIR__ . '/daily_record_revision_capabilities.php';
 
 if (!class_exists('DailyRecordRevisionApiSchemaUnavailable', false)) {
     final class DailyRecordRevisionApiSchemaUnavailable extends RuntimeException {}
@@ -107,12 +108,12 @@ if (!function_exists('daily_record_revision_api_permissions')) {
      */
     function daily_record_revision_api_permissions(string $type): array
     {
-        return match ($type) {
-            'layer' => ['poultry', 'poultry_daily_layer', 'poultry_daily_layer_edit'],
-            'broiler' => ['poultry', 'poultry_daily_broiler', 'poultry_daily_broiler_edit'],
-            'ruminant' => ['ruminant', 'ruminant_daily', 'ruminant_daily_edit'],
-            default => throw new InvalidArgumentException('Unknown Daily Record type.'),
-        };
+        $capabilities = daily_record_revision_capabilities($type);
+        return [
+            $capabilities['module'],
+            $capabilities['view'],
+            $capabilities['edit'],
+        ];
     }
 }
 
