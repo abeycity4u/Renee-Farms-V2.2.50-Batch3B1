@@ -27,6 +27,40 @@ function b12_schema_audit_abort(string $reason): never
     exit(1);
 }
 
+/**
+ * Section 05 must report the three actual cycle foreign keys. A SELECT may
+ * succeed but return zero visible metadata rows under limited DB privileges;
+ * that is NOT a successful schema audit.
+ */
+function b12_schema_audit_has_cycle_fk_rules(array $rows): bool
+{
+    $expected = [
+        'layer_daily_records' => 0,
+        'broiler_daily_records' => 0,
+        'ruminant_daily_records' => 0,
+    ];
+    foreach ($rows as $row) {
+        if (!is_array($row)) {
+            return false;
+        }
+        $table = (string)($row['table_name'] ?? '');
+        if (!array_key_exists($table, $expected)
+            || ($row['referenced_table_name'] ?? null) !== 'production_cycles') {
+            continue;
+        }
+        if (strtoupper(trim((string)($row['delete_rule'] ?? ''))) !== 'SET NULL') {
+            return false;
+        }
+        $expected[$table]++;
+    }
+    foreach ($expected as $count) {
+        if ($count !== 1) {
+            return false;
+        }
+    }
+    return true;
+}
+
 $mode = $argv[1] ?? '--lint-only';
 if (!in_array($mode, ['--lint-only', '--run'], true) || count($argv) > 2) {
     b12_schema_audit_abort('USE_EXPLICIT_LINT_ONLY_OR_RUN');
@@ -83,6 +117,25 @@ foreach ($statements as $i => $sql) {
 }
 
 if ($mode === '--lint-only') {
+    $cycleFkFixture = [
+        ['table_name' => 'layer_daily_records',
+         'referenced_table_name' => 'production_cycles', 'delete_rule' => 'SET NULL'],
+        ['table_name' => 'broiler_daily_records',
+         'referenced_table_name' => 'production_cycles', 'delete_rule' => 'SET NULL'],
+        ['table_name' => 'ruminant_daily_records',
+         'referenced_table_name' => 'production_cycles', 'delete_rule' => 'SET NULL'],
+    ];
+    if (!b12_schema_audit_has_cycle_fk_rules($cycleFkFixture) ||
+        b12_schema_audit_has_cycle_fk_rules([]) ||
+        b12_schema_audit_has_cycle_fk_rules(array_slice($cycleFkFixture, 0, 2))) {
+        b12_schema_audit_abort('CYCLE_FK_RESULT_VALIDATOR_FAILED');
+    }
+    $wrongDelete = $cycleFkFixture;
+    $wrongDelete[0]['delete_rule'] = 'CASCADE';
+    if (b12_schema_audit_has_cycle_fk_rules($wrongDelete)) {
+        b12_schema_audit_abort('CYCLE_FK_WRONG_DELETE_RULE_ACCEPTED');
+    }
+    echo "CYCLE_FK_RESULT_FAIL_CLOSED=PASS\n";
     echo "B12_SCHEMA_SOURCE_GATE=PASS\n";
     echo "READONLY_SELECT_SECTIONS=11\n";
     echo "DATABASE_CONNECTIONS=0\n";
@@ -136,6 +189,10 @@ try {
         $rows = $pdo->query($sql)->fetchAll();
         if (count($rows) > 300) {
             b12_schema_audit_abort('METADATA_RESULT_TOO_LARGE');
+        }
+        if ($labels[$i] === '05_FOREIGN_KEY_DELETE_RULES' &&
+            !b12_schema_audit_has_cycle_fk_rules($rows)) {
+            b12_schema_audit_abort('CYCLE_FK_METADATA_MISSING_OR_INCOMPATIBLE');
         }
         echo 'SECTION=' . $labels[$i] . PHP_EOL;
         foreach ($rows as $row) {
