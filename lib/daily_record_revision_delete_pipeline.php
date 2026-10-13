@@ -17,7 +17,7 @@ declare(strict_types=1);
  * mortality reversal -> CAS DELETE -> Layer egg-sale allocation -> commit.
  * Any throwable rolls back all side effects and preserves the user draft.
  */
-require_once __DIR__ . '/daily_record_revision_capabilities.php';
+require_once __DIR__ . '/daily_record_revision_save_gate.php';
 require_once __DIR__ . '/daily_record_revision_form_tokens.php';
 
 if (!function_exists('daily_record_revision_delete_contract')) {
@@ -123,7 +123,7 @@ if (!function_exists('daily_record_revision_delete_transaction')) {
         if ($authorized(
             $permission['module'], $permission['view'], $permission['delete']
         ) !== true) {
-            throw new DailyRecordRevisionConflict('DELETE capability is unavailable.');
+            throw new DailyRecordRevisionPermissionDenied('DELETE capability is unavailable.');
         }
         if ($pdo->inTransaction()) {
             throw new LogicException('Daily Record DELETE owns its transaction.');
