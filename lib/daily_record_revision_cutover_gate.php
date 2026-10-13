@@ -12,9 +12,7 @@ declare(strict_types=1);
  *
  * Until then, three staged route branches must not call dormant CAS helpers.
  */
-if (!function_exists('daily_record_revision_cutover_enabled')) {
-    function daily_record_revision_cutover_enabled(): bool
-    {
-        return false;
-    }
+function daily_record_revision_cutover_enabled(): bool
+{
+    return false;
 }
