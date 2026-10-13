@@ -4,6 +4,7 @@ require_once(__DIR__ . '/../config.php');
 require_once(__DIR__ . '/../lib/daily_feed_sync.php');
 require_once(__DIR__ . '/../lib/daily_population_sync.php');
 require_once(__DIR__ . '/../lib/daily_population_continuity.php');
+require_once(__DIR__ . '/../lib/daily_record_revision_cutover_gate.php');
 require_once(__DIR__ . '/../lib/daily_record_workspace_scope.php');
 requireLogin();
 
@@ -207,6 +208,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_record'])) {
         header('Location: broiler_daily_record.php?month=' . urlencode($yearMonth) . '&cycle_id=' . (int)$selectedCycleId);
         exit();
     }
+    // B12 FUTURE CUTOVER ONLY. The hard-disabled source fuse prevents
+    // mixing revision CAS with still-active legacy writers.
+    if (daily_record_revision_cutover_enabled()) {
+        require_once __DIR__ . '/../lib/daily_record_revision_route_adapter.php';
+        daily_record_revision_route_dispatch_json(
+            $pdo, 'broiler', $tenantFarmId, (int)($_SESSION['user_id'] ?? 0),
+            $cycleIdForSave, $recordDate, null, $_POST, [
+                'opening_stock' => $openingStock,
+                'mortality' => $mortality,
+                'feed_consumption' => $feedConsumption,
+                'feed_item_id' => $feedItemId,
+                'water_consumption' => $waterConsumption,
+                'birds_age' => $birdsAge,
+            ]
+        );
+    }
+
     if ($cycleIdForSave !== null) {
         $canonicalExpected =
             daily_population_continuity_expected_opening(
