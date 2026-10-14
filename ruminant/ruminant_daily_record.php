@@ -894,7 +894,7 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!"
                                                               <i class="bi bi-pencil"></i>
                                                           </button>
                                                         <?php if ($canDeleteRecords): ?>
-                                                        <form method="POST" class="d-inline" data-confirm="Delete this record? This action cannot be undone." data-confirm-title="Delete daily record?" data-confirm-button="Delete"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>">
+                                                        <form method="POST" class="d-inline" <?php if (daily_record_revision_cutover_enabled()): ?><?php require_once __DIR__ . '/../lib/daily_record_revision_page_switch.php'; echo daily_record_revision_page_ruminant_delete_marker(); ?><?php else: ?>data-confirm="Delete this record? This action cannot be undone." data-confirm-title="Delete daily record?" data-confirm-button="Delete"<?php endif; ?>><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>">
                                                             <input type="hidden" name="record_id" value="<?php echo (int)$record['id']; ?>">
                                                             <?php if (daily_record_revision_cutover_enabled()): ?>
                                                                 <?php
@@ -1127,8 +1127,18 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!"
         'UTF-8'
     ); ?>"
     data-can-edit-opening="<?php echo (isPlatformOwner() || hasRole('farm_admin')) ? '1' : '0'; ?>"
+    <?php echo daily_record_revision_page_future_markers('ruminant', (int)$selectedCycleId); ?>
 ></div>
 <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/daily-population-movement-ui.js'); ?>"></script>
+<?php
+// B12 source-only switch: all old page edit/delete controllers are excluded
+// from the same future response that renders the shared revision owner.
+require_once __DIR__ . '/../lib/daily_record_revision_page_switch.php';
+if (daily_record_revision_cutover_enabled()):
+    echo daily_record_revision_page_future_script_tags('ruminant', (int)$selectedCycleId);
+else:
+?>
 <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/ruminant-daily-record.js'); ?>"></script>
+<?php endif; ?>
 </body>
 </html>
