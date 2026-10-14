@@ -26,6 +26,26 @@ if [ "$BRANCH" != "c137-gc24-k2p03-b12-cas-writer-cutover-source" ]; then
   echo '#####COPY TO HERE#####'
   exit 1
 fi
+# A dirty checkout would make this evidence unrepeatable. This script never
+# cleans, resets, fetches, or modifies files; it only refuses to run.
+if [ -n "$(git status --porcelain --untracked-files=normal)" ]; then
+  echo 'WORKTREE=DIRTY'
+  echo 'B12_OFFLINE_RESULT=BLOCKED_DIRTY_SOURCE'
+  echo '#####COPY TO HERE#####'
+  exit 1
+fi
+echo 'WORKTREE=CLEAN'
+# Refuse stale local source evidence; the caller may refresh refs separately.
+# This runner makes no network requests itself.
+REMOTE_REF='refs/remotes/origin/c137-gc24-k2p03-b12-cas-writer-cutover-source'
+REMOTE_HEAD="$(git rev-parse --verify "$REMOTE_REF" 2>/dev/null || true)"
+if [ -z "$REMOTE_HEAD" ] || [ "$HEAD" != "$REMOTE_HEAD" ]; then
+  echo 'REMOTE_TRACKING_HEAD_MATCH=FAIL'
+  echo 'B12_OFFLINE_RESULT=BLOCKED_SOURCE_NOT_SYNCHRONIZED'
+  echo '#####COPY TO HERE#####'
+  exit 1
+fi
+echo 'REMOTE_TRACKING_HEAD_MATCH=PASS'
 if [ "$(php -r 'require "lib/daily_record_revision_cutover_gate.php"; echo daily_record_revision_cutover_enabled() ? "ON" : "OFF";' 2>/dev/null)" != 'OFF' ]; then
   echo 'B12_OFFLINE_RESULT=BLOCKED_GATE_NOT_OFF'
   echo '#####COPY TO HERE#####'
