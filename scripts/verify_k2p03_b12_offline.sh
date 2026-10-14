@@ -117,6 +117,7 @@ for file in \
   tests/integration/k2p03_b12_thin_page_adapters_source.php \
   tests/integration/k2p03_b12_page_delete_owner_source.php \
   tests/integration/k2p03_b12_page_asset_plan_pure.php \
+  tests/integration/k2p03_b12_page_bootstrap_source.php \
   tests/integration/k2p03_b12_page_fields_parity_source.php \
   tests/integration/k2p03_b12_cycle_seed_pure.php \
   tests/integration/k2p03_b12_cycle_seed_staging_source.php \
@@ -137,7 +138,8 @@ for file in \
   tests/integration/k2p03_b12_page_lifecycle.test.cjs \
   tests/integration/k2p03_b12_thin_page_adapters.test.cjs \
   tests/integration/k2p03_b12_page_fields_parity.test.cjs \
-  tests/integration/k2p03_b12_page_delete_ownership.test.cjs
+  tests/integration/k2p03_b12_page_delete_ownership.test.cjs \
+  tests/integration/k2p03_b12_page_bootstrap.test.cjs
 do
   label="$(basename "$file" .test.cjs | tr '[:lower:]-' '[:upper:]_')"
   run_case "NODE_TEST_$label" node "$file"
