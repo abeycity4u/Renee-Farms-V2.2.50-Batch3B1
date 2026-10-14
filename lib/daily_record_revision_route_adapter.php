@@ -182,6 +182,16 @@ if (!function_exists('daily_record_revision_route_save')) {
         array $post, array $facts
     ): array {
         daily_record_revision_require_transaction($pdo);
+        // The three interactive pages require an explicitly selected cycle.
+        // Their legacy all-cycles selector resolves to NULL, but it is NOT
+        // authorization to CREATE/EDIT a historical NULL-cycle record. Keep
+        // those records intact for a separately reviewed legacy workflow.
+        // Enforce this on the server, not only in the B12 browser workspace.
+        if ($cycleId === null || $cycleId < 1) {
+            throw new DailyRecordRevisionConflict(
+                'Select an exact production cycle before saving this Daily Record.'
+            );
+        }
         $fields = daily_record_revision_route_fields($type, $post, $facts);
         $tokens = [];
         foreach ([
