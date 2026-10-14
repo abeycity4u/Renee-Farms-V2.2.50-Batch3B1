@@ -361,6 +361,40 @@ async function test(label,fn) {
     await test('requires styled UI action callbacks before initialization',async()=>{
         assert.throws(()=>make('layer',{notify:null}),/Missing B12 page action/);
     });
+    await test('overlapping confirmation dialogs cannot reset newer date selection',async()=>{
+        let releaseA;
+        const confirmationA=new Promise(resolve=>{releaseA=resolve;});
+        let calls=0;
+        const v=make('layer',{
+            confirmReplace:()=>++calls===1?confirmationA:Promise.resolve(true)
+        });
+        v.adapter.bind();
+        const earlier=v.adapter.open({recordDate:'2026-10-13'});
+        const later=v.adapter.open({recordDate:'2026-10-14'});
+        assert.equal((await later).status,'ready');
+        releaseA(true);
+        assert.equal((await earlier).status,'stale');
+        assert.equal(v.form.controls.recordDate.value,'2026-10-14');
+        assert.equal(v.form.resets,1);
+        assert.equal(v.events.ready.length,1);
+    });
+    await test('cancelled newer selection leaves previously entered draft intact',async()=>{
+        let next=true;
+        const v=make('ruminant',{
+            confirmReplace:()=>Promise.resolve(next)
+        });
+        v.adapter.bind();
+        await v.adapter.open({recordDate:'2026-10-13',animalType:'goat'});
+        v.form.controls.openingStock.value='saved draft';
+        const priorResets=v.form.resets;
+        next=false;
+        const result=await v.adapter.open({
+            recordDate:'2026-10-14',animalType:'sheep'
+        });
+        assert.equal(result.status,'cancelled');
+        assert.equal(v.form.resets,priorResets);
+        assert.equal(v.form.controls.openingStock.value,'saved draft');
+    });
     await test('manual date change mirrors submitted hidden date but blocks stale SAVE',async()=>{
         const v=make('layer');v.adapter.bind();
         await v.adapter.open({recordDate:'2026-10-13'});
