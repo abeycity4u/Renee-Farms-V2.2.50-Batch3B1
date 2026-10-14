@@ -253,6 +253,10 @@ if (permission_runtime_ends_with($path, '/poultry/layers_daily_record.php')) {
         // guard runs, while preserving the page's tenant/CSRF/feed-restoration rules.
         if (!permission_runtime_privileged()) {
             if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
+                if (daily_record_revision_cutover_enabled()) {
+                    require_once dirname(__DIR__) . '/lib/daily_record_revision_delete_http.php';
+                    daily_record_revision_delete_http_csrf_failure();
+                }
                 http_response_code(419);
                 exit('Invalid request token.');
             }
