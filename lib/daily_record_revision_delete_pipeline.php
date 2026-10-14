@@ -19,6 +19,7 @@ declare(strict_types=1);
  */
 require_once __DIR__ . '/daily_record_revision_save_gate.php';
 require_once __DIR__ . '/daily_record_revision_form_tokens.php';
+require_once __DIR__ . '/daily_record_revision_delete_continuity.php';
 
 if (!function_exists('daily_record_revision_delete_contract')) {
     /**
@@ -151,6 +152,10 @@ if (!function_exists('daily_record_revision_delete_transaction')) {
                 $tokens['record_date'], $tokens['animal_type'],
                 $tokens['expected_revision']
             );
+            $continuityPlan = daily_record_revision_delete_continuity_lock(
+                $pdo, $type, $farmId, $tokens['record_id'],
+                $tokens['cycle_id'], $tokens['record_date'], $tokens['animal_type']
+            );
             $sourceType = match ($type) {
                 'layer' => 'daily_layer_record',
                 'broiler' => 'daily_broiler_record',
@@ -163,6 +168,9 @@ if (!function_exists('daily_record_revision_delete_transaction')) {
                 $pdo, $farmId, $sourceType,
                 $tokens['record_id'], $actorId
             );
+            // Rebase later canonical Daily Records while source and later-row
+            // locks remain held, after mortality reversal and before CAS DELETE.
+            daily_record_revision_delete_continuity_apply($pdo, $continuityPlan);
             daily_record_revision_delete_locked(
                 $pdo, $type, $farmId,
                 $tokens['record_id'], $tokens['cycle_id'],
