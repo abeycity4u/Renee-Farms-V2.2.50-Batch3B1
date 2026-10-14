@@ -105,7 +105,12 @@ try {
     $edit = new B12GatePDO();
     $out = daily_record_revision_prepare_save($edit,'layer',7,11,'2026-10-13',null,b12_gate_tokens('edit'),$auth);
     b12_gate_ok($out['contract']['mode']==='edit' && $out['locked_row']['id']==='19', 'edit returns locked source');
-    b12_gate_ok(count($edit->trace)===1 && str_contains($edit->trace[0][0],'FOR UPDATE'), 'single exact-row lock before side effects');
+    b12_gate_ok(count($edit->trace)===3 &&
+        str_contains($edit->trace[0][0],'FROM farms') &&
+        str_contains($edit->trace[1][0],'FROM production_cycles') &&
+        str_contains($edit->trace[2][0],'FROM layer_daily_records') &&
+        str_contains($edit->trace[2][0],'FOR UPDATE'),
+        'EDIT farm-cycle-source lock order before side effects');
     b12_gate_ok($tracePermission[0]===['poultry','poultry_daily_layer','poultry_daily_layer_edit'], 'edit authorization capabilities');
 
     $create = new B12GatePDO();
@@ -129,7 +134,9 @@ try {
         fn()=>daily_record_revision_prepare_save($stale,'layer',7,11,'2026-10-13',null,b12_gate_tokens('edit'),$auth),
         DailyRecordRevisionConflict::class,'stale revision blocked'
     );
-    b12_gate_ok(count($stale->trace)===1, 'stale edit obtains source lock without writing');
+    b12_gate_ok(count($stale->trace)===3 &&
+        str_contains($stale->trace[2][0],'FROM layer_daily_records'),
+        'stale EDIT fails after parent and source locks, without writing');
     $missing = new B12GatePDO();
     $missing->sourceRow = false;
     b12_gate_reject(
