@@ -169,6 +169,26 @@ async function test(label,fn) {
             assert.equal(v.events.pending,1);
         });
     }
+    await test('shared lifecycle prohibits POST until current population boundary succeeds',async()=>{
+        const deferred=later(),v=make('layer',()=>deferred.promise);
+        v.client.bind();
+        assert.equal(state.config.canSubmit(),false);
+        await v.client.select();
+        assert.equal(state.config.canSubmit(),false);
+        await tick();
+        assert.equal(state.config.canSubmit(),false);
+        deferred.resolve(response());
+        await v.client.populationSettled();
+        assert.equal(state.config.canSubmit(),true);
+        v.client.invalidate();
+        assert.equal(state.config.canSubmit(),false);
+    });
+    await test('population failure leaves shared POST permission revoked',async()=>{
+        const v=make('broiler',async()=>response(503,{error:'unavailable'}));
+        v.client.bind();await v.client.select();
+        assert.equal((await v.client.populationSettled()).status,'blocked');
+        assert.equal(state.config.canSubmit(),false);
+    });
     await test('EDIT never overwrites originally loaded opening stock',async()=>{
         const v=make('layer');
         v.f.inputs.openingStock.value='123';
