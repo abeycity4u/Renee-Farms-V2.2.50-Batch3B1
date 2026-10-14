@@ -150,6 +150,43 @@ try {
             str_contains($pdo->calls[0][0],'LOWER(TRIM(production_type)) = ?') &&
             $pdo->cycleScopeMatched,
             $type.' locked tenant-and-species-scoped cycle revalidation');
+
+        // The future browser rejects all-cycles, but a direct POST can bypass
+        // JS. Reject both the legacy NULL and numeric-zero scope server-side
+        // before SELECT/INSERT/UPDATE or canonical side effects for every type.
+        foreach ([null, 0] as $unscopedCycle) {
+            foreach (['create', 'edit'] as $intent) {
+                $unscopedPost = b12_route_post();
+                $unscopedPost['write_intent'] = $intent;
+                if ($intent === 'create') {
+                    foreach (['record_id', 'expected_revision',
+                              'original_cycle_id', 'original_record_date',
+                              'original_animal_type'] as $key) {
+                        $unscopedPost[$key] = '';
+                    }
+                } else {
+                    $unscopedPost['original_animal_type'] =
+                        $type === 'ruminant' ? 'goat' : '';
+                }
+                $unscoped = new B12RouteFakePDO();
+                $GLOBALS['b12_pipeline_invoked'] = [];
+                b12_route_reject(
+                    fn() => daily_record_revision_route_transaction(
+                        $unscoped, $type, 7, 9, $unscopedCycle,
+                        '2026-10-13', $type === 'ruminant' ? 'goat' : null,
+                        $unscopedPost, b12_route_facts($type)
+                    ),
+                    DailyRecordRevisionConflict::class,
+                    $type.' unscoped '.$intent.' rejected'
+                );
+                b12_route_check(
+                    $unscoped->rolledBack && !$unscoped->committed &&
+                    count($unscoped->calls) === 0 &&
+                    count($GLOBALS['b12_pipeline_invoked']) === 0,
+                    $type.' unscoped '.$intent.' has no source/side effects'
+                );
+            }
+        }
     }
 
     foreach(['medications','remarks','other_details','reproduction_details',
