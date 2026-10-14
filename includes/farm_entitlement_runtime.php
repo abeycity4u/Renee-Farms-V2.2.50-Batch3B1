@@ -44,6 +44,7 @@ if (!function_exists('farm_entitlement_runtime_deny')) {
             header('Location: ' . BASE_URL . '/no_access.php');
             exit();
         }
+        daily_record_revision_preroute_maybe_send('subscription_access_required', $_SERVER, $_POST);
         http_response_code(403);
         exit(ucfirst($module) . ' subscription access required.');
     }
