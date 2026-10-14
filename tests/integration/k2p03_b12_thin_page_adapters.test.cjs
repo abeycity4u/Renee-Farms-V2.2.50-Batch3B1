@@ -92,7 +92,7 @@ function makeForm() {
         Object.assign(field,eventObject());
     }
     const form={
-        ...eventObject(),controls,nextMode:'edit',resets:0,
+        ...eventObject(),controls,nextMode:'edit',resets:0,inert:true,
         querySelector(selector){
             if(selector==='[name="save_record"]')return controls.save;
             return controls[selector.slice(1)]||null;
@@ -201,6 +201,7 @@ async function test(label,fn) {
             assert.equal(v.header.listenerCount('click'),0);
             assert.equal(v.form.controls.save.disabled,false);
             v.adapter.bind();
+            assert.equal(v.form.inert,false,'verified B12 bind must unlock Record Form');
             assert.equal(v.add.listenerCount('click'),1);
             assert.equal(v.edit.listenerCount('click'),1);
             assert.equal(v.header.listenerCount('click'),1);
@@ -264,6 +265,43 @@ async function test(label,fn) {
             assert.equal(v.opts.modalTitle.textContent,'Add Daily Record');
         });
     }
+    await test('missing top-button provider leaves future Record Form inert',async()=>{
+        for(const type of ['layer','broiler','ruminant']){
+            const v=make(type,{currentDate:null});
+            assert.equal(v.form.inert,true);
+            assert.throws(()=>v.adapter.bind(),/top Add Record ownership/);
+            assert.equal(v.form.inert,true,'failed bind must not unlock native POST');
+        }
+    });
+    await test('failed late listener registration keeps native Record Form locked',async()=>{
+        const v=make('layer');
+        v.header.addEventListener=()=>{throw Error('listener unavailable');};
+        assert.throws(()=>v.adapter.bind(),/listener unavailable/);
+        assert.equal(v.form.inert,true);
+        assert.equal(v.form.controls.save.disabled,true);
+    });
+    await test('Ruminant DELETE form unlocks only after shared AJAX listener bind',async()=>{
+        const rawForm={
+            ...eventObject(),dataset:{b12RevisionDelete:'ruminant'},
+            inert:true,hasAttribute(){return false;}
+        };
+        const v=make('ruminant',{
+            FormDataImpl:class SyntheticData {},
+            URLSearchParamsImpl:URLSearchParams
+        });
+        const original=v.document.querySelectorAll.bind(v.document);
+        v.document.querySelectorAll=selector=>{
+            if(selector==='form[data-b12-revision-delete="ruminant"]' ||
+                selector==='form[data-b12-revision-delete]')return [rawForm];
+            return original(selector);
+        };
+        assert.equal(v.form.inert,true);
+        assert.equal(rawForm.inert,true);
+        v.adapter.bind();
+        assert.equal(v.form.inert,false);
+        assert.equal(rawForm.inert,false);
+        assert.equal(rawForm.listenerCount('submit'),1);
+    });
     await test('top header fails closed without explicit current-date provider',async()=>{
         const v=make('layer',{currentDate:null});
         assert.throws(()=>v.adapter.bind(),/top Add Record ownership/);
