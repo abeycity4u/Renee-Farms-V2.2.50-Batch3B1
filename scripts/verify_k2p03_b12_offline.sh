@@ -116,6 +116,7 @@ for file in \
   tests/integration/k2p03_b12_page_switch_contract.php \
   tests/integration/k2p03_b12_thin_page_adapters_source.php \
   tests/integration/k2p03_b12_page_delete_owner_source.php \
+  tests/integration/k2p03_b12_page_asset_plan_pure.php \
   tests/integration/k2p03_b12_page_fields_parity_source.php \
   tests/integration/k2p03_b12_cycle_seed_pure.php \
   tests/integration/k2p03_b12_cycle_seed_staging_source.php \
