@@ -1127,7 +1127,7 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!"
         'UTF-8'
     ); ?>"
     data-can-edit-opening="<?php echo (isPlatformOwner() || hasRole('farm_admin')) ? '1' : '0'; ?>"
-    <?php echo daily_record_revision_page_future_markers('ruminant', (int)$selectedCycleId); ?>
+    <?php require_once __DIR__ . '/../lib/daily_record_revision_page_switch.php'; echo daily_record_revision_page_future_markers('ruminant', (int)$selectedCycleId); ?>
 ></div>
 <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/daily-population-movement-ui.js'); ?>"></script>
 <?php
