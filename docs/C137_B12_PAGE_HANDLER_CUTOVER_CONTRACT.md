@@ -44,10 +44,10 @@ Layer and Broiler DELETE buttons currently use `data-poultry-daily-delete-type` 
 
 ## Current blockers / unverified dependencies
 
-- The three old modal controllers are still loaded; the coordinated thin page adapters are **not written or activated**.
+- The three old modal controllers are still loaded. The new `daily-record-revision-page-adapters.js` shared owner and thin `daily-record-revision-{layer,broiler,ruminant}-page.js` entries are now **staged and unloaded**, not wired or browser certified. They explicitly refuse loaded legacy controllers, native Ruminant confirmation, missing original Poultry DELETE tokens and unapproved handler ownership.
 - Ruminant page still has legacy `data-confirm` and no `data-b12-revision-delete`; the source-only binder correctly refuses that state.
 - Need complete browser rules for calendar edit placeholders and asynchronous population-side-panel updates, not only source identity and POST.
 - Actual browser and MariaDB concurrency behavior is unverified; native fake-fetch regressions cannot certify those.
 - No conclusion is made that the code is production-ready, that migration is approved, or that the cutover may be enabled.
 
-**Current next step:** run the focused native `k2p03_b12_page_lifecycle.test.cjs` verifier on the isolated checkout and review its result. After it passes, prepare three thin page integration adapters and independently test their handler ownership without activating any PHP page. The schema, seven-writer and real MariaDB concurrency gates remain OPEN.
+**Current next step:** run the focused native `k2p03_b12_thin_page_adapters.test.cjs`, `k2p03_b12_thin_page_adapters_source.php`, and the affected lifecycle/editor tests in the isolated source checkout. The browser page controller switch, formula/feed-unit/calculator parity, real authenticated E2E, three-table schema, seven-writer and real MariaDB concurrency gates remain OPEN. No live PHP page has loaded a B12 module.
