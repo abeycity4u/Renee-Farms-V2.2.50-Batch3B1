@@ -59,6 +59,9 @@ function daily_record_revision_page_asset_plan(string $type): array
     $shared[] = 'daily-record-revision-page-delete.js';
     $shared[] = 'daily-record-revision-page-adapters.js';
     $shared[] = $pages[$type]['entry'];
+    // The browser bootstrap consumes the species entry factory.
+    // Merely loading this script does not initialize or bind the page.
+    $shared[] = 'daily-record-revision-page-bootstrap.js';
 
     return [
         'type' => $type,
