@@ -52,6 +52,7 @@ if (file_put_contents($dir . '/daily_record_revision_cutover_gate.php', $gate, L
     fwrite(STDERR, "WS17_STUB_SETUP_FAILED\n");
     exit(2);
 }
+require $dir . '/daily_record_revision_cutover_gate.php';
 require $dir . '/daily_record_revision_delete_http.php';
 http_response_code(200);
 daily_record_revision_delete_http_csrf_failure();
