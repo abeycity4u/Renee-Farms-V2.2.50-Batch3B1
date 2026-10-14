@@ -29,13 +29,25 @@ if (!function_exists('daily_record_revision_page_future_markers')) {
     }
 }
 
+/**
+ * Before any B12 client successfully binds, the HTML Record Form must not
+ * accept user interaction/native submission. Only the fully bound page
+ * adapter may release this lock. Gate-OFF forms render unchanged.
+ */
+if (!function_exists('daily_record_revision_page_future_form_lock')) {
+    function daily_record_revision_page_future_form_lock(): string
+    {
+        return daily_record_revision_cutover_enabled() ? ' inert' : '';
+    }
+}
+
 if (!function_exists('daily_record_revision_page_ruminant_delete_marker')) {
     function daily_record_revision_page_ruminant_delete_marker(): string
     {
         // The outer page template independently enforces DELETE permission
         // and CSRF; this is only opt-in browser form ownership metadata.
         return daily_record_revision_cutover_enabled()
-            ? ' data-b12-revision-delete="ruminant"' : '';
+            ? ' data-b12-revision-delete="ruminant" inert' : '';
     }
 }
 
