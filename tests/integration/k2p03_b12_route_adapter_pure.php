@@ -12,7 +12,7 @@ $GLOBALS['b12_inject_failure'] = false;
 
 function checkAccess(string $module): bool { return $module==='poultry' || $module==='ruminant'; }
 function permission_runtime_has(string $permission): bool {
-    return str_contains($permission,'daily_');
+    return str_contains($permission,'_daily');
 }
 function daily_population_continuity_expected_opening(
     PDO $pdo,int $farmId,int $cycleId,string $recordType,
