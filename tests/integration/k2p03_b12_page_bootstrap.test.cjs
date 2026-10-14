@@ -159,6 +159,25 @@ async function test(name,fn){
         cfg.showModal();
         assert.equal(v.events.modalShow,1);
     });
+    await test('known early HTTP failures show safe messages without auto-refresh',()=>{
+        const v=make('ruminant');v.create();
+        const cfg=mock.Ruminant;
+        const reasons=[
+            'authentication_required','forbidden','subscription_access_required',
+            'revision_client_required','invalid_csrf','invalid_record','storage_unavailable'
+        ];
+        for(const reason of reasons){
+            cfg.notify({reason});
+            const msg=v.events.error.at(-1);
+            assert.equal(typeof msg,'string');
+            assert.ok(msg.length>15);
+            assert.ok(!msg.includes('SQL'));
+            assert.ok(!msg.includes('farm_id'));
+        }
+        assert.equal(v.events.error.length,reasons.length);
+        assert.equal(v.events.reload,0);
+        assert.equal(v.events.success.length,0);
+    });
     await test('Layer and Broiler reuse existing population display; Ruminant uses movement breakdown',()=>{
         const a=make('layer');a.create();mock.Layer.display.render({sale:-1});
         assert.equal(a.events.displayRender.length,1);
