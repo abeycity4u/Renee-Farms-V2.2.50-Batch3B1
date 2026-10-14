@@ -72,6 +72,7 @@ function build(type, overrides={}) {
         },onBlocked:e=>blocked.push(e),
         onSaved:e=>saved.push(e),
         onSubmit:overrides.onSubmit,
+        canSubmit:overrides.canSubmit,
     });
     return {editor,inputs,tokens,form,ready,blocked,saved};
 }
@@ -245,6 +246,37 @@ const absent=()=>({success:true,mode:'scope',
         assert.equal(v.saved.length,1);
         assert.equal(v.inputs.openingStock.value,'777');
         assert.equal(v.tokens.expected_revision.value,'');
+    });
+    await check('ticket-bound population guard blocks Enter or scripted POST until verified',async()=>{
+        let ready=false, calls=0;
+        const v=build('layer',{
+            onSubmit:()=>{calls++;return {status:'saved'};},
+            canSubmit:()=>ready
+        });
+        v.editor.bind();
+        await v.editor.select();
+        v.inputs.openingStock.value='draft';
+        assert.equal(v.form.dispatch('submit').prevented,true);
+        assert.equal(calls,0);
+        assert.equal(v.blocked.at(-1).reason,'population_pending');
+        assert.equal(v.tokens.expected_revision.value,'4');
+        assert.equal(v.inputs.openingStock.value,'draft');
+        ready=true;
+        v.form.dispatch('submit');
+        await new Promise(resolve=>setImmediate(resolve));
+        assert.equal(calls,1);
+        assert.equal(v.saved.length,1);
+    });
+    await check('throwing population submission readiness fails closed',async()=>{
+        let calls=0;
+        const v=build('broiler',{
+            onSubmit:()=>{calls++;return {status:'saved'};},
+            canSubmit:()=>{throw Error('population unavailable');}
+        });
+        v.editor.bind();await v.editor.select();
+        assert.equal(v.form.dispatch('submit').prevented,true);
+        assert.equal(v.blocked.at(-1).reason,'population_pending');
+        assert.equal(calls,0);
     });
     await check('409 conflict invalidates identity without erasing user values',async()=>{
         const v=build('ruminant',{onSubmit:()=>Promise.resolve({status:'conflict'})});
