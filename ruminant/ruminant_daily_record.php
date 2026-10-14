@@ -893,7 +893,7 @@ $_SESSION['success'] = "Ruminant daily record saved successfully!"
                                                                   data-remarks="<?php echo htmlspecialchars($record['remarks']); ?>">
                                                               <i class="bi bi-pencil"></i>
                                                           </button>
-                                                        <?php if ($canDeleteRecords): ?>
+                                                        <?php if ($canDeleteRecords && (!daily_record_revision_cutover_enabled() || $selectedCycleId > 0)): ?>
                                                         <form method="POST" class="d-inline" <?php if (daily_record_revision_cutover_enabled()): ?><?php require_once __DIR__ . '/../lib/daily_record_revision_page_switch.php'; echo daily_record_revision_page_ruminant_delete_marker(); ?><?php else: ?>data-confirm="Delete this record? This action cannot be undone." data-confirm-title="Delete daily record?" data-confirm-button="Delete"<?php endif; ?>><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>">
                                                             <input type="hidden" name="record_id" value="<?php echo (int)$record['id']; ?>">
                                                             <?php if (daily_record_revision_cutover_enabled()): ?>
