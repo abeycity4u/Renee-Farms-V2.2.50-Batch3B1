@@ -9,9 +9,9 @@ declare(strict_types=1);
  * gate; a future separately authorized cutover must migrate all seven
  * writers, revision DDL, and exact AJAX clients together.
  *
- * Returning no scripts for the ALL-CYCLES view is deliberate: an all-cycles
- * navigation target is NOT a valid editable record scope. Browser navigation
- * parity for that view still needs authenticated browser certification.
+ * The ALL-CYCLES (cycle=0) view gets only a dedicated read-only navigation
+ * owner. It must not receive an editor, DELETE binder or legacy controller.
+ * Real authenticated navigation still needs separate browser certification.
  */
 require_once __DIR__ . '/daily_record_revision_page_asset_plan.php';
 
@@ -44,11 +44,26 @@ if (!function_exists('daily_record_revision_page_future_script_tags')) {
         string $type, int $cycleId
     ): string {
         $plan = daily_record_revision_page_asset_plan($type);
-        if (!daily_record_revision_cutover_enabled() || $cycleId <= 0) {
+        if (!daily_record_revision_cutover_enabled()) {
             return '';
         }
         if (!defined('BASE_URL') || !function_exists('versioned_asset')) {
             throw new LogicException('B12 page asset authority is not available.');
+        }
+        if ($cycleId <= 0) {
+            // The All Cycles view is navigable but NOT editable. It must
+            // never silently revive a legacy writer or omit all navigation.
+            $source = rtrim((string)BASE_URL, '/')
+                . versioned_asset('/assets/js/daily-record-revision-readonly-nav.js');
+            $url = htmlspecialchars($source, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            return '<script src="' . $url . '"></script>' . "\n"
+                . '<script>(function(){'
+                . 'const m=window.ReneeDailyRecordRevisionReadOnlyNav;'
+                . 'if(!m||typeof m.create!=="function")'
+                . '{throw new Error("B12 All Cycles navigation unavailable.");}'
+                . 'm.create(' . json_encode($type, JSON_THROW_ON_ERROR)
+                . ',{document:document,location:window.location}).bind();'
+                . '})();</script>';
         }
         $scripts = [];
         foreach ($plan['future_assets'] as $asset) {
