@@ -77,11 +77,18 @@ final class B12DeleteFakeStatement extends PDOStatement
         return $this->db->row;
     }
     public function rowCount():int { return $this->db->deleteAffected; }
+    public function fetchColumn(int $column=0):mixed {
+        if (str_contains($this->sql,'FROM farms')) return $this->db->farmRow;
+        if (str_contains($this->sql,'FROM production_cycles')) return $this->db->cycleRow;
+        throw new RuntimeException('Unexpected fake DELETE fetchColumn.');
+    }
 }
 final class B12DeleteFakePDO extends PDO
 {
     public bool $active=false;
     public int $deleteAffected=1;
+    public mixed $farmRow='7';
+    public mixed $cycleRow='11';
     public bool $committed=false;
     public bool $rolledBack=false;
     public array $statements=[];
@@ -136,7 +143,7 @@ try {
         $GLOBALS['b12_delete_events']=[];$GLOBALS['b12_delete_fail_at']='';
         $pdo=new B12DeleteFakePDO();
         $out=b12_delete_action($type,$pdo,b12_delete_post($type));
-        $events=['begin','lock','later_lock','feed','mortality',
+        $events=['begin','lock','lock','lock','later_lock','feed','mortality',
             'continuity','lock','cas_delete'];
         if($type==='layer')$events[]='sales';
         $events[]='commit';
@@ -144,9 +151,12 @@ try {
             $type.' exact lock -> reversals -> revision CAS -> commit');
         b12_delete_check($pdo->committed&&!$pdo->rolledBack,
             $type.' transaction committed');
-        b12_delete_check(count($pdo->statements)===3,
-            $type.' two locked revision compares and one DELETE');
-        b12_delete_check(str_contains($pdo->statements[2][0],
+        b12_delete_check(count($pdo->statements)===5 &&
+            str_contains($pdo->statements[0][0],'FROM farms') &&
+            str_contains($pdo->statements[1][0],'FROM production_cycles') &&
+            str_contains($pdo->statements[2][0],'FROM '.$type.'_daily_records'),
+            $type.' farm-cycle-source parent locks before exact DELETE');
+        b12_delete_check(str_contains($pdo->statements[4][0],
             'WHERE id = ? AND farm_id = ? AND record_revision = ?'),
             $type.' DELETE has immutable revision CAS predicate');
         b12_delete_check($out===['record_id'=>19,'record_date'=>'2026-10-13'],
@@ -205,7 +215,7 @@ try {
     b12_delete_reject(
         fn()=>b12_delete_action('layer',$pdo,b12_delete_post('layer')),
         DailyRecordRevisionConflict::class,'stale revision');
-    b12_delete_check($GLOBALS['b12_delete_events']===['begin','lock','rollback'],
+    b12_delete_check($GLOBALS['b12_delete_events']===['begin','lock','lock','lock','rollback'],
         'stale revision never locks later rows or reverses inventory or mortality');
     b12_delete_check($pdo->rolledBack&&!$pdo->committed,
         'stale revision transaction rolled back');
