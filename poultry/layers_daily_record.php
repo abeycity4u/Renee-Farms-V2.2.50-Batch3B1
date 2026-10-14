@@ -161,9 +161,11 @@ if ($recordCount > 0) {
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['save_record'])) {
+        // B12 requires AJAX before validation; gate-OFF legacy POST is unchanged.
+        require_once __DIR__ . '/../lib/daily_record_revision_save_http.php';
+        daily_record_revision_save_http_require_ajax($_SERVER);
         if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
-            http_response_code(419);
-            exit('Invalid request token.');
+            daily_record_revision_save_http_csrf_failure();
         }
         $parseNumeric = static function ($value) {
             return str_replace(',', '', trim((string)$value));
@@ -178,9 +180,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $recordDate = trim((string)($_POST['record_date'] ?? ''));
         $dateObject = DateTime::createFromFormat('Y-m-d', $recordDate);
         if (!$dateObject || $dateObject->format('Y-m-d') !== $recordDate) {
-            $_SESSION['error'] = 'Please provide a valid record date.';
-            header('Location: layers_daily_record.php?month=' . urlencode($yearMonth) . '&cycle_id=' . (int)$selectedCycleId);
-            exit();
+            daily_record_revision_save_http_validation_failure(
+                'Please provide a valid record date.',
+                'layers_daily_record.php?month=' . urlencode($yearMonth) . '&cycle_id=' . (int)$selectedCycleId
+            );
         }
 
         $cycleIdForSave = ($cycleEnabled && $selectedCycleId > 0) ? $selectedCycleId : null;
@@ -189,9 +192,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $cycleCheck->execute([$cycleIdForSave, $tenantFarmId]);
             $cycle = $cycleCheck->fetch(PDO::FETCH_ASSOC);
             if (!$cycle || $recordDate < $cycle['start_date'] || (!empty($cycle['expected_end_date']) && $recordDate > $cycle['expected_end_date'])) {
-                $_SESSION['error'] = 'The selected layer cycle is invalid for this record date.';
-                header('Location: layers_daily_record.php?month=' . urlencode($yearMonth) . '&cycle_id=' . (int)$selectedCycleId);
-                exit();
+                daily_record_revision_save_http_validation_failure(
+                    'The selected layer cycle is invalid for this record date.',
+                    'layers_daily_record.php?month=' . urlencode($yearMonth) . '&cycle_id=' . (int)$selectedCycleId
+                );
             }
         }
 
@@ -207,25 +211,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $birdsAge = (int)$nonNegative($_POST['birds_age'] ?? 0, 'Bird age');
             $eggProduction = (int)$nonNegative($_POST['egg_production'] ?? 0, 'Egg production');
         } catch (InvalidArgumentException $e) {
-            $_SESSION['error'] = $e->getMessage();
-            header('Location: layers_daily_record.php?month=' . urlencode($yearMonth) . '&cycle_id=' . (int)$selectedCycleId);
-            exit();
+            daily_record_revision_save_http_validation_failure(
+                $e->getMessage(),
+                'layers_daily_record.php?month=' . urlencode($yearMonth) . '&cycle_id=' . (int)$selectedCycleId
+            );
         }
 
         if ($openingStock < 1 || $birdsAge < 1) {
-            $_SESSION['error'] = 'Opening stock and bird age must be greater than zero.';
-            header('Location: layers_daily_record.php?month=' . urlencode($yearMonth) . '&cycle_id=' . (int)$selectedCycleId);
-            exit();
+            daily_record_revision_save_http_validation_failure(
+                'Opening stock and bird age must be greater than zero.',
+                'layers_daily_record.php?month=' . urlencode($yearMonth) . '&cycle_id=' . (int)$selectedCycleId
+            );
         }
         if ($mortality > $openingStock) {
-            $_SESSION['error'] = 'Mortality cannot exceed opening stock.';
-            header('Location: layers_daily_record.php?month=' . urlencode($yearMonth) . '&cycle_id=' . (int)$selectedCycleId);
-            exit();
+            daily_record_revision_save_http_validation_failure(
+                'Mortality cannot exceed opening stock.',
+                'layers_daily_record.php?month=' . urlencode($yearMonth) . '&cycle_id=' . (int)$selectedCycleId
+            );
         }
         if ($eggProduction > $openingStock) {
-            $_SESSION['error'] = 'Egg production cannot exceed the opening flock for a single day.';
-            header('Location: layers_daily_record.php?month=' . urlencode($yearMonth) . '&cycle_id=' . (int)$selectedCycleId);
-            exit();
+            daily_record_revision_save_http_validation_failure(
+                'Egg production cannot exceed the opening flock for a single day.',
+                'layers_daily_record.php?month=' . urlencode($yearMonth) . '&cycle_id=' . (int)$selectedCycleId
+            );
         }
         $calculatedLayingRate = round(($eggProduction / $openingStock) * 100, 2);
         $calculatedCrates = round($eggProduction / 30, 2);
