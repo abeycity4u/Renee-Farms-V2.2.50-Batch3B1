@@ -141,6 +141,42 @@ async function check(name, fn) {
             assert.equal((await send({type:'layer',form:form('layer'),cycleId:'11',mode:'edit',guard:accepted})).status,'blocked');
         }
     });
+    await check('known B12 pre-route HTTP failures map narrowly and retain draft values',async()=>{
+        const variants=[
+            [401,'authentication_required'],
+            [403,'forbidden'],
+            [403,'subscription_access_required'],
+            [409,'revision_client_required'],
+            [419,'invalid_csrf'],
+            [422,'invalid_record'],
+            [503,'storage_unavailable']
+        ];
+        for(const [status,reason] of variants){
+            for(const type of Object.keys(routes)){
+                const f=form(type),send=client(async()=>response(status,{
+                    success:false,code:reason,error:'test-only'
+                }));
+                const result=await send({type,form:f,cycleId:'11',mode:'edit',guard:accepted});
+                assert.equal(result.status,'blocked');
+                assert.equal(result.reason,reason);
+                assert.equal(f.fields.remarks,noMessage);
+                assert.equal(f.fields.expected_revision,'4');
+            }
+        }
+    });
+    await check('unrecognized or mismatched HTTP code cannot impersonate a known failure',async()=>{
+        for(const [status,code] of [
+            [200,'authentication_required'],[401,'forbidden'],
+            [403,'record_conflict'],[409,'forbidden'],
+            [419,'storage_unavailable'],[500,'storage_unavailable']
+        ]){
+            const result=await client(async()=>response(status,{success:false,code}))({
+                type:'layer',form:form('layer'),cycleId:'11',mode:'edit',guard:accepted
+            });
+            assert.equal(result.status,'blocked');
+            assert.equal(result.reason,undefined);
+        }
+    });
     await check('unrecognized conflict JSON is blocked rather than trusted',async()=>{
         const send=client(async()=>response(409,{success:false,code:'unknown'}));
         assert.equal((await send({type:'layer',form:form('layer'),cycleId:'11',mode:'edit',guard:accepted})).status,'blocked');
