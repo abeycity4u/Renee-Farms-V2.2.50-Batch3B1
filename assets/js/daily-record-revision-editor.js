@@ -207,13 +207,66 @@
             return {status:'ready', mode:result.mode, ticket:result.ticket};
         }
 
+        let submitting = false;
         function handleSubmit(event) {
-            if (!isReady()) {
-                if (event && typeof event.preventDefault === 'function') {
-                    event.preventDefault();
-                }
-                notify(options.onBlocked, {reason:'submit_not_ready'});
+            // NEVER allow a native form POST after loading revision tokens.
+            // A native navigation on 409 destroys the user's unsaved draft.
+            // This capture listener cancels even a READY form and delegates
+            // only to a separately supplied asynchronous B12 sender.
+            if (event && typeof event.preventDefault === 'function') {
+                event.preventDefault();
             }
+            if (!isReady()) {
+                notify(options.onBlocked, {reason:'submit_not_ready'});
+                return;
+            }
+            if (submitting) {
+                notify(options.onBlocked, {reason:'submit_pending'});
+                return;
+            }
+            if (typeof options.onSubmit !== 'function') {
+                notify(options.onBlocked, {reason:'submit_transport_missing'});
+                return;
+            }
+            const ticket = readyTicket;
+            const mode = readyMode;
+            submitting = true;
+            let result;
+            try {
+                result = options.onSubmit({
+                    type: options.type, form, mode,
+                    guard: callback => guard(ticket, callback)
+                });
+            } catch (_) {
+                submitting = false;
+                if (ticket === readyTicket) {
+                    invalidate();
+                    notify(options.onBlocked, {reason:'submit_failed'});
+                }
+                return;
+            }
+            Promise.resolve(result).then(outcome => {
+                // Responses belonging to a later selection cannot change
+                // this modal, clear its tokens, or dismiss newer draft data.
+                if (ticket !== readyTicket || !controller.isCurrent(ticket)) return;
+                if (outcome && outcome.status === 'saved') {
+                    invalidate();
+                    notify(options.onSaved, outcome);
+                    return;
+                }
+                // Conflict and all other failures preserve business fields
+                // but revoke old immutable tokens until an explicit reload.
+                invalidate();
+                notify(options.onBlocked, {
+                    reason: outcome && outcome.status === 'conflict'
+                        ? 'record_conflict' : 'submit_failed'
+                });
+            }).catch(() => {
+                if (ticket === readyTicket && controller.isCurrent(ticket)) {
+                    invalidate();
+                    notify(options.onBlocked, {reason:'submit_failed'});
+                }
+            }).finally(() => { submitting = false; });
         }
         // Capture-phase guard executes before legacy normalization handlers.
         // Future activation MUST retire legacy edit/existence listeners: a
