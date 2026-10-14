@@ -113,6 +113,7 @@ for file in \
   tests/integration/k2p03_b12_delete_browser_source.php \
   tests/integration/k2p03_b12_ruminant_delete_http_pure.php \
   tests/integration/k2p03_b12_ruminant_delete_http_source.php \
+  tests/integration/k2p03_b12_page_switch_contract.php \
   tests/integration/k2p03_b12_cycle_seed_pure.php \
   tests/integration/k2p03_b12_cycle_seed_staging_source.php \
   tests/integration/k2p03_b12_reader_endpoint_source.php
