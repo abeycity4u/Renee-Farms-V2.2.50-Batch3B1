@@ -12,6 +12,7 @@ requireLogin();
 
 // Check access
 if (!checkAccess('ruminant')) {
+    daily_record_revision_preroute_maybe_send('forbidden', $_SERVER, $_POST);
     header('Location: dashboard.php');
     exit();
 }
