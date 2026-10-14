@@ -154,5 +154,122 @@
         return send;
     }
 
-    global.ReneeDailyRecordRevisionDelete = Object.freeze({createSender});
+    /*
+     * Ruminant uses a server-rendered DELETE <form> and the same shared
+     * revision policy, but a different same-origin endpoint. SOURCE ONLY.
+     * FormData(form) excludes a submit button unless explicitly supplied;
+     * preserve the existing PHP route's 'delete_record' trigger here.
+     * The form's original hidden tokens must predate this call. No reader,
+     * fresh revision synthesis, legacy fallback, or external endpoint.
+     */
+    function createRuminantFormSender(options) {
+        if (!options || typeof options.fetchImpl !== 'function') {
+            throw new Error('B12 Ruminant DELETE transport is unavailable.');
+        }
+        const Form = options.FormDataImpl || global.FormData;
+        const Params = options.URLSearchParamsImpl || global.URLSearchParams;
+        if (typeof Form !== 'function' || typeof Params !== 'function') {
+            throw new Error('B12 Ruminant DELETE form encoding is unavailable.');
+        }
+        const fetchImpl = options.fetchImpl;
+        const pendingForms = new WeakSet();
+
+        function exactlyOne(data, name) {
+            const values = data.getAll(name);
+            if (!Array.isArray(values) || values.length !== 1 ||
+                typeof values[0] !== 'string') {
+                throw new Error('Missing or duplicated Ruminant DELETE token.');
+            }
+            return values[0];
+        }
+
+        async function send({form}) {
+            if (!form || typeof form !== 'object') {
+                return Object.freeze({status:'blocked'});
+            }
+            if (pendingForms.has(form)) {
+                return Object.freeze({status:'blocked',reason:'delete_pending'});
+            }
+            let data, id;
+            try {
+                data = new Form(form);
+                if (!data || typeof data.getAll !== 'function' ||
+                    typeof data.set !== 'function') {
+                    throw new Error('Ruminant DELETE form snapshot unavailable.');
+                }
+                const values = Object.fromEntries(
+                    names.map(name => [name, exactlyOne(data,name)])
+                );
+                if (values.write_intent !== 'delete') {
+                    throw new Error('Ruminant DELETE needs originally loaded intent.');
+                }
+                id = decimal(values.record_id,maxId);
+                decimal(values.expected_revision,maxRevision);
+                if (values.original_cycle_id !== '') {
+                    decimal(values.original_cycle_id,maxId);
+                }
+                checkedDate(values.original_record_date);
+                if (!['cattle','goat','sheep','other'].includes(
+                    values.original_animal_type
+                )) {
+                    throw new Error('Invalid Ruminant source species.');
+                }
+                if (exactlyOne(data,'record_id') !== id ||
+                    exactlyOne(data,'csrf_token').trim() === '' ||
+                    data.getAll('farm_id').length !== 0 ||
+                    data.getAll('type').length !== 0 ||
+                    data.getAll('id').length !== 0 ||
+                    data.getAll('save_record').length !== 0) {
+                    throw new Error('Conflicting Ruminant DELETE fields.');
+                }
+                // Never add intent/revision from a POST-time GET or a
+                // browser-side lookup. The original form already has them.
+                data.set('delete_record','1');
+            } catch (_) {
+                return Object.freeze({status:'blocked'});
+            }
+
+            pendingForms.add(form);
+            try {
+                const response = await fetchImpl('ruminant_daily_record.php',{
+                    method:'POST',
+                    credentials:'same-origin',
+                    redirect:'error',
+                    cache:'no-store',
+                    headers:{
+                        Accept:'application/json',
+                        'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8',
+                        'X-Requested-With':'XMLHttpRequest'
+                    },
+                    body:new Params(data).toString()
+                });
+                if (!isJson(response)) {
+                    return Object.freeze({status:'blocked'});
+                }
+                const result = await response.json();
+                if (response.status === 409 && result &&
+                    result.success === false &&
+                    result.code === 'record_conflict') {
+                    return Object.freeze({status:'conflict'});
+                }
+                if (response.status !== 200 || response.ok !== true ||
+                    !result || result.success !== true ||
+                    result.code !== 'deleted' ||
+                    decimal(result.record_id === undefined
+                        ? '' : String(result.record_id),maxId) !== id) {
+                    return Object.freeze({status:'blocked'});
+                }
+                return Object.freeze({status:'deleted',record_id:id});
+            } catch (_) {
+                return Object.freeze({status:'blocked'});
+            } finally {
+                pendingForms.delete(form);
+            }
+        }
+        return send;
+    }
+
+    global.ReneeDailyRecordRevisionDelete = Object.freeze({
+        createSender, createRuminantFormSender
+    });
 })(typeof window !== 'undefined' ? window : this);
