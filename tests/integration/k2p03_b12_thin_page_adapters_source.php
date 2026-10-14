@@ -26,12 +26,36 @@ try {
     $life=b12_adapters_file($root,'assets/js/daily-record-revision-page-lifecycle.js');
     $workspace=b12_adapters_file($root,'assets/js/daily-record-revision-workspace.js');
     $editor=b12_adapters_file($root,'assets/js/daily-record-revision-editor.js');
+    $derived=b12_adapters_file($root,'assets/js/daily-record-revision-page-fields.js');
     b12_adapters_check(
         str_contains($common,'ReneeDailyRecordRevisionPageLifecycle') &&
         str_contains($common,'function createAdapter(type, options)') &&
         str_contains($common,'function ownership()') &&
         str_contains($common,'function bind()'),
         'one shared lifecycle / handler ownership policy'
+    );
+    b12_adapters_check(
+        str_contains($common,'ReneeDailyRecordRevisionPageFields') &&
+        str_contains($common,'fieldsModule.createFields(') &&
+        str_contains($common,'derived.bind();') &&
+        str_contains($common,'derived.ready(ready);') &&
+        str_contains($common,'derived.reset();') &&
+        str_contains($common,'derived.computeLayer();') &&
+        str_contains($derived,'function createFields(options)') &&
+        str_contains($derived,'function computeLayer()') &&
+        str_contains($derived,'function feedUnit(record=null)'),
+        'one shared unloaded derived-field parity integration'
+    );
+    b12_adapters_check(
+        strpos($common,'ownership(); // No partial')!==false &&
+        strpos($common,'derived.bind();')!==false &&
+        strpos($common,'ownership(); // No partial') <
+            strpos($common,'derived.bind();') &&
+        strpos($common,'derived.bind();') <
+            strpos($common,'lifecycle.bind();') &&
+        strpos($common,'derived.computeLayer();') <
+            strpos($common,'save.disabled=false;'),
+        'ownership precedes field listeners; authoritative stock precedes Save'
     );
     b12_adapters_check(
         str_contains($common,'options.pageMarker.dataset.b12RevisionPage!==type') &&
