@@ -30,6 +30,7 @@ Layer and Broiler DELETE buttons currently use `data-poultry-daily-delete-type` 
 - `daily-record-revision-workspace.js` — opt-in composition, exact positive cycle, callback contract; does not bind automatically.
 - `daily-record-revision-delete.js` — original-row Poultry DELETE and original-form Ruminant DELETE; no delete-time revision lookup.
 - `daily-record-revision-ruminant-delete.js` — opt-in Ruminant form binder; refuses forms retaining `data-confirm`, native POST interception, confirmation, conflict reload requirement.
+- `daily-record-revision-page-lifecycle.js` — newly staged and **unloaded** ticket-bound population GET/page lifecycle: clears prior side panels on pending/selection change, renders stock/movement only if the original editor ticket remains current, rejects HTML/non-200/malformed data, prevents a delayed CREATE boundary from overwriting a user-edited opening-stock field, and revokes revision tokens on a current failed boundary without deleting draft entries. `onPopulation` is display-only: future thin adapters must not use it as an authority to mutate business fields. Save UI must remain disabled until `onPopulationReady` for the currently selected ticket.
 
 ## Required coordinated future page switch (NOT IMPLEMENTED)
 
@@ -49,4 +50,4 @@ Layer and Broiler DELETE buttons currently use `data-poultry-daily-delete-type` 
 - Actual browser and MariaDB concurrency behavior is unverified; native fake-fetch regressions cannot certify those.
 - No conclusion is made that the code is production-ready, that migration is approved, or that the cutover may be enabled.
 
-**Next implementable step after this audit:** a shared, unloaded page lifecycle adapter with authoritative ticket-bound population/display updates and modal event orchestration, plus focused Node fake-DOM tests. Only later modify live page scripts under a coordinated, separately gated cutover.
+**Current next step:** run the focused native `k2p03_b12_page_lifecycle.test.cjs` verifier on the isolated checkout and review its result. After it passes, prepare three thin page integration adapters and independently test their handler ownership without activating any PHP page. The schema, seven-writer and real MariaDB concurrency gates remain OPEN.
