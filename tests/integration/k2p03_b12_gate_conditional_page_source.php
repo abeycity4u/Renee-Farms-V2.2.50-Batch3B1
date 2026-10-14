@@ -63,7 +63,7 @@ try {
         str_contains($helper,'if (!daily_record_revision_cutover_enabled()) {') &&
         str_contains($helper,'daily-record-revision-readonly-nav.js') &&
         str_contains($helper,'daily_record_revision_cutover_enabled()') &&
-        str_contains($helper,'? \' data-b12-revision-delete="ruminant"\' : \'\''),
+        str_contains($helper,'? \' data-b12-revision-delete="ruminant" inert\' : \'\''),
         'shared marker and asset rendering only behind explicit hard-off gate'
     );
     ws08b_check(
