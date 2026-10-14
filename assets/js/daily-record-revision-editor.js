@@ -234,7 +234,7 @@
             let result;
             try {
                 result = options.onSubmit({
-                    type: options.type, form, mode,
+                    type: options.type, form, mode, cycleId: cycle,
                     guard: callback => guard(ticket, callback)
                 });
             } catch (_) {
