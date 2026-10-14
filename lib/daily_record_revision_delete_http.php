@@ -13,7 +13,7 @@ declare(strict_types=1);
  * protected AJAX client. Until then, reject ordinary navigation POST before
  * the canonical deletion transaction. Never redirect a revision conflict.
  */
-require_once __DIR__ . '/daily_record_revision_authority.php';
+require_once __DIR__ . '/daily_record_revision_save_gate.php';
 
 if (!class_exists('DailyRecordRevisionDeleteClientNotReady', false)) {
     final class DailyRecordRevisionDeleteClientNotReady extends RuntimeException {}
