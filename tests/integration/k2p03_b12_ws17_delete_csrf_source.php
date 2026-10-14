@@ -27,6 +27,7 @@ try {
         preg_match('~function\s+daily_record_revision_cutover_enabled\s*\(\s*\)\s*:\s*bool\s*\{\s*return\s+false\s*;\s*\}~', $gate) === 1,
         'checked-in B12 cutover remains literally hard OFF'
     );
+    require_once $root . '/lib/daily_record_revision_cutover_gate.php';
     require_once $root . '/lib/daily_record_revision_delete_http.php';
     ws17_check(daily_record_revision_cutover_enabled() === false,
         'requiring shared Ruminant DELETE responder cannot enable B12');
