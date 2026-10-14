@@ -312,10 +312,7 @@ if (!function_exists('daily_record_revision_route_dispatch_json')) {
             $body = ['success'=>false,'code'=>'save_failed',
                      'error'=>'The Daily Record could not be saved. Keep your draft.'];
         }
-        http_response_code($status);
-        header('Content-Type: application/json; charset=utf-8');
-        header('Cache-Control: no-store');
-        echo json_encode($body, JSON_THROW_ON_ERROR);
-        exit;
+        // One shared JSON status/header writer, including pre-validation errors.
+        daily_record_revision_http_send_json($status, $body);
     }
 }
