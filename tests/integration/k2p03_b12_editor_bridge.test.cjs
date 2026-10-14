@@ -291,6 +291,34 @@ const absent=()=>({success:true,mode:'scope',
         assert.equal(v.tokens.expected_revision.value,'');
         assert.equal(v.saved.length,0);
     });
+    await check('early authentication and permission failure preserves draft and clears tokens',async()=>{
+        for(const reason of [
+            'authentication_required','forbidden','subscription_access_required',
+            'revision_client_required','invalid_csrf','invalid_record','storage_unavailable'
+        ]){
+            const v=build('layer',{
+                onSubmit:()=>Promise.resolve({status:'blocked',reason})
+            });
+            v.editor.bind();await v.editor.select();
+            v.inputs.openingStock.value='draft 135';
+            assert.equal(v.form.dispatch('submit').prevented,true);
+            await new Promise(resolve=>setImmediate(resolve));
+            assert.equal(v.blocked.at(-1).reason,reason);
+            assert.equal(v.inputs.openingStock.value,'draft 135');
+            assert.equal(v.tokens.expected_revision.value,'');
+            assert.equal(v.saved.length,0);
+        }
+    });
+    await check('unknown sender reason never renders as a trusted permission status',async()=>{
+        const v=build('broiler',{
+            onSubmit:()=>Promise.resolve({status:'blocked',reason:'session_999_secret'})
+        });
+        v.editor.bind();await v.editor.select();
+        v.form.dispatch('submit');
+        await new Promise(resolve=>setImmediate(resolve));
+        assert.equal(v.blocked.at(-1).reason,'submit_failed');
+        assert.equal(v.saved.length,0);
+    });
     await check('duplicate modal submit cannot issue two in-flight operations',async()=>{
         let release;
         const pending=new Promise(resolve=>{release=resolve;});
