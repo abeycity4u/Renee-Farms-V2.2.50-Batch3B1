@@ -202,6 +202,17 @@
         function bind() {
             if(bound)return;
             ownership(); // No partial listener binding when legacy owns page.
+            const headerButtons=Array.from(options.document.querySelectorAll(
+                '[data-open-record-modal]'
+            ));
+            // The legacy page has one top Add Today's Record button.
+            // Do not silently drop it, guess the date, or double-own it.
+            if(headerButtons.length!==1 ||
+                !headerButtons[0] ||
+                typeof headerButtons[0].addEventListener!=='function' ||
+                typeof options.currentDate!=='function') {
+                throw new Error('B12 top Add Record ownership is incomplete.');
+            }
             const actions=[];
             for(const selector of ['.add-record-btn','.edit-record-btn']) {
                 for(const button of options.document.querySelectorAll(selector)) {
@@ -218,6 +229,18 @@
             save.disabled=true;
             lifecycle.bind();
             deletes.bind();
+            // Header Add and calendar Add/Edit use the same exact-scope
+            // selection, confirmation and immutable revision-ticket reader.
+            // The future browser initializer must supply the page's
+            // ReneeCalendar.today/appToday date provider explicitly.
+            headerButtons[0].addEventListener('click',()=>{
+                let today;
+                try {today=options.currentDate();} catch (_) {}
+                const species=type==='ruminant'
+                    ?options.selectedCycleAnimalType:'';
+                open({recordDate:today,animalType:species})
+                    .catch(()=>options.notify({reason:'selection_failed'}));
+            });
             for(const button of actions) {
                 button.addEventListener('click',()=>{
                         const ds=button.dataset||{};
