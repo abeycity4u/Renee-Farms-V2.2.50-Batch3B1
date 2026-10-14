@@ -134,7 +134,8 @@ for file in \
   tests/integration/k2p03_b12_ruminant_delete_browser.test.cjs \
   tests/integration/k2p03_b12_page_lifecycle.test.cjs \
   tests/integration/k2p03_b12_thin_page_adapters.test.cjs \
-  tests/integration/k2p03_b12_page_fields_parity.test.cjs
+  tests/integration/k2p03_b12_page_fields_parity.test.cjs \
+  tests/integration/k2p03_b12_page_delete_ownership.test.cjs
 do
   label="$(basename "$file" .test.cjs | tr '[:lower:]-' '[:upper:]_')"
   run_case "NODE_TEST_$label" node "$file"
