@@ -49,12 +49,20 @@ class B12RouteFakeStatement extends PDOStatement
     public function __construct(private B12RouteFakePDO $db,private string $sql) {}
     public function execute(?array $params=null): bool {
         $this->db->calls[]=[$this->sql,$params];
+        if (str_contains($this->sql,'production_cycles')) {
+            $this->db->cycleScopeMatched =
+                str_contains($this->sql, 'LOWER(TRIM(production_type)) = ?')
+                && is_array($params)
+                && end($params) === $this->db->cycleProductionType;
+        }
         return true;
     }
     public function fetch(int $mode=PDO::FETCH_DEFAULT,
         int $cursorOrientation=PDO::FETCH_ORI_NEXT,int $cursorOffset=0):mixed {
         if (str_contains($this->sql,'production_cycles')) {
-            return ['id'=>11,'start_date'=>'2026-01-01','expected_end_date'=>null];
+            return $this->db->cycleScopeMatched
+                ? ['id'=>11,'start_date'=>'2026-01-01','expected_end_date'=>null]
+                : false;
         }
         return $this->db->previousRow;
     }
@@ -66,6 +74,8 @@ class B12RouteFakePDO extends PDO
     public bool $rolledBack=false;
     public array $calls=[];
     public mixed $previousRow=['opening_stock'=>122,'mortality'=>2];
+    public string $cycleProductionType='goat';
+    public bool $cycleScopeMatched=false;
     public function __construct() {}
     public function inTransaction():bool { return $this->active; }
     public function beginTransaction():bool { $this->active=true;return true; }
@@ -124,6 +134,7 @@ try {
             $type.' no caller-controlled identity in source UPDATE');
         $GLOBALS['b12_pipeline_invoked']=[];
         $pdo=new B12RouteFakePDO();
+        $pdo->cycleProductionType=$type==='ruminant'?'goat':$type;
         $out=daily_record_revision_route_transaction(
             $pdo,$type,7,9,11,'2026-10-13',
             $type==='ruminant'?'goat':null,$post,b12_route_facts($type)
@@ -135,8 +146,10 @@ try {
             $type.' one authorized pipeline');
         b12_route_check(count($pdo->calls)===1 &&
             str_contains($pdo->calls[0][0],'FOR UPDATE') &&
-            str_contains($pdo->calls[0][0],'farm_id = ?'),
-            $type.' locked tenant-scoped cycle revalidation');
+            str_contains($pdo->calls[0][0],'farm_id = ?') &&
+            str_contains($pdo->calls[0][0],'LOWER(TRIM(production_type)) = ?') &&
+            $pdo->cycleScopeMatched,
+            $type.' locked tenant-and-species-scoped cycle revalidation');
     }
 
     foreach(['medications','remarks','other_details','reproduction_details',
@@ -168,6 +181,19 @@ try {
         str_contains($pdo->calls[1][0],'ORDER BY record_date DESC, id DESC'),
         'legacy ruminant predecessor scoped by species and tenant');
 
+    $pdo=new B12RouteFakePDO();
+    $pdo->active=true;
+    $pdo->cycleProductionType='cattle';
+    b12_route_reject(
+        fn()=>daily_record_revision_route_revalidate_locked(
+            $pdo,'ruminant',7,11,'2026-10-13','goat',120
+        ),
+        DailyRecordRevisionConflict::class,
+        'goat Daily Record cannot be written into cattle cycle'
+    );
+    b12_route_check(!$pdo->cycleScopeMatched && count($pdo->calls)===1,
+        'cross-species mismatch fails before canonical/legacy predecessor lookup');
+
     $GLOBALS['b12_expected_opening']=['opening_stock'=>99];
     b12_route_reject(
         fn()=>daily_record_revision_route_revalidate_locked(
@@ -178,6 +204,7 @@ try {
     $GLOBALS['b12_expected_opening']=['opening_stock'=>120];
     $GLOBALS['b12_inject_failure']=true;
     $pdo=new B12RouteFakePDO();
+    $pdo->cycleProductionType='layer';
     b12_route_reject(
         fn()=>daily_record_revision_route_transaction(
             $pdo,'layer',7,9,11,'2026-10-13',null,
