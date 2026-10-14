@@ -43,6 +43,8 @@ if (!defined('BASE_URL')) {
 }
 
 require_once __DIR__ . '/includes/csp_policy.php';
+// B12-only, hard-OFF exact SAVE error representation; authorization remains unchanged.
+require_once __DIR__ . '/lib/daily_record_revision_preroute_http.php';
 
 // V2 security baseline
 define('SESSION_TIMEOUT', 900);
@@ -77,6 +79,7 @@ if (isset($_SESSION['user_id']) && isset($_SESSION['LAST_ACTIVITY'])) {
     if (time() - $_SESSION['LAST_ACTIVITY'] > SESSION_TIMEOUT) {
         session_unset();
         session_destroy();
+        daily_record_revision_preroute_maybe_send('authentication_required', $_SERVER, $_POST);
         header('Location: ' . BASE_URL . '/login.php?timeout=1');
         exit();
     }
@@ -97,6 +100,7 @@ try {
     $pdo->exec('SET time_zone = ' . $pdo->quote($appOffset));
 } catch(PDOException $e) {
     error_log('Database connection failed: ' . $e->getMessage());
+    daily_record_revision_preroute_maybe_send('storage_unavailable', $_SERVER, $_POST);
     die('Unable to connect to the database. Please try again later.');
 }
 
@@ -154,6 +158,7 @@ function requireCurrentFarmId(): int {
     if ($farmId < 1) {
         session_unset();
         session_destroy();
+        daily_record_revision_preroute_maybe_send('authentication_required', $_SERVER, $_POST);
         header('Location: ' . BASE_URL . '/sign.php');
         exit();
     }
@@ -346,6 +351,7 @@ function validTenantRoleCodes(array $roles): array {
 // Redirect if not logged in
 function requireLogin() {
     if (!isLoggedIn()) {
+        daily_record_revision_preroute_maybe_send('authentication_required', $_SERVER, $_POST);
         header('Location: ' . BASE_URL . '/login.php');
         exit();
     }
@@ -375,6 +381,7 @@ function requireLogin() {
         if ($account === false || (!$isPlatformOwnerAccount && in_array($account['subscription_status'], ['suspended', 'cancelled'], true))) {
             session_unset();
             session_destroy();
+            daily_record_revision_preroute_maybe_send('authentication_required', $_SERVER, $_POST);
             header('Location: ' . BASE_URL . '/login.php');
             exit();
         }
