@@ -151,9 +151,11 @@ $daysRecorded = daily_record_workspace_distinct_days($records);
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_record'])) {
+    // B12 requires AJAX before validation; gate-OFF legacy POST is unchanged.
+    require_once __DIR__ . '/../lib/daily_record_revision_save_http.php';
+    daily_record_revision_save_http_require_ajax($_SERVER);
     if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
-        http_response_code(419);
-        exit('Invalid request token.');
+        daily_record_revision_save_http_csrf_failure();
     }
     $parseNumeric = static function ($value): string {
         return str_replace(',', '', trim((string)$value));
@@ -168,9 +170,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_record'])) {
     $recordDate = trim((string)($_POST['record_date'] ?? ''));
     $dateObject = DateTime::createFromFormat('Y-m-d', $recordDate);
     if (!$dateObject || $dateObject->format('Y-m-d') !== $recordDate) {
-        $_SESSION['error'] = 'Please provide a valid record date.';
-        header('Location: broiler_daily_record.php?month=' . urlencode($yearMonth) . '&cycle_id=' . (int)$selectedCycleId);
-        exit();
+        daily_record_revision_save_http_validation_failure(
+            'Please provide a valid record date.',
+            'broiler_daily_record.php?month=' . urlencode($yearMonth) . '&cycle_id=' . (int)$selectedCycleId
+        );
     }
     $cycleIdForSave = ($cycleEnabled && $selectedCycleId > 0) ? $selectedCycleId : null;
     if ($cycleIdForSave !== null) {
@@ -178,9 +181,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_record'])) {
         $cycleCheck->execute([$cycleIdForSave, $tenantFarmId]);
         $cycle = $cycleCheck->fetch(PDO::FETCH_ASSOC);
         if (!$cycle || $recordDate < $cycle['start_date'] || (!empty($cycle['expected_end_date']) && $recordDate > $cycle['expected_end_date'])) {
-            $_SESSION['error'] = 'The selected broiler cycle is invalid for this record date.';
-            header('Location: broiler_daily_record.php?month=' . urlencode($yearMonth) . '&cycle_id=' . (int)$selectedCycleId);
-            exit();
+            daily_record_revision_save_http_validation_failure(
+                'The selected broiler cycle is invalid for this record date.',
+                'broiler_daily_record.php?month=' . urlencode($yearMonth) . '&cycle_id=' . (int)$selectedCycleId
+            );
         }
     }
     try {
@@ -194,19 +198,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_record'])) {
         $waterConsumption = $nonNegative($_POST['water_consumption'] ?? 0, 'Water consumption');
         $birdsAge = (int)$nonNegative($_POST['birds_age'] ?? 0, 'Bird age');
     } catch (InvalidArgumentException $e) {
-        $_SESSION['error'] = $e->getMessage();
-        header('Location: broiler_daily_record.php?month=' . urlencode($yearMonth) . '&cycle_id=' . (int)$selectedCycleId);
-        exit();
+        daily_record_revision_save_http_validation_failure(
+            $e->getMessage(),
+            'broiler_daily_record.php?month=' . urlencode($yearMonth) . '&cycle_id=' . (int)$selectedCycleId
+        );
     }
     if ($openingStock < 1 || $birdsAge < 1) {
-        $_SESSION['error'] = 'Opening stock and bird age must be greater than zero.';
-        header('Location: broiler_daily_record.php?month=' . urlencode($yearMonth) . '&cycle_id=' . (int)$selectedCycleId);
-        exit();
+        daily_record_revision_save_http_validation_failure(
+            'Opening stock and bird age must be greater than zero.',
+            'broiler_daily_record.php?month=' . urlencode($yearMonth) . '&cycle_id=' . (int)$selectedCycleId
+        );
     }
     if ($mortality > $openingStock) {
-        $_SESSION['error'] = 'Mortality cannot exceed opening stock.';
-        header('Location: broiler_daily_record.php?month=' . urlencode($yearMonth) . '&cycle_id=' . (int)$selectedCycleId);
-        exit();
+        daily_record_revision_save_http_validation_failure(
+            'Mortality cannot exceed opening stock.',
+            'broiler_daily_record.php?month=' . urlencode($yearMonth) . '&cycle_id=' . (int)$selectedCycleId
+        );
     }
     // B12 FUTURE CUTOVER ONLY. The hard-disabled source fuse prevents
     // mixing revision CAS with still-active legacy writers.
