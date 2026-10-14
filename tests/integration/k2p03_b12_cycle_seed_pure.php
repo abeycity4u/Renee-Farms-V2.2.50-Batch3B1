@@ -148,11 +148,28 @@ try {
         b12_seed_assert($pdo->calls===[],'tampered cycle cannot insert '.$field);
     }
 
-    $GLOBALS['b12_seed_cycle']=b12_cycle('ruminant',str_repeat('A',101));
+    // The shared reader and the active Ruminant form accept exactly four
+    // persisted species. Custom livestock types use production_type=other;
+    // an unknown/stale species must never create an uneditable seed row.
+    foreach (['horse', '', 'camel', str_repeat('A',101)] as $invalidSpecies) {
+        $GLOBALS['b12_seed_cycle']=b12_cycle('ruminant',$invalidSpecies);
+        $pdo=new B12SeedPDO();
+        b12_seed_reject(fn()=>b12_seed($pdo),
+            DailyRecordRevisionConflict::class,
+            'unsupported Ruminant seed species rejected');
+        b12_seed_assert($pdo->calls===[],
+            'unsupported Ruminant seed species never probes or inserts');
+    }
+
+    // Persisted built-in species are case-insensitive, matching the canonical
+    // production-cycle and Daily Record species normalizers.
+    $GLOBALS['b12_seed_cycle']=b12_cycle('ruminant',' CATTLE ');
     $pdo=new B12SeedPDO();
-    b12_seed_reject(fn()=>b12_seed($pdo),
-        InvalidArgumentException::class,'species longer than permitted');
-    b12_seed_assert($pdo->calls===[],'invalid species never inserts');
+    $normalized=b12_seed($pdo);
+    b12_seed_assert($normalized['type']==='ruminant' &&
+        $pdo->calls[0][1][3]==='cattle' &&
+        in_array('cattle',$pdo->calls[1][1],true),
+        'Ruminant seed uses normalized supported cycle species');
 
     $GLOBALS['b12_seed_cycle']=b12_cycle('poultry','layer');
     $pdo=new B12SeedPDO();$pdo->insertCount=0;
