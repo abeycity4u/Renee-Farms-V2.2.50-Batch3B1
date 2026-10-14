@@ -697,7 +697,7 @@ $_SESSION['success'] = "Broiler daily record saved successfully!"
                                                             <i class="bi bi-pencil"></i>
                                                         </button>
                                                         <?php endif; ?>
-                                                        <?php if ($canDelete): ?>
+                                                        <?php if ($canDelete && (!daily_record_revision_cutover_enabled() || $selectedCycleId > 0)): ?>
                                                         <button class="btn btn-sm btn-outline-danger ms-1"
                                                                 type="button"
                                                                 title="Delete Record"
