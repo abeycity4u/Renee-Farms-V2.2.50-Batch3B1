@@ -10,13 +10,16 @@ const path=require('node:path');
 const vm=require('node:vm');
 const root=path.join(__dirname,'../../assets/js');
 const names=[
+    'daily-record-revision-delete.js',
+    'daily-record-revision-ruminant-delete.js',
+    'daily-record-revision-page-delete.js',
     'daily-record-revision-page-fields.js',
     'daily-record-revision-page-adapters.js',
     'daily-record-revision-layer-page.js',
     'daily-record-revision-broiler-page.js',
     'daily-record-revision-ruminant-page.js'
 ];
-const win={};const staged=[];
+const win={URLSearchParams};const staged=[];
 win.ReneeDailyRecordRevisionPageLifecycle={
     createLifecycle(opts) {
         staged.push(opts);
@@ -146,6 +149,11 @@ function make(type='layer', overrides={}) {
         fetchImpl:()=>{throw Error('PAGE MUST NOT INITIATE FETCH');},
         legacyHandlersRetired:true,
         deleteOwnership:'replacement',
+        csrfToken:'test-csrf',
+        confirmDelete:async()=>true,
+        onDeleted:d=>events.saved.push(d),
+        onDeleteConflict:d=>events.errors.push(d),
+        onDeleteBlocked:d=>events.errors.push(d),
         canEditOpeningStock:false,
         confirmReplace:async()=>{events.confirmations++;return true;},
         showModal:()=>{events.shows++;},
@@ -347,11 +355,38 @@ async function test(label,fn) {
     });
     await test('Poultry row missing original DELETE tokens refuses takeover',async()=>{
         const v=make('layer',{missingDeleteTokens:true});
-        assert.throws(()=>v.adapter.bind(),/original-row tokens unavailable/);
+        assert.throws(()=>v.adapter.bind(),/Poultry DELETE row is not revision-owned/);
         assert.equal(v.add.listenerCount('click'),0);
     });
     await test('requires styled UI action callbacks before initialization',async()=>{
         assert.throws(()=>make('layer',{notify:null}),/Missing B12 page action/);
+    });
+    await test('manual date change mirrors submitted hidden date but blocks stale SAVE',async()=>{
+        const v=make('layer');v.adapter.bind();
+        await v.adapter.open({recordDate:'2026-10-13'});
+        assert.equal(v.form.controls.recordDate.value,'2026-10-13');
+        v.form.controls.selectedDate.value='2026-10-15';
+        v.form.controls.selectedDate.dispatch('change');
+        assert.equal(v.form.controls.recordDate.value,'2026-10-15');
+        assert.equal(v.form.controls.save.disabled,true);
+        assert.equal(v.adapter.isReady(),false);
+    });
+    await test('Ruminant species change mirrors hidden animal but blocks stale SAVE',async()=>{
+        const v=make('ruminant');v.adapter.bind();
+        await v.adapter.open({recordDate:'2026-10-13',animalType:'goat'});
+        v.form.controls.animalType.value='sheep';
+        v.form.controls.animalType.dispatch('change');
+        assert.equal(v.form.controls.animalTypeHidden.value,'sheep');
+        assert.equal(v.form.controls.save.disabled,true);
+        assert.equal(v.adapter.isReady(),false);
+    });
+    await test('closing modal disables SAVE and revokes in-flight draft replacement intent',async()=>{
+        const v=make('broiler');v.adapter.bind();
+        await v.adapter.open({recordDate:'2026-10-13'});
+        assert.equal(v.adapter.isReady(),true);
+        v.opts.modalElement.dispatch('hidden.bs.modal');
+        assert.equal(v.form.controls.save.disabled,true);
+        assert.equal(v.adapter.isReady(),false);
     });
     await test('change event invalidates Save and original revision authority',async()=>{
         const v=make('broiler');v.adapter.bind();
