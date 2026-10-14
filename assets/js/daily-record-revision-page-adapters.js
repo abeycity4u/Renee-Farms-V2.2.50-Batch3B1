@@ -32,8 +32,10 @@
             }
         }
         const module = global.ReneeDailyRecordRevisionPageLifecycle;
-        if (!module || typeof module.createLifecycle !== 'function') {
-            throw new Error('Shared B12 Daily Record lifecycle is not available.');
+        const fieldsModule = global.ReneeDailyRecordRevisionPageFields;
+        if (!module || typeof module.createLifecycle !== 'function' ||
+            !fieldsModule || typeof fieldsModule.createFields !== 'function') {
+            throw new Error('Shared B12 Daily Record modules are not available.');
         }
         const form=options.form;
         const field=id=>form.querySelector('#'+id);
@@ -47,6 +49,12 @@
             (type==='ruminant'&&(!animal || !hiddenAnimal))) {
             throw new Error('Incomplete B12 Daily Record modal fields.');
         }
+        // One central derived-field service; thin animal-type entrypoints
+        // must not reimplement rates, feed units, or stock calculations.
+        // Neither module binds listeners or fetches during construction.
+        const derived=fieldsModule.createFields({
+            type,form,document:options.document
+        });
         let lifecycle, bound=false;
         let switchGeneration=0;
 
@@ -66,6 +74,9 @@
             onPending:pending,
             onReady:ready=>{
                 save.disabled=true;
+                // Authoritative EDIT form values are hydrated by the shared
+                // editor before this point; no second date-only read.
+                derived.ready(ready);
                 title.textContent=ready.mode==='edit'?'Edit Record':'Add Daily Record';
                 if (typeof options.onReady==='function')options.onReady(ready);
             },
@@ -92,6 +103,10 @@
                     save.disabled=true;
                     return;
                 }
+                // CREATE opening stock may have been populated asynchronously
+                // WITHOUT a DOM input event. Recompute Layer rate before
+                // allowing the form to become submittable.
+                derived.computeLayer();
                 save.disabled=false;
                 if(typeof options.onPopulationReady==='function') {
                     options.onPopulationReady(scope);
@@ -175,6 +190,7 @@
             // A failed GET after this selection does NOT erase new draft data.
             lifecycle.invalidate();
             form.reset();
+            derived.reset(); // Derived values cannot leak across selections.
             date.value=selection.recordDate;
             hiddenDate.value=selection.recordDate;
             if(animal)animal.value=species;
@@ -197,6 +213,9 @@
                     actions.push(button);
                 }
             }
+            // Validate all species-specific UI fields before attaching the
+            // shared controller and any calendar action listeners.
+            derived.bind();
             bound=true;
             save.disabled=true;
             lifecycle.bind();
