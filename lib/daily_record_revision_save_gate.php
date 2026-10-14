@@ -136,6 +136,11 @@ if (!function_exists('daily_record_revision_prepare_save')) {
         daily_record_revision_require_transaction($pdo);
 
         if ($contract['mode'] === 'edit') {
+            // Match CREATE and canonical population cycle-first locking.
+            // Never lock a source record before its farm/cycle parents.
+            daily_record_revision_lock_parents(
+                $pdo, $farmId, $contract['scope']['cycle_id']
+            );
             $row = daily_record_revision_lock_and_compare(
                 $pdo, $contract['type'], $farmId,
                 $contract['record_id'], $contract['scope']['cycle_id'],
