@@ -111,8 +111,20 @@ if (!function_exists('daily_record_revision_route_revalidate_locked')) {
             . ' WHERE id = ? AND farm_id = ? AND farm_type = ?'
             . " AND status = 'active'";
         $params = [$cycleId, $farmId, $farmType];
-        if ($type !== 'ruminant') {
-            $sql .= ' AND production_type = ?';
+        // A Ruminant cycle is species-specific. Its canonical population
+        // reader enforces this when a baseline exists, but legacy cycles
+        // can fall back to a previous-record chain. Enforce species for
+        // BOTH paths under the cycle lock, never only in the UI.
+        $sql .= ' AND LOWER(TRIM(production_type)) = ?';
+        if ($type === 'ruminant') {
+            if ($animalType === null ||
+                !in_array($animalType, ['cattle','goat','sheep','other'], true)) {
+                throw new DailyRecordRevisionConflict(
+                    'The selected Ruminant species is invalid for this cycle.'
+                );
+            }
+            $params[] = $animalType;
+        } else {
             $params[] = $type;
         }
         $sql .= ' LIMIT 1 FOR UPDATE';
