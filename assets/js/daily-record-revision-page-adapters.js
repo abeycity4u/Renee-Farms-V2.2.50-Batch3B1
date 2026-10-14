@@ -47,7 +47,7 @@
             (type==='ruminant'&&(!animal || !hiddenAnimal))) {
             throw new Error('Incomplete B12 Daily Record modal fields.');
         }
-        let lifecycle, bound=false, openingGeneration=0;
+        let lifecycle, bound=false;
         let switchGeneration=0;
 
         function pending() {
@@ -131,11 +131,22 @@
             // Ruminant native confirmation has a document-level capture
             // listener that calls form.submit(): never bind both paths.
             if(type==='ruminant') {
-                const deletes=options.document.querySelectorAll(
-                    'form[data-confirm][data-b12-revision-delete]'
-                );
-                if(deletes.length!==0) {
-                    throw new Error('Competing Ruminant DELETE handlers.');
+                // The global confirmation capture listener can call native
+                // form.submit(), bypassing a JS editor's submit guard.
+                if(options.document.querySelectorAll('form[data-confirm]').length!==0) {
+                    throw new Error('Legacy Ruminant native DELETE is still active.');
+                }
+            } else {
+                // A future enabled page must carry the ORIGINAL row revision
+                // beside each deletable Poultry row, not fetch it on DELETE.
+                for(const button of options.document.querySelectorAll(
+                    '[data-poultry-daily-delete-id]'
+                )) {
+                    if(!button.dataset ||
+                        typeof button.dataset.b12DeleteTokens!=='string' ||
+                        button.dataset.b12DeleteTokens==='') {
+                        throw new Error('Poultry DELETE original-row tokens unavailable.');
+                    }
                 }
             }
         }
@@ -177,15 +188,20 @@
         function bind() {
             if(bound)return;
             ownership(); // No partial listener binding when legacy owns page.
-            bound=true;
-            save.disabled=true;
-            lifecycle.bind();
+            const actions=[];
             for(const selector of ['.add-record-btn','.edit-record-btn']) {
                 for(const button of options.document.querySelectorAll(selector)) {
                     if (!button || typeof button.addEventListener!=='function') {
                         throw new Error('Invalid B12 calendar action.');
                     }
-                    button.addEventListener('click',()=>{
+                    actions.push(button);
+                }
+            }
+            bound=true;
+            save.disabled=true;
+            lifecycle.bind();
+            for(const button of actions) {
+                button.addEventListener('click',()=>{
                         const ds=button.dataset||{};
                         const species=type==='ruminant'
                             ?(ds.animalType||ds.cycleAnimalType||
@@ -194,8 +210,7 @@
                             recordDate:ds.recordDate||'',
                             animalType:species
                         }).catch(()=>options.notify({reason:'selection_failed'}));
-                    });
-                }
+                });
             }
             // The lifecycle/editor already invalidate selection tokens on
             // these events. Do not also install a second date-only fetch.
