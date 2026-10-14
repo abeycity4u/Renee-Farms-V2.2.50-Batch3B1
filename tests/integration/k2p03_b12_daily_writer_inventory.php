@@ -34,6 +34,18 @@ $read = 0;
 $revisionCallers = [];
 
 /*
+ * The new staged CAS helpers are expected direct revision-authority callers,
+ * but are dormant behind an immutable false cutover gate. Detect ALL other
+ * direct callers rather than flagging this known future interface as live.
+ */
+$expectedStagedRevisionCallers = [
+    'lib/daily_record_revision_delete_pipeline.php',
+    'lib/daily_record_revision_persistence.php',
+    'lib/daily_record_revision_save_gate.php',
+];
+sort($expectedStagedRevisionCallers, SORT_STRING);
+
+/*
  * Named exceptions to the direct-table SQL match rule.
  * The tenant purge uses a closed table-list plus dynamic DELETE; the dormant
  * revision authority uses closed table definitions with dynamic UPDATE/DELETE.
@@ -68,6 +80,31 @@ $dynamicExceptions = [
             "'layer_daily_records'",
             "'broiler_daily_records'",
             "'ruminant_daily_records'",
+        ],
+    ],
+    'lib/daily_record_revision_persistence.php' => [
+        'classification' => 'STAGED_CAS_AND_INSERT_PERSISTENCE',
+        'signatures' => [
+            'function daily_record_revision_persist_prepared(',
+            'daily_record_revision_write(',
+            "'INSERT INTO ' . $def['table']",
+            'daily_record_revision_require_transaction($pdo);',
+        ],
+    ],
+    'lib/daily_record_revision_cycle_seed.php' => [
+        'classification' => 'STAGED_CYCLE_SEED_REVISION_ONE',
+        'signatures' => [
+            'function daily_record_revision_seed_cycle_entry(',
+            "'INSERT INTO ' . $config['table']",
+            '$values[] = 1;',
+        ],
+    ],
+    'lib/daily_record_revision_continuity.php' => [
+        'classification' => 'STAGED_LATER_ROW_REVISION_BUMP',
+        'signatures' => [
+            'function daily_record_revision_apply_continuity_change(',
+            "'UPDATE ' . $definition['table']",
+            'record_revision = record_revision + 1',
         ],
     ],
 ];
@@ -165,11 +202,36 @@ foreach ($dynamicExceptions as $path => $contract) {
 }
 $revisionCallers = array_values(array_unique($revisionCallers));
 sort($revisionCallers, SORT_STRING);
-foreach ($revisionCallers as $path) {
+$unknownRevisionCallers = array_values(array_diff(
+    $revisionCallers, $expectedStagedRevisionCallers
+));
+$missingRevisionCallers = array_values(array_diff(
+    $expectedStagedRevisionCallers, $revisionCallers
+));
+foreach ($unknownRevisionCallers as $path) {
     $dynamicErrors[] = 'Unexpected active revision-service caller: ' . $path;
     echo 'UNEXPECTED_REVISION_CALLER=' . $path . PHP_EOL;
 }
-echo 'DORMANT_REVISION_CALLER_COUNT=' . count($revisionCallers) . PHP_EOL;
+foreach ($missingRevisionCallers as $path) {
+    $dynamicErrors[] = 'Missing staged revision-service caller: ' . $path;
+    echo 'MISSING_STAGED_REVISION_CALLER=' . $path . PHP_EOL;
+}
+$gateSource = file_get_contents(
+    $root . '/lib/daily_record_revision_cutover_gate.php'
+);
+if (!is_string($gateSource) ||
+    preg_match(
+        '/function daily_record_revision_cutover_enabled\(\): bool\s*\{\s*return false;\s*\}/',
+        $gateSource
+    ) !== 1 ||
+    str_contains($gateSource, 'function_exists(')
+) {
+    $dynamicErrors[] = 'B12 revision cutover gate is not demonstrably hard-off.';
+}
+echo 'EXPECTED_STAGED_REVISION_CALLER_COUNT='
+    . count($expectedStagedRevisionCallers) . PHP_EOL;
+echo 'STAGED_REVISION_CALLER_COUNT=' . count($revisionCallers) . PHP_EOL;
+echo 'STAGED_REVISION_CUTOVER=HARD_OFF_REQUIRED' . PHP_EOL;
 ksort($found, SORT_STRING);
 $actual = array_keys($found);
 $new = array_values(array_diff($actual, $expected));
