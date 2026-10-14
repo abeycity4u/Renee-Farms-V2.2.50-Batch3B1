@@ -222,15 +222,24 @@ if (!function_exists('daily_record_revision_reader_read_exact')) {
 }
 
 if (!function_exists('daily_record_revision_reader_check_scope')) {
-    /** A scope probe is NEVER a unique CREATE reservation or edit token. */
+    /**
+     * Read-only UI scope probes use ordinary SELECT; they NEVER authorize
+     * CREATE. After the CREATE guard takes its farm/cycle FOR UPDATE locks,
+     * it MUST request a locking CURRENT read: a plain SELECT may reuse an
+     * earlier REPEATABLE READ snapshot and miss a newly committed row.
+     */
     function daily_record_revision_reader_check_scope(
         PDO $pdo, string $type, int $farmId, mixed $rawCycle,
-        string $recordDate, ?string $animalType
+        string $recordDate, ?string $animalType, bool $forUpdate = false
     ): array {
+        if ($forUpdate && !$pdo->inTransaction()) {
+            throw new LogicException('Locked Daily Record scope check needs a transaction.');
+        }
         $plan = daily_record_revision_reader_scope_plan(
             $type, $farmId, $rawCycle, $recordDate, $animalType
         );
-        $stmt = $pdo->prepare($plan['sql']);
+        $sql = $plan['sql'] . ($forUpdate ? ' FOR UPDATE' : '');
+        $stmt = $pdo->prepare($sql);
         if ($stmt === false) {
             throw new RuntimeException('The Daily Record selection could not be checked.');
         }
