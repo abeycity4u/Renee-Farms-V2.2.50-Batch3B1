@@ -67,6 +67,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_record']) && $
         exit('Invalid request token.');
     }
 
+    // B12 FUTURE ONLY: the existing HTML form must not navigate away after
+    // a stale revision. Both delegated and privileged callers share a
+    // mandatory AJAX-only JSON response contract behind the hard-off gate.
+    $b12DeleteAjax = daily_record_revision_cutover_enabled();
+    if ($b12DeleteAjax) {
+        require_once __DIR__ . '/../lib/daily_record_revision_delete_http.php';
+        daily_record_revision_delete_require_ajax($_SERVER);
+    }
+
     $recordId = (int)($_POST['record_id'] ?? 0);
     if ($recordId > 0) {
         try {
@@ -79,14 +88,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_record']) && $
                     : null,
                 $_POST
             );
+            if ($b12DeleteAjax) {
+                daily_record_revision_delete_http_send(null, $recordId);
+            }
             $_SESSION['success'] = 'Ruminant daily record deleted successfully.';
         } catch (Throwable $e) {
+            if ($b12DeleteAjax) {
+                daily_record_revision_delete_http_send($e);
+            }
             $_SESSION['error'] = safeUserExceptionMessage(
                 $e,
                 'The daily record could not be deleted.'
             );
         }
     } else {
+        if ($b12DeleteAjax) {
+            daily_record_revision_delete_http_send(
+                new InvalidArgumentException('Invalid daily record ID.')
+            );
+        }
         $_SESSION['error'] = 'Invalid daily record.';
     }
 
