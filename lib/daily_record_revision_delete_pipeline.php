@@ -20,6 +20,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/daily_record_revision_save_gate.php';
 require_once __DIR__ . '/daily_record_revision_form_tokens.php';
 require_once __DIR__ . '/daily_record_revision_delete_continuity.php';
+require_once __DIR__ . '/daily_record_revision_parent_lock.php';
 
 if (!function_exists('daily_record_revision_delete_contract')) {
     /**
@@ -144,7 +145,12 @@ if (!function_exists('daily_record_revision_delete_transaction')) {
             throw new RuntimeException('Daily Record DELETE transaction unavailable.');
         }
         try {
-            // First mutation-safe read: exact farm-owned row, immutable scope,
+            // Match CREATE/EDIT: lock tenant and selected cycle before
+            // taking the exact source-row CAS lock or any downstream locks.
+            daily_record_revision_lock_parents(
+                $pdo, $farmId, $tokens['cycle_id']
+            );
+            // First source-row read: exact farm-owned row, immutable scope,
             // and the browser-loaded expected revision under FOR UPDATE.
             daily_record_revision_lock_and_compare(
                 $pdo, $type, $farmId,
