@@ -102,6 +102,17 @@
             ) && typeof response.json === 'function';
     }
 
+    // Only an exact status+code pair can distinguish early failures.
+    // Unknown, HTML, redirect, or unexpected responses remain blocked.
+    const failureReasons=Object.freeze({
+        '401|authentication_required':'authentication_required',
+        '403|forbidden':'forbidden',
+        '403|subscription_access_required':'subscription_access_required',
+        '409|revision_client_required':'revision_client_required',
+        '419|invalid_csrf':'invalid_csrf',
+        '422|invalid_record':'invalid_record',
+        '503|storage_unavailable':'storage_unavailable'
+    });
     function createSender(options) {
         if (!options || typeof options !== 'object' ||
             typeof options.fetchImpl !== 'function') {
@@ -168,7 +179,13 @@
                 }
                 if (response.status !== 200 || response.ok !== true ||
                     !payload || payload.success !== true) {
-                    return Object.freeze({status:'blocked'});
+                    const key=String(response.status)+'|'+String(
+                        payload && payload.success===false ? payload.code : ''
+                    );
+                    const reason=failureReasons[key];
+                    return Object.freeze(reason
+                        ? {status:'blocked',reason}
+                        : {status:'blocked'});
                 }
                 const recordId = decimal(payload.record_id, maxId);
                 const nextRevision = decimal(payload.record_revision, maxId);
