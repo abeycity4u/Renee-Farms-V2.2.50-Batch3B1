@@ -57,6 +57,14 @@ if (!function_exists('daily_record_revision_seed_cycle_entry')) {
             in_array($productionType, ['layer', 'broiler'], true)) {
             $type = $productionType;
         } elseif ($farmType === 'ruminant') {
+            // Built-in and custom livestock cycle choices resolve to the
+            // same four persisted Daily Record species as the shared reader.
+            // Never seed an uneditable or unsupported historical species.
+            if (!in_array($productionType, ['cattle', 'goat', 'sheep', 'other'], true)) {
+                throw new DailyRecordRevisionConflict(
+                    'Unsupported Ruminant production cycle species for Daily Record seed.'
+                );
+            }
             $type = 'ruminant';
         } else {
             throw new DailyRecordRevisionConflict('Unsupported production cycle seed.');
