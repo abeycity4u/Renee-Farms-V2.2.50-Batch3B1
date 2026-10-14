@@ -127,6 +127,7 @@ try {
     ws10_check(daily_record_revision_cutover_enabled() === true,
         'only isolated fixture process has simulated ON authority');
 
+    $rendered = [];
     $types = [
         'layer' => ['poultry/layers_daily_record.php', 'layers-daily-record.js'],
         'broiler' => ['poultry/broiler_daily_record.php', 'broiler-daily-record.js'],
@@ -186,6 +187,10 @@ try {
         );
         $exact = ws10_include($footerFile, 17);
         $all = ws10_include($footerFile, 0);
+        $rendered[$type] = [
+            'exact' => ['markers' => $exactMarkers, 'html' => $exact],
+            'all' => ['markers' => $allMarkers, 'html' => $all],
+        ];
 
         $plan = daily_record_revision_page_asset_plan($type);
         $expected = array_map(
@@ -260,6 +265,12 @@ try {
         hash_file('sha256', $originalGate) === $gateShaBefore,
         'original hard-OFF gate bytes unchanged throughout simulated ON'
     );
+    if (($argv[1] ?? '') === '--json') {
+        // Structured samples are consumed only by the network-disabled
+        // fake-DOM Node VM. They come from actual PHP fragment execution.
+        echo json_encode($rendered, JSON_THROW_ON_ERROR) . "\n";
+        return;
+    }
     echo "B12_WS10_ISOLATED_GATE_ON_RENDER=PASS\n";
     echo "PASS_COUNT={$passes}\n";
     echo "SIMULATION_GATE=ON_IN_TEMP_ONLY\n";
@@ -270,7 +281,6 @@ try {
 } catch (Throwable $error) {
     fwrite(STDERR, "B12_WS10_ISOLATED_GATE_ON_RENDER=FAIL " .
         $error->getMessage() . "\n");
-    exitCode:
     exit(1);
 } finally {
     ws10_cleanup($fixtureDir);
