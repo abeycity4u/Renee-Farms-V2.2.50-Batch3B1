@@ -66,7 +66,7 @@ try {
         str_contains($save,"409, 'revision_client_required'") &&
         str_contains($save,"419, 'invalid_csrf'") &&
         str_contains($save,"422, 'invalid_record'") &&
-        str_contains($save,"$_SESSION['error'] = $message;") &&
+        str_contains($save,'$_SESSION[\'error\'] = $message;') &&
         str_contains($save,"header('Location: ' . $legacyRedirect);"),
         'malformed client, CSRF, validation and original legacy redirect are distinct'
     );
