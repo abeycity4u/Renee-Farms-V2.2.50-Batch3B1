@@ -269,10 +269,17 @@
                 // Conflict and all other failures preserve business fields
                 // but revoke old immutable tokens until an explicit reload.
                 invalidate();
-                notify(options.onBlocked, {
-                    reason: outcome && outcome.status === 'conflict'
-                        ? 'record_conflict' : 'submit_failed'
-                });
+                const safeFailures=[
+                    'authentication_required','forbidden',
+                    'subscription_access_required','revision_client_required',
+                    'invalid_csrf','invalid_record','storage_unavailable'
+                ];
+                const reason=outcome && outcome.status==='conflict'
+                    ? 'record_conflict'
+                    : (outcome && outcome.status==='blocked' &&
+                        safeFailures.includes(outcome.reason)
+                        ? outcome.reason : 'submit_failed');
+                notify(options.onBlocked, {reason});
             }).catch(() => {
                 if (ticket === readyTicket && controller.isCurrent(ticket)) {
                     invalidate();
