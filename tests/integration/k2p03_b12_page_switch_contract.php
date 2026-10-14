@@ -30,7 +30,7 @@ try {
         str_contains($contract,'SOURCE ONLY')&&
         str_contains($contract,'NOT IMPLEMENTED')&&
         str_contains($contract,'MariaDB')&&
-        str_contains($contract,'all seven')&&
+        preg_match('/\bseven\s+coordinated\s+CAS\s+writers\b/i',$contract)===1&&
         str_contains($contract,'data-confirm'),
         'page handoff records coordination and outstanding certification'
     );
