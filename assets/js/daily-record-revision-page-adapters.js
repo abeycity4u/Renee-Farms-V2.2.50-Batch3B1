@@ -13,6 +13,18 @@
     const types = Object.freeze(['layer','broiler','ruminant']);
     const retiredScript =
         /(?:^|\/)(?:layers|broiler|ruminant)-daily-record\.js(?:\?|$)/i;
+    function validRecordDate(value) {
+        if(typeof value!=='string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)){
+            return false;
+        }
+        const year=Number(value.slice(0,4));
+        const month=Number(value.slice(5,7));
+        const day=Number(value.slice(8,10));
+        const leap=year%4===0&&(year%100!==0||year%400===0);
+        const days=[31,leap?29:28,31,30,31,30,31,31,30,31,30,31];
+        return year>=1&&month>=1&&month<=12&&
+            day>=1&&day<=days[month-1];
+    }
 
     function createAdapter(type, options) {
         if (!types.includes(type) || !options || typeof options !== 'object' ||
@@ -167,8 +179,7 @@
         async function open(selection) {
             if (!bound) throw new Error('B12 page handler is not bound.');
             const attempt=++switchGeneration;
-            if (!selection || typeof selection.recordDate!=='string' ||
-                !/^\d{4}-\d{2}-\d{2}$/.test(selection.recordDate)) {
+            if (!selection || !validRecordDate(selection.recordDate)) {
                 options.notify({reason:'invalid_selection'});
                 return {status:'blocked'};
             }
@@ -210,6 +221,8 @@
             if(headerButtons.length!==1 ||
                 !headerButtons[0] ||
                 typeof headerButtons[0].addEventListener!=='function' ||
+                (typeof headerButtons[0].getAttribute==='function' &&
+                    headerButtons[0].getAttribute('onclick')!==null) ||
                 typeof options.currentDate!=='function') {
                 throw new Error('B12 top Add Record ownership is incomplete.');
             }
@@ -233,7 +246,10 @@
             // selection, confirmation and immutable revision-ticket reader.
             // The future browser initializer must supply the page's
             // ReneeCalendar.today/appToday date provider explicitly.
-            headerButtons[0].addEventListener('click',()=>{
+            headerButtons[0].addEventListener('click',event=>{
+                if(event&&typeof event.preventDefault==='function'){
+                    event.preventDefault();
+                }
                 let today;
                 try {today=options.currentDate();} catch (_) {}
                 const species=type==='ruminant'
