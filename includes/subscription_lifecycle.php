@@ -161,6 +161,9 @@ if (!function_exists('subscription_lifecycle_refresh_slug')) {
 if (!function_exists('subscription_lifecycle_redirect')) {
     function subscription_lifecycle_redirect(string $path): void
     {
+        // The subscription denial/cleanup has already happened; only
+        // future B12 SAVE receives an alternate non-redirect response.
+        daily_record_revision_preroute_maybe_send('subscription_access_required', $_SERVER, $_POST);
         if (!headers_sent()) {
             $base = defined('BASE_URL') ? rtrim((string)BASE_URL, '/') : '';
             header('Location: ' . $base . '/' . ltrim($path, '/'), true, 303);
