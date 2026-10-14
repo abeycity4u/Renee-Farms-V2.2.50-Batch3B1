@@ -134,9 +134,20 @@ function initAutoCalculations() {
         input.addEventListener('input', calculateTotalAmount);
     });
     
-    // Auto-calculate laying rate
+    // Auto-calculate laying rate on legacy forms. A future, separately
+    // authorized B12 Layer page has its own two-decimal derived-field owner;
+    // never attach this older one-decimal listener to that exact form.
+    // The required server markers do not exist while B12 is hard-OFF.
+    const b12LayerOwner = document.querySelector(
+        '#layerDailyConfig[data-b12-revision-page="layer"][data-b12-legacy-retired="1"]'
+    );
     const layerStockInputs = document.querySelectorAll('input[name="opening_stock"], input[name="egg_production"]');
     layerStockInputs.forEach(input => {
+        const parentForm = typeof input.closest === 'function'
+            ? input.closest('form') : null;
+        if (b12LayerOwner && parentForm && parentForm.id === 'recordForm') {
+            return;
+        }
         input.addEventListener('input', calculateLayingRate);
     });
 }
