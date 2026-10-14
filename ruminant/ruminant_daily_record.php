@@ -316,11 +316,17 @@ if ($cycleEnabled) {
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_record'])) {
-    if (!verify_csrf_token($_POST['csrf_token'] ?? '')) { http_response_code(419); exit('Invalid request token.'); }
+    // B12 requires AJAX before validation; gate-OFF legacy POST is unchanged.
+    require_once __DIR__ . '/../lib/daily_record_revision_save_http.php';
+    daily_record_revision_save_http_require_ajax($_SERVER);
+    if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
+        daily_record_revision_save_http_csrf_failure();
+    }
     if ($cycleEnabled && count($activeCycles) > 1 && $selectedCycleId <= 0) {
-        $_SESSION['error'] = 'Select an active ruminant production cycle before saving this record.';
-        header('Location: ruminant_daily_record.php?month=' . urlencode($month));
-        exit();
+        daily_record_revision_save_http_validation_failure(
+            'Select an active ruminant production cycle before saving this record.',
+            'ruminant_daily_record.php?month=' . urlencode($month)
+        );
     }
     $parseNumeric = static function ($value): string { return str_replace(',', '', trim((string)$value)); };
     $nonNegative = static function ($value, string $label) use ($parseNumeric): float {
@@ -333,9 +339,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_record'])) {
     $animalType = strtolower(trim((string)($_POST['animal_type'] ?? '')));
     $allowedAnimalTypes = ['cattle','goat','sheep','other'];
     if (!$dateObject || $dateObject->format('Y-m-d') !== $recordDate || !in_array($animalType, $allowedAnimalTypes, true)) {
-        $_SESSION['error'] = 'Please provide a valid date and animal type.';
-        header('Location: ruminant_daily_record.php?month=' . urlencode($month) . '&cycle_id=' . (int)$selectedCycleId);
-        exit();
+        daily_record_revision_save_http_validation_failure(
+            'Please provide a valid date and animal type.',
+            'ruminant_daily_record.php?month=' . urlencode($month) . '&cycle_id=' . (int)$selectedCycleId
+        );
     }
     $cycleIdForSave = ($cycleEnabled && $selectedCycleId > 0) ? $selectedCycleId : null;
     if ($cycleIdForSave !== null) {
@@ -343,9 +350,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_record'])) {
         $cycleCheck->execute([$cycleIdForSave, $tenantFarmId]);
         $cycle = $cycleCheck->fetch(PDO::FETCH_ASSOC);
         if (!$cycle || $recordDate < $cycle['start_date'] || (!empty($cycle['expected_end_date']) && $recordDate > $cycle['expected_end_date'])) {
-            $_SESSION['error'] = 'The selected ruminant cycle is invalid for this record date.';
-            header('Location: ruminant_daily_record.php?month=' . urlencode($month) . '&cycle_id=' . (int)$selectedCycleId);
-            exit();
+            daily_record_revision_save_http_validation_failure(
+                'The selected ruminant cycle is invalid for this record date.',
+                'ruminant_daily_record.php?month=' . urlencode($month) . '&cycle_id=' . (int)$selectedCycleId
+            );
         }
     }
     try {
@@ -364,19 +372,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_record'])) {
             );
         }
     } catch (InvalidArgumentException $e) {
-        $_SESSION['error'] = safeUserExceptionMessage($e, 'The ruminant daily record could not be saved.');
-        header('Location: ruminant_daily_record.php?month=' . urlencode($month) . '&cycle_id=' . (int)$selectedCycleId);
-        exit();
+        daily_record_revision_save_http_validation_failure(
+            safeUserExceptionMessage($e, 'The ruminant daily record could not be saved.'),
+            'ruminant_daily_record.php?month=' . urlencode($month) . '&cycle_id=' . (int)$selectedCycleId
+        );
     }
     if ($openingStock < 1) {
-        $_SESSION['error'] = 'Opening stock must be greater than zero.';
-        header('Location: ruminant_daily_record.php?month=' . urlencode($month) . '&cycle_id=' . (int)$selectedCycleId);
-        exit();
+        daily_record_revision_save_http_validation_failure(
+            'Opening stock must be greater than zero.',
+            'ruminant_daily_record.php?month=' . urlencode($month) . '&cycle_id=' . (int)$selectedCycleId
+        );
     }
     if ($mortality > $openingStock) {
-        $_SESSION['error'] = 'Mortality cannot exceed opening stock.';
-        header('Location: ruminant_daily_record.php?month=' . urlencode($month) . '&cycle_id=' . (int)$selectedCycleId);
-        exit();
+        daily_record_revision_save_http_validation_failure(
+            'Mortality cannot exceed opening stock.',
+            'ruminant_daily_record.php?month=' . urlencode($month) . '&cycle_id=' . (int)$selectedCycleId
+        );
     }
     // B12 FUTURE CUTOVER ONLY. The hard-disabled source fuse prevents
     // partial migration of Ruminant group mortality and feed movements.
