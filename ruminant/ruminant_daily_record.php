@@ -64,6 +64,10 @@ $workspaceScope = daily_record_workspace_scope(
 // the shared service alone owns the canonical business transaction.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_record']) && $canDeleteRecords) {
     if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
+        if (daily_record_revision_cutover_enabled()) {
+            require_once __DIR__ . '/../lib/daily_record_revision_delete_http.php';
+            daily_record_revision_delete_http_csrf_failure();
+        }
         http_response_code(419);
         exit('Invalid request token.');
     }
