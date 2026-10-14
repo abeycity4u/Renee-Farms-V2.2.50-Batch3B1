@@ -279,6 +279,43 @@ async function test(label,fn) {
             assert.equal(v.edit.listenerCount('click'),0);
         }
     });
+    await test('calendar action matching both Add and Edit selectors blocks takeover',async()=>{
+        for(const type of ['layer','broiler','ruminant']){
+            const v=make(type);
+            const original=v.document.querySelectorAll.bind(v.document);
+            v.document.querySelectorAll=selector=>
+                selector==='.edit-record-btn'?[v.add]:original(selector);
+            assert.throws(()=>v.adapter.bind(),/Conflicting B12 calendar handler ownership/);
+            assert.equal(v.add.listenerCount('click'),0);
+            assert.equal(v.edit.listenerCount('click'),0);
+            assert.equal(v.header.listenerCount('click'),0);
+            assert.equal(v.form.controls.openingStock.listenerCount('input'),0);
+        }
+    });
+    await test('inline legacy calendar onclick blocks all future listeners',async()=>{
+        for(const type of ['layer','broiler','ruminant']){
+            const v=make(type);
+            v.edit.getAttribute=name=>
+                name==='onclick'?'openLegacyEdit()':null;
+            assert.throws(()=>v.adapter.bind(),/Conflicting B12 calendar handler ownership/);
+            assert.equal(v.add.listenerCount('click'),0);
+            assert.equal(v.edit.listenerCount('click'),0);
+            assert.equal(v.header.listenerCount('click'),0);
+            assert.equal(v.form.controls.openingStock.listenerCount('input'),0);
+        }
+    });
+    await test('header reused as calendar action rejects duplicate owner',async()=>{
+        for(const type of ['layer','broiler','ruminant']){
+            const v=make(type);
+            const original=v.document.querySelectorAll.bind(v.document);
+            v.document.querySelectorAll=selector=>
+                selector==='.add-record-btn'?[v.header]:original(selector);
+            assert.throws(()=>v.adapter.bind(),/Conflicting B12 calendar handler ownership/);
+            assert.equal(v.header.listenerCount('click'),0);
+            assert.equal(v.edit.listenerCount('click'),0);
+            assert.equal(v.form.controls.openingStock.listenerCount('input'),0);
+        }
+    });
     await test('invalid top date never opens modal or clears unsaved draft',async()=>{
         const v=make('broiler',{currentDate:()=>''});
         v.adapter.bind();
