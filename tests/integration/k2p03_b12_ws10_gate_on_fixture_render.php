@@ -128,6 +128,12 @@ try {
         'only isolated fixture process has simulated ON authority');
 
     $rendered = [];
+    ws10_check(
+        daily_record_revision_page_future_form_lock() === ' inert' &&
+        daily_record_revision_page_ruminant_delete_marker()
+            === ' data-b12-revision-delete="ruminant" inert',
+        'future ON markup keeps Record Form and Ruminant DELETE inert by default'
+    );
     $types = [
         'layer' => ['poultry/layers_daily_record.php', 'layers-daily-record.js'],
         'broiler' => ['poultry/broiler_daily_record.php', 'broiler-daily-record.js'],
@@ -160,6 +166,31 @@ try {
             str_contains($exactMarkers, 'data-b12-delete-ownership="replacement"') &&
             trim($allMarkers) === '',
             $type . ' exact scope receives ownership; All Cycles does not'
+        );
+
+        // Execute the exact originally rendered opening Record Form tag.
+        // The ON state must default to noninteractive markup before any
+        // JavaScript module or error-prone browser initializer can run.
+        $formStart = strpos($page, '<form method="POST" id="recordForm"');
+        $formEnd = $formStart === false ? false :
+            strpos($page, '?>', $formStart);
+        ws10_check(
+            $formStart !== false && $formEnd !== false &&
+            str_contains(substr($page, $formStart, $formEnd-$formStart),
+                'daily_record_revision_page_future_form_lock()'),
+            $type . ' Record Form tag delegates inert policy to shared authority'
+        );
+        $formOpen = substr(
+            $page, $formStart, $formEnd + strlen('?>') + 1 - $formStart
+        );
+        $formFixture = ws10_fixture_file(
+            $fixtureDir, dirname($path) . '/ws10-record-form.php', $formOpen
+        );
+        $renderedForm = ws10_include($formFixture, 17);
+        ws10_check(
+            preg_match('~<form[^>]*\bid="recordForm"[^>]*\binert>~', $renderedForm) === 1 &&
+            substr_count($renderedForm, ' inert') === 1,
+            $type . ' simulated ON Record Form is inert until B12 bind'
         );
 
         // Evaluate each page's EXACT on/off footer including its legacy
@@ -246,7 +277,7 @@ try {
     );
     $formHtml = ws10_include($formFile, 17);
     ws10_check(
-        str_contains($formHtml, 'data-b12-revision-delete="ruminant"') &&
+        str_contains($formHtml, 'data-b12-revision-delete="ruminant" inert') &&
         !str_contains($formHtml, 'data-confirm=') &&
         substr_count($formHtml, '<form') === 1,
         'simulated ON Ruminant DELETE form exclusively uses AJAX ownership'
