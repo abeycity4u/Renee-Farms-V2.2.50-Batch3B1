@@ -11,6 +11,7 @@ requireLogin();
 // Check access
 $userType = getUserType();
 if (!checkAccess('poultry')) {
+    daily_record_revision_preroute_maybe_send('forbidden', $_SERVER, $_POST);
     header('Location: dashboard.php');
     exit();
 }
