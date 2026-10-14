@@ -228,6 +228,18 @@
                 notify(options.onBlocked, {reason:'submit_transport_missing'});
                 return;
             }
+            // The page lifecycle may still be validating opening-stock and
+            // population projections after the exact revision read is ready.
+            // Disabling a Save button alone cannot prevent Enter or scripted
+            // form submission; enforce the shared readiness gate here too.
+            if (typeof options.canSubmit === 'function') {
+                let allowed = false;
+                try { allowed = options.canSubmit() === true; } catch (_) {}
+                if (!allowed) {
+                    notify(options.onBlocked, {reason:'population_pending'});
+                    return;
+                }
+            }
             const ticket = readyTicket;
             const mode = readyMode;
             submitting = true;
