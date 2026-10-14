@@ -16,6 +16,8 @@ final class B12FakeStatement extends PDOStatement {
     }
 }
 final class B12FakePDO extends PDO {
+    public bool $active = false;
+    public function inTransaction(): bool { return $this->active; }
     public string $sql = '';
     public ?B12FakeStatement $statement = null;
     public function __construct(private array $rows) {}
@@ -33,7 +35,7 @@ function ok(bool $actual, string $label): void {
     echo 'PASS: ' . $label . PHP_EOL;
 }
 function rejection(callable $fn, string $label): void {
-    try {$fn();} catch (DailyRecordRevisionConflict|DailyRecordRevisionNotFound|InvalidArgumentException $e) {
+    try {$fn();} catch (DailyRecordRevisionConflict|DailyRecordRevisionNotFound|InvalidArgumentException|LogicException $e) {
         ok(true, $label);
         return;
     }
@@ -82,6 +84,21 @@ try {
         $mockAbsent=new B12FakePDO([]);
         $check=daily_record_revision_reader_check_scope($mockAbsent,$type,7,'','2026-10-12',$type==='ruminant'?'goat':null);
         ok($check===['status'=>'absent','record_id'=>null], "$type cardinality zero means absence, not CREATE authorization");
+        ok(!str_contains($mockAbsent->sql,'FOR UPDATE'), "$type ordinary reader probe remains nonlocking");
+        $locked=new B12FakePDO([['id'=>'99']]);
+        $locked->active=true;
+        $current=daily_record_revision_reader_check_scope(
+            $locked,$type,7,'','2026-10-12',$type==='ruminant'?'goat':null,true
+        );
+        ok($current===['status'=>'unique','record_id'=>99] &&
+            str_ends_with($locked->sql,' LIMIT 2 FOR UPDATE') &&
+            str_contains($locked->sql,'d.cycle_id IS NULL'),
+            "$type CREATE scope probe is a current locking read, including NULL-cycle");
+        $unlocked=new B12FakePDO([['id'=>'99']]);
+        rejection(static fn()=>daily_record_revision_reader_check_scope(
+            $unlocked,$type,7,'','2026-10-12',$type==='ruminant'?'goat':null,true
+        ), "$type locking scope probe requires a transaction");
+        ok($unlocked->sql==='', "$type unowned locking probe cannot query");
         $mockAmbiguous=new B12FakePDO([['id'=>'99'],['id'=>'100']]);
         rejection(static fn()=>daily_record_revision_reader_check_scope($mockAmbiguous,$type,7,'','2026-10-12',$type==='ruminant'?'goat':null), "$type scope with two records fails closed");
         $mockUnique=new B12FakePDO([['id'=>'99']]);
