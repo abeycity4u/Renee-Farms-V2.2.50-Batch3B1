@@ -233,16 +233,23 @@
             // The lifecycle/editor already invalidate selection tokens on
             // these events. Do not also install a second date-only fetch.
             date.addEventListener('change',()=>{
-                // These hidden fields follow the user's CURRENT selection,
-                // never an old row; the revision editor simultaneously
-                // invalidates its immutable tokens until a fresh select().
+                // These hidden fields follow the user's CURRENT selection.
+                // Selector changes also invalidate any earlier draft-discard
+                // confirmation awaiting a response.
+                ++switchGeneration;
                 hiddenDate.value=date.value;
                 save.disabled=true;
             });
             if(animal)animal.addEventListener('change',()=>{
+                ++switchGeneration;
                 hiddenAnimal.value=animal.value;
                 save.disabled=true;
             });
+            // A draft edited while a confirmation is on screen must NOT be
+            // silently cleared when that old confirmation eventually resolves.
+            form.addEventListener('input',()=>{++switchGeneration;});
+            form.addEventListener('change',()=>{++switchGeneration;});
+            form.addEventListener('reset',()=>{++switchGeneration;save.disabled=true;});
             options.modalElement.addEventListener('hidden.bs.modal',()=>{
                 ++switchGeneration;
                 save.disabled=true;
