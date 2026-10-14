@@ -85,7 +85,7 @@ try {
     }
     $page=b12_rum_stage_file($root,'ruminant/ruminant_daily_record.php');
     b12_rum_stage_check(
-        str_contains($page,"daily_record_revision_delete_form_fields('ruminant', $tenantFarmId, $record)") &&
+        str_contains($page,"daily_record_revision_delete_form_fields('ruminant', \$tenantFarmId, \$record)") &&
         str_contains($page,'data-confirm="Delete this record?') &&
         !str_contains($page,'daily-record-revision-delete.js'),
         'page still has originally rendered guarded form tokens, legacy modal and NO activated AJAX client'
