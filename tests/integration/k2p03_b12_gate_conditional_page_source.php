@@ -25,6 +25,27 @@ try {
         preg_match('~function\s+daily_record_revision_cutover_enabled\s*\(\s*\)\s*:\s*bool\s*\{\s*return\s+false\s*;\s*\}~',$gate)===1,
         'cutover fuse remains literal false'
     );
+    // Execute only the hard-OFF branch of the pure presentation helper.
+    // No HTML page, PDO, authenticated request or future ON path is executed.
+    require_once $root.'/lib/daily_record_revision_page_switch.php';
+    foreach (['layer','broiler','ruminant'] as $species) {
+        ws08b_check(
+            daily_record_revision_page_future_markers($species,17)==='' &&
+            daily_record_revision_page_future_script_tags($species,17)==='' &&
+            daily_record_revision_page_future_script_tags($species,0)==='',
+            $species.' exact-cycle and all-cycle rendering stay inert with gate OFF'
+        );
+    }
+    ws08b_check(
+        daily_record_revision_page_ruminant_delete_marker()==='',
+        'gate OFF Ruminant DELETE never receives AJAX ownership marker'
+    );
+    try {
+        daily_record_revision_page_future_markers('other',17);
+        throw new RuntimeException('Unknown species accepted.');
+    } catch(InvalidArgumentException $expected) {
+        ws08b_check(true,'closed page species allowlist is enforced');
+    }
     $helper=ws08b_read('lib/daily_record_revision_page_switch.php');
     ws08b_check(
         str_contains($helper,"require_once __DIR__ . '/daily_record_revision_page_asset_plan.php';") &&
