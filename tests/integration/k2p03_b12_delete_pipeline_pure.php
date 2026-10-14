@@ -39,6 +39,23 @@ function sales_rebuild_layer_egg_allocations(
     }
     return [];
 }
+// These two test doubles verify orchestration order. The actual canonical
+// rebase helper is covered separately by k2p03_b12_delete_continuity_pure.php.
+function daily_record_revision_delete_continuity_lock(
+    PDO $pdo,string $type,int $farmId,int $recordId,?int $cycleId,
+    string $recordDate,?string $species
+):array {
+    b12_delete_event('later_lock');
+    if ($farmId!==7 || $recordId!==19 || $recordDate!=='2026-10-13' ||
+        !in_array($type,['layer','broiler','ruminant'],true)) {
+        throw new RuntimeException('Wrong later-row lock identity.');
+    }
+    return ['needs_rebase'=>$cycleId!==null];
+}
+function daily_record_revision_delete_continuity_apply(PDO $pdo,array $plan):int {
+    b12_delete_event('continuity');
+    return !empty($plan['needs_rebase']) ? 2 : 0;
+}
 require_once dirname(__DIR__,2) . '/lib/daily_record_revision_delete_pipeline.php';
 
 final class B12DeleteFakeStatement extends PDOStatement
@@ -119,7 +136,8 @@ try {
         $GLOBALS['b12_delete_events']=[];$GLOBALS['b12_delete_fail_at']='';
         $pdo=new B12DeleteFakePDO();
         $out=b12_delete_action($type,$pdo,b12_delete_post($type));
-        $events=['begin','lock','feed','mortality','lock','cas_delete'];
+        $events=['begin','lock','later_lock','feed','mortality',
+            'continuity','lock','cas_delete'];
         if($type==='layer')$events[]='sales';
         $events[]='commit';
         b12_delete_check($GLOBALS['b12_delete_events']===$events,
@@ -188,11 +206,11 @@ try {
         fn()=>b12_delete_action('layer',$pdo,b12_delete_post('layer')),
         DailyRecordRevisionConflict::class,'stale revision');
     b12_delete_check($GLOBALS['b12_delete_events']===['begin','lock','rollback'],
-        'stale revision never reverses inventory or mortality');
+        'stale revision never locks later rows or reverses inventory or mortality');
     b12_delete_check($pdo->rolledBack&&!$pdo->committed,
         'stale revision transaction rolled back');
 
-    foreach(['feed','mortality','cas_delete','sales'] as $failure) {
+    foreach(['later_lock','feed','mortality','continuity','cas_delete','sales'] as $failure) {
         $GLOBALS['b12_delete_events']=[];
         $GLOBALS['b12_delete_fail_at']=$failure;
         $pdo=new B12DeleteFakePDO();
