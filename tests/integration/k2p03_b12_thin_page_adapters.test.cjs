@@ -129,7 +129,7 @@ function button(date,species='goat') {
 }
 function make(type='layer', overrides={}) {
     const form=makeForm(),add=button('2026-10-13','goat'),
-        edit=button('2026-10-14','cattle');
+        edit=button('2026-10-14','cattle'),header=button('','');
     const scripts=(overrides.scripts||[]).map(src=>({
         src,getAttribute(name){return name==='src'?src:null;}
     }));
@@ -142,6 +142,7 @@ function make(type='layer', overrides={}) {
             if(selector==='form[data-confirm]')return overrides.legacyConfirm?[{}]:[];
             if(selector==='[data-poultry-daily-delete-id]')return overrides.missingDeleteTokens
                 ?[{dataset:{poultryDailyDeleteId:'19'}}]:[];
+            if(selector==='[data-open-record-modal]')return overrides.headerButtons??[header];
             if(selector==='.add-record-btn')return [add];
             if(selector==='.edit-record-btn')return [edit];
             if(selector==='form[data-confirm][data-b12-revision-delete]')return [];
@@ -161,6 +162,8 @@ function make(type='layer', overrides={}) {
         fetchImpl:()=>{throw Error('PAGE MUST NOT INITIATE FETCH');},
         legacyHandlersRetired:true,
         deleteOwnership:'replacement',
+        currentDate:()=> '2026-10-14',
+        selectedCycleAnimalType:'goat',
         csrfToken:'test-csrf',
         confirmDelete:async()=>true,
         onDeleted:d=>events.saved.push(d),
@@ -180,7 +183,7 @@ function make(type='layer', overrides={}) {
         ruminant:'ReneeDailyRecordRevisionRuminantPage'
     };
     const adapter=win[api[type]].create(opts);
-    return {adapter,opts,form,add,edit,events,markup,document,feedLabel};
+    return {adapter,opts,form,add,edit,header,events,markup,document,feedLabel};
 }
 const tick=()=>new Promise(r=>setImmediate(r));
 let count=0;
@@ -195,13 +198,31 @@ async function test(label,fn) {
             assert.equal(v.events.clears,0);
             assert.equal(v.add.listenerCount('click'),0);
             assert.equal(v.edit.listenerCount('click'),0);
+            assert.equal(v.header.listenerCount('click'),0);
             assert.equal(v.form.controls.save.disabled,false);
             v.adapter.bind();
             assert.equal(v.add.listenerCount('click'),1);
             assert.equal(v.edit.listenerCount('click'),1);
+            assert.equal(v.header.listenerCount('click'),1);
             assert.equal(v.form.controls.save.disabled,true);
             v.adapter.bind();
             assert.equal(v.add.listenerCount('click'),1);
+            assert.equal(v.header.listenerCount('click'),1);
+        });
+        await test(type+' top Add Today uses same exact-scope authoritative selection',async()=>{
+            const v=make(type);v.adapter.bind();
+            v.header.click();await tick();
+            assert.equal(v.form.controls.selectedDate.value,'2026-10-14');
+            assert.equal(v.form.controls.recordDate.value,'2026-10-14');
+            assert.equal(v.events.confirmations,1);
+            assert.equal(v.events.shows,1);
+            assert.equal(v.events.ready.length,1);
+            assert.equal(v.form.resets,1);
+            assert.equal(v.events.errors.length,0);
+            if(type==='ruminant'){
+                assert.equal(v.form.controls.animalType.value,'goat');
+                assert.equal(v.form.controls.animalTypeHidden.value,'goat');
+            }
         });
         await test(type+' calendar action delegates to exact shared workspace',async()=>{
             const v=make(type);v.adapter.bind();
@@ -243,6 +264,54 @@ async function test(label,fn) {
             assert.equal(v.opts.modalTitle.textContent,'Add Daily Record');
         });
     }
+    await test('top header fails closed without explicit current-date provider',async()=>{
+        const v=make('layer',{currentDate:null});
+        assert.throws(()=>v.adapter.bind(),/top Add Record ownership/);
+        assert.equal(v.header.listenerCount('click'),0);
+        assert.equal(v.add.listenerCount('click'),0);
+        assert.equal(v.form.controls.openingStock.listenerCount('input'),0);
+    });
+    await test('duplicate or missing top header button rejects partial takeover',async()=>{
+        for(const headerButtons of [[],[button(''),button('')]]){
+            const v=make('broiler',{headerButtons});
+            assert.throws(()=>v.adapter.bind(),/top Add Record ownership/);
+            assert.equal(v.add.listenerCount('click'),0);
+            assert.equal(v.edit.listenerCount('click'),0);
+        }
+    });
+    await test('invalid top date never opens modal or clears unsaved draft',async()=>{
+        const v=make('broiler',{currentDate:()=>''});
+        v.adapter.bind();
+        v.form.controls.openingStock.value='unsaved';
+        v.header.click();await tick();
+        assert.equal(v.events.errors.at(-1).reason,'invalid_selection');
+        assert.equal(v.events.shows,0);
+        assert.equal(v.form.resets,0);
+        assert.equal(v.form.controls.openingStock.value,'unsaved');
+    });
+    await test('top button current-date provider failure is safely blocked',async()=>{
+        const v=make('layer',{currentDate:()=>{throw Error('clock unavailable');}});
+        v.adapter.bind();v.header.click();await tick();
+        assert.equal(v.events.errors.at(-1).reason,'invalid_selection');
+        assert.equal(v.events.shows,0);
+    });
+    await test('Ruminant header blocks missing or unsupported cycle species',async()=>{
+        for(const selectedCycleAnimalType of ['', 'horse']){
+            const v=make('ruminant',{selectedCycleAnimalType});
+            v.adapter.bind();v.header.click();await tick();
+            assert.equal(v.events.errors.at(-1).reason,'invalid_species');
+            assert.equal(v.events.shows,0);
+            assert.equal(v.form.resets,0);
+        }
+    });
+    await test('cancelled header confirmation preserves previously typed draft',async()=>{
+        const v=make('layer',{confirmReplace:async()=>false});
+        v.adapter.bind();v.form.controls.openingStock.value='draft';
+        v.header.click();await tick();
+        assert.equal(v.form.resets,0);
+        assert.equal(v.events.shows,0);
+        assert.equal(v.form.controls.openingStock.value,'draft');
+    });
     await test('Layer authoritative EDIT hydration recalculates crates and rate once',async()=>{
         const v=make('layer');
         v.form.fakeAuthoritativeRecord=true;
