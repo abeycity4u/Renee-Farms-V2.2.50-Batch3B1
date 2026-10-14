@@ -45,6 +45,7 @@ function permission_runtime_deny(string $message = 'You do not have permission t
         header('Location: ' . BASE_URL . '/no_access.php');
         exit();
     }
+    daily_record_revision_preroute_maybe_send('forbidden', $_SERVER, $_POST);
     http_response_code(403);
     exit($message);
 }
@@ -69,6 +70,7 @@ function permission_runtime_daily_save_permission(PDO $pdo, string $type): strin
             );
             return daily_record_revision_operation_permission($type, $intent['mode']);
         } catch (DailyRecordRevisionConflict $error) {
+            daily_record_revision_preroute_maybe_send('record_conflict', $_SERVER, $_POST);
             permission_runtime_deny('Daily Record form identity is stale. Reload the selection.');
         }
     }
