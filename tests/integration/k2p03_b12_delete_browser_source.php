@@ -27,17 +27,35 @@ try {
     foreach (['layer'=>'poultry/layers_daily_record.php',
               'broiler'=>'poultry/broiler_daily_record.php'] as $type=>$path) {
         $page = b12_browser_delete_source($root,$path);
+        // Button attributes may put the title BEFORE or AFTER the data
+        // attributes (Broiler and Layer differ). Scope the check to the
+        // actual delete button, not a brittle title-ordering assumption.
         $needle = 'data-poultry-daily-delete-id=';
-        $idIndex = strpos($page,$needle);
-        $gateIndex = strpos($page,'if (daily_record_revision_cutover_enabled()):',$idIndex === false ? 0 : $idIndex);
-        $tokenIndex = strpos($page,'data-b12-delete-tokens=', $idIndex === false ? 0 : $idIndex);
-        $endIndex = strpos($page, 'title="Delete Record"', $idIndex === false ? 0 : $idIndex);
+        $idIndex = strpos($page, $needle);
+        $buttonStart = $idIndex === false ? false
+            : strrpos(substr($page, 0, $idIndex), '<button');
+        $buttonEnd = $idIndex === false ? false
+            : strpos($page, '</button>', $idIndex);
+        $button = $buttonStart !== false && $buttonEnd !== false
+            ? substr($page, $buttonStart, $buttonEnd - $buttonStart)
+            : '';
+        $idInButton = strpos($button, $needle);
+        $gateInButton = strpos($button, 'if (daily_record_revision_cutover_enabled()):');
+        $tokenInButton = strpos($button, 'data-b12-delete-tokens=');
+        $endifInButton = $tokenInButton === false ? false
+            : strpos($button, '<?php endif; ?>', $tokenInButton);
         b12_browser_delete_check(
-            $idIndex!==false && $gateIndex!==false && $tokenIndex!==false &&
-            $endIndex!==false &&
-            $idIndex < $gateIndex && $gateIndex < $tokenIndex &&
-            $tokenIndex < $endIndex &&
-            $endIndex - $idIndex < 1800,
+            $button !== '' &&
+            str_contains($button, 'data-poultry-daily-delete-type="' . $type . '"') &&
+            str_contains($button, 'title="Delete Record"') &&
+            substr_count($button, $needle) === 1 &&
+            substr_count($button, 'data-b12-delete-tokens=') === 1 &&
+            $idInButton !== false &&
+            $gateInButton !== false && $tokenInButton !== false &&
+            $endifInButton !== false &&
+            $idInButton < $gateInButton &&
+            $gateInButton < $tokenInButton &&
+            $tokenInButton < $endifInButton,
             $type . ' token attribute exists only within button hard-off guard'
         );
         b12_browser_delete_check(
