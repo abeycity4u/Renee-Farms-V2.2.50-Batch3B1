@@ -955,7 +955,7 @@ $_SESSION['success'] = "Daily record saved successfully!"
         ENT_QUOTES | ENT_SUBSTITUTE,
         'UTF-8'
     ); ?>"
-    <?php echo daily_record_revision_page_future_markers('layer', (int)$selectedCycleId); ?>
+    <?php require_once __DIR__ . '/../lib/daily_record_revision_page_switch.php'; echo daily_record_revision_page_future_markers('layer', (int)$selectedCycleId); ?>
 ></div>
 <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/daily-population-movement-ui.js'); ?>"></script>
 <?php
