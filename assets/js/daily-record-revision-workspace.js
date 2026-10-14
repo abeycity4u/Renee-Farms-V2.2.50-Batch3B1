@@ -74,6 +74,7 @@
             modalElement:options.modalElement,
             request,
             onSubmit:submit,
+            canSubmit:options.canSubmit,
             onPending:options.onPending,
             onReady:options.onReady,
             onBlocked:options.onBlocked,
