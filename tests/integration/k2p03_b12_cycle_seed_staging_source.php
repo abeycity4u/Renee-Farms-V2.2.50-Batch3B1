@@ -92,12 +92,11 @@ try {
         'new seed helper never owns transaction'
     );
     b12_seed_stage_check(
-        str_contains($seed, "\$fields['feed_consumption_bags'] = 0;") &&
-        str_contains($seed, "\$fields['feed_consumption_kg'] = 0;") &&
-        str_contains($seed, "\$fields['egg_production'] = 0;") &&
-        str_contains($seed, "\$fields['birds_age'] = \$startAgeDays;") &&
-        str_contains($seed, "\$fields['mortality']") === false &&
-        str_contains($seed, "'mortality' => 0"),
+        preg_match('~\$fields\[\x27feed_consumption_bags\x27\]\s*=\s*0\s*;~', $seed) === 1 &&
+        preg_match('~\$fields\[\x27feed_consumption_kg\x27\]\s*=\s*0\s*;~', $seed) === 1 &&
+        preg_match('~\$fields\[\x27egg_production\x27\]\s*=\s*0\s*;~', $seed) === 1 &&
+        preg_match('~\$fields\[\x27birds_age\x27\]\s*=\s*\$startAgeDays\s*;~', $seed) === 1 &&
+        preg_match('~\x27mortality\x27\s*=>\s*0\b~', $seed) === 1,
         'all three animal types retain starting facts'
     );
 
