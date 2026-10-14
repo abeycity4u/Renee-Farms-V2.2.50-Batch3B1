@@ -105,6 +105,9 @@ function make(type='layer', overrides={}) {
     const document={
         querySelectorAll(selector) {
             if(selector==='script[src]')return scripts;
+            if(selector==='form[data-confirm]')return overrides.legacyConfirm?[{}]:[];
+            if(selector==='[data-poultry-daily-delete-id]')return overrides.missingDeleteTokens
+                ?[{dataset:{poultryDailyDeleteId:'19'}}]:[];
             if(selector==='.add-record-btn')return [add];
             if(selector==='.edit-record-btn')return [edit];
             if(selector==='form[data-confirm][data-b12-revision-delete]')return [];
@@ -252,6 +255,16 @@ async function test(label,fn) {
     await test('rejects shared generic submit handler on same form',async()=>{
         const v=make('ruminant');v.form.getAttribute=()=> 'true';
         assert.throws(()=>v.adapter.bind(),/ownership/);
+    });
+    await test('Ruminant legacy native confirmation refuses partial takeover',async()=>{
+        const v=make('ruminant',{legacyConfirm:true});
+        assert.throws(()=>v.adapter.bind(),/Legacy Ruminant native DELETE/);
+        assert.equal(v.add.listenerCount('click'),0);
+    });
+    await test('Poultry row missing original DELETE tokens refuses takeover',async()=>{
+        const v=make('layer',{missingDeleteTokens:true});
+        assert.throws(()=>v.adapter.bind(),/original-row tokens unavailable/);
+        assert.equal(v.add.listenerCount('click'),0);
     });
     await test('requires styled UI action callbacks before initialization',async()=>{
         assert.throws(()=>make('layer',{notify:null}),/Missing B12 page action/);
