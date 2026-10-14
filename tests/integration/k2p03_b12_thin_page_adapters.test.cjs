@@ -10,6 +10,7 @@ const path=require('node:path');
 const vm=require('node:vm');
 const root=path.join(__dirname,'../../assets/js');
 const names=[
+    'daily-record-revision-page-fields.js',
     'daily-record-revision-page-adapters.js',
     'daily-record-revision-layer-page.js',
     'daily-record-revision-broiler-page.js',
@@ -30,12 +31,18 @@ win.ReneeDailyRecordRevisionPageLifecycle={
                 opts.clearPopulation();
                 opts.onPending();
                 const mode=opts.form.nextMode||'edit';
-                const record=mode==='edit'?{mortality:3,id:'19'}:null;
+                const record=mode==='edit'
+                    ?{mortality:3,id:'19',feed_consumption_unit:'kg'}:null;
                 const guard=callback=>{
                     if(!valid)return false;
                     callback();
                     return true;
                 };
+                if (opts.form.fakeAuthoritativeRecord && mode==='edit') {
+                    opts.form.controls.openingStock.value='3000';
+                    opts.form.controls.eggProduction.value='2400';
+                    opts.form.controls.feedItemId.value='5';
+                }
                 opts.onReady({mode,record,guard});
                 opts.onPopulation({
                     closing_stock:120,
@@ -67,6 +74,11 @@ function makeForm() {
         selectedDate:{value:''}, recordDate:{value:''},
         animalType:{value:''},animalTypeHidden:{value:''},
         openingStock:{value:'',readOnly:false},
+        eggProduction:{value:''}, cratesCount:{value:''},
+        layingRate:{value:''}, feedConsumptionUnit:{value:'kg'},
+        feedItemId:{value:'',selectedIndex:0,options:[
+            {dataset:{}},{dataset:{unit:'kg'}},{dataset:{unit:'bags'}}
+        ]},
         save:{disabled:false}
     };
     for(const field of Object.values(controls)) {
@@ -83,7 +95,8 @@ function makeForm() {
             this.resets++;
             this.dispatch('reset');
             for(const key of ['selectedDate','recordDate','animalType',
-                'animalTypeHidden','openingStock']) controls[key].value='';
+                'animalTypeHidden','openingStock','eggProduction',
+                'cratesCount','layingRate','feedItemId']) controls[key].value='';
         }
     };
     return form;
@@ -102,7 +115,9 @@ function make(type='layer', overrides={}) {
         src,getAttribute(name){return name==='src'?src:null;}
     }));
     const markup={b12RevisionPage:type};
+    const feedLabel={textContent:'Feed Consumption (kg)'};
     const document={
+        getElementById(id){return id==='feedConsumptionLabel'?feedLabel:null;},
         querySelectorAll(selector) {
             if(selector==='script[src]')return scripts;
             if(selector==='form[data-confirm]')return overrides.legacyConfirm?[{}]:[];
@@ -141,7 +156,7 @@ function make(type='layer', overrides={}) {
         ruminant:'ReneeDailyRecordRevisionRuminantPage'
     };
     const adapter=win[api[type]].create(opts);
-    return {adapter,opts,form,add,edit,events,markup,document};
+    return {adapter,opts,form,add,edit,events,markup,document,feedLabel};
 }
 const tick=()=>new Promise(r=>setImmediate(r));
 let count=0;
@@ -204,6 +219,69 @@ async function test(label,fn) {
             assert.equal(v.opts.modalTitle.textContent,'Add Daily Record');
         });
     }
+    await test('Layer authoritative EDIT hydration recalculates crates and rate once',async()=>{
+        const v=make('layer');
+        v.form.fakeAuthoritativeRecord=true;
+        v.adapter.bind();
+        await v.adapter.open({recordDate:'2026-10-13'});
+        assert.equal(v.form.controls.cratesCount.value,'80.00');
+        assert.equal(v.form.controls.layingRate.value,'80.00');
+        assert.equal(v.form.controls.openingStock.listenerCount('input'),1);
+        assert.equal(v.form.controls.eggProduction.listenerCount('input'),1);
+        v.form.controls.eggProduction.value='1500';
+        v.form.controls.eggProduction.dispatch('input');
+        assert.equal(v.form.controls.cratesCount.value,'50.00');
+        assert.equal(v.form.controls.layingRate.value,'50.00');
+        assert.equal(v.events.renders.length,1);
+    });
+    await test('Layer CREATE recalculates after verified opening stock becomes available',async()=>{
+        const v=make('layer');
+        v.form.nextMode='create';
+        v.adapter.bind();
+        await v.adapter.open({recordDate:'2026-10-13'});
+        // The real lifecycle applies closing stock without an input event.
+        // The focused parity/lifecycle tests separately certify that rule.
+        assert.equal(v.form.controls.cratesCount.value,'0.00');
+        assert.equal(v.form.controls.layingRate.value,'');
+        assert.equal(v.form.controls.save.disabled,false);
+    });
+    await test('Ruminant authoritative EDIT synchronizes hidden feed unit and label',async()=>{
+        const v=make('ruminant');v.adapter.bind();
+        v.form.controls.feedItemId.selectedIndex=1;
+        await v.adapter.open({recordDate:'2026-10-13',animalType:'goat'});
+        assert.equal(v.form.controls.feedConsumptionUnit.value,'kg');
+        assert.equal(v.feedLabel.textContent,'Feed Consumption (kg)');
+        v.form.controls.feedItemId.selectedIndex=2;
+        v.form.controls.feedItemId.dispatch('change');
+        assert.equal(v.form.controls.feedConsumptionUnit.value,'bags');
+        assert.equal(v.feedLabel.textContent,'Feed Consumption (bags)');
+        assert.equal(v.form.controls.feedItemId.listenerCount('change'),1);
+    });
+    await test('Ruminant fresh selection resets previous feed unit and label',async()=>{
+        const v=make('ruminant');v.adapter.bind();
+        v.form.controls.feedItemId.selectedIndex=2;
+        v.form.controls.feedItemId.dispatch('change');
+        assert.equal(v.feedLabel.textContent,'Feed Consumption (bags)');
+        v.form.controls.feedItemId.selectedIndex=0;
+        await v.adapter.open({recordDate:'2026-10-13',animalType:'goat'});
+        assert.equal(v.feedLabel.textContent,'Feed Consumption (kg)');
+        assert.equal(v.form.controls.feedConsumptionUnit.value,'kg');
+    });
+    await test('missing Layer derived fields blocks whole page ownership before listeners',async()=>{
+        const v=make('layer');
+        const original=v.form.querySelector.bind(v.form);
+        v.form.querySelector=s=>s==='#eggProduction'?null:original(s);
+        assert.throws(()=>v.adapter.bind(),/Missing B12 Daily Record control/);
+        assert.equal(v.add.listenerCount('click'),0);
+        assert.equal(v.form.controls.openingStock.listenerCount('input'),0);
+    });
+    await test('missing Ruminant feed label blocks page cutover before listeners',async()=>{
+        const v=make('ruminant');
+        v.document.getElementById=()=>null;
+        assert.throws(()=>v.adapter.bind(),/Incomplete B12 Ruminant feed UI/);
+        assert.equal(v.add.listenerCount('click'),0);
+        assert.equal(v.form.controls.feedItemId.listenerCount('change'),0);
+    });
     await test('farm admin may correct retrieved CREATE opening stock',async()=>{
         const v=make('layer',{canEditOpeningStock:true});
         v.form.nextMode='create';v.adapter.bind();
