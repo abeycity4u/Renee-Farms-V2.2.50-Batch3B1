@@ -106,6 +106,18 @@ function makeForm() {
                 'cratesCount','layingRate','feedItemId']) controls[key].value='';
         }
     };
+    // Native browser input/change events bubble from the control to its
+    // parent form. Model that here: the shared B12 draft guard listens on
+    // the form, not on every individual field.
+    for (const control of Object.values(controls)) {
+        const dispatchControl = control.dispatch.bind(control);
+        control.dispatch = name => {
+            dispatchControl(name);
+            if (name === 'input' || name === 'change') {
+                form.dispatch(name);
+            }
+        };
+    }
     return form;
 }
 function button(date,species='goat') {
