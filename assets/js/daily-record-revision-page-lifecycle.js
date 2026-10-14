@@ -100,11 +100,13 @@
         }
         let epoch = 0;
         let openingEditVersion = 0;
+        let populationReady = false;
         let latestPopulation = Promise.resolve({status:'idle'});
         let bound = false;
 
         function clear() {
             epoch += 1;
+            populationReady = false;
             options.clearPopulation();
         }
         function current(ticketEpoch, guard) {
@@ -181,6 +183,9 @@
                             type:options.type, mode:ready.mode,
                             record_date:scopeDate
                         });
+                        // The exact revision lookup alone does not permit
+                        // POST until this same ticket's boundary has passed.
+                        populationReady = true;
                     });
                     return applied && current(ticketEpoch,guard)
                         ? {status:'applied'} : {status:'stale'};
@@ -196,6 +201,7 @@
             fetchImpl:options.fetchImpl,
             FormDataImpl:options.FormDataImpl,
             URLSearchParamsImpl:options.URLSearchParamsImpl,
+            canSubmit:() => populationReady === true,
             onPending:() => {
                 clear(); // Before any new record scope is read.
                 options.onPending();
