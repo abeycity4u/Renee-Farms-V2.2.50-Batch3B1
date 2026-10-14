@@ -702,7 +702,14 @@ $_SESSION['success'] = "Broiler daily record saved successfully!"
                                                                 type="button"
                                                                 title="Delete Record"
                                                                 data-poultry-daily-delete-type="broiler"
-                                                                data-poultry-daily-delete-id="<?php echo (int)$record['id']; ?>">
+                                                                data-poultry-daily-delete-id="<?php echo (int)$record['id']; ?>"
+                                                                <?php if (daily_record_revision_cutover_enabled()): ?>
+                                                                <?php
+                                                                    require_once __DIR__ . '/../lib/daily_record_revision_delete_pipeline.php';
+                                                                    $b12DeleteTokens = daily_record_revision_delete_form_fields('broiler', $tenantFarmId, $record);
+                                                                ?>
+                                                                data-b12-delete-tokens="<?php echo htmlspecialchars(json_encode($b12DeleteTokens, JSON_THROW_ON_ERROR), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>"
+                                                                <?php endif; ?>>
                                                             <i class="bi bi-trash"></i>
                                                         </button>
                                                         <?php endif; ?>
