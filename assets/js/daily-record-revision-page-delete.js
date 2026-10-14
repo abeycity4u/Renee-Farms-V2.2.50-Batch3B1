@@ -72,6 +72,11 @@
                     throw new Error('Duplicate Poultry DELETE elements.');
                 }
                 for(const button of buttons) {
+                    // Refuse page takeover before any new listener is
+                    // installed when an earlier controller owns this row.
+                    if(bound.has(button)) {
+                        throw new Error('Poultry DELETE button was already bound.');
+                    }
                     const ds=button && button.dataset;
                     if(!button || typeof button.addEventListener!=='function' ||
                         typeof button.getAttribute!=='function' ||
