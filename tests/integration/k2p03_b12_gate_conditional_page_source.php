@@ -37,8 +37,9 @@ try {
         );
     }
     ws08b_check(
-        daily_record_revision_page_ruminant_delete_marker()==='',
-        'gate OFF Ruminant DELETE never receives AJAX ownership marker'
+        daily_record_revision_page_ruminant_delete_marker()==='' &&
+        daily_record_revision_page_future_form_lock()==='',
+        'gate OFF Record Form stays interactive and Ruminant DELETE keeps legacy ownership'
     );
     try {
         daily_record_revision_page_future_markers('other',17);
