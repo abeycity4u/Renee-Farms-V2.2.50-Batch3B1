@@ -299,6 +299,20 @@
                 ++switchGeneration;
                 save.disabled=true;
             });
+            // Fail-closed future HTML renders record/delete forms inert by
+            // default. Release only AFTER the editor's capture-phase native
+            // submit guard, DELETE AJAX confirmation, and all page listeners
+            // have attached successfully. A missing module or failed bind
+            // leaves both forms noninteractive rather than exposing a native
+            // POST fallback that could lose a draft or bypass confirmation.
+            if (type==='ruminant') {
+                for(const deleteForm of options.document.querySelectorAll(
+                    'form[data-b12-revision-delete="ruminant"]'
+                )) {
+                    deleteForm.inert=false;
+                }
+            }
+            form.inert=false;
         }
 
         function invalidate() {
