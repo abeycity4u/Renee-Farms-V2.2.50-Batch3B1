@@ -107,9 +107,11 @@ try {
         str_contains($delete,'createRuminantFormSender') &&
         !str_contains($delete,'daily_record_revision_read.php'),
         'both DELETE transports use original revision, no DELETE-time GET');
-    ws09(str_contains($owner,'deletes')===false ||
-        str_contains($owner,'function preflight()'),
-        'shared DELETE owner requires explicit marker preflight');
+    ws09(str_contains($owner,'function preflight()') &&
+        str_contains($owner,'function bind()') &&
+        str_contains($owner,'preflight();') &&
+        str_contains($owner,'delete_pending'),
+        'shared DELETE owner preflights markers and guards duplicate operations');
     ws09(str_contains($rumBinder,"form.hasAttribute('data-confirm')") &&
         str_contains($rumBinder,'event.preventDefault();') &&
         str_contains($rumHttp,"'code' => 'record_conflict'") &&
