@@ -14,6 +14,7 @@ declare(strict_types=1);
  * redirected response, or draft destruction is performed here.
  */
 require_once __DIR__ . '/daily_record_revision_save_pipeline.php';
+require_once __DIR__ . '/daily_record_revision_save_http.php';
 
 if (!function_exists('daily_record_revision_route_text')) {
     function daily_record_revision_route_text(array $post, string $key, string $default = ''): string
@@ -270,6 +271,14 @@ if (!function_exists('daily_record_revision_route_dispatch_json')) {
         ?int $cycleId, string $recordDate, ?string $animalType,
         array $post, array $facts
     ): never {
+        // Defense in depth: the centralized save dispatcher itself refuses
+        // disabled cutover and every native/non-JSON client BEFORE transaction.
+        if (!daily_record_revision_cutover_enabled()) {
+            daily_record_revision_save_http_error(
+                503, 'revision_unavailable', 'Revision-aware saving is not enabled.'
+            );
+        }
+        daily_record_revision_save_http_require_ajax($_SERVER);
         $status = 200;
         try {
             $saved = daily_record_revision_route_transaction(
