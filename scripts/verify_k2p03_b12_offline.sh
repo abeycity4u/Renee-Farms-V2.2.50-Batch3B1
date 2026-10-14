@@ -109,6 +109,7 @@ for file in \
   tests/integration/k2p03_b12_delete_source_lock_pure.php \
   tests/integration/k2p03_b12_delete_pipeline_pure.php \
   tests/integration/k2p03_b12_delete_staged_source_pure.php \
+  tests/integration/k2p03_b12_delete_browser_source.php \
   tests/integration/k2p03_b12_cycle_seed_pure.php \
   tests/integration/k2p03_b12_cycle_seed_staging_source.php \
   tests/integration/k2p03_b12_reader_endpoint_source.php
@@ -122,7 +123,8 @@ for file in \
   tests/integration/k2p03_b12_editor_bridge.test.cjs \
   tests/integration/k2p03_b12_reader_transport.test.cjs \
   tests/integration/k2p03_b12_submit_transport.test.cjs \
-  tests/integration/k2p03_b12_workspace_composition.test.cjs
+  tests/integration/k2p03_b12_workspace_composition.test.cjs \
+  tests/integration/k2p03_b12_delete_browser_transport.test.cjs
 do
   label="$(basename "$file" .test.cjs | tr '[:lower:]-' '[:upper:]_')"
   run_case "NODE_TEST_$label" node "$file"
