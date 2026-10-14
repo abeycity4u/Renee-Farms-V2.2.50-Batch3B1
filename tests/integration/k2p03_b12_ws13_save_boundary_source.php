@@ -67,7 +67,7 @@ try {
         str_contains($save,"419, 'invalid_csrf'") &&
         str_contains($save,"422, 'invalid_record'") &&
         str_contains($save,'$_SESSION[\'error\'] = $message;') &&
-        str_contains($save,"header('Location: ' . $legacyRedirect);"),
+        str_contains($save,'header(\'Location: \' . $legacyRedirect);'),
         'malformed client, CSRF, validation and original legacy redirect are distinct'
     );
     foreach([
@@ -94,7 +94,7 @@ try {
         ws13_assert(
             substr_count($early,'daily_record_revision_save_http_validation_failure(')===$failureCount &&
             !str_contains($early,"header('Location:") &&
-            !str_contains($early,"$_SESSION['error'] = ") &&
+            !str_contains($early,'$_SESSION[\'error\'] = ') &&
             !str_contains($early,"exit('Invalid request token."),
             $type.' every pre-dispatch validation failure uses shared JSON/legacy policy'
         );
