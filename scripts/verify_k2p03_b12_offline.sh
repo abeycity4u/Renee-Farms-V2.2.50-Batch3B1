@@ -95,6 +95,7 @@ done
 for file in \
   tests/integration/k2p03_b12_daily_writer_inventory.php \
   tests/integration/k2p03_b12_shared_revision_pure.php \
+  tests/integration/k2p03_b12_two_actor_revision_pure.php \
   tests/integration/k2p03_b12_form_tokens_pure.php \
   tests/integration/k2p03_b12_form_controls_pure.php \
   tests/integration/k2p03_b12_create_guard_pure.php \
