@@ -756,7 +756,7 @@ $_SESSION['success'] = "Daily record saved successfully!"
                                                               data-remarks="<?php echo htmlspecialchars($record['remarks']); ?>">
                                                           <i class="bi bi-pencil"></i>
                                                       </button>
-                                                      <?php if ($canDelete): ?>
+                                                      <?php if ($canDelete && (!daily_record_revision_cutover_enabled() || $selectedCycleId > 0)): ?>
                                                       <button class="btn btn-sm btn-outline-danger"
                                                               data-poultry-daily-delete-type="layer"
                                                               data-poultry-daily-delete-id="<?php echo (int)$record['id']; ?>"
