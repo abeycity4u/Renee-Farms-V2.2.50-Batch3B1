@@ -94,6 +94,27 @@ if (!function_exists('daily_record_revision_delete_http_send')) {
     }
 }
 
+/**
+ * Only an already-rejected Ruminant DELETE CSRF check may call this.
+ * The historical gate-OFF response remains byte-for-byte compatible;
+ * future ON uses the shared no-store JSON writer for BOTH caller roles.
+ * Authentication, roles, and CSRF verification remain caller-owned.
+ */
+if (!function_exists('daily_record_revision_delete_http_csrf_failure')) {
+    function daily_record_revision_delete_http_csrf_failure(): never
+    {
+        if (!daily_record_revision_cutover_enabled()) {
+            http_response_code(419);
+            exit('Invalid request token.');
+        }
+        daily_record_revision_http_send_json(419, [
+            'success' => false,
+            'code' => 'invalid_csrf',
+            'error' => 'Invalid request token. Keep your draft and reload before deleting.',
+        ]);
+    }
+}
+
 if (!function_exists('daily_record_revision_delete_require_ajax')) {
     /**
      * Called after the existing CSRF and role checks, before any DB mutation.
