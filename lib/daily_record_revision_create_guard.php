@@ -49,10 +49,13 @@ if (!function_exists('daily_record_revision_create_lock_scope')) {
             }
         }
 
-        // Probe AFTER the tenant lock. Every participating writer must use the
-        // same lock order. Scope probe's unique row is not an EDIT permission.
+        // Probe AFTER the tenant lock using a CURRENT locking read. A plain
+        // SELECT can reuse a stale REPEATABLE READ snapshot from earlier in
+        // this transaction and miss a concurrent CREATE that just committed.
+        // Every participating writer must use this lock order. A found row
+        // is never permission to silently reclassify CREATE as EDIT.
         $existing = daily_record_revision_reader_check_scope(
-            $pdo, $type, $farmId, $cycleId, $recordDate, $animalType
+            $pdo, $type, $farmId, $cycleId, $recordDate, $animalType, true
         );
         if (($existing['status'] ?? null) !== 'absent' ||
             !array_key_exists('record_id', $existing) || $existing['record_id'] !== null) {
