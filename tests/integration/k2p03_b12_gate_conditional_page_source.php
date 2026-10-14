@@ -59,7 +59,9 @@ try {
         str_contains($helper,'daily_record_revision_page_future_markers(') &&
         str_contains($helper,'daily_record_revision_page_future_script_tags(') &&
         str_contains($helper,'daily_record_revision_page_ruminant_delete_marker(') &&
-        substr_count($helper,'!daily_record_revision_cutover_enabled() || $cycleId <= 0')===2 &&
+        str_contains($helper,'!daily_record_revision_cutover_enabled() || $cycleId <= 0') &&
+        str_contains($helper,'if (!daily_record_revision_cutover_enabled()) {') &&
+        str_contains($helper,'daily-record-revision-readonly-nav.js') &&
         str_contains($helper,'daily_record_revision_cutover_enabled()') &&
         str_contains($helper,'? \' data-b12-revision-delete="ruminant"\' : \'\''),
         'shared marker and asset rendering only behind explicit hard-off gate'
