@@ -255,8 +255,21 @@ if (permission_runtime_ends_with($path, '/poultry/layers_daily_record.php')) {
                 exit('Invalid request token.');
             }
 
+            // B12 FUTURE: preserve the same 409 JSON contract as the
+            // privileged Ruminant page; never redirect stale AJAX deletes.
+            $b12DeleteAjax = daily_record_revision_cutover_enabled();
+            if ($b12DeleteAjax) {
+                require_once dirname(__DIR__) . '/lib/daily_record_revision_delete_http.php';
+                daily_record_revision_delete_require_ajax($_SERVER);
+            }
+
             $recordId = (int)($_POST['record_id'] ?? 0);
             if ($recordId <= 0) {
+                if ($b12DeleteAjax) {
+                    daily_record_revision_delete_http_send(
+                        new InvalidArgumentException('Invalid daily record ID.')
+                    );
+                }
                 $_SESSION['error'] = 'Invalid daily record.';
             } else {
                 $farmId = requireCurrentFarmId();
@@ -276,8 +289,14 @@ if (permission_runtime_ends_with($path, '/poultry/layers_daily_record.php')) {
                             : null,
                         $_POST
                     );
+                    if ($b12DeleteAjax) {
+                        daily_record_revision_delete_http_send(null, $recordId);
+                    }
                     $_SESSION['success'] = 'Ruminant daily record deleted successfully.';
                 } catch (Throwable $e) {
+                    if ($b12DeleteAjax) {
+                        daily_record_revision_delete_http_send($e);
+                    }
                     $_SESSION['error'] = safeUserExceptionMessage(
                         $e,
                         'The daily record could not be deleted.'
