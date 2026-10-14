@@ -27,6 +27,7 @@ try {
     $workspace=b12_adapters_file($root,'assets/js/daily-record-revision-workspace.js');
     $editor=b12_adapters_file($root,'assets/js/daily-record-revision-editor.js');
     $derived=b12_adapters_file($root,'assets/js/daily-record-revision-page-fields.js');
+    $deleteOwner=b12_adapters_file($root,'assets/js/daily-record-revision-page-delete.js');
     b12_adapters_check(
         str_contains($common,'ReneeDailyRecordRevisionPageLifecycle') &&
         str_contains($common,'function createAdapter(type, options)') &&
@@ -68,10 +69,23 @@ try {
     b12_adapters_check(
         str_contains($common,"script.getAttribute('src')") &&
         str_contains($common,'retiredScript.test(') &&
-        str_contains($common,"'form[data-confirm]'") &&
-        str_contains($common,"'[data-poultry-daily-delete-id]'") &&
-        str_contains($common,'button.dataset.b12DeleteTokens'),
+        str_contains($common,'deletes.preflight();') &&
+        str_contains($common,'deletes.bind();') &&
+        str_contains($deleteOwner,"'form[data-confirm]'") &&
+        str_contains($deleteOwner,"'[data-poultry-daily-delete-id]'") &&
+        str_contains($deleteOwner,'ds.b12DeleteTokens'),
         'legacy page and DELETE takeover preflight prevents collisions'
+    );
+    b12_adapters_check(
+        str_contains($common,'ReneeDailyRecordRevisionPageDelete') &&
+        str_contains($common,'deleteModule.createBindings(') &&
+        str_contains($deleteOwner,'function createBindings(options)') &&
+        str_contains($deleteOwner,'shared.createSender(') &&
+        str_contains($deleteOwner,'ReneeDailyRecordRevisionRuminantDelete.createBindings(') &&
+        str_contains($deleteOwner,'options.confirm(button)') &&
+        str_contains($deleteOwner,'options.onConflict(') &&
+        str_contains($deleteOwner,'options.onBlocked('),
+        'one shared DELETE preflight, original-row confirmation and conflict feedback'
     );
     b12_adapters_check(
         str_contains($common,'form.reset()') &&
