@@ -289,6 +289,32 @@ async function test(label,fn) {
         assert.equal(v.form.resets,0);
         assert.equal(v.form.controls.openingStock.value,'unsaved');
     });
+    await test('top button rejects impossible calendar date before draft reset',async()=>{
+        for(const value of ['2026-02-30','2025-02-29','2026-13-01']){
+            const v=make('layer',{currentDate:()=>value});
+            v.adapter.bind();
+            v.form.controls.openingStock.value='keep draft';
+            v.header.click();await tick();
+            assert.equal(v.events.errors.at(-1).reason,'invalid_selection');
+            assert.equal(v.form.resets,0);
+            assert.equal(v.events.shows,0);
+            assert.equal(v.form.controls.openingStock.value,'keep draft');
+        }
+    });
+    await test('top button accepts valid leap day with explicit provider',async()=>{
+        const v=make('layer',{currentDate:()=> '2028-02-29'});
+        v.adapter.bind();v.header.click();await tick();
+        assert.equal(v.form.controls.selectedDate.value,'2028-02-29');
+        assert.equal(v.events.ready.length,1);
+    });
+    await test('inline legacy top-button click handler blocks entire takeover',async()=>{
+        const old=button('');
+        old.getAttribute=name=>name==='onclick'?'legacyOpenRecordModal()':null;
+        const v=make('broiler',{headerButtons:[old]});
+        assert.throws(()=>v.adapter.bind(),/top Add Record ownership/);
+        assert.equal(old.listenerCount('click'),0);
+        assert.equal(v.add.listenerCount('click'),0);
+    });
     await test('top button current-date provider failure is safely blocked',async()=>{
         const v=make('layer',{currentDate:()=>{throw Error('clock unavailable');}});
         v.adapter.bind();v.header.click();await tick();
