@@ -395,6 +395,50 @@ async function test(label,fn) {
         assert.equal(v.form.resets,priorResets);
         assert.equal(v.form.controls.openingStock.value,'saved draft');
     });
+    await test('manual date change revokes an earlier pending selection confirmation',async()=>{
+        let release;
+        const answer=new Promise(done=>{release=done;});
+        const v=make('layer',{confirmReplace:()=>answer});
+        v.adapter.bind();
+        v.form.controls.openingStock.value='unsaved draft';
+        const pending=v.adapter.open({recordDate:'2026-10-13'});
+        v.form.controls.selectedDate.value='2026-10-14';
+        v.form.controls.selectedDate.dispatch('change');
+        release(true);
+        assert.equal((await pending).status,'stale');
+        assert.equal(v.form.resets,0);
+        assert.equal(v.form.controls.openingStock.value,'unsaved draft');
+        assert.equal(v.events.shows,0);
+    });
+    await test('Ruminant species change revokes an earlier pending selection confirmation',async()=>{
+        let release;
+        const answer=new Promise(done=>{release=done;});
+        const v=make('ruminant',{confirmReplace:()=>answer});
+        v.adapter.bind();
+        const pending=v.adapter.open({
+            recordDate:'2026-10-13',animalType:'goat'
+        });
+        v.form.controls.animalType.value='sheep';
+        v.form.controls.animalType.dispatch('change');
+        release(true);
+        assert.equal((await pending).status,'stale');
+        assert.equal(v.form.resets,0);
+        assert.equal(v.form.controls.animalTypeHidden.value,'sheep');
+    });
+    await test('draft edits revoke a prior delete-draft confirmation without clearing user data',async()=>{
+        let release;
+        const answer=new Promise(done=>{release=done;});
+        const v=make('broiler',{confirmReplace:()=>answer});
+        v.adapter.bind();
+        const pending=v.adapter.open({recordDate:'2026-10-13'});
+        v.form.controls.openingStock.value='789';
+        v.form.controls.openingStock.dispatch('input');
+        release(true);
+        assert.equal((await pending).status,'stale');
+        assert.equal(v.form.resets,0);
+        assert.equal(v.form.controls.openingStock.value,'789');
+        assert.equal(v.events.shows,0);
+    });
     await test('manual date change mirrors submitted hidden date but blocks stale SAVE',async()=>{
         const v=make('layer');v.adapter.bind();
         await v.adapter.open({recordDate:'2026-10-13'});
