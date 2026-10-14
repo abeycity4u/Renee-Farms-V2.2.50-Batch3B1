@@ -92,10 +92,12 @@ try {
         'new seed helper never owns transaction'
     );
     b12_seed_stage_check(
-        str_contains($seed, "'feed_consumption_bags' => 0") &&
-        str_contains($seed, "'feed_consumption_kg'") &&
-        str_contains($seed, "'egg_production'") &&
-        str_contains($seed, "'birds_age'"),
+        str_contains($seed, "\$fields['feed_consumption_bags'] = 0;") &&
+        str_contains($seed, "\$fields['feed_consumption_kg'] = 0;") &&
+        str_contains($seed, "\$fields['egg_production'] = 0;") &&
+        str_contains($seed, "\$fields['birds_age'] = \$startAgeDays;") &&
+        str_contains($seed, "\$fields['mortality']") === false &&
+        str_contains($seed, "'mortality' => 0"),
         'all three animal types retain starting facts'
     );
 
