@@ -195,12 +195,17 @@ try {
         'cross-species mismatch fails before canonical/legacy predecessor lookup');
 
     $GLOBALS['b12_expected_opening']=['opening_stock'=>99];
+    $pdo->cycleProductionType='layer';
+    $callsBeforeCanonical=count($pdo->calls);
     b12_route_reject(
         fn()=>daily_record_revision_route_revalidate_locked(
             $pdo,'layer',7,11,'2026-10-13',null,120
         ),
         DailyRecordRevisionConflict::class,'stale canonical opening rejects'
     );
+    b12_route_check($pdo->cycleScopeMatched &&
+        count($pdo->calls)===$callsBeforeCanonical+1,
+        'canonical opening mismatch is reached AFTER matching Layer cycle lock');
     $GLOBALS['b12_expected_opening']=['opening_stock'=>120];
     $GLOBALS['b12_inject_failure']=true;
     $pdo=new B12RouteFakePDO();
