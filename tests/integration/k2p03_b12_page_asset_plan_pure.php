@@ -53,6 +53,7 @@ try {
             array_splice($order, 8, 0, 'ruminant-delete');
         }
         $order[] = $type . '-page';
+        $order[] = 'page-bootstrap';
         $requiredScripts = array_map(
             static fn(string $name): string => $base . $name . '.js',
             $order
