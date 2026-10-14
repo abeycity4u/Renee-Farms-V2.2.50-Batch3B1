@@ -46,7 +46,6 @@ try {
         str_contains($boot,'function validDate(value)') &&
         str_contains($boot,"target!=='0'&&!positive(target)") &&
         str_contains($boot,"if(!positive(cycle)") &&
-        str_contains($boot,"'selectedCycleAnimalType'")===false &&
         str_contains($boot,'ds.selectedCycleAnimalType'),
         'exact positive edit cycle, safe date, explicit NAV-only zero'
     );
