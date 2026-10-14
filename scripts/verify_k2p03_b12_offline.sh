@@ -121,7 +121,8 @@ for file in \
   tests/integration/k2p03_b12_scope_exact_modal.test.cjs \
   tests/integration/k2p03_b12_editor_bridge.test.cjs \
   tests/integration/k2p03_b12_reader_transport.test.cjs \
-  tests/integration/k2p03_b12_submit_transport.test.cjs
+  tests/integration/k2p03_b12_submit_transport.test.cjs \
+  tests/integration/k2p03_b12_workspace_composition.test.cjs
 do
   label="$(basename "$file" .test.cjs | tr '[:lower:]-' '[:upper:]_')"
   run_case "NODE_TEST_$label" node "$file"
