@@ -14,6 +14,8 @@ declare(strict_types=1);
  * the PDO transaction, initialize validated farmId from the server session,
  * and call with an explicitly selected cycle (null means legacy NULL).
  */
+require_once __DIR__ . '/daily_record_revision_parent_lock.php';
+
 if (!function_exists('daily_record_revision_create_lock_scope')) {
     function daily_record_revision_create_lock_scope(
         PDO $pdo, string $type, int $farmId, ?int $cycleId,
@@ -33,21 +35,9 @@ if (!function_exists('daily_record_revision_create_lock_scope')) {
         }
         daily_record_revision_reader_scope_plan($type, $farmId, $cycleId, $recordDate, $animalType);
 
-        $lock = $pdo->prepare('SELECT id FROM farms WHERE id = ? LIMIT 1 FOR UPDATE');
-        if ($lock === false) throw new RuntimeException('Tenant scope lock is unavailable.');
-        $lock->execute([$farmId]);
-        if ((string)$lock->fetchColumn() !== (string)$farmId) {
-            throw new RuntimeException('Tenant scope lock could not be verified.');
-        }
-
-        if ($cycleId !== null) {
-            $cycle = $pdo->prepare('SELECT id FROM production_cycles WHERE id = ? AND farm_id = ? LIMIT 1 FOR UPDATE');
-            if ($cycle === false) throw new RuntimeException('Cycle scope lock is unavailable.');
-            $cycle->execute([$cycleId, $farmId]);
-            if ((string)$cycle->fetchColumn() !== (string)$cycleId) {
-                throw new RuntimeException('Production cycle is unavailable for this farm.');
-            }
-        }
+        // Central parent locking policy is shared with EDIT and DELETE.
+        // Preserve farm -> cycle -> CREATE scope ordering.
+        daily_record_revision_lock_parents($pdo, $farmId, $cycleId);
 
         // Probe AFTER the tenant lock using a CURRENT locking read. A plain
         // SELECT can reuse a stale REPEATABLE READ snapshot from earlier in
