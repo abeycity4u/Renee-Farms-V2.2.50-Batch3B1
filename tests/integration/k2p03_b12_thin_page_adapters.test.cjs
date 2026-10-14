@@ -44,6 +44,10 @@ win.ReneeDailyRecordRevisionPageLifecycle={
                     opts.form.controls.feedItemId.value='5';
                 }
                 opts.onReady({mode,record,guard});
+                if (mode==='create' && opts.form.fakeCreateStock) {
+                    opts.form.controls.openingStock.value='120';
+                    opts.form.controls.eggProduction.value='90';
+                }
                 opts.onPopulation({
                     closing_stock:120,
                     movement_totals:{sale:-1}
@@ -237,12 +241,14 @@ async function test(label,fn) {
     await test('Layer CREATE recalculates after verified opening stock becomes available',async()=>{
         const v=make('layer');
         v.form.nextMode='create';
+        v.form.fakeCreateStock=true;
         v.adapter.bind();
         await v.adapter.open({recordDate:'2026-10-13'});
-        // The real lifecycle applies closing stock without an input event.
-        // The focused parity/lifecycle tests separately certify that rule.
-        assert.equal(v.form.controls.cratesCount.value,'0.00');
-        assert.equal(v.form.controls.layingRate.value,'');
+        // The fake lifecycle applies closing stock without an input event.
+        // Shared derived fields must recalculate onPopulationReady.
+        assert.equal(v.form.controls.openingStock.value,'120');
+        assert.equal(v.form.controls.cratesCount.value,'3.00');
+        assert.equal(v.form.controls.layingRate.value,'75.00');
         assert.equal(v.form.controls.save.disabled,false);
     });
     await test('Ruminant authoritative EDIT synchronizes hidden feed unit and label',async()=>{
