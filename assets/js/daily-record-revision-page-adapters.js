@@ -26,15 +26,20 @@
             typeof options.display.clear !== 'function') {
             throw new Error('Incomplete B12 Daily Record page integration.');
         }
-        for (const action of ['confirmReplace','showModal','notify','onSaved']) {
+        for (const action of [
+            'confirmReplace','showModal','notify','onSaved',
+            'confirmDelete','onDeleted','onDeleteConflict','onDeleteBlocked'
+        ]) {
             if (typeof options[action] !== 'function') {
                 throw new Error('Missing B12 page action: '+action);
             }
         }
         const module = global.ReneeDailyRecordRevisionPageLifecycle;
         const fieldsModule = global.ReneeDailyRecordRevisionPageFields;
+        const deleteModule = global.ReneeDailyRecordRevisionPageDelete;
         if (!module || typeof module.createLifecycle !== 'function' ||
-            !fieldsModule || typeof fieldsModule.createFields !== 'function') {
+            !fieldsModule || typeof fieldsModule.createFields !== 'function' ||
+            !deleteModule || typeof deleteModule.createBindings !== 'function') {
             throw new Error('Shared B12 Daily Record modules are not available.');
         }
         const form=options.form;
@@ -54,6 +59,16 @@
         // Neither module binds listeners or fetches during construction.
         const derived=fieldsModule.createFields({
             type,form,document:options.document
+        });
+        const deletes=deleteModule.createBindings({
+            type,document:options.document,fetchImpl:options.fetchImpl,
+            csrfToken:options.csrfToken,
+            FormDataImpl:options.FormDataImpl,
+            URLSearchParamsImpl:options.URLSearchParamsImpl,
+            confirm:options.confirmDelete,
+            onDeleted:options.onDeleted,
+            onConflict:options.onDeleteConflict,
+            onBlocked:options.onDeleteBlocked
         });
         let lifecycle, bound=false;
         let switchGeneration=0;
@@ -143,27 +158,10 @@
                     throw new Error('Legacy Daily Record page script is still loaded.');
                 }
             }
-            // Ruminant native confirmation has a document-level capture
-            // listener that calls form.submit(): never bind both paths.
-            if(type==='ruminant') {
-                // The global confirmation capture listener can call native
-                // form.submit(), bypassing a JS editor's submit guard.
-                if(options.document.querySelectorAll('form[data-confirm]').length!==0) {
-                    throw new Error('Legacy Ruminant native DELETE is still active.');
-                }
-            } else {
-                // A future enabled page must carry the ORIGINAL row revision
-                // beside each deletable Poultry row, not fetch it on DELETE.
-                for(const button of options.document.querySelectorAll(
-                    '[data-poultry-daily-delete-id]'
-                )) {
-                    if(!button.dataset ||
-                        typeof button.dataset.b12DeleteTokens!=='string' ||
-                        button.dataset.b12DeleteTokens==='') {
-                        throw new Error('Poultry DELETE original-row tokens unavailable.');
-                    }
-                }
-            }
+            // The shared DELETE service owns all per-species token, native
+            // form and duplicate-handler rejection. The page owner cannot
+            // independently weaken it.
+            deletes.preflight();
         }
 
         async function open(selection) {
@@ -219,6 +217,7 @@
             bound=true;
             save.disabled=true;
             lifecycle.bind();
+            deletes.bind();
             for(const button of actions) {
                 button.addEventListener('click',()=>{
                         const ds=button.dataset||{};
