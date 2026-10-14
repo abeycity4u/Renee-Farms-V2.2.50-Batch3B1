@@ -76,6 +76,7 @@ for file in \
   lib/daily_record_revision_continuity.php \
   lib/daily_record_revision_continuity_apply.php \
   lib/daily_record_revision_delete_pipeline.php \
+  lib/daily_record_revision_delete_http.php \
   lib/daily_record_revision_cycle_seed.php \
   lib/daily_record_revision_api_adapter.php \
   lib/daily_record_revision_cutover_gate.php \
@@ -110,6 +111,8 @@ for file in \
   tests/integration/k2p03_b12_delete_pipeline_pure.php \
   tests/integration/k2p03_b12_delete_staged_source_pure.php \
   tests/integration/k2p03_b12_delete_browser_source.php \
+  tests/integration/k2p03_b12_ruminant_delete_http_pure.php \
+  tests/integration/k2p03_b12_ruminant_delete_http_source.php \
   tests/integration/k2p03_b12_cycle_seed_pure.php \
   tests/integration/k2p03_b12_cycle_seed_staging_source.php \
   tests/integration/k2p03_b12_reader_endpoint_source.php
