@@ -858,8 +858,18 @@ $_SESSION['success'] = "Broiler daily record saved successfully!"
         ENT_QUOTES | ENT_SUBSTITUTE,
         'UTF-8'
     ); ?>"
+    <?php echo daily_record_revision_page_future_markers('broiler', (int)$selectedCycleId); ?>
 ></div>
 <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/daily-population-movement-ui.js'); ?>"></script>
+<?php
+// B12 source-only switch: all old page edit/delete controllers are excluded
+// from the same future response that renders the shared revision owner.
+require_once __DIR__ . '/../lib/daily_record_revision_page_switch.php';
+if (daily_record_revision_cutover_enabled()):
+    echo daily_record_revision_page_future_script_tags('broiler', (int)$selectedCycleId);
+else:
+?>
 <script src="<?php echo BASE_URL; ?><?php echo versioned_asset('/assets/js/broiler-daily-record.js'); ?>"></script>
+<?php endif; ?>
 </body>
 </html>
