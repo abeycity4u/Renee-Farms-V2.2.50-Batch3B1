@@ -88,6 +88,25 @@ try {
         'one shared DELETE preflight, original-row confirmation and conflict feedback'
     );
     b12_adapters_check(
+        str_contains($common,"'[data-open-record-modal]'") &&
+        str_contains($common,"headerButtons.length!==1") &&
+        str_contains($common,"typeof options.currentDate!=='function'") &&
+        str_contains($common,"headerButtons[0].getAttribute('onclick')!==null") &&
+        str_contains($common,"headerButtons[0].addEventListener('click'") &&
+        str_contains($common,"recordDate:today,animalType:species") &&
+        str_contains($common,'validRecordDate(selection.recordDate)'),
+        'single guarded top Add Today date/species selection without inline legacy handler'
+    );
+    b12_adapters_check(
+        strpos($common,'ownership(); // No partial') <
+            strpos($common,'headerButtons[0].addEventListener(') &&
+        strpos($common,'derived.bind();') <
+            strpos($common,'headerButtons[0].addEventListener(') &&
+        strpos($common,'deletes.bind();') <
+            strpos($common,'headerButtons[0].addEventListener('),
+        'top Add Today cannot bind before shared ownership, field and DELETE preflight'
+    );
+    b12_adapters_check(
         str_contains($common,'form.reset()') &&
         str_contains($common,'options.confirmReplace(selection)') &&
         str_contains($common,'switchGeneration') &&
