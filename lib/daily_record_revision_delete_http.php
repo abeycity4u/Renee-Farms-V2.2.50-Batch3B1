@@ -14,6 +14,7 @@ declare(strict_types=1);
  * the canonical deletion transaction. Never redirect a revision conflict.
  */
 require_once __DIR__ . '/daily_record_revision_save_gate.php';
+require_once __DIR__ . '/daily_record_revision_http_transport.php';
 
 if (!class_exists('DailyRecordRevisionDeleteClientNotReady', false)) {
     final class DailyRecordRevisionDeleteClientNotReady extends RuntimeException {}
@@ -23,12 +24,7 @@ if (!function_exists('daily_record_revision_delete_is_ajax')) {
     /** This is transport validation, NOT user authorization. */
     function daily_record_revision_delete_is_ajax(array $server): bool
     {
-        $method = strtoupper((string)($server['REQUEST_METHOD'] ?? ''));
-        $requestedWith = (string)($server['HTTP_X_REQUESTED_WITH'] ?? '');
-        $accept = (string)($server['HTTP_ACCEPT'] ?? '');
-        return $method === 'POST'
-            && strcasecmp($requestedWith, 'XMLHttpRequest') === 0
-            && preg_match('~(?:^|,)\s*application/json\s*(?:;[^,]*)?(?:,|$)~i', $accept) === 1;
+        return daily_record_revision_http_is_ajax($server);
     }
 }
 
