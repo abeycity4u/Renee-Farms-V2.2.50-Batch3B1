@@ -87,7 +87,7 @@ $dynamicExceptions = [
         'signatures' => [
             'function daily_record_revision_persist_prepared(',
             'daily_record_revision_write(',
-            "'INSERT INTO ' . $def['table']",
+            "'INSERT INTO ' . \$def['table']",
             'daily_record_revision_require_transaction($pdo);',
         ],
     ],
@@ -95,7 +95,7 @@ $dynamicExceptions = [
         'classification' => 'STAGED_CYCLE_SEED_REVISION_ONE',
         'signatures' => [
             'function daily_record_revision_seed_cycle_entry(',
-            "'INSERT INTO ' . $config['table']",
+            "'INSERT INTO ' . \$config['table']",
             '$values[] = 1;',
         ],
     ],
@@ -103,7 +103,7 @@ $dynamicExceptions = [
         'classification' => 'STAGED_LATER_ROW_REVISION_BUMP',
         'signatures' => [
             'function daily_record_revision_apply_continuity_change(',
-            "'UPDATE ' . $definition['table']",
+            "'UPDATE ' . \$definition['table']",
             'record_revision = record_revision + 1',
         ],
     ],
