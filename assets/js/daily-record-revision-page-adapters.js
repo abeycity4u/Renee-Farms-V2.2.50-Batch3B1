@@ -229,8 +229,14 @@
             const actions=[];
             for(const selector of ['.add-record-btn','.edit-record-btn']) {
                 for(const button of options.document.querySelectorAll(selector)) {
-                    if (!button || typeof button.addEventListener!=='function') {
-                        throw new Error('Invalid B12 calendar action.');
+                    // An element may accidentally match both calendar
+                    // selectors, or still carry an inline legacy action.
+                    // Reject BEFORE attaching any B12 page listeners.
+                    if (!button || typeof button.addEventListener!=='function' ||
+                        (typeof button.getAttribute==='function' &&
+                            button.getAttribute('onclick')!==null) ||
+                        button===headerButtons[0] || actions.includes(button)) {
+                        throw new Error('Conflicting B12 calendar handler ownership.');
                     }
                     actions.push(button);
                 }
