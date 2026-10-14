@@ -15,6 +15,10 @@ declare(strict_types=1);
  */
 require_once __DIR__ . '/daily_record_revision_authority.php';
 
+if (!class_exists('DailyRecordRevisionDeleteClientNotReady', false)) {
+    final class DailyRecordRevisionDeleteClientNotReady extends RuntimeException {}
+}
+
 if (!function_exists('daily_record_revision_delete_is_ajax')) {
     /** This is transport validation, NOT user authorization. */
     function daily_record_revision_delete_is_ajax(array $server): bool
@@ -48,6 +52,12 @@ if (!function_exists('daily_record_revision_delete_http_envelope')) {
                     'message' => 'Daily Record deleted successfully.',
                 ],
             ];
+        }
+        if ($error instanceof DailyRecordRevisionDeleteClientNotReady) {
+            return ['status' => 409, 'body' => [
+                'success' => false, 'code' => 'revision_client_required',
+                'error' => 'Reload the Daily Record page before deleting.',
+            ]];
         }
         if ($error instanceof DailyRecordRevisionConflict) {
             return ['status' => 409, 'body' => [
@@ -98,7 +108,7 @@ if (!function_exists('daily_record_revision_delete_require_ajax')) {
     {
         if (!daily_record_revision_delete_is_ajax($server)) {
             daily_record_revision_delete_http_send(
-                new DailyRecordRevisionConflict('B12 AJAX DELETE client is required.')
+                new DailyRecordRevisionDeleteClientNotReady('B12 AJAX DELETE client is required.')
             );
         }
     }
