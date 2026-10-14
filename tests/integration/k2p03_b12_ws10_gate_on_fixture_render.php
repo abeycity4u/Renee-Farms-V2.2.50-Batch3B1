@@ -279,9 +279,12 @@ try {
     echo "DATABASE_CONNECTIONS=0\n";
     echo "AUTHENTICATED_PAGE_RENDER=NOT_TESTED\n";
 } catch (Throwable $error) {
-    fwrite(STDERR, "B12_WS10_ISOLATED_GATE_ON_RENDER=FAIL " .
-        $error->getMessage() . "\n");
-    exit(1);
+    $failure = $error;
 } finally {
     ws10_cleanup($fixtureDir);
+}
+if (isset($failure)) {
+    fwrite(STDERR, "B12_WS10_ISOLATED_GATE_ON_RENDER=FAIL " .
+        $failure->getMessage() . "\n");
+    exit(1);
 }
