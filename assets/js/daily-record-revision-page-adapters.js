@@ -233,8 +233,21 @@
             }
             // The lifecycle/editor already invalidate selection tokens on
             // these events. Do not also install a second date-only fetch.
-            date.addEventListener('change',()=>{save.disabled=true;});
-            if(animal)animal.addEventListener('change',()=>{save.disabled=true;});
+            date.addEventListener('change',()=>{
+                // These hidden fields follow the user's CURRENT selection,
+                // never an old row; the revision editor simultaneously
+                // invalidates its immutable tokens until a fresh select().
+                hiddenDate.value=date.value;
+                save.disabled=true;
+            });
+            if(animal)animal.addEventListener('change',()=>{
+                hiddenAnimal.value=animal.value;
+                save.disabled=true;
+            });
+            options.modalElement.addEventListener('hidden.bs.modal',()=>{
+                ++switchGeneration;
+                save.disabled=true;
+            });
         }
 
         function invalidate() {
