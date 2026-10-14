@@ -57,6 +57,7 @@ function build(type, overrides={}) {
     };
     const ready=[];
     const blocked=[];
+    const saved=[];
     const reader=overrides.request || (async query=>{
         if(query.mode==='scope')return {success:true,mode:'scope',data:{
             status:'unique',record_id:19
@@ -69,8 +70,10 @@ function build(type, overrides={}) {
             ready.push(r);
             if (overrides.failReady) throw new Error('Injected rendering failure');
         },onBlocked:e=>blocked.push(e),
+        onSaved:e=>saved.push(e),
+        onSubmit:overrides.onSubmit,
     });
-    return {editor,inputs,tokens,form,ready,blocked};
+    return {editor,inputs,tokens,form,ready,blocked,saved};
 }
 function exact(query, custom={}) {
     return {
@@ -143,7 +146,8 @@ const absent=()=>({success:true,mode:'scope',
             v.editor.bind();
             await v.editor.select();
             const before=v.form.dispatch('submit');
-            assert.equal(before.prevented,false);
+            assert.equal(before.prevented,true);
+            assert.equal(v.blocked.at(-1).reason,'submit_transport_missing');
             v.form.dispatch('reset');
             const after=v.form.dispatch('submit');
             assert.equal(after.prevented,true);
@@ -209,6 +213,81 @@ const absent=()=>({success:true,mode:'scope',
     });
     await check('invalid cycle selector is rejected at setup',async()=>{
         assert.throws(()=>build('layer',{cycleId:'0'}));
+    });
+    await check('ready EDIT never performs native POST without B12 sender',async()=>{
+        const v=build('layer');
+        v.editor.bind();
+        await v.editor.select();
+        const event=v.form.dispatch('submit');
+        assert.equal(event.prevented,true);
+        assert.equal(v.blocked.at(-1).reason,'submit_transport_missing');
+        assert.equal(v.tokens.expected_revision.value,'4');
+    });
+    await check('successful shared submit receives immutable mode and cycle; preserves draft',async()=>{
+        let sent=null;
+        const v=build('layer',{onSubmit:input=>{
+            sent=input;
+            return Promise.resolve({
+                status:'saved', record_id:'19', record_revision:'5',
+                continuity_affected:0
+            });
+        }});
+        v.editor.bind();
+        await v.editor.select();
+        v.inputs.openingStock.value='777';
+        const event=v.form.dispatch('submit');
+        assert.equal(event.prevented,true);
+        await new Promise(resolve=>setImmediate(resolve));
+        assert.equal(sent.type,'layer');
+        assert.equal(sent.mode,'edit');
+        assert.equal(sent.cycleId,'11');
+        assert.equal(sent.guard(()=>{}),false);
+        assert.equal(v.saved.length,1);
+        assert.equal(v.inputs.openingStock.value,'777');
+        assert.equal(v.tokens.expected_revision.value,'');
+    });
+    await check('409 conflict invalidates identity without erasing user values',async()=>{
+        const v=build('ruminant',{onSubmit:()=>Promise.resolve({status:'conflict'})});
+        v.editor.bind();
+        await v.editor.select();
+        v.inputs.openingStock.value='123';
+        const event=v.form.dispatch('submit');
+        assert.equal(event.prevented,true);
+        await new Promise(resolve=>setImmediate(resolve));
+        assert.equal(v.blocked.at(-1).reason,'record_conflict');
+        assert.equal(v.inputs.openingStock.value,'123');
+        assert.equal(v.tokens.expected_revision.value,'');
+        assert.equal(v.saved.length,0);
+    });
+    await check('duplicate modal submit cannot issue two in-flight operations',async()=>{
+        let release;
+        const pending=new Promise(resolve=>{release=resolve;});
+        let calls=0;
+        const v=build('broiler',{onSubmit:()=>{calls++;return pending;}});
+        v.editor.bind();
+        await v.editor.select();
+        assert.equal(v.form.dispatch('submit').prevented,true);
+        assert.equal(v.form.dispatch('submit').prevented,true);
+        assert.equal(calls,1);
+        assert.equal(v.blocked.at(-1).reason,'submit_pending');
+        release({status:'blocked'});
+        await new Promise(resolve=>setImmediate(resolve));
+        assert.equal(v.tokens.record_id.value,'');
+    });
+    await check('stale response never invalidates newer selection tokens',async()=>{
+        let release;
+        const pending=new Promise(resolve=>{release=resolve;});
+        const v=build('layer',{onSubmit:()=>pending});
+        v.editor.bind();
+        await v.editor.select();
+        v.form.dispatch('submit');
+        v.inputs.selectedDate.value='2026-10-14';
+        await v.editor.select();
+        assert.equal(v.tokens.original_record_date.value,'2026-10-14');
+        release({status:'saved'});
+        await new Promise(resolve=>setImmediate(resolve));
+        assert.equal(v.tokens.original_record_date.value,'2026-10-14');
+        assert.equal(v.saved.length,0);
     });
     console.log('B12_EDITOR_BRIDGE_PURE=PASS');
     console.log('PASS_COUNT='+count);
