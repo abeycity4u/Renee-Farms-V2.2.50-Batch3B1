@@ -178,6 +178,38 @@ class SyntheticCorpus(unittest.TestCase):
                     MODULE.classify_synthetic(sql)
                 self.assertEqual(str(ctx.exception), "UNSUPPORTED_OR_UNSAFE_SYNTHETIC_SQL")
 
+    def test_conservative_varchar_policy(self):
+        # WS52-JS: VARCHAR(255) accepted, VARCHAR(65535) rejected by
+        # the pinned MariaDB 11.4 synthetic oracle. Narrow policy here;
+        # not a universal MariaDB syntax or row-size certificate.
+        permitted = [
+            "CREATE TABLE `demo` (`v` VARCHAR(1));",
+            "CREATE TABLE `demo` (`v` VARCHAR(255));",
+            "CREATE TABLE `demo` (`id` INT, `v` VARCHAR(255), `n` INT);",
+            "CREATE TABLE `demo` (`a` INT, `b` INT, `c` INT);",
+        ]
+        for i, sql in enumerate(permitted):
+            with self.subTest(policy="allow", case=i):
+                self.assertEqual(MODULE.classify_synthetic(sql), ("CREATE_TABLE",))
+
+        disallowed = [
+            "CREATE TABLE `demo` (`v` VARCHAR(256));",
+            "CREATE TABLE `demo` (`v` VARCHAR(65535));",
+            "CREATE TABLE `demo` (`v` VARCHAR(65536));",
+            "CREATE TABLE `demo` (`v` VARCHAR(0001));",
+            "CREATE TABLE `demo` (`v` VARCHAR(0));",
+            "CREATE TABLE `demo` (`a` VARCHAR(1), `b` VARCHAR(1));",
+            "CREATE TABLE `demo` (`a` VARCHAR(255), `b` VARCHAR(1));",
+            "CREATE TABLE `demo` (`a` VARCHAR(1), `b` VARCHAR(255));",
+            "CREATE TABLE `demo` (`a` VARCHAR(255), `b` VARCHAR(255));",
+            "CREATE TABLE `demo` (`id` INT, `a` VARCHAR(99), `b` VARCHAR(99));",
+        ]
+        for i, sql in enumerate(disallowed):
+            with self.subTest(policy="reject", case=i):
+                with self.assertRaises(MODULE.Rejected) as ctx:
+                    MODULE.classify_synthetic(sql)
+                self.assertEqual(str(ctx.exception), "UNSUPPORTED_OR_UNSAFE_SYNTHETIC_SQL")
+
     def test_fail_closed_input_contract(self):
         for val in (None, b"DROP TABLE x;", "", " ", "DROP TABLE x;\x00", "DROP TABLE x;" * 1000):
             with self.subTest(type=type(val).__name__):
