@@ -198,7 +198,7 @@ def _schema_errors(kind: str, root: Any, context: dict[str, Any]) -> list[str]:
         if (type(mounts) is not list or len(mounts) != 1 or
                 not _keys(mounts[0], MOUNT)):
             errors.append("EFFECTIVE_MOUNT_NOT_EXACTLY_ONE")
-        elif (mounts[0] != {
+        elif (mounts[0]["RW"] is not True or mounts[0] != {
             "Type": "volume", "Name": vol, "Destination": "/var/lib/mysql",
             "RW": True, "Driver": "local",
         }):
