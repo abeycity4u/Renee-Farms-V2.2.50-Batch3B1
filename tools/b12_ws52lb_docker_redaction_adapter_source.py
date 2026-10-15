@@ -20,6 +20,7 @@ from b12_ws52kz_broker_projection_source_contract import (
     ROUTE_NAMES,
     _routes,
 )
+from b12_ws52kt_one_volume_identity_cleanup_contract import CONFIG as PINNED_IMAGE_CONFIG
 
 ADAPTER_EXECUTION_ENABLED = False
 DOCKER_SOCKET_ACCESS_GRANTED = False
@@ -185,7 +186,7 @@ def _schema_errors(kind: str, root: Any, context: dict[str, Any]) -> list[str]:
     elif kind == "single_container":
         hc = root["HostConfig"]
         mounts = root["Mounts"]
-        if (root["Id"] != cid or not _matches(root["Image"], SHA256)):
+        if (root["Id"] != cid or root["Image"] != PINNED_IMAGE_CONFIG):
             errors.append("CONTAINER_IMAGE_OR_ID_MISMATCH")
         if not _keys(hc, HOST_CONFIG):
             errors.append("HOST_CONFIG_NOT_MINIMIZED")
