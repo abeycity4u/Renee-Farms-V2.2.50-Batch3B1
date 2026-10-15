@@ -1,0 +1,93 @@
+name: "C137 B12 WS52-KI OCI index parser offline-only source tests"
+
+# Guarded ONE-USE; this job does not query Docker Hub or run the script's main.
+# It downloads only two immutable GitHub sources and tests fictional JSON.
+on:
+  push:
+    branches:
+      - c137-gc24-k2p03-b12-ws52ki-registry-image-identity-source-review
+    paths:
+      - docs/C137_GC24_K2_P03_B12_WS52KI_ONE_USE_OFFLINE_APPROVAL.txt
+
+permissions: {}
+
+concurrency:
+  group: c137-b12-ws52ki-offline-source
+  cancel-in-progress: false
+
+jobs:
+  index-parser-offline:
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/c137-gc24-k2p03-b12-ws52ki-registry-image-identity-source-review' &&
+      github.event.head_commit.message == 'ci-b12(ws52ki-run): authorize one offline registry parser test' &&
+      github.run_number == 1 &&
+      github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Verify exact sources and test eight offline parser contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          export LC_ALL=C PYTHONDONTWRITEBYTECODE=1
+          echo '#####COPY FROM HERE#####'
+          echo 'AUDIT=B12_WS52KI_OCI_INDEX_PARSER_OFFLINE'
+          if [[ "$GITHUB_REPOSITORY" != 'abeycity4u/Renee-Farms-V2.2.50-Batch3B1' ||
+                "$GITHUB_REF" != 'refs/heads/c137-gc24-k2p03-b12-ws52ki-registry-image-identity-source-review' ||
+                "$GITHUB_RUN_ATTEMPT" != '1' || "$GITHUB_RUN_NUMBER" != '1' ]]; then
+            echo 'RESULT=BLOCKED'
+            echo 'REASON=RUN_SOURCE_GUARDS'
+            echo '#####COPY TO HERE#####'
+            exit 1
+          fi
+          d="$(mktemp -d "${RUNNER_TEMP}/b12-ws52ki.XXXXXXXX")"
+          trap 'rm -rf -- "$d"' EXIT
+          mkdir -p "$d/tools" "$d/tests"
+          base='https://raw.githubusercontent.com/abeycity4u/Renee-Farms-V2.2.50-Batch3B1/bca718d8da92e91301da1c59e15ae306b14a293a'
+          fetch() {
+            local path="$1" sha="$2"
+            if ! curl --fail --location --silent --show-error --max-time 20                  "$base/$path" -o "$d/$path"; then
+              echo 'RESULT=BLOCKED'
+              echo 'REASON=PINNED_SOURCE_FETCH_FAILED'
+              echo '#####COPY TO HERE#####'
+              exit 1
+            fi
+            if [[ "$(git hash-object --no-filters "$d/$path")" != "$sha" ]]; then
+              echo 'RESULT=BLOCKED'
+              echo 'REASON=PINNED_SOURCE_BLOB_DRIFT'
+              echo '#####COPY TO HERE#####'
+              exit 1
+            fi
+          }
+          fetch tools/b12_ws52ki_mariadb_registry_manifest_readonly.py             ab109cd44b6c3965f284b3d53bc15a242a1fb970
+          fetch tests/test_b12_ws52ki_mariadb_registry_manifest_readonly.py             05fcecfa428560bb0203e45452f8562609aff061
+          echo 'TWO_EXACT_SOURCE_BLOBS=PASS'
+          if ! (cd "$d" && python3 -B -m unittest discover -s tests                -p 'test_b12_ws52ki_mariadb_registry_manifest_readonly.py' -v)                >"$d/test.stdout" 2>"$d/test.stderr"; then
+            echo 'RESULT=BLOCKED'
+            echo 'REASON=OFFLINE_PARSER_CONTRACT_TEST_FAILED'
+            echo '#####COPY TO HERE#####'
+            exit 1
+          fi
+          if ! grep -Eq '^Ran 8 tests' "$d/test.stderr" ||
+             ! grep -Eq '^OK[[:space:]]*$' "$d/test.stderr"; then
+            echo 'RESULT=BLOCKED'
+            echo 'REASON=OFFLINE_TEST_COUNT_OR_STATUS'
+            echo '#####COPY TO HERE#####'
+            exit 1
+          fi
+          echo 'PURE_OCI_INDEX_TESTS=PASS_8_OF_8'
+          echo 'REGISTRY_REQUESTS=0'
+          echo 'MARIADB_OCI_DIGEST=NOT_ESTABLISHED'
+          echo 'DOCKER_OPERATIONS=NO'
+          echo 'DATABASE_CONNECTIONS=0'
+          echo 'SQL_EXECUTED=NO'
+          echo 'RC01_WORKERS_EXECUTED=NO'
+          echo 'IMAGE_LAYERS_DOWNLOADED=NO'
+          echo 'BACKUP_ACCESSED=NO'
+          echo 'RC01_RUNTIME_AUTHORIZATION=NO'
+          echo 'REPAIRED_RC01_RC14_CERTIFIED_PASSES=0'
+          echo 'MIGRATION_092=NOT_AUTHORIZED'
+          echo 'B12_CUTOVER=OFF'
+          echo 'RESULT=PASS_OFFLINE_ONLY'
+          echo '#####COPY TO HERE#####'
