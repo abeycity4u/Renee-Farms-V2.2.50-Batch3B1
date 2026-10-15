@@ -13,7 +13,7 @@ from dataclasses import dataclass
 MAX_BYTES = 8192
 MAX_STATEMENTS = 128
 MAX_TOKENS = 512
-SAFE_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z", re.ASCII)
+SAFE_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,63}\Z", re.ASCII)
 SANDBOX = r"/*M!999999\- enable the sandbox mode */"
 
 
@@ -200,7 +200,9 @@ def _classify_stmt(tokens: list[Token]) -> str:
             elif cur.word("VARCHAR"):
                 cur.expect("SYMBOL", "(")
                 size = cur.expect("INTEGER")
-                if not 1 <= int(size.value) <= 65535:
+                # Bound decimal conversion before int(): giant literals must
+                # produce Rejected, never an interpreter ValueError.
+                if len(size.value) > 5 or not 1 <= int(size.value) <= 65535:
                     _reject()
                 cur.expect("SYMBOL", ")")
             else:
@@ -258,7 +260,9 @@ def classify_synthetic(sql: str) -> tuple[str, ...]:
         len(sql.encode("ascii")) > MAX_BYTES
     ):
         _reject()
-    if any(ord(ch) < 32 and ch not in "\r\n\t" for ch in sql):
+    # Reject CR rather than guessing whether line-comment boundaries match
+    # every MariaDB client/server mode (including CRLF inputs).
+    if any(ord(ch) < 32 and ch not in "\n\t" for ch in sql):
         _reject()
     tokens, sandbox = _lex(sql)
     statements: list[list[Token]] = []
