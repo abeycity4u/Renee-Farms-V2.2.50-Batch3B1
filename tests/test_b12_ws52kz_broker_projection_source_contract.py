@@ -351,6 +351,37 @@ class BrokerProjectionOfflineTests(unittest.TestCase):
             self.assertBlocked(c, item, r, "REQUEST_KEYS_INVALID")
             self.assertBlocked(c, q, item, "PROJECTED_RESPONSE_KEYS_INVALID")
 
+
+    def test_nominal_policy_result_all_capability_flags_false(self):
+        c, q, r = fixtures()
+        check = kz.assess_broker_fixture(c, q, r)
+        self.assertTrue(check.shape_valid, check.blockers)
+        self.assertIs(check.physical_attested, False)
+        self.assertIs(check.broker_executed, False)
+        self.assertIs(check.one_use_approved, False)
+        self.assertIs(check.raw_response_exported, False)
+        self.assertIs(check.cleanup_certified, False)
+
+    def test_response_projection_shape_cannot_coerce_to_empty_list(self):
+        for bad in (None, (), {}, {"Env": []}, "[]", False):
+            with self.subTest(value_type=type(bad).__name__):
+                c, q, r = fixtures()
+                r["projected_keys"] = bad
+                self.assertBlocked(c, q, r, "UNREVIEWED_RESPONSE_OR_RAW_DATA")
+
+    def test_no_response_status_or_header_type_confusion(self):
+        for field, bad in (
+            ("http_status", "200"),
+            ("http_status", True),
+            ("fixture_class", True),
+            ("projection_state", None),
+            ("content_encoding", "Identity"),
+        ):
+            with self.subTest(field=field):
+                c, q, r = fixtures()
+                r[field] = bad
+                self.assertBlocked(c, q, r, "UNREVIEWED_RESPONSE_OR_RAW_DATA")
+
     def test_source_only_ast_import_guard_and_no_client(self):
         text = (Path(__file__).resolve().parents[1] /
                 "tools/b12_ws52kz_broker_projection_source_contract.py").read_text("utf-8")
