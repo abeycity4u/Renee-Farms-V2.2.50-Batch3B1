@@ -1,0 +1,51 @@
+name: "C137 B12 WS52-KF proposed preliminary RC01 (DISABLED)"
+
+# SOURCE-ONLY PROPOSAL. This workflow CANNOT run a database or test.
+# A separate one-use approval, reviewed host+MariaDB image digest, exact runner
+# blob and new source commit are required before any execution.
+# The approval path does not exist in this commit. Even if added later,
+# this job is explicitly guarded by 'if: false' and fails closed.
+on:
+  push:
+    branches:
+      - c137-gc24-k2p03-b12-ws52kf-github-rc01-candidate-disabled
+    paths:
+      - docs/C137_GC24_K2_P03_B12_WS52KF_ONE_USE_RC01_APPROVAL.txt
+
+permissions:
+  contents: read
+
+concurrency:
+  group: c137-b12-ws52kf-preliminary-rc01
+  cancel-in-progress: false
+
+jobs:
+  preliminary-rc01-synthetic:
+    # NON-NEGOTIABLE SOURCE-STAGING FUSE: no database container is created.
+    # Not a matrix, no workflow_dispatch, not an executable test approval.
+    if: ${{ false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      GITHUB_RC01_SCOPE: "FABRICATED_NONCERTIFYING_ONLY"
+      B12_RC01_DB_NAME: "renee_b12_gh_rc01_synthetic_only"
+      B12_RC01_DB_HOST: "127.0.0.1"
+      B12_RC01_DB_PORT: "3306"
+      B12_RC01_GH_ISOLATION_ATTESTED: "NO"
+      B12_RC01_APPROVED_HARNESS_BLOB: ""
+      B12_RC01_EXPECTED_SERVER_ID: ""
+      B12_RC01_DB_PASSWORD: ""
+    # CANDIDATE ONLY: a future separately reviewed workflow must add
+    # exact digest-pinned, isolated MariaDB 10.11 on loopback and prove
+    # its independent identity before initializing the empty schema.
+    # It MUST NOT reuse the protected Mac WS32 or old one-use B12 workflow.
+    steps:
+      - name: Fail-closed pre-execution sentinel
+        shell: bash
+        run: |
+          echo "AUDIT=B12_WS52KF_GH_RC01_CANDIDATE"
+          echo "RESULT=BLOCKED_SOURCE_ONLY"
+          echo "RC01_FUSE=OFF"
+          echo "DATABASE_CONNECTIONS=0"
+          echo "B12_CUTOVER=OFF"
+          exit 86
