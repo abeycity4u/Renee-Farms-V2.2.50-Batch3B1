@@ -162,7 +162,8 @@ class Cursor:
         if self.i >= len(self.tokens):
             _reject()
         t = self.tokens[self.i]
-        if t.kind not in ("WORD", "IDENT") or not SAFE_NAME.fullmatch(t.value):
+        # Fail-closed: table/column identifiers must be backtick-quoted.
+        if t.kind != "IDENT" or not SAFE_NAME.fullmatch(t.value):
             _reject()
         self.i += 1
 
@@ -287,10 +288,10 @@ def main() -> int:
     p.add_argument("--self-test", action="store_true", required=True)
     a = p.parse_args()
     assert a.self_test
-    if classify_synthetic("CREATE TABLE demo (id INT);") != ("CREATE_TABLE",):
+    if classify_synthetic("CREATE TABLE `demo` (`id` INT);") != ("CREATE_TABLE",):
         raise SystemExit(1)
     try:
-        classify_synthetic("DROP TABLE other.demo;")
+        classify_synthetic("CREATE TABLE SELECT (`id` INT);")
     except Rejected:
         pass
     else:
