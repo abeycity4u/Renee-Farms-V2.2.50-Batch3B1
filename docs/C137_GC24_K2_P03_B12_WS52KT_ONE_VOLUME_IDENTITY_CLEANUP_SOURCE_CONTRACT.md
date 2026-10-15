@@ -8,7 +8,7 @@
 - Parent branch: c137-gc24-k2p03-b12-ws52ks-runtime-volume-isolation-source-review at exact HEAD b59f199747cc6338c20a77e3a3432c3cf6f884f4.
 - New WS52-KT branch: c137-gc24-k2p03-b12-ws52kt-volume-identity-cleanup-contract-source.
 - New PURE hard-disabled policy: tools/b12_ws52kt_one_volume_identity_cleanup_contract.py, Git blob e3c6b7b79bb979902b9d610234b6fd84f2120c2d.
-- New 20-case fixture-only unit test source: tests/test_b12_ws52kt_one_volume_identity_cleanup_contract.py, Git blob e2e8d7759eaf80f2a9f14978661f8d486d319fe1. **Tests authored, not executed and not certified by this source commit.**
+- New 20-case fixture-only unit test source: tests/test_b12_ws52kt_one_volume_identity_cleanup_contract.py, Git blob 38f2272be8e8058899fee1f798b4eb7de37eb960. **Tests authored, not executed and not certified by this source commit.**
 - Existing policy left intact: tools/b12_ws52kh_rc01_isolation_cleanup_contract.py, blob f5f9b82453fae41cc8bcc070414d988f052c5e14.
 - Existing hard-disabled GH RC01 candidate left intact: tests/integration/k2p03_b12_gh_rc01_preliminary_synthetic.php, blob e78318509e270ccd24684bf41f5e854b74765f76.
 - Cutover gate unchanged: lib/daily_record_revision_cutover_gate.php, blob 6e88c913ad5e5b371a9d0c92ce08870214ac1268.
@@ -46,7 +46,7 @@ Every result has physical_attested=False and execution_authorized=False **by con
 
 The 20 fictional/mocked unit cases cover a valid-but-never-authorized synthetic shape, literal hard-off fuses, mismatched repo/source/OCI digest, run/name/attempt drift, pre-existing volumes, unexpected anonymous volumes, missing original volumes, extra/reused containers, duplicate/malformed inventories, zero/multiple mounts, bind/driver/target/read-only/fingerprint drift, volume and container label mismatches, public port/privileged/egress deviation, nominal synthetic postcleanup (still not physically attested), inventory-restoration failures, identity drift, residue and unverified removal, preflight failure despite claimed cleanup, unknown keys, safe_status refusal to claim execution and AST checks disallowing runtime I/O imports.
 
-Do not say 20/20 PASS until a user-returned pinned-source offline test result or another independently observed fixture-only execution is available. Do not rerun previously verified WS52-KO 16/16 tests; their code has not changed.
+The test source was additionally corrected prior to runtime to classify volume-inspect mountpoint fingerprint drift as an effective-mount linkage mismatch; the policy source itself was not changed. Do not say 20/20 PASS until a user-returned pinned-source offline test result or another independently observed fixture-only execution is available. Do not rerun previously verified WS52-KO 16/16 tests; their code has not changed.
 
 ## 5. Limitations and exact next gate
 
