@@ -40,6 +40,17 @@ function rc01_source_gate(): void
         $actual = sha1('blob ' . strlen($content) . "\0" . $content);
         rc01_assert(hash_equals($expected, $actual), 'pinned source blob');
     }
+    // A future one-use host-side approval must pin this harness's own blob.
+    // This cannot be satisfied by a guessed filename or a reused approval.
+    $approvedHarness = getenv('B12_RC01_APPROVED_HARNESS_BLOB');
+    rc01_assert(is_string($approvedHarness) &&
+        preg_match('/\\A[a-f0-9]{40}\\z/D', $approvedHarness) === 1,
+        'explicit exact runner source approval');
+    $runner = @file_get_contents(__FILE__);
+    rc01_assert(is_string($runner), 'exact runner source readable');
+    rc01_assert(hash_equals($approvedHarness,
+        sha1('blob ' . strlen($runner) . "\\0" . $runner)),
+        'exact runner source pinned');
     require_once $root . '/lib/daily_record_revision_cutover_gate.php';
     rc01_assert(daily_record_revision_cutover_enabled() === false, 'B12 gate is OFF');
     require_once $root . '/lib/daily_record_revision_authority.php';
@@ -102,15 +113,32 @@ function rc01_metadata_gate(PDO $pdo): void
         $seen[$row['table_name']] = true;
     }
     rc01_assert(count($seen) === 3, 'one revision column per Daily Record table');
-    foreach ([
-        'farms', 'production_cycles', 'layer_daily_records',
-        'broiler_daily_records', 'ruminant_daily_records',
-        'production_population_baselines', 'production_population_movements',
-        'stock_items', 'stock_transactions', 'sales_records',
-    ] as $table) {
-        // Identifiers are from a fixed local allowlist only.
-        $n = (int)$pdo->query('SELECT COUNT(*) FROM ' . $table)->fetchColumn();
-        rc01_assert($n === 0, $table . ' has no prior rows');
+    // Check every table, not a selective subset, before inserting a fixture.
+    // Names originate in the isolated database's metadata and are strictly
+    // restricted to the source-reviewed simple identifier grammar.
+    $objects = $pdo->query(
+        "SELECT table_name, table_type FROM information_schema.tables
+         WHERE table_schema=DATABASE() ORDER BY table_name"
+    )->fetchAll(PDO::FETCH_ASSOC);
+    rc01_assert(count($objects) === 69, 'exact synthetic table object count');
+    foreach ($objects as $object) {
+        rc01_assert($object['table_type'] === 'BASE TABLE',
+            'no views in synthetic fixture');
+        $table = (string)$object['table_name'];
+        rc01_assert(preg_match('/\\A[a-z][a-z0-9_]*\\z/D', $table) === 1,
+            'source-style synthetic table identifier');
+        $n = (int)$pdo->query('SELECT COUNT(*) FROM `' . $table . '`')->fetchColumn();
+        rc01_assert($n === 0, 'all synthetic tables initially empty');
+    }
+    foreach (['TRIGGERS' => 'trigger_schema',
+              'ROUTINES' => 'routine_schema',
+              'EVENTS' => 'event_schema'] as $metadata => $schemaColumn) {
+        // These identifiers are static reviewed code literals only.
+        $count = (int)$pdo->query(
+            'SELECT COUNT(*) FROM information_schema.' . $metadata .
+            ' WHERE ' . $schemaColumn . '=DATABASE()'
+        )->fetchColumn();
+        rc01_assert($count === 0, 'no synthetic stored side-effect objects');
     }
     rc01_assert((int)$pdo->query('SELECT COUNT(*) FROM schema_migrations')->fetchColumn() === 0,
         'no application migrations');
@@ -128,12 +156,50 @@ function rc01_metadata_gate(PDO $pdo): void
     rc01_assert((int)$fk === 3, 'three source cycle FKs preserved');
 }
 
-function rc01_signal(string $dir, string $name): void
+function rc01_signal(string $dir, string $name, ?int $readyId = null): void
 {
     rc01_assert(preg_match('/^[AB]_(?:READY|ATTEMPT|LOCKED|RESULT)$|^(?:GO|RELEASE|ABORT)$/D',
         $name) === 1, 'closed barrier signal');
-    rc01_assert(file_put_contents($dir . '/' . $name, "1\n", LOCK_EX) !== false,
+    $ready = in_array($name, ['A_READY','B_READY'], true);
+    rc01_assert($ready ? ($readyId !== null && $readyId > 0) :
+        $readyId === null, 'bounded READY connection identity');
+    $value = $ready ? ((string)$readyId . "\n") : "1\n";
+    rc01_assert(file_put_contents($dir . '/' . $name, $value, LOCK_EX) !== false,
         'barrier signal created');
+}
+
+function rc01_ready_connection_id(string $dir, string $role): int
+{
+    rc01_assert(in_array($role, ['A','B'], true), 'closed READY role');
+    $raw = @file_get_contents($dir . '/' . $role . '_READY');
+    rc01_assert(is_string($raw) &&
+        preg_match('/\\A[1-9][0-9]{0,9}\\n\\z/D', $raw) === 1,
+        'valid worker ready connection identifier');
+    return (int)trim($raw);
+}
+
+function rc01_confirm_innodb_lock_wait(PDO $observer, int $aId, int $bId): void
+{
+    // MariaDB 10.11 only: independent server-side wait metadata, NOT the
+    // worker's own timing assertion. Lack of PROCESS/metadata => fail closed.
+    rc01_assert($aId > 0 && $bId > 0 && $aId !== $bId,
+        'distinct observed sessions');
+    $stmt = $observer->prepare(
+        'SELECT COUNT(*) FROM information_schema.INNODB_LOCK_WAITS w
+         JOIN information_schema.INNODB_TRX waiting
+           ON waiting.trx_id = w.requesting_trx_id
+         JOIN information_schema.INNODB_TRX blocking
+           ON blocking.trx_id = w.blocking_trx_id
+         WHERE waiting.trx_mysql_thread_id = ?
+           AND blocking.trx_mysql_thread_id = ?'
+    );
+    $deadline = microtime(true) + 2.0;
+    do {
+        $stmt->execute([$bId, $aId]);
+        if ((int)$stmt->fetchColumn() > 0) return;
+        usleep(20000);
+    } while (microtime(true) < $deadline);
+    throw new RuntimeException('RC01 independent InnoDB lock wait not certified.');
 }
 
 function rc01_wait(string $dir, string $name, float $seconds = 12.0): void
@@ -190,7 +256,7 @@ function rc01_worker(array $args): void
         (int)$initial['mortality'] === 2 &&
         (int)$initial['cycle_id'] === $cycle, 'same original read');
     $expectedRevision = (int)$initial['record_revision'];
-    rc01_signal($dir, $role . '_READY');
+    rc01_signal($dir, $role . '_READY', $connectionId);
     rc01_wait($dir, 'GO');
     if ($role === 'B') {
         rc01_wait($dir, 'A_LOCKED');
@@ -305,14 +371,18 @@ function rc01_controller(): void
     $dir = null;
     $processes = [];
     $fixture = null;
-    $passed = false;
+    $racePassed = false;
+    $firstFailure = null;
+    $teardownIssues = [];
+    $workersStopped = true;
     try {
         $fixture = rc01_seed($pdo);
         [$farm, $cycle, $id] = $fixture;
         rc01_assert((int)rc01_row($pdo,$farm,$id)['record_revision'] === 1,
             'fresh fixture revision 1');
         $dir = sys_get_temp_dir() . '/b12_rc01_' . bin2hex(random_bytes(10));
-        rc01_assert(mkdir($dir,0700) && is_dir($dir), 'private barrier initialized');
+        rc01_assert(mkdir($dir,0700) && is_dir($dir) && !is_link($dir),
+            'private barrier initialized');
         foreach (['A','B'] as $role) {
             $descriptors = [
                 0 => ['pipe','r'],
@@ -327,11 +397,20 @@ function rc01_controller(): void
         }
         rc01_wait($dir,'A_READY');
         rc01_wait($dir,'B_READY');
+        $aSession = rc01_ready_connection_id($dir, 'A');
+        $bSession = rc01_ready_connection_id($dir, 'B');
+        rc01_assert($aSession !== $bSession, 'two separate worker sessions');
+        $observerSession = (int)$pdo->query('SELECT CONNECTION_ID()')->fetchColumn();
+        rc01_assert($observerSession > 0 && $observerSession !== $aSession &&
+            $observerSession !== $bSession, 'independent observer connection');
         rc01_signal($dir,'GO');
         rc01_wait($dir,'A_LOCKED');
         rc01_wait($dir,'B_ATTEMPT');
-        usleep(500000);
-        rc01_assert(!is_file($dir.'/B_RESULT'), 'B cannot finish while A holds row lock');
+        // Proof of actual lock contention; the marker alone is not proof.
+        rc01_confirm_innodb_lock_wait($pdo, $aSession, $bSession);
+        usleep(350000);
+        rc01_assert(!is_file($dir.'/B_RESULT'),
+            'B cannot finish while A holds the record lock');
         rc01_signal($dir,'RELEASE');
         rc01_wait($dir,'A_RESULT');
         rc01_wait($dir,'B_RESULT');
@@ -345,14 +424,13 @@ function rc01_controller(): void
         }
         rc01_assert($result['A']['status'] === 'COMMITTED' &&
             $result['B']['status'] === 'STALE_CONFLICT', 'one commit, one explicit stale');
-        rc01_assert((int)$result['A']['connection_id'] > 0 &&
-            (int)$result['B']['connection_id'] > 0 &&
-            $result['A']['connection_id'] !== $result['B']['connection_id'],
-            'distinct real database connection IDs');
+        rc01_assert($result['A']['connection_id'] === $aSession &&
+            $result['B']['connection_id'] === $bSession,
+            'worker result matches independently captured connection identity');
         rc01_assert($result['A']['original_revision'] === 1 &&
-            $result['B']['original_revision'] === 1, 'both loaded the same revision');
+            $result['B']['original_revision'] === 1, 'both loaded original revision');
         rc01_assert((int)$result['B']['elapsed_ms'] >= 300,
-            'stale writer was blocked by first lock');
+            'stale writer observed a bounded waiting interval');
         foreach ($processes as $role => $proc) {
             $until = microtime(true) + 3.0;
             do {
@@ -361,48 +439,105 @@ function rc01_controller(): void
                 usleep(20000);
             } while (microtime(true) < $until);
             rc01_assert(!$state['running'] && (int)$state['exitcode'] === 0,
-                'independent worker ' . $role . ' exited successfully');
+                'worker ' . $role . ' exited successfully');
         }
         $stored = rc01_row($pdo, $farm, $id);
         rc01_assert((int)$stored['record_revision'] === 2 &&
             (int)$stored['mortality'] === 4,
-            'independent read confirms winner-only durable CAS');
-        echo "RC01_TWO_CONNECTIONS=PASS\n";
-        echo "RC01_EXACTLY_ONE_COMMIT=PASS\n";
-        echo "RC01_STALE_CONFLICT=PASS\n";
-        echo "RC01_DURABLE_REVISION=2\n";
-        $passed = true;
+            'observer read confirms winner-only durable CAS');
+        $racePassed = true;
+    } catch (Throwable $error) {
+        // Keep the first failure; cleanup problems must not overwrite it.
+        $firstFailure = $error;
     } finally {
-        if ($dir !== null && is_dir($dir)) {
-            rc01_signal($dir,'ABORT');
+        if ($dir !== null && is_dir($dir) && !is_link($dir)) {
+            try {
+                rc01_signal($dir,'ABORT');
+            } catch (Throwable $error) {
+                $teardownIssues[] = 'ABORT_SIGNAL';
+            }
         }
         foreach ($processes as $proc) {
             if (!is_resource($proc)) continue;
-            $status = proc_get_status($proc);
-            if ($status['running']) {
-                proc_terminate($proc, 15);
-                usleep(250000);
-                if (proc_get_status($proc)['running']) proc_terminate($proc, 9);
+            try {
+                $state = proc_get_status($proc);
+                if ($state['running']) {
+                    proc_terminate($proc,15);
+                    $until = microtime(true) + 2.0;
+                    do {
+                        usleep(20000);
+                        $state = proc_get_status($proc);
+                    } while ($state['running'] && microtime(true) < $until);
+                    if ($state['running']) {
+                        proc_terminate($proc,9);
+                        usleep(200000);
+                        $state = proc_get_status($proc);
+                    }
+                }
+                if ($state['running']) {
+                    $workersStopped = false;
+                    $teardownIssues[] = 'WORKER_STILL_RUNNING';
+                    continue; // Do not delete fixture while a worker lives.
+                }
+                proc_close($proc);
+            } catch (Throwable $error) {
+                $workersStopped = false;
+                $teardownIssues[] = 'WORKER_STOP_UNVERIFIED';
             }
-            proc_close($proc);
         }
-        if ($fixture !== null) {
-            [$farm,$cycle,$id] = $fixture;
-            rc01_cleanup($pdo,$farm,$cycle,$id);
-        }
-        if ($dir !== null && is_dir($dir) &&
-            str_starts_with(basename($dir), 'b12_rc01_')) {
-            foreach (scandir($dir) ?: [] as $entry) {
-                if ($entry === '.' || $entry === '..') continue;
-                $file = $dir . '/' . $entry;
-                if (is_file($file) || is_link($file)) unlink($file);
+        if ($fixture !== null && $workersStopped) {
+            try {
+                [$farm,$cycle,$id] = $fixture;
+                rc01_cleanup($pdo,$farm,$cycle,$id);
+            } catch (Throwable $error) {
+                $teardownIssues[] = 'FIXTURE_CLEANUP_FAILED';
             }
-            rmdir($dir);
+        } elseif ($fixture !== null) {
+            $teardownIssues[] = 'FIXTURE_QUARANTINE_REQUIRED';
+        }
+        // File cleanup cannot change the verdict or hide a failed DB teardown.
+        if ($dir !== null) {
+            try {
+                rc01_assert(is_dir($dir) && !is_link($dir) &&
+                    preg_match('/\\Ab12_rc01_[a-f0-9]{20}\\z/D',
+                        basename($dir)) === 1,
+                    'private barrier identity on cleanup');
+                $entries = scandir($dir);
+                rc01_assert(is_array($entries), 'barrier files list');
+                foreach ($entries as $entry) {
+                    if ($entry === '.' || $entry === '..') continue;
+                    rc01_assert(preg_match(
+                        '/\\A(?:[AB]_(?:OUT|ERR|READY|ATTEMPT|LOCKED|RESULT(?:\\.tmp)?)|GO|RELEASE|ABORT)\\z/D',
+                        $entry) === 1, 'allowlisted barrier file');
+                    $file = $dir . '/' . $entry;
+                    rc01_assert(is_file($file) && !is_link($file),
+                        'ordinary private barrier file');
+                }
+                foreach ($entries as $entry) {
+                    if ($entry === '.' || $entry === '..') continue;
+                    rc01_assert(unlink($dir . '/' . $entry), 'barrier file removed');
+                }
+                rc01_assert(rmdir($dir), 'private barrier directory removed');
+            } catch (Throwable $error) {
+                $teardownIssues[] = 'BARRIER_DISPOSAL_FAILED';
+            }
         }
     }
-    rc01_assert($passed, 'RC01 completed');
+    if ($teardownIssues !== []) {
+        echo "RC01_TEARDOWN=INCOMPLETE_MANUAL_REVIEW\\n";
+    }
+    if ($firstFailure !== null) {
+        throw $firstFailure;
+    }
+    rc01_assert($teardownIssues === [], 'full teardown completed');
+    rc01_assert($racePassed, 'RC01 passed both-worker CAS race');
     rc01_metadata_gate($pdo);
-    echo "RC01_FIXTURE_TEARDOWN=PASS\n";
+    echo "RC01_TWO_CONNECTIONS=PASS\\n";
+    echo "RC01_INDEPENDENT_INNODB_WAIT=PASS\\n";
+    echo "RC01_EXACTLY_ONE_COMMIT=PASS\\n";
+    echo "RC01_STALE_CONFLICT=PASS\\n";
+    echo "RC01_DURABLE_REVISION=2\\n";
+    echo "RC01_FIXTURE_TEARDOWN=PASS\\n";
 }
 
 // Runtime fuse intentionally precedes any database connection or fixture.
