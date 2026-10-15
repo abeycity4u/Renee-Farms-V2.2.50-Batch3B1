@@ -140,7 +140,10 @@ def _project(route: str, raw: Any) -> Any:
         return {"Volumes": _pick_entries(_pick(raw, ("Volumes",))["Volumes"], ("Name",))}
     if route == "single_volume":
         volume = _pick(raw, ("Name", "Driver", "Labels"))
-        volume["Labels"] = _pick(volume["Labels"], ("run_id", "purpose"))
+        labels = volume["Labels"]
+        if type(labels) is not dict or frozenset(labels) != frozenset({"run_id", "purpose"}):
+            raise ValueError("VOLUME_LABEL_SET_UNREVIEWED")
+        volume["Labels"] = _pick(labels, ("run_id", "purpose"))
         return volume
     if route == "single_container":
         values = _pick(raw, ("Id", "Image", "HostConfig", "Mounts"))
