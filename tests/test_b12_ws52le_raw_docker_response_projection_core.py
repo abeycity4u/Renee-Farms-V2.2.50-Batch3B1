@@ -217,6 +217,11 @@ class RawProjectionCoreTests(unittest.TestCase):
             self.require_blocked(c, req, encoded(obj),
                                  "MINIMIZED_CONTRACT_REJECTED")
 
+    def test_raw_volume_extra_labels_rejected_not_hidden(self):
+        c, req, obj = fixture(5)
+        obj["Labels"]["hidden_owner"] = "production"
+        self.require_blocked(c, req, encoded(obj), "PROJECTION_SHAPE_INVALID")
+
     def test_wrong_volume_name_labels_driver_fails(self):
         for field, bad in (("Name", "protected"), ("Driver", "nfs")):
             c, req, obj = fixture(5)
