@@ -103,9 +103,9 @@ class RC01OfflineSourceContract(unittest.TestCase):
         # This Python verifier reads a local source file only. It does not
         # launch PHP, Docker, MariaDB, CI, or any external process.
         source = Path(__file__).read_text(encoding="utf-8")
-        self.assertNotIn("subprocess.run(", source)
-        self.assertNotIn("os.system(", source)
-        self.assertNotIn("import pymysql", source)
+        self.assertNotIn("subprocess." + "run(", source)
+        self.assertNotIn("os." + "system(", source)
+        self.assertNotIn("import " + "pymysql", source)
 
 
 if __name__ == "__main__":
