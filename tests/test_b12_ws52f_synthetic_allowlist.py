@@ -150,6 +150,34 @@ class SyntheticCorpus(unittest.TestCase):
                 with self.assertRaises(MODULE.Rejected):
                     MODULE.classify_synthetic(statement)
 
+    def test_identifier_and_lexer_boundary_regressions(self):
+        # MariaDB's table/column identifier length is limited to 64;
+        # this conservative prototype permits only ASCII backtick names.
+        valid = [
+            "CREATE TABLE `" + "t" * 64 + "` (`id` INT);",
+            "CREATE TABLE `demo` (`" + "c" * 64 + "` INT);",
+        ]
+        for i, sql in enumerate(valid):
+            with self.subTest(kind="valid_64", case=i):
+                self.assertEqual(MODULE.classify_synthetic(sql), ("CREATE_TABLE",))
+
+        invalid = [
+            "CREATE TABLE `" + "t" * 65 + "` (`id` INT);",
+            "CREATE TABLE `demo` (`" + "c" * 65 + "` INT);",
+            "CREATE TABLE `demo` (`id` VARCHAR(" + "9" * 5000 + "));",
+            "CREATE TABLE `demo` (`id` VARCHAR(" + "0" * 100 + "1));",
+            "CREATE TABLE `demo` (`id` VARCHAR(999999));",
+            "CREATE TABLE `demo` (`id` INT); -- hidden\rDROP TABLE `demo`;",
+            "CREATE TABLE `demo` (`id` INT); -- hidden\r\nDROP TABLE `demo`;",
+            "INSERT INTO `demo` VALUES ('contains\rreturn');",
+            "CREATE TABLE `demo` (`id` INT);\r",
+        ]
+        for i, sql in enumerate(invalid):
+            with self.subTest(kind="invalid", case=i):
+                with self.assertRaises(MODULE.Rejected) as ctx:
+                    MODULE.classify_synthetic(sql)
+                self.assertEqual(str(ctx.exception), "UNSUPPORTED_OR_UNSAFE_SYNTHETIC_SQL")
+
     def test_fail_closed_input_contract(self):
         for val in (None, b"DROP TABLE x;", "", " ", "DROP TABLE x;\x00", "DROP TABLE x;" * 1000):
             with self.subTest(type=type(val).__name__):
