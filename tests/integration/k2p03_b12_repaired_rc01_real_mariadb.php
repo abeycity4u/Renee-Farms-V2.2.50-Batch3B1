@@ -392,8 +392,8 @@ function rc01_controller(): void
             $proc = proc_open([PHP_BINARY,__FILE__,'--worker',$role,$dir,
                 (string)$farm,(string)$cycle,(string)$id], $descriptors,$pipes);
             rc01_assert(is_resource($proc), 'independent worker process launched');
-            fclose($pipes[0]);
             $processes[$role] = $proc;
+            if (isset($pipes[0]) && is_resource($pipes[0])) fclose($pipes[0]);
         }
         rc01_wait($dir,'A_READY');
         rc01_wait($dir,'B_READY');
@@ -495,8 +495,12 @@ function rc01_controller(): void
         } elseif ($fixture !== null) {
             $teardownIssues[] = 'FIXTURE_QUARANTINE_REQUIRED';
         }
-        // File cleanup cannot change the verdict or hide a failed DB teardown.
-        if ($dir !== null) {
+        // Preserve the private barrier directory for guarded manual review if
+        // any process or database teardown cannot be verified; never destroy
+        // diagnostic files before the first-failure status is preserved.
+        if ($dir !== null && (!$workersStopped || $teardownIssues !== [])) {
+            $teardownIssues[] = 'BARRIER_QUARANTINED';
+        } elseif ($dir !== null) {
             try {
                 rc01_assert(is_dir($dir) && !is_link($dir) &&
                     preg_match('/\\Ab12_rc01_[a-f0-9]{20}\\z/D',
