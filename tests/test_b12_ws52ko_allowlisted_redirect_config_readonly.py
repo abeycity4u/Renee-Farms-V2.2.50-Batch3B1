@@ -1,4 +1,5 @@
 """WS52-KO fixture-free security contracts. NO network/Docker/SQL/actions."""
+import ast
 import contextlib
 import hashlib
 import io
@@ -234,7 +235,15 @@ class WS52KOOfflineTests(unittest.TestCase):
         self.assertIn('method="GET"', source)
         self.assertIn("if sys.platform == \"darwin\"", source)
         self.assertIn("response.read(read_cap + 1)", source)
-        self.assertNotIn("subprocess.", source)
+        # Parse Python source, not docstrings/comments containing "subprocess.".
+        syntax = ast.parse(source)
+        forbidden = {"subprocess", "os", "docker", "pymysql", "mysql"}
+        for node in ast.walk(syntax):
+            if isinstance(node, ast.Import):
+                for imported in node.names:
+                    self.assertNotIn(imported.name.split(".")[0], forbidden)
+            elif isinstance(node, ast.ImportFrom):
+                self.assertNotIn((node.module or "").split(".")[0], forbidden)
         self.assertNotIn("os.system", source)
         self.assertNotIn('method="POST"', source)
         self.assertNotIn('method="PUT"', source)
