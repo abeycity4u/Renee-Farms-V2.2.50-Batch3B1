@@ -171,10 +171,13 @@ class RedactionSpecOfflineTests(unittest.TestCase):
         c, req, obj = fixture(0)
         obj["Components"] = [{"Details": {"Secrets": "private"}}]
         self.blocked(c, req, as_bytes(obj), "UNEXPECTED_DOCKER_FIELDS_OR_STRUCTURE")
-        for value in ("latest", "26.1.0\nSECRET", 26.1, True, None):
+        for value in ("latest", "26.1.0\nSECRET", True, None):
             c, req, obj = fixture(0)
             obj["Version"] = value
             self.blocked(c, req, as_bytes(obj), "ENGINE_VERSION_FORMAT")
+        c, req, obj = fixture(0)
+        obj["Version"] = 26.1
+        self.blocked(c, req, as_bytes(obj), "JSON_FLOAT_NOT_PERMITTED")
 
     def test_engine_info_rejects_sensitive_fields(self):
         c, req, obj = fixture(1)
