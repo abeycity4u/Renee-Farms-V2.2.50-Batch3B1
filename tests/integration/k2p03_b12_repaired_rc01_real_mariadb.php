@@ -49,7 +49,7 @@ function rc01_source_gate(): void
     $runner = @file_get_contents(__FILE__);
     rc01_assert(is_string($runner), 'exact runner source readable');
     rc01_assert(hash_equals($approvedHarness,
-        sha1('blob ' . strlen($runner) . "\\0" . $runner)),
+        sha1('blob ' . strlen($runner) . "\0" . $runner)),
         'exact runner source pinned');
     require_once $root . '/lib/daily_record_revision_cutover_gate.php';
     rc01_assert(daily_record_revision_cutover_enabled() === false, 'B12 gate is OFF');
@@ -524,7 +524,7 @@ function rc01_controller(): void
         }
     }
     if ($teardownIssues !== []) {
-        echo "RC01_TEARDOWN=INCOMPLETE_MANUAL_REVIEW\\n";
+        echo "RC01_TEARDOWN=INCOMPLETE_MANUAL_REVIEW\n";
     }
     if ($firstFailure !== null) {
         throw $firstFailure;
@@ -532,12 +532,12 @@ function rc01_controller(): void
     rc01_assert($teardownIssues === [], 'full teardown completed');
     rc01_assert($racePassed, 'RC01 passed both-worker CAS race');
     rc01_metadata_gate($pdo);
-    echo "RC01_TWO_CONNECTIONS=PASS\\n";
-    echo "RC01_INDEPENDENT_INNODB_WAIT=PASS\\n";
-    echo "RC01_EXACTLY_ONE_COMMIT=PASS\\n";
-    echo "RC01_STALE_CONFLICT=PASS\\n";
-    echo "RC01_DURABLE_REVISION=2\\n";
-    echo "RC01_FIXTURE_TEARDOWN=PASS\\n";
+    echo "RC01_TWO_CONNECTIONS=PASS\n";
+    echo "RC01_INDEPENDENT_INNODB_WAIT=PASS\n";
+    echo "RC01_EXACTLY_ONE_COMMIT=PASS\n";
+    echo "RC01_STALE_CONFLICT=PASS\n";
+    echo "RC01_DURABLE_REVISION=2\n";
+    echo "RC01_FIXTURE_TEARDOWN=PASS\n";
 }
 
 // Runtime fuse intentionally precedes any database connection or fixture.
