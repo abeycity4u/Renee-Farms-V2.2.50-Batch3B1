@@ -1,0 +1,136 @@
+name: "C137 B12 WS52-KD PHP 8.2 hard-disabled offline verification (one-use)"
+
+# One-use approval trigger. No workflow_dispatch / PR / broad push trigger.
+# Runs only on the dedicated evidence branch when the separate approval file
+# is created with the exact commit message below; no SQL or database fixture.
+on:
+  push:
+    branches:
+      - c137-gc24-k2p03-b12-ws52kd-php82-offline-gha
+    paths:
+      - docs/C137_GC24_K2_P03_B12_WS52KD_ONE_USE_OFFLINE_APPROVAL.txt
+
+permissions: {}
+
+concurrency:
+  group: c137-ws52kd-php82-source-only
+  cancel-in-progress: false
+
+jobs:
+  php82-hardoff-offline:
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/c137-gc24-k2p03-b12-ws52kd-php82-offline-gha' &&
+      github.event.head_commit.message == 'ci-b12(ws52kd-run): authorize one PHP82 offline hard-OFF check' &&
+      github.run_number == 1 &&
+      github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      CI: "true"
+      B12_RC01_ISOLATED_MAC_ATTESTED: ""
+      B12_RC01_DB_NAME: ""
+      B12_RC01_DB_PASSWORD: ""
+      B12_RC01_APPROVED_HARNESS_BLOB: ""
+    steps:
+      - name: Setup PHP 8.2 from pinned public action, no runtime secrets
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962
+        with:
+          php-version: "8.2"
+          extensions: none
+          coverage: none
+          tools: none
+          github-token: ""
+
+      - name: Verify exact pinned source syntax and the hard-disabled exit only
+        shell: bash
+        run: |
+          set -euo pipefail
+          export LC_ALL=C
+          echo "#####COPY FROM HERE#####"
+          echo "AUDIT=B12_WS52KD_PHP82_HARDOFF_CI"
+          if [[ "$GITHUB_REF" != "refs/heads/c137-gc24-k2p03-b12-ws52kd-php82-offline-gha" ||
+                "$GITHUB_EVENT_NAME" != "push" ||
+                "$GITHUB_RUN_ATTEMPT" != "1" ||
+                "$GITHUB_RUN_NUMBER" != "1" ]]; then
+            echo "RESULT=BLOCKED"
+            echo "REASON=RUN_IDENTITY_GUARD"
+            echo "#####COPY TO HERE#####"
+            exit 1
+          fi
+          d="$(mktemp -d)"
+          trap 'rm -rf "$d"' EXIT
+          echo "GITHUB_JOB_SCOPE=ONE_USE_SOURCE_ONLY"
+          url="https://raw.githubusercontent.com/abeycity4u/Renee-Farms-V2.2.50-Batch3B1/1c373f9f730bec1d2908ee06be1a2e299ac17cb6/tests/integration/k2p03_b12_repaired_rc01_real_mariadb.php"
+          if ! curl --fail --location --silent --max-time 25 "$url" -o "$d/rc01.php"; then
+            echo "RESULT=BLOCKED"
+            echo "REASON=PINNED_SOURCE_FETCH_FAILED"
+            echo "#####COPY TO HERE#####"
+            exit 1
+          fi
+          if [[ "$(git hash-object --no-filters "$d/rc01.php")" != "6f17d1a4ba7e98dbf286d1c8e1a147e6ac3e4aad" ]]; then
+            echo "RESULT=BLOCKED"
+            echo "REASON=EXACT_GIT_BLOB_MISMATCH"
+            echo "#####COPY TO HERE#####"
+            exit 1
+          fi
+          echo "EXACT_RC01_SOURCE_BLOB=PASS"
+          if ! php -n -v >"$d/version" 2>"$d/version_err"; then
+            echo "RESULT=BLOCKED"
+            echo "REASON=PHP_CLI_NOT_AVAILABLE"
+            echo "#####COPY TO HERE#####"
+            exit 1
+          fi
+          if ! grep -Eq '^PHP 8\.2\.[0-9]+ \(cli\)' "$d/version"; then
+            echo "RESULT=BLOCKED"
+            echo "REASON=PHP_VERSION_NOT_8_2"
+            echo "#####COPY TO HERE#####"
+            exit 1
+          fi
+          echo "PHP82_CLI=PASS"
+          if ! grep -Fqx 'const B12_RC01_EXECUTION_ENABLED = false;' \
+                <(sed -n '/const B12_RC01_EXECUTION_ENABLED = false;/p' "$d/rc01.php"); then
+            echo "RESULT=BLOCKED"
+            echo "REASON=RC01_FUSE_GUARD"
+            echo "#####COPY TO HERE#####"
+            exit 1
+          fi
+          echo "RC01_LITERAL_EXECUTION_FUSE=OFF"
+          if ! php -n -l "$d/rc01.php" >"$d/lint_out" 2>"$d/lint_err"; then
+            echo "PHP82_LINT=FAIL"
+            echo "RESULT=BLOCKED"
+            echo "REASON=PHP82_SYNTAX_LINT"
+            echo "#####COPY TO HERE#####"
+            exit 1
+          fi
+          if ! grep -Fq 'No syntax errors detected' "$d/lint_out"; then
+            echo "RESULT=BLOCKED"
+            echo "REASON=PHP82_LINT_OUTPUT_UNEXPECTED"
+            echo "#####COPY TO HERE#####"
+            exit 1
+          fi
+          echo "PHP82_LINT=PASS"
+          set +e
+          php -n "$d/rc01.php" >"$d/stdout" 2>"$d/stderr"
+          rc=$?
+          set -e
+          if [[ "$rc" != "90" ||
+                -s "$d/stdout" ]] ||
+                ! printf 'B12_RC01=SOURCE_ONLY_HARD_DISABLED\n' | cmp -s - "$d/stderr"; then
+            echo "RESULT=BLOCKED"
+            echo "REASON=HARD_DISABLED_SMOKE_MISMATCH"
+            echo "DISABLED_EXIT_CODE=$rc"
+            echo "#####COPY TO HERE#####"
+            exit 1
+          fi
+          echo "PHP82_DISABLED_EXIT_CODE=90"
+          echo "HARD_DISABLED_STDERR_EXACT=PASS"
+          echo "PYTHON_7_TESTS=PREVIOUSLY_PASSED_NOT_RERUN"
+          echo "DATABASE_CONNECTIONS=0"
+          echo "DOCKER_OR_SERVICES_USED=NO"
+          echo "REAL_BACKUP_ACCESS=NO"
+          echo "MIGRATION_092_EXECUTED=NO"
+          echo "REPAIRED_RC01_RC14_CERTIFIED_PASSES=0"
+          echo "B12_CUTOVER=OFF"
+          echo "RESULT=PASS_OFFLINE_ONLY"
+          echo "#####COPY TO HERE#####"
