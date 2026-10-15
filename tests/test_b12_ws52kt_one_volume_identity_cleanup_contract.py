@@ -203,7 +203,10 @@ class VolumeIdentityCleanupOfflineTests(unittest.TestCase):
             with self.subTest(field=field):
                 p = synthetic_pre()
                 p["volume_inspect"][field] = value
-                self.assertBlocked(p, "VOLUME_INSPECT_IDENTITY_DRIFT")
+                expected = ("EFFECTIVE_MOUNT_UNREVIEWED_OR_UNLINKED"
+                            if field == "mountpoint_fingerprint"
+                            else "VOLUME_INSPECT_IDENTITY_DRIFT")
+                self.assertBlocked(p, expected)
 
     def test_container_labels_port_privilege_network_egress_rejected(self):
         cases = (
