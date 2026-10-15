@@ -1,0 +1,100 @@
+name: "C137 B12 WS52-KH isolated fixture policy source-only (one-use)"
+
+# Read-only Python policy tests; no PHP, MariaDB, Docker, SQL, credentials,
+# customer data, migrations or product gate modifications. The one-use
+# approval path is not present in the workflow-preparation commit.
+on:
+  push:
+    branches:
+      - c137-gc24-k2p03-b12-ws52kh-rc01-isolation-cleanup-disabled-source
+    paths:
+      - docs/C137_GC24_K2_P03_B12_WS52KH_ONE_USE_OFFLINE_APPROVAL.txt
+
+permissions: {}
+
+concurrency:
+  group: c137-ws52kh-offline-policy
+  cancel-in-progress: false
+
+jobs:
+  synthetic-policy-source-contract:
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/c137-gc24-k2p03-b12-ws52kh-rc01-isolation-cleanup-disabled-source' &&
+      github.event.head_commit.message == 'ci-b12(ws52kh-run): authorize one fixture-free policy check' &&
+      github.run_number == 1 &&
+      github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      B12_RC01_GH_ISOLATION_ATTESTED: 'NO'
+      B12_RC01_APPROVED_HARNESS_BLOB: ''
+      B12_RC01_DB_PASSWORD: ''
+    steps:
+      - name: Verify pinned Python source and 12 fixture-free tests only
+        shell: bash
+        run: |
+          set -euo pipefail
+          export LC_ALL=C PYTHONDONTWRITEBYTECODE=1
+          echo '#####COPY FROM HERE#####'
+          echo 'AUDIT=B12_WS52KH_POLICY_SOURCE_ONLY'
+          if [[ "$GITHUB_REPOSITORY" != 'abeycity4u/Renee-Farms-V2.2.50-Batch3B1' ||
+                "$GITHUB_REF" != 'refs/heads/c137-gc24-k2p03-b12-ws52kh-rc01-isolation-cleanup-disabled-source' ||
+                "$GITHUB_EVENT_NAME" != 'push' ||
+                "$GITHUB_RUN_NUMBER" != '1' ||
+                "$GITHUB_RUN_ATTEMPT" != '1' ]]; then
+            echo 'RESULT=BLOCKED'
+            echo 'REASON=ONE_USE_IDENTITY_GUARD'
+            echo '#####COPY TO HERE#####'
+            exit 1
+          fi
+          tmp="$(mktemp -d "${RUNNER_TEMP}/b12-ws52kh.XXXXXXXX")"
+          trap 'rm -rf -- "$tmp"' EXIT
+          mkdir -p "$tmp/tools" "$tmp/tests"
+          pinned='https://raw.githubusercontent.com/abeycity4u/Renee-Farms-V2.2.50-Batch3B1/3172ffec06a61c532f8635f90e07bf0d47fd2d1b'
+          fetch_source() {
+            local path="$1" expected="$2"
+            if ! curl --fail --location --silent --show-error --max-time 20                  "$pinned/$path" -o "$tmp/$path"; then
+              echo 'RESULT=BLOCKED'
+              echo 'REASON=PINNED_SOURCE_FETCH'
+              echo '#####COPY TO HERE#####'
+              exit 1
+            fi
+            if [[ "$(git hash-object --no-filters "$tmp/$path")" != "$expected" ]]; then
+              echo 'RESULT=BLOCKED'
+              echo 'REASON=GIT_BLOB_IDENTITY_MISMATCH'
+              echo '#####COPY TO HERE#####'
+              exit 1
+            fi
+          }
+          fetch_source tools/b12_ws52kh_rc01_isolation_cleanup_contract.py             f5f9b82453fae41cc8bcc070414d988f052c5e14
+          fetch_source tests/test_b12_ws52kh_rc01_isolation_cleanup_contract.py             b2227d659a15999f25fcfc8ae4e4bdff68ac8444
+          echo 'PINNED_PURE_POLICY_AND_TEST_BLOBS=PASS'
+          if ! (cd "$tmp" && python3 -B -m unittest discover -s tests                  -p test_b12_ws52kh_rc01_isolation_cleanup_contract.py -v)                >"$tmp/test.stdout" 2>"$tmp/test.stderr"; then
+            echo 'RESULT=BLOCKED'
+            echo 'REASON=SOURCE_POLICY_UNIT_TEST_FAILED'
+            echo '#####COPY TO HERE#####'
+            exit 1
+          fi
+          if ! grep -Eq '^Ran 12 tests' "$tmp/test.stderr" ||
+             ! grep -Eq '^OK[[:space:]]*$' "$tmp/test.stderr"; then
+            echo 'RESULT=BLOCKED'
+            echo 'REASON=UNIT_TEST_COUNT_OR_STATUS'
+            echo '#####COPY TO HERE#####'
+            exit 1
+          fi
+          echo 'FIXTURE_FREE_SOURCE_TESTS=PASS_12_OF_12'
+          echo 'REVIEWED_MARIADB_IMAGE_DIGEST=NOT_ESTABLISHED'
+          echo 'RUNTIME_APPROVAL=NOT_GRANTED'
+          echo 'RC01_EXECUTION_FUSE=OFF'
+          echo 'DATABASE_CONNECTIONS=0'
+          echo 'DATABASE_SERVICES_CREATED=NO'
+          echo 'DOCKER_OPERATIONS=NO'
+          echo 'SQL_EXECUTED=NO'
+          echo 'REAL_BACKUP_READ=NO'
+          echo 'RC01_WORKERS_EXECUTED=NO'
+          echo 'MIGRATION_092_EXECUTED=NO'
+          echo 'REPAIRED_RC01_RC14_CERTIFIED_PASSES=0'
+          echo 'B12_CUTOVER=OFF'
+          echo 'RESULT=PASS_OFFLINE_ONLY'
+          echo '#####COPY TO HERE#####'
