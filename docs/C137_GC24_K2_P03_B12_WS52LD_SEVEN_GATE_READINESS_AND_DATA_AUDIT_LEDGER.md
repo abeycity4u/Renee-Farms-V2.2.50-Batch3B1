@@ -32,6 +32,11 @@ Seven rows represent completion *gates*, not seven predictable commands or guara
 - Network: Docker bridge mode and `127.0.0.1:3306` config are not proof of outbound network egress block or actually isolated listener; validate host and container namespace state independently before SQL.
 - Volume: WS52-KH old zero-mount model conflicts with MariaDB config's declared default VOLUME; WS52-KT proposes an explicit named one-use local volume model, but no real engine has confirmed that replacing the implicit anonymous volume prevents second mounts. Exact pre/post inventories needed.
 
+## C2. Migration 092 — independent pinned GitHub directory inventory
+
+- GitHub `contents/migrations` at the WS52-LD source branch currently lists **96 directory entries**; numbered SQL filenames shown in the 080–091 series end with `091_permission_architecture_alignment.sql`. **No `092*.sql` file was returned in that migrations directory.** This is a precise source-directory observation, NOT proof that migration 092 is absent on every other branch or location.
+- Therefore stage 7 must NOT presume that migration 092 exists, is reviewed, or is ready for execution. Its contents, review authority, tenant/FK/legacy safety and migration/rollback semantics are still pending. B12 cutover cannot be inferred from the existence of earlier numbered migration files.
+
 ## D. Stage 3 — historical database audit specification (read-only and separately authorized)
 
 **Non-negotiable before any data access:** exact authorized owner/source of the production-derived backup, expected dump timestamp and logical schema, encrypted copy handling, customer-data controls, verified restore *only into an approved isolated clone with no production/staging networks*, operator approval, read-only DB identity and audit log. Do not run SQL or restore based on this document alone.
