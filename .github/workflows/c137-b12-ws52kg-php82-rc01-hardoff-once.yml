@@ -1,0 +1,155 @@
+name: "C137 B12 WS52-KG source-only PHP82 GH RC01 verification (one-use)"
+
+# Separate from historic B12 runner and dormant WS52-KF candidate.
+# Only the exact one-use authorization path can trigger this job.
+# NO services, MariaDB, SQL, Docker, backup, secrets, fuse switch or customer data.
+on:
+  push:
+    branches:
+      - c137-gc24-k2p03-b12-ws52kg-gh-rc01-offline-verification
+    paths:
+      - docs/C137_GC24_K2_P03_B12_WS52KG_ONE_USE_OFFLINE_APPROVAL.txt
+
+permissions: {}
+
+concurrency:
+  group: c137-b12-ws52kg-php82-hardoff
+  cancel-in-progress: false
+
+jobs:
+  php82-gh-rc01-source-only:
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/c137-gc24-k2p03-b12-ws52kg-gh-rc01-offline-verification' &&
+      github.event.head_commit.message == 'ci-b12(ws52kg-run): authorize one GH RC01 offline-only check' &&
+      github.run_number == 1 &&
+      github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      CI: 'true'
+      B12_RC01_GH_ISOLATION_ATTESTED: 'NO'
+      B12_RC01_DB_NAME: ''
+      B12_RC01_DB_HOST: ''
+      B12_RC01_DB_PORT: ''
+      B12_RC01_DB_PASSWORD: ''
+      B12_RC01_EXPECTED_SERVER_ID: ''
+      B12_RC01_APPROVED_HARNESS_BLOB: ''
+    steps:
+      - name: Set up PHP 8.2 from verified immutable public action
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962
+        with:
+          php-version: '8.2'
+          extensions: none
+          coverage: none
+          tools: none
+          github-token: ''
+
+      - name: Verify 4 pinned files; run seven Python tests, PHP lint, hard-OFF exit only
+        shell: bash
+        run: |
+          set -euo pipefail
+          export LC_ALL=C
+          echo '#####COPY FROM HERE#####'
+          echo 'AUDIT=B12_WS52KG_GH_RC01_OFFLINE_ONLY'
+          if [[ "$GITHUB_REPOSITORY" != 'abeycity4u/Renee-Farms-V2.2.50-Batch3B1' ||
+                "$GITHUB_REF" != 'refs/heads/c137-gc24-k2p03-b12-ws52kg-gh-rc01-offline-verification' ||
+                "$GITHUB_EVENT_NAME" != 'push' ||
+                "$GITHUB_RUN_NUMBER" != '1' ||
+                "$GITHUB_RUN_ATTEMPT" != '1' ]]; then
+            echo 'RESULT=BLOCKED'
+            echo 'REASON=RUN_IDENTITY_DRIFT'
+            echo '#####COPY TO HERE#####'
+            exit 1
+          fi
+          d="$(mktemp -d "${RUNNER_TEMP}/b12-ws52kg.XXXXXXXX")"
+          trap 'rm -rf -- "$d"' EXIT
+          mkdir -p "$d/tests/integration" "$d/.github/workflows"
+          base='https://raw.githubusercontent.com/abeycity4u/Renee-Farms-V2.2.50-Batch3B1/99538d136d06228fdff1351b676af828feb9942c'
+          fetch_blob() {
+            local path="$1" expected="$2"
+            if ! curl --fail --location --silent --show-error --max-time 25                  "$base/$path" -o "$d/$path"; then
+              echo "RESULT=BLOCKED"
+              echo "REASON=PINNED_FETCH_FAILED"
+              echo '#####COPY TO HERE#####'
+              exit 1
+            fi
+            if [[ "$(git hash-object --no-filters "$d/$path")" != "$expected" ]]; then
+              echo "RESULT=BLOCKED"
+              echo "REASON=PINNED_GIT_BLOB_MISMATCH"
+              echo '#####COPY TO HERE#####'
+              exit 1
+            fi
+          }
+          fetch_blob tests/integration/k2p03_b12_repaired_rc01_real_mariadb.php             6f17d1a4ba7e98dbf286d1c8e1a147e6ac3e4aad
+          fetch_blob tests/integration/k2p03_b12_gh_rc01_preliminary_synthetic.php             e78318509e270ccd24684bf41f5e854b74765f76
+          fetch_blob tests/test_b12_ws52kf_gh_rc01_disabled_source.py             c75c62216b6557eb58aeb82a2ee5e5f4c325560c
+          fetch_blob .github/workflows/c137-b12-ws52kf-rc01-gh-candidate-disabled.yml             f59974c2e626eed8d16f3dd73fbd181c1c63837f
+          echo 'FOUR_SOURCE_BLOBS=PASS'
+          source="$d/tests/integration/k2p03_b12_gh_rc01_preliminary_synthetic.php"
+          if [[ "$(grep -Fxc 'const B12_RC01_EXECUTION_ENABLED = false;' "$source")" != 1 ||
+                -n "$(grep -F 'const B12_RC01_EXECUTION_ENABLED = true;' "$source")" ]]; then
+            echo 'RESULT=BLOCKED'
+            echo 'REASON=GH_RC01_LITERAL_FUSE_DRIFT'
+            echo '#####COPY TO HERE#####'
+            exit 1
+          fi
+          echo 'GH_RC01_EXECUTION_FUSE=OFF'
+          if ! python3 -B -m unittest discover -s "$d/tests"                    -p test_b12_ws52kf_gh_rc01_disabled_source.py -v                    >"$d/test.stdout" 2>"$d/test.stderr"; then
+            echo 'PYTHON_SOURCE_CONTRACT=FAIL'
+            echo 'RESULT=BLOCKED'
+            echo 'REASON=SEVEN_PYTHON_TESTS'
+            echo '#####COPY TO HERE#####'
+            exit 1
+          fi
+          if ! grep -Eq '^Ran 7 tests' "$d/test.stderr" ||
+             ! grep -Eq '^OK[[:space:]]*$' "$d/test.stderr"; then
+            echo 'PYTHON_SOURCE_CONTRACT=FAIL'
+            echo 'RESULT=BLOCKED'
+            echo 'REASON=SEVEN_TEST_OUTPUT_NOT_VERIFIED'
+            echo '#####COPY TO HERE#####'
+            exit 1
+          fi
+          echo 'PYTHON_SOURCE_CONTRACT=PASS_7_OF_7'
+          if ! php -n -v >"$d/php.version" 2>"$d/php.version.err" ||
+             ! grep -Eq '^PHP 8\.2\.[0-9]+ \(cli\)' "$d/php.version"; then
+            echo 'RESULT=BLOCKED'
+            echo 'REASON=PHP82_CLI_NOT_ATTESTED'
+            echo '#####COPY TO HERE#####'
+            exit 1
+          fi
+          echo 'PHP82_CLI=PASS'
+          if ! php -n -l "$source" >"$d/php.lint" 2>"$d/php.lint.err" ||
+             ! grep -Fq 'No syntax errors detected' "$d/php.lint"; then
+            echo 'PHP82_LINT=FAIL'
+            echo 'RESULT=BLOCKED'
+            echo 'REASON=GH_CANDIDATE_PHP82_SYNTAX'
+            echo '#####COPY TO HERE#####'
+            exit 1
+          fi
+          echo 'PHP82_LINT=PASS'
+          set +e
+          timeout 10s php -n "$source" >"$d/php.stdout" 2>"$d/php.stderr"
+          rc=$?
+          set -e
+          if [[ "$rc" != 90 || -s "$d/php.stdout" ]] ||
+             ! printf 'B12_RC01=SOURCE_ONLY_HARD_DISABLED\n' | cmp -s - "$d/php.stderr"; then
+            echo 'HARD_OFF_SMOKE=FAIL'
+            echo "RETURN_CODE=$rc"
+            echo 'RESULT=BLOCKED'
+            echo 'REASON=GH_RC01_DISABLED_PATH'
+            echo '#####COPY TO HERE#####'
+            exit 1
+          fi
+          echo 'HARD_OFF_SMOKE=PASS_EXIT_90'
+          echo 'EXACT_EXPECTED_STDERR=PASS'
+          echo 'GH_RC01_WORKERS_EXECUTED=NO'
+          echo 'DATABASE_CONNECTIONS=0'
+          echo 'DATABASE_SERVICES_CREATED=NO'
+          echo 'SQL_EXECUTED=NO'
+          echo 'REAL_BACKUP_READ=NO'
+          echo 'MIGRATION_092_EXECUTED=NO'
+          echo 'REPAIRED_RC01_RC14_CERTIFIED_PASSES=0'
+          echo 'B12_CUTOVER=OFF'
+          echo 'RESULT=PASS_OFFLINE_ONLY'
+          echo '#####COPY TO HERE#####'
