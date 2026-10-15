@@ -13,38 +13,41 @@ MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
-ALLOW = [('CREATE TABLE demo(id INT);', ('CREATE_TABLE',)),
- ('CREATE TABLE demo (id INT, name VARCHAR(30));', ('CREATE_TABLE',)),
+ALLOW = [('CREATE TABLE `demo`(`id` INT);', ('CREATE_TABLE',)),
+ ('CREATE TABLE `demo` (`id` INT, `name` VARCHAR(30));', ('CREATE_TABLE',)),
  ('CREATE TABLE `demo` (`id` INT);', ('CREATE_TABLE',)),
- ('CREATE TABLE _demo2 (a_2 VARCHAR(255));', ('CREATE_TABLE',)),
- ('DROP TABLE demo;', ('DROP_TABLE',)),
+ ('CREATE TABLE `_demo2` (`a_2` VARCHAR(255));', ('CREATE_TABLE',)),
+ ('DROP TABLE `demo`;', ('DROP_TABLE',)),
  ('DROP TABLE IF EXISTS demo;', ('DROP_TABLE',)),
  ('DROP TABLE `Demo`;', ('DROP_TABLE',)),
- ('INSERT INTO demo VALUES (1);', ('INSERT_VALUES',)),
- ("INSERT INTO demo VALUES (1, NULL, 'a;b');", ('INSERT_VALUES',)),
- ("INSERT INTO demo VALUES ('/*not comment*/');", ('INSERT_VALUES',)),
- ("INSERT INTO demo VALUES ('--not comment');", ('INSERT_VALUES',)),
- ("INSERT INTO demo VALUES ('a\\n');", ('INSERT_VALUES',)),
+ ('INSERT INTO `demo` VALUES (1);', ('INSERT_VALUES',)),
+ ("INSERT INTO `demo` VALUES (1, NULL, 'a;b');", ('INSERT_VALUES',)),
+ ("INSERT INTO `demo` VALUES ('/*not comment*/');", ('INSERT_VALUES',)),
+ ("INSERT INTO `demo` VALUES ('--not comment');", ('INSERT_VALUES',)),
+ ("INSERT INTO `demo` VALUES ('a\\n');", ('INSERT_VALUES',)),
  ("INSERT INTO `demo` VALUES ('it''s fine');", ('INSERT_VALUES',)),
- ('ALTER TABLE demo ENABLE KEYS;', ('ALTER_KEYS',)),
+ ('ALTER TABLE `demo` ENABLE KEYS;', ('ALTER_KEYS',)),
  ('ALTER TABLE `demo` DISABLE KEYS;', ('ALTER_KEYS',)),
- ('LOCK TABLES demo READ;', ('LOCK_TABLES',)),
- ('LOCK TABLES demo WRITE;', ('LOCK_TABLES',)),
+ ('LOCK TABLES `demo` READ;', ('LOCK_TABLES',)),
+ ('LOCK TABLES `demo` WRITE;', ('LOCK_TABLES',)),
  ('UNLOCK TABLES;', ('UNLOCK_TABLES',)),
  ("SET SESSION sql_mode='';", ('SET_SQL_MODE',)),
  ("SET SESSION sql_mode='STRICT_ALL_TABLES';", ('SET_SQL_MODE',)),
  ("/*!40101 SET SESSION sql_mode='' */;", ('SET_SQL_MODE',)),
- ('/*M!100000 ALTER TABLE demo ENABLE KEYS */;', ('ALTER_KEYS',)),
- ('/* normal comment */ CREATE TABLE demo (id INT);', ('CREATE_TABLE',)),
- ('# fake CREATE USER\nCREATE TABLE demo (id INT);', ('CREATE_TABLE',)),
- ('-- valid comment\nDROP TABLE demo;', ('DROP_TABLE',)),
- ('INSERT INTO demo VALUES (1); DROP TABLE demo;', ('INSERT_VALUES', 'DROP_TABLE')),
- ('/*M!999999\\- enable the sandbox mode */\nCREATE TABLE demo(id INT);',
+ ('/*M!100000 ALTER TABLE `demo` ENABLE KEYS */;', ('ALTER_KEYS',)),
+ ('/* normal comment */ CREATE TABLE `demo` (`id` INT);', ('CREATE_TABLE',)),
+ ('# fake CREATE USER\nCREATE TABLE `demo` (`id` INT);', ('CREATE_TABLE',)),
+ ('-- valid comment\nDROP TABLE `demo`;', ('DROP_TABLE',)),
+ ('INSERT INTO `demo` VALUES (1); DROP TABLE `demo`;', ('INSERT_VALUES', 'DROP_TABLE')),
+ ('/*M!999999\\- enable the sandbox mode */\nCREATE TABLE `demo`(`id` INT);',
   ('CREATE_TABLE',)),
- ('   /*M!999999\\- enable the sandbox mode */\nCREATE TABLE demo(id INT);',
+ ('   /*M!999999\\- enable the sandbox mode */\nCREATE TABLE `demo`(`id` INT);',
   ('CREATE_TABLE',)),
- ('CREATE TABLE demo(id INT); -- trailing comment', ('CREATE_TABLE',)),
- ("INSERT INTO demo VALUES ('a\\\\b');", ('INSERT_VALUES',))]
+ ('CREATE TABLE `demo`(`id` INT); -- trailing comment', ('CREATE_TABLE',)),
+ ("INSERT INTO `demo` VALUES ('a\\\\b');", ('INSERT_VALUES',)),
+ ('CREATE TABLE `SELECT` (`id` INT);', ('CREATE_TABLE',)),
+ ('CREATE TABLE `ORDER` (`id` INT);', ('CREATE_TABLE',))
+]
 
 REJECT = ['DROP TABLE other.demo;',
  'DROP TABLE `other`.`demo`;',
@@ -116,16 +119,32 @@ REJECT = ['DROP TABLE other.demo;',
  '/*regular /* nested*/ DROP TABLE demo;',
  'CREATE TABLE demo(id INT) /* regular */; USE other;']
 
+# WS52-G targeted reserved-identifier and fail-closed unquoted-name regression.
+REJECT.extend([
+    "CREATE TABLE SELECT (`id` INT);",
+    "CREATE TABLE ORDER (`id` INT);",
+    "CREATE TABLE demo (`id` INT);",
+    "CREATE TABLE `demo` (id INT);",
+    "DROP TABLE demo;",
+    "INSERT INTO demo VALUES (1);",
+    "ALTER TABLE demo ENABLE KEYS;",
+    "LOCK TABLES demo READ;",
+    "CREATE TABLE `demo` (`id` INT, name VARCHAR(30));",
+    "CREATE TABLE `demo` (`id` INT, `name` VARCHAR(30), a_2 INT);",
+    "CREATE TABLE `SELECT` (id INT);",
+    "INSERT INTO `demo` VALUES (1); DROP TABLE demo;",
+])
+
 
 class SyntheticCorpus(unittest.TestCase):
     def test_approved_subset(self):
-        self.assertEqual(len(ALLOW), 30)
+        self.assertEqual(len(ALLOW), 32)
         for i, (statement, expected) in enumerate(ALLOW):
             with self.subTest(case=i):
                 self.assertEqual(MODULE.classify_synthetic(statement), expected)
 
     def test_rejected_cases(self):
-        self.assertEqual(len(REJECT), 67)
+        self.assertEqual(len(REJECT), 79)
         for i, statement in enumerate(REJECT):
             with self.subTest(case=i):
                 with self.assertRaises(MODULE.Rejected):
