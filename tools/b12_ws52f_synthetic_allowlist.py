@@ -193,16 +193,24 @@ def _classify_stmt(tokens: list[Token]) -> str:
         cur.expect("WORD", "TABLE")
         cur.ident()
         cur.expect("SYMBOL", "(")
+        varchar_columns = 0
         while True:
             cur.ident()
             if cur.word("INT"):
                 pass
             elif cur.word("VARCHAR"):
+                # Fail closed on cumulative row-width growth: at most one
+                # VARCHAR column per CREATE TABLE in this synthetic subset.
+                varchar_columns += 1
+                if varchar_columns > 1:
+                    _reject()
                 cur.expect("SYMBOL", "(")
                 size = cur.expect("INTEGER")
                 # Bound decimal conversion before int(): giant literals must
                 # produce Rejected, never an interpreter ValueError.
-                if len(size.value) > 5 or not 1 <= int(size.value) <= 65535:
+                # Conservative tested policy, NOT MariaDB-wide validity.
+                # A single VARCHAR(255) was accepted by WS52-JS.
+                if len(size.value) > 3 or not 1 <= int(size.value) <= 255:
                     _reject()
                 cur.expect("SYMBOL", ")")
             else:
