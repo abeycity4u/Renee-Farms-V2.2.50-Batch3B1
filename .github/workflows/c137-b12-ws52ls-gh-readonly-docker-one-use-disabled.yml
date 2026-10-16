@@ -1,6 +1,9 @@
 name: "C137 B12 WS52-LS THIRD-GEN read-only preflight PREPARED DISABLED"
 
-# WS52-LS PREPARATION ONLY. There is NO authorization for a third run.
+# WS52-LT PREPARATION ONLY. Non-self-referential commit lineage proof.
+# Event-before/commit-API agreement is not independent approval.
+# External reviewer must pin final reviewed source parent before authorization.
+# There is NO authorization for a third run.
 # All prior one-use approvals were consumed; this job MUST remain if:false.
 # Source-only review of a future read-only HTTPS GitHub commit API approval
 # proof, then Docker metadata observation. No live network or Docker now.
@@ -52,6 +55,7 @@ jobs:
           audit = {
               "ONE_USE_EVENT_GUARD": "NOT_VERIFIED",
               "APPROVAL_GITHUB_COMMIT_API": "NOT_VERIFIED",
+              "APPROVED_SOURCE_AUTHORITY": "NOT_ATTESTED",
               "GITHUB_HOSTED_RUNNER_CLAIM": "NOT_VERIFIED",
               "DOCKER_LOCAL_UNIX_SOCKET": "NOT_VERIFIED",
               "DOCKER_READONLY_COMMANDS": "NOT_RUN",
@@ -105,11 +109,15 @@ jobs:
               def redirect_request(self, request, fp, code, msg, headers, newurl):
                   raise GuardReject("COMMIT_API_REDIRECT_BLOCKED")
 
-          def verify_commit_delta_via_api(commit_sha):
+          def verify_commit_delta_via_api(commit_sha, expected_parent_sha):
               """Read-only independent GitHub API proof; no caller-supplied URL."""
               require(type(commit_sha) is str and
                       re.fullmatch(r"[a-f0-9]{40}", commit_sha) is not None,
                       "COMMIT_API_SHA_INVALID")
+              require(type(expected_parent_sha) is str and
+                      re.fullmatch(r"[a-f0-9]{40}", expected_parent_sha) is not None and
+                      expected_parent_sha != "0" * 40,
+                      "COMMIT_API_BEFORE_SHA_INVALID")
               url = ("https://api.github.com/repos/"
                      "abeycity4u/Renee-Farms-V2.2.50-Batch3B1/commits/"
                      + commit_sha)
@@ -149,7 +157,7 @@ jobs:
               require(type(parents) is list and len(parents) == 1,
                       "COMMIT_API_PARENT_COUNT")
               require(type(parents[0]) is dict and
-                      parents[0].get("sha") == "0000000000000000000000000000000000000000",
+                      parents[0].get("sha") == expected_parent_sha,
                       "COMMIT_API_PARENT_MISMATCH")
               files = record.get("files")
               require(type(files) is list and len(files) == 1,
@@ -214,9 +222,10 @@ jobs:
                       "EVENT_COMMIT_MESSAGE_MISMATCH")
               # GitHub push-event head_commit.added may be unavailable or
               # differ from independently retrieved commit metadata.
-              # Fail CLOSED unless a direct GitHub commit API response proves
-              # the sole added approval file and exact expected parent.
-              verify_commit_delta_via_api(sha)
+              # Do NOT trust push-event added/removed lists. First validate
+              # GitHub event.before, then fetch the exact commit API metadata.
+              # This compares two GitHub-provided values; it does NOT attest
+              # independent human approval of the reviewed workflow source.
               commits = event.get("commits")
               require(type(commits) is list and len(commits) == 1,
                       "EVENT_COMMIT_COUNT_NOT_ONE")
@@ -231,6 +240,9 @@ jobs:
               require(type(before) is str and
                       re.fullmatch(r"[a-f0-9]{40}", before) is not None and
                       before != "0" * 40, "EVENT_BEFORE_SHA_INVALID")
+              # The caller cannot pick the parent via method input, query, or
+              # override; the GitHub-supplied before must agree with the API.
+              verify_commit_delta_via_api(sha, before)
               audit["ONE_USE_EVENT_GUARD"] = "PASS"
 
           def readonly(*args):
