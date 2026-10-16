@@ -1,6 +1,8 @@
 name: "C137 B12 WS52-LP fresh single-use read-only Docker preflight"
 
-# WS52-LP: NEW, separately user-authorized one-use read-only preflight.
+# WS52-LQ SOURCE-ONLY: fixed event-added evidence dependency using
+# a pinned GitHub commit API comparison, with no access to Docker.
+# This branch is permanently disabled; no new physical run authorized.
 # WS52-LK approval is consumed and is NOT reused; no RC01 approval.
 # No checkout action, services, image pulls, containers, volumes, SQL, backup,
 # registry/CDN, production/staging, migration or concurrency execution.
@@ -20,13 +22,9 @@ concurrency:
 
 jobs:
   docker-readonly-preflight:
-    # Both workflow and Python gates require first run and first attempt.
-    if: >-
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/c137-gc24-k2p03-b12-ws52lp-second-gh-readonly-preflight' &&
-      github.event.head_commit.message == 'ci-b12(ws52lp-run): authorize fresh readonly Docker preflight' &&
-      github.run_number == 1 &&
-      github.run_attempt == 1
+    # WS52-LP physical preflight attempt was CONSUMED; this copy is inert.
+    # NOT AN EXECUTABLE ONE-USE WORKFLOW. A fresh branch/scope/approval needed.
+    if: ${{ false }}
     name: "One-use GitHub-hosted Docker metadata inspection (NO MUTATION)"
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -42,6 +40,7 @@ jobs:
           import stat
           import subprocess
           import sys
+          import urllib.request
 
           REPO = "abeycity4u/Renee-Farms-V2.2.50-Batch3B1"
           REF = "refs/heads/c137-gc24-k2p03-b12-ws52lp-second-gh-readonly-preflight"
@@ -49,6 +48,7 @@ jobs:
           MESSAGE = "ci-b12(ws52lp-run): authorize fresh readonly Docker preflight"
           audit = {
               "ONE_USE_EVENT_GUARD": "NOT_VERIFIED",
+              "APPROVAL_GITHUB_COMMIT_API": "NOT_VERIFIED",
               "GITHUB_HOSTED_RUNNER_CLAIM": "NOT_VERIFIED",
               "DOCKER_LOCAL_UNIX_SOCKET": "NOT_VERIFIED",
               "DOCKER_READONLY_COMMANDS": "NOT_RUN",
@@ -98,6 +98,69 @@ jobs:
               if not valid:
                   raise GuardReject(code)
 
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, request, fp, code, msg, headers, newurl):
+                  raise GuardReject("COMMIT_API_REDIRECT_BLOCKED")
+
+          def verify_commit_delta_via_api(commit_sha):
+              """Read-only independent GitHub API proof; no caller-supplied URL."""
+              require(type(commit_sha) is str and
+                      re.fullmatch(r"[a-f0-9]{40}", commit_sha) is not None,
+                      "COMMIT_API_SHA_INVALID")
+              url = ("https://api.github.com/repos/"
+                     "abeycity4u/Renee-Farms-V2.2.50-Batch3B1/commits/"
+                     + commit_sha)
+              opener = urllib.request.build_opener(
+                  urllib.request.ProxyHandler({}), NoRedirect())
+              request = urllib.request.Request(
+                  url,
+                  method="GET",
+                  headers={
+                      "Accept": "application/vnd.github+json",
+                      "Accept-Encoding": "identity",
+                      "User-Agent": "B12-WS52LQ-ReadOnly-Approval-Proof",
+                  },
+              )
+              try:
+                  with opener.open(request, timeout=10) as response:
+                      require(response.status == 200 and
+                              response.geturl() == url,
+                              "COMMIT_API_RESPONSE_UNEXPECTED")
+                      require(response.headers.get(
+                          "Content-Encoding", "identity").lower() == "identity",
+                          "COMMIT_API_ENCODING_UNEXPECTED")
+                      raw = response.read(65537)
+              except GuardReject:
+                  raise
+              except Exception:
+                  raise GuardReject("COMMIT_API_FETCH_FAILED") from None
+              require(0 < len(raw) <= 65536, "COMMIT_API_BODY_INVALID")
+              try:
+                  record = json.loads(raw.decode("utf-8", "strict"))
+              except (UnicodeError, ValueError):
+                  raise GuardReject("COMMIT_API_JSON_INVALID") from None
+              require(type(record) is dict, "COMMIT_API_RECORD_INVALID")
+              require(record.get("sha") == commit_sha,
+                      "COMMIT_API_SHA_MISMATCH")
+              parents = record.get("parents")
+              require(type(parents) is list and len(parents) == 1,
+                      "COMMIT_API_PARENT_COUNT")
+              require(type(parents[0]) is dict and
+                      parents[0].get("sha") == "1908c45f3526a511fd0037cae212133822fe7a5b",
+                      "COMMIT_API_PARENT_MISMATCH")
+              files = record.get("files")
+              require(type(files) is list and len(files) == 1,
+                      "COMMIT_API_CHANGED_FILE_COUNT")
+              require(type(files[0]) is dict and
+                      files[0].get("filename") == APPROVAL and
+                      files[0].get("status") == "added",
+                      "COMMIT_API_APPROVAL_DELTA_MISMATCH")
+              commit = record.get("commit")
+              require(type(commit) is dict and
+                      commit.get("message") == MESSAGE,
+                      "COMMIT_API_MESSAGE_MISMATCH")
+              audit["APPROVAL_GITHUB_COMMIT_API"] = "PASS_TLS_READONLY"
+
           def guard():
               # Order matters: each step returns exactly one fixed reason code.
               require(os.environ.get("GITHUB_ACTIONS") == "true",
@@ -146,12 +209,11 @@ jobs:
               require(head.get("id") == sha, "EVENT_COMMIT_SHA_MISMATCH")
               require(head.get("message") == MESSAGE,
                       "EVENT_COMMIT_MESSAGE_MISMATCH")
-              require(head.get("added") == [APPROVAL],
-                      "EVENT_ADDED_FILES_MISMATCH")
-              require(head.get("modified") == [],
-                      "EVENT_MODIFIED_FILES_MISMATCH")
-              require(head.get("removed") == [],
-                      "EVENT_REMOVED_FILES_MISMATCH")
+              # GitHub push-event head_commit.added may be unavailable or
+              # differ from independently retrieved commit metadata.
+              # Fail CLOSED unless a direct GitHub commit API response proves
+              # the sole added approval file and exact expected parent.
+              verify_commit_delta_via_api(sha)
               commits = event.get("commits")
               require(type(commits) is list and len(commits) == 1,
                       "EVENT_COMMIT_COUNT_NOT_ONE")
