@@ -1,0 +1,327 @@
+name: "C137 B12 WS52-LS THIRD-GEN read-only preflight PREPARED DISABLED"
+
+# WS52-LS PREPARATION ONLY. There is NO authorization for a third run.
+# All prior one-use approvals were consumed; this job MUST remain if:false.
+# Source-only review of a future read-only HTTPS GitHub commit API approval
+# proof, then Docker metadata observation. No live network or Docker now.
+# No checkout action, services, image pulls, containers, volumes, SQL, backup,
+# registry/CDN, production/staging, migration or concurrency execution.
+# This workflow has a single-use exact-branch/approval-path/commit-message gate.
+on:
+  push:
+    branches:
+      - c137-gc24-k2p03-b12-ws52ls-third-readonly-preflight-preparation
+    paths:
+      - docs/C137_GC24_K2_P03_B12_WS52LS_READONLY_PREFLIGHT_ONE_USE_APPROVAL.txt
+
+permissions: {}
+
+concurrency:
+  group: c137-b12-ws52ls-single-readonly-preflight-preparation
+  cancel-in-progress: false
+
+jobs:
+  docker-readonly-preflight:
+    # Future executable form also needs exact first-run/first-attempt gate
+    # at BOTH job and Python levels, a frozen source/approval parent, and
+    # independent one-use authorization. These are intentionally incomplete.
+    # NO physical preflight authorized; preparation is non-executable.
+    # The future one-use job must be separately rebuilt/reviewed/approved.
+    if: ${{ false }}
+    name: "One-use GitHub-hosted Docker metadata inspection (NO MUTATION)"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: "Validate one-use approval event; inspect runner and Docker read-only"
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
+          import json
+          import os
+          import re
+          import stat
+          import subprocess
+          import sys
+          import urllib.request
+
+          REPO = "abeycity4u/Renee-Farms-V2.2.50-Batch3B1"
+          REF = "refs/heads/c137-gc24-k2p03-b12-ws52ls-third-readonly-preflight-preparation"
+          APPROVAL = "docs/C137_GC24_K2_P03_B12_WS52LS_READONLY_PREFLIGHT_ONE_USE_APPROVAL.txt"
+          MESSAGE = "ci-b12(ws52ls-run): approve distinct one-use readonly Docker and GitHub API preflight"
+          audit = {
+              "ONE_USE_EVENT_GUARD": "NOT_VERIFIED",
+              "APPROVAL_GITHUB_COMMIT_API": "NOT_VERIFIED",
+              "GITHUB_HOSTED_RUNNER_CLAIM": "NOT_VERIFIED",
+              "DOCKER_LOCAL_UNIX_SOCKET": "NOT_VERIFIED",
+              "DOCKER_READONLY_COMMANDS": "NOT_RUN",
+              "ENGINE_METADATA_READ": "NO",
+              "ENGINE_ID_PRESENT": "NOT_VERIFIED",
+              "DOCKER_CONTAINERS_EXIST": "NOT_VERIFIED",
+              "DOCKER_VOLUMES_EXIST": "NOT_VERIFIED",
+              "UNEXPECTED_NETWORKS_EXIST": "NOT_VERIFIED",
+              "TCP_3306_LISTENER": "NOT_VERIFIED",
+          }
+
+          def emit(result, reason):
+              print("#####COPY FROM HERE#####")
+              print("AUDIT=B12_WS52LS_GITHUB_READONLY_PHYSICAL_PREFLIGHT")
+              print("RESULT=" + result)
+              print("REASON=" + reason)
+              for key, val in audit.items():
+                  print(key + "=" + val)
+              print("RUNNER_PROVENANCE=SELF_REPORTED_GITHUB_HOSTED_ONLY")
+              print("ENGINE_PROVENANCE=DAEMON_SELF_REPORTED_ONLY")
+              print("INDEPENDENT_ATTESTOR=NOT_ESTABLISHED")
+              print("EGRESS_ISOLATION=NOT_ATTESTED")
+              print("DOCKER_BROKER_PRIVILEGE_SEPARATION=NOT_CERTIFIED")
+              print("IMAGE_DOWNLOADS=NO")
+              print("REGISTRY_REQUESTS=0")
+              print("CONTAINERS_CREATED=0")
+              print("CONTAINERS_REMOVED=0")
+              print("VOLUMES_CREATED=0")
+              print("VOLUMES_REMOVED=0")
+              print("DATABASE_CONNECTIONS=0")
+              print("SQL_EXECUTED=NO")
+              print("CUSTOMER_DATA_ACCESSED=NO")
+              print("RC01_WORKERS_EXECUTED=NO")
+              print("RUNTIME_RC01_APPROVAL=NOT_GRANTED")
+              print("REPAIRED_RC01_RC14_CERTIFIED_PASSES=0")
+              print("MIGRATION_092=NOT_AUTHORIZED")
+              print("B12_CUTOVER=HARD_OFF")
+              print("#####COPY TO HERE#####")
+              sys.stdout.flush()
+
+          class GuardReject(Exception):
+              """Owns a constant non-sensitive diagnostic code, never input data."""
+              def __init__(self, code):
+                  self.code = code
+
+          def require(valid, code):
+              if not valid:
+                  raise GuardReject(code)
+
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, request, fp, code, msg, headers, newurl):
+                  raise GuardReject("COMMIT_API_REDIRECT_BLOCKED")
+
+          def verify_commit_delta_via_api(commit_sha):
+              """Read-only independent GitHub API proof; no caller-supplied URL."""
+              require(type(commit_sha) is str and
+                      re.fullmatch(r"[a-f0-9]{40}", commit_sha) is not None,
+                      "COMMIT_API_SHA_INVALID")
+              url = ("https://api.github.com/repos/"
+                     "abeycity4u/Renee-Farms-V2.2.50-Batch3B1/commits/"
+                     + commit_sha)
+              opener = urllib.request.build_opener(
+                  urllib.request.ProxyHandler({}), NoRedirect())
+              request = urllib.request.Request(
+                  url,
+                  method="GET",
+                  headers={
+                      "Accept": "application/vnd.github+json",
+                      "Accept-Encoding": "identity",
+                      "User-Agent": "B12-WS52LQ-ReadOnly-Approval-Proof",
+                  },
+              )
+              try:
+                  with opener.open(request, timeout=10) as response:
+                      require(response.status == 200 and
+                              response.geturl() == url,
+                              "COMMIT_API_RESPONSE_UNEXPECTED")
+                      require(response.headers.get(
+                          "Content-Encoding", "identity").lower() == "identity",
+                          "COMMIT_API_ENCODING_UNEXPECTED")
+                      raw = response.read(65537)
+              except GuardReject:
+                  raise
+              except Exception:
+                  raise GuardReject("COMMIT_API_FETCH_FAILED") from None
+              require(0 < len(raw) <= 65536, "COMMIT_API_BODY_INVALID")
+              try:
+                  record = json.loads(raw.decode("utf-8", "strict"))
+              except (UnicodeError, ValueError):
+                  raise GuardReject("COMMIT_API_JSON_INVALID") from None
+              require(type(record) is dict, "COMMIT_API_RECORD_INVALID")
+              require(record.get("sha") == commit_sha,
+                      "COMMIT_API_SHA_MISMATCH")
+              parents = record.get("parents")
+              require(type(parents) is list and len(parents) == 1,
+                      "COMMIT_API_PARENT_COUNT")
+              require(type(parents[0]) is dict and
+                      parents[0].get("sha") == "0000000000000000000000000000000000000000",
+                      "COMMIT_API_PARENT_MISMATCH")
+              files = record.get("files")
+              require(type(files) is list and len(files) == 1,
+                      "COMMIT_API_CHANGED_FILE_COUNT")
+              require(type(files[0]) is dict and
+                      files[0].get("filename") == APPROVAL and
+                      files[0].get("status") == "added",
+                      "COMMIT_API_APPROVAL_DELTA_MISMATCH")
+              commit = record.get("commit")
+              require(type(commit) is dict and
+                      commit.get("message") == MESSAGE,
+                      "COMMIT_API_MESSAGE_MISMATCH")
+              audit["APPROVAL_GITHUB_COMMIT_API"] = "PASS_TLS_READONLY"
+
+          def guard():
+              # Order matters: each step returns exactly one fixed reason code.
+              require(os.environ.get("GITHUB_ACTIONS") == "true",
+                      "ENV_GITHUB_ACTIONS")
+              require(os.environ.get("GITHUB_EVENT_NAME") == "push",
+                      "ENV_EVENT_NOT_PUSH")
+              require(os.environ.get("GITHUB_REPOSITORY") == REPO,
+                      "ENV_REPOSITORY_MISMATCH")
+              require(os.environ.get("GITHUB_REF") == REF,
+                      "ENV_REF_MISMATCH")
+              require(os.environ.get("GITHUB_RUN_NUMBER") == "1",
+                      "ENV_RUN_NUMBER_NOT_ONE")
+              require(os.environ.get("GITHUB_RUN_ATTEMPT") == "1",
+                      "ENV_RUN_ATTEMPT_NOT_ONE")
+              require(os.environ.get("RUNNER_OS") == "Linux",
+                      "RUNNER_OS_UNEXPECTED")
+              require(os.environ.get("RUNNER_ARCH") == "X64",
+                      "RUNNER_ARCH_UNEXPECTED")
+              runner_environment = os.environ.get("RUNNER_ENVIRONMENT")
+              require(runner_environment in (None, "github-hosted"),
+                      "RUNNER_ENVIRONMENT_UNEXPECTED")
+              audit["GITHUB_HOSTED_RUNNER_CLAIM"] = (
+                  "PASS_SELF_REPORTED" if runner_environment == "github-hosted"
+                  else "JOB_LABEL_ONLY_NOT_INDEPENDENTLY_ATTESTED"
+              )
+              sha = os.environ.get("GITHUB_SHA")
+              require(type(sha) is str and
+                      re.fullmatch(r"[a-f0-9]{40}", sha) is not None,
+                      "ENV_HEAD_SHA_INVALID")
+              event_path = os.environ.get("GITHUB_EVENT_PATH")
+              require(type(event_path) is str and bool(event_path),
+                      "EVENT_PATH_MISSING")
+              try:
+                  with open(event_path, "rb") as stream:
+                      raw = stream.read(262145)
+              except OSError:
+                  raise GuardReject("EVENT_FILE_UNREADABLE") from None
+              require(0 < len(raw) <= 262144, "EVENT_BYTES_OUT_OF_BOUNDS")
+              try:
+                  event = json.loads(raw.decode("utf-8", "strict"))
+              except (UnicodeError, ValueError, TypeError):
+                  raise GuardReject("EVENT_JSON_INVALID") from None
+              require(type(event) is dict, "EVENT_ROOT_NOT_OBJECT")
+              head = event.get("head_commit")
+              require(type(head) is dict, "EVENT_HEAD_COMMIT_MISSING")
+              require(head.get("id") == sha, "EVENT_COMMIT_SHA_MISMATCH")
+              require(head.get("message") == MESSAGE,
+                      "EVENT_COMMIT_MESSAGE_MISMATCH")
+              # GitHub push-event head_commit.added may be unavailable or
+              # differ from independently retrieved commit metadata.
+              # Fail CLOSED unless a direct GitHub commit API response proves
+              # the sole added approval file and exact expected parent.
+              verify_commit_delta_via_api(sha)
+              commits = event.get("commits")
+              require(type(commits) is list and len(commits) == 1,
+                      "EVENT_COMMIT_COUNT_NOT_ONE")
+              require(event.get("ref") == REF, "EVENT_REF_MISMATCH")
+              require(event.get("deleted") is False,
+                      "EVENT_DELETED_OR_MISSING")
+              repository = event.get("repository")
+              require(type(repository) is dict and
+                      repository.get("full_name") == REPO,
+                      "EVENT_REPOSITORY_MISMATCH")
+              before = event.get("before")
+              require(type(before) is str and
+                      re.fullmatch(r"[a-f0-9]{40}", before) is not None and
+                      before != "0" * 40, "EVENT_BEFORE_SHA_INVALID")
+              audit["ONE_USE_EVENT_GUARD"] = "PASS"
+
+          def readonly(*args):
+              approved = {
+                  ("version", "--format", "{{json .Server}}"),
+                  ("info", "--format", "{{json .}}"),
+                  ("container", "ls", "--all", "--no-trunc", "--quiet"),
+                  ("volume", "ls", "--quiet"),
+                  ("network", "ls", "--format", "{{json .}}"),
+              }
+              assert args in approved
+              proc = subprocess.run(
+                  ["/usr/bin/docker", *args],
+                  shell=False,
+                  stdin=subprocess.DEVNULL,
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.PIPE,
+                  timeout=12,
+                  check=False,
+              )
+              require(proc.returncode == 0, "DOCKER_READONLY_COMMAND_FAILED")
+              require(len(proc.stdout) <= 131072, "DOCKER_METADATA_OVERSIZE")
+              try:
+                  return proc.stdout.decode("utf-8", "strict")
+              except UnicodeError:
+                  raise GuardReject("DOCKER_METADATA_ENCODING_INVALID") from None
+
+          def check_listener():
+              # Host-kernel metadata only. Never open a TCP connection.
+              for filename in ("/proc/net/tcp", "/proc/net/tcp6"):
+                  with open(filename, "rt", encoding="ascii") as f:
+                      next(f)
+                      for line in f:
+                          fields = line.split()
+                          if len(fields) < 4:
+                              continue
+                          port = int(fields[1].split(":")[-1], 16)
+                          if port == 3306 and fields[3] == "0A":
+                              return True
+              return False
+
+          try:
+              guard()
+              require(not os.environ.get("DOCKER_CONTEXT"), "DOCKER_CONTEXT_NOT_DEFAULT")
+              require(os.environ.get("DOCKER_HOST", "") in
+                      ("", "unix:///var/run/docker.sock"), "DOCKER_HOST_UNEXPECTED")
+              require(not os.environ.get("DOCKER_TLS_VERIFY"), "DOCKER_TLS_UNEXPECTED")
+              require(not os.environ.get("DOCKER_CERT_PATH"), "DOCKER_CERT_PATH_UNEXPECTED")
+              require(os.path.isfile("/usr/bin/docker"), "DOCKER_BINARY_MISSING")
+              require(not os.path.islink("/var/run/docker.sock"),
+                      "DOCKER_SOCKET_SYMLINK_UNREVIEWED")
+              require(os.path.exists("/var/run/docker.sock"),
+                      "DOCKER_LOCAL_SOCKET_MISSING")
+              require(stat.S_ISSOCK(os.stat("/var/run/docker.sock").st_mode),
+                      "DOCKER_LOCAL_SOCKET_NOT_UNIX")
+              audit["DOCKER_LOCAL_UNIX_SOCKET"] = "PRESENT"
+              try:
+                  version = json.loads(readonly("version", "--format", "{{json .Server}}"))
+                  info = json.loads(readonly("info", "--format", "{{json .}}"))
+              except (ValueError, TypeError):
+                  raise GuardReject("ENGINE_METADATA_JSON_INVALID") from None
+              assert type(version) is dict and type(info) is dict
+              assert isinstance(info.get("ID"), str) and bool(info["ID"])
+              assert isinstance(version.get("Version"), str) and bool(version["Version"])
+              assert isinstance(info.get("ServerVersion"), str)
+              assert info["ServerVersion"] == version["Version"]
+              audit["ENGINE_METADATA_READ"] = "YES_DOCKER_CLI"
+              audit["ENGINE_ID_PRESENT"] = "YES_DAEMON_SELF_REPORTED"
+              containers = [x for x in readonly("container", "ls", "--all", "--no-trunc", "--quiet").splitlines() if x]
+              volumes = [x for x in readonly("volume", "ls", "--quiet").splitlines() if x]
+              networks = [json.loads(line) for line in readonly("network", "ls", "--format", "{{json .}}").splitlines() if line]
+              assert all(type(n) is dict and isinstance(n.get("Name"), str) for n in networks)
+              names = {n["Name"] for n in networks}
+              audit["DOCKER_READONLY_COMMANDS"] = "PASS"
+              audit["DOCKER_CONTAINERS_EXIST"] = "YES" if containers else "NO"
+              audit["DOCKER_VOLUMES_EXIST"] = "YES" if volumes else "NO"
+              audit["UNEXPECTED_NETWORKS_EXIST"] = "YES" if (names - {"bridge", "host", "none"}) else "NO"
+              audit["TCP_3306_LISTENER"] = "YES" if check_listener() else "NO"
+              if containers or volumes or (names - {"bridge", "host", "none"}):
+                  emit("BLOCKED", "PREEXISTING_DOCKER_RESOURCES_PRESENT")
+                  sys.exit(2)
+              if audit["TCP_3306_LISTENER"] != "NO":
+                  emit("BLOCKED", "LOCAL_TCP_3306_IN_USE")
+                  sys.exit(2)
+              emit("READONLY_OBSERVATION_PASS", "NONE")
+          except GuardReject as issue:
+              # This code is selected from source constants only.
+              emit("BLOCKED", issue.code)
+              sys.exit(2)
+          except Exception:
+              # Never reflect stderr, host metadata, paths or raw JSON.
+              emit("BLOCKED", "UNEXPECTED_DOCKER_PREFLIGHT_FAILURE")
+              sys.exit(2)
+          PY
