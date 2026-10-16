@@ -34,10 +34,9 @@ def _guard_only(workflow_source):
     z = "          def readonly(*args):"
     if workflow_source.count(a) != 1 or workflow_source.count(z) != 1:
         raise AssertionError("GUARD_SOURCE_ANCHOR_CHANGED")
-    extracted = textwrap.dedent(
-        workflow_source.split(a, 1)[1].split(z, 1)[0]
-    )
-    extracted = "REPO = " + extracted
+    start = workflow_source.index(a)
+    end = workflow_source.index(z, start)
+    extracted = textwrap.dedent(workflow_source[start:end])
     tree = ast.parse(extracted)
     permitted = {
         "REPO", "REF", "APPROVAL", "MESSAGE", "audit",
