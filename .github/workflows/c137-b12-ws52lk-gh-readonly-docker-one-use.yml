@@ -1,6 +1,9 @@
 name: "C137 B12 WS52-LK single-use read-only Docker runner preflight"
 
-# Authorized by user ONLY for a disposable GitHub-hosted runner metadata preflight.
+# FROZEN SOURCE-ONLY DIAGNOSTIC PATCH ON WS52-LM FEATURE BRANCH.
+# Literal if:false means NO execution, even with an approval-path push.
+# WS52-LK previous one-use authorization has already been consumed.
+# Original scope: disposable GitHub-hosted runner metadata preflight.
 # No checkout action, services, image pulls, containers, volumes, SQL, backup,
 # registry/CDN, production/staging, migration or concurrency execution.
 # This workflow has a single-use exact-branch/approval-path/commit-message gate.
@@ -19,12 +22,9 @@ concurrency:
 
 jobs:
   docker-readonly-preflight:
-    if: >-
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/c137-gc24-k2p03-b12-ws52lk-gh-readonly-docker-preflight' &&
-      github.event.head_commit.message == 'ci-b12(ws52lk-run): approve one readonly Docker preflight' &&
-      github.run_number == 1 &&
-      github.run_attempt == 1
+    # WS52-LK one-use attempt is CONSUMED; this source-only successor is inert.
+    # A future independently reviewed, newly authorized workflow is required.
+    if: ${{ false }}
     name: "One-use GitHub-hosted Docker metadata inspection (NO MUTATION)"
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -87,34 +87,78 @@ jobs:
               print("#####COPY TO HERE#####")
               sys.stdout.flush()
 
+          class GuardReject(Exception):
+              """Owns a constant non-sensitive diagnostic code, never input data."""
+              def __init__(self, code):
+                  self.code = code
+
+          def require(valid, code):
+              if not valid:
+                  raise GuardReject(code)
+
           def guard():
-              assert os.environ.get("GITHUB_ACTIONS") == "true"
-              assert os.environ.get("GITHUB_EVENT_NAME") == "push"
-              assert os.environ.get("GITHUB_REPOSITORY") == REPO
-              assert os.environ.get("GITHUB_REF") == REF
-              assert os.environ.get("GITHUB_RUN_NUMBER") == "1"
-              assert os.environ.get("GITHUB_RUN_ATTEMPT") == "1"
-              assert os.environ.get("RUNNER_OS") == "Linux"
-              assert os.environ.get("RUNNER_ARCH") == "X64"
-              assert os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted"
-              event_path = os.environ["GITHUB_EVENT_PATH"]
-              with open(event_path, "rb") as stream:
-                  raw = stream.read(262145)
-              assert 0 < len(raw) <= 262144
-              event = json.loads(raw.decode("utf-8", "strict"))
-              head = event["head_commit"]
-              assert head["id"] == os.environ["GITHUB_SHA"]
-              assert head["message"] == MESSAGE
-              assert head["added"] == [APPROVAL]
-              assert head["modified"] == []
-              assert head["removed"] == []
-              assert len(event["commits"]) == 1
-              assert event["ref"] == REF
-              assert event.get("deleted") is False
-              assert event["repository"]["full_name"] == REPO
-              before = event["before"]
-              assert re.fullmatch(r"[a-f0-9]{40}", before)
-              assert before != "0" * 40
+              # Order matters: each step returns exactly one fixed reason code.
+              require(os.environ.get("GITHUB_ACTIONS") == "true",
+                      "ENV_GITHUB_ACTIONS")
+              require(os.environ.get("GITHUB_EVENT_NAME") == "push",
+                      "ENV_EVENT_NOT_PUSH")
+              require(os.environ.get("GITHUB_REPOSITORY") == REPO,
+                      "ENV_REPOSITORY_MISMATCH")
+              require(os.environ.get("GITHUB_REF") == REF,
+                      "ENV_REF_MISMATCH")
+              require(os.environ.get("GITHUB_RUN_NUMBER") == "1",
+                      "ENV_RUN_NUMBER_NOT_ONE")
+              require(os.environ.get("GITHUB_RUN_ATTEMPT") == "1",
+                      "ENV_RUN_ATTEMPT_NOT_ONE")
+              require(os.environ.get("RUNNER_OS") == "Linux",
+                      "RUNNER_OS_UNEXPECTED")
+              require(os.environ.get("RUNNER_ARCH") == "X64",
+                      "RUNNER_ARCH_UNEXPECTED")
+              require(os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted",
+                      "RUNNER_ENVIRONMENT_UNVERIFIED")
+              sha = os.environ.get("GITHUB_SHA")
+              require(type(sha) is str and
+                      re.fullmatch(r"[a-f0-9]{40}", sha) is not None,
+                      "ENV_HEAD_SHA_INVALID")
+              event_path = os.environ.get("GITHUB_EVENT_PATH")
+              require(type(event_path) is str and bool(event_path),
+                      "EVENT_PATH_MISSING")
+              try:
+                  with open(event_path, "rb") as stream:
+                      raw = stream.read(262145)
+              except OSError:
+                  raise GuardReject("EVENT_FILE_UNREADABLE") from None
+              require(0 < len(raw) <= 262144, "EVENT_BYTES_OUT_OF_BOUNDS")
+              try:
+                  event = json.loads(raw.decode("utf-8", "strict"))
+              except (UnicodeError, ValueError, TypeError):
+                  raise GuardReject("EVENT_JSON_INVALID") from None
+              require(type(event) is dict, "EVENT_ROOT_NOT_OBJECT")
+              head = event.get("head_commit")
+              require(type(head) is dict, "EVENT_HEAD_COMMIT_MISSING")
+              require(head.get("id") == sha, "EVENT_COMMIT_SHA_MISMATCH")
+              require(head.get("message") == MESSAGE,
+                      "EVENT_COMMIT_MESSAGE_MISMATCH")
+              require(head.get("added") == [APPROVAL],
+                      "EVENT_ADDED_FILES_MISMATCH")
+              require(head.get("modified") == [],
+                      "EVENT_MODIFIED_FILES_MISMATCH")
+              require(head.get("removed") == [],
+                      "EVENT_REMOVED_FILES_MISMATCH")
+              commits = event.get("commits")
+              require(type(commits) is list and len(commits) == 1,
+                      "EVENT_COMMIT_COUNT_NOT_ONE")
+              require(event.get("ref") == REF, "EVENT_REF_MISMATCH")
+              require(event.get("deleted") is False,
+                      "EVENT_DELETED_OR_MISSING")
+              repository = event.get("repository")
+              require(type(repository) is dict and
+                      repository.get("full_name") == REPO,
+                      "EVENT_REPOSITORY_MISMATCH")
+              before = event.get("before")
+              require(type(before) is str and
+                      re.fullmatch(r"[a-f0-9]{40}", before) is not None and
+                      before != "0" * 40, "EVENT_BEFORE_SHA_INVALID")
               audit["ONE_USE_EVENT_GUARD"] = "PASS"
               audit["GITHUB_HOSTED_RUNNER_CLAIM"] = "PASS_SELF_REPORTED"
 
@@ -190,9 +234,12 @@ jobs:
                   emit("BLOCKED", "LOCAL_TCP_3306_IN_USE")
                   sys.exit(2)
               emit("READONLY_OBSERVATION_PASS", "NONE")
+          except GuardReject as issue:
+              # This code is selected from source constants only.
+              emit("BLOCKED", issue.code)
+              sys.exit(2)
           except Exception:
-              # Never reflect arbitrary stderr, paths, host names, socket
-              # diagnostics or Docker response payloads into public logs.
-              emit("BLOCKED", "ONE_USE_OR_DOCKER_READONLY_PREFLIGHT_FAILED")
+              # Never reflect stderr, host metadata, paths or raw JSON.
+              emit("BLOCKED", "UNEXPECTED_DOCKER_PREFLIGHT_FAILURE")
               sys.exit(2)
           PY
