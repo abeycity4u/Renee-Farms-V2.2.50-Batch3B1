@@ -149,47 +149,60 @@ def _parse_http_wire(data: Any) -> WireBody:
     return WireBody(body, 200, "application/json", "identity")
 
 
-def _bounded_socket_get(context: Any, request: Any) -> bytes:
-    """Engine-touching primitive; NEVER CALL without separate code/host review.
-
-    This exact-route validation occurs at the socket boundary. No raw caller
-    request bytes are accepted. The public entrypoint remains HARD OFF.
-    """
-    request_bytes = _request_for_path(context, request)
-    raw = bytearray()
-    # socket is created ONLY inside this internal primitive, not at import.
-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
-        connection.settimeout(SOCKET_TIMEOUT_SECONDS)
-        connection.connect(SOCKET_PATH)
-        connection.sendall(request_bytes)
-        while True:
-            part = connection.recv(READ_CHUNK)
-            if not part:
-                break
-            if len(raw) + len(part) > MAX_WIRE_BYTES:
-                raise ValueError("WIRE_LIMIT_EXCEEDED_DURING_READ")
-            raw.extend(part)
-            # If headers are present, reject any size excess early.
-            split = raw.find(b"\r\n\r\n")
-            if split >= 0:
-                if split > MAX_HEADER_BYTES:
-                    raise ValueError("HEADER_LIMIT_EXCEEDED_DURING_READ")
-                if len(raw) - split - 4 > MAX_RAW_BYTES:
-                    raise ValueError("BODY_LIMIT_EXCEEDED_DURING_READ")
-            elif len(raw) > MAX_HEADER_BYTES + 4:
-                raise ValueError("HEADER_LIMIT_EXCEEDED_DURING_READ")
-    return bytes(raw)
-
-
-def inspect_once(context: Any, request: Any) -> TransportStatus:
-    """EXPLICIT HARD OFF. No env variable or input can grant authority."""
-    if not (
+def _runtime_gate() -> bool:
+    """Not satisfiable in this source version; no caller-supplied override."""
+    return (
         RUN_ENABLED is True and DOCKER_SOCKET_PERMISSION is True and
         APPROVAL_VERIFIER_IMPLEMENTED is True and
         INDEPENDENT_ENGINE_ATTESTED is True and
         ISOLATED_HOST_ATTESTED is True and
         ONE_USE_APPROVAL is not None
-    ):
+    )
+
+
+def _read_from_connection(connection: Any, request_bytes: bytes) -> bytes:
+    """Testable receive loop; connection must be supplied by trusted caller.
+
+    Tests pass a fake connection object only. Not an engine authorization.
+    """
+    raw = bytearray()
+    connection.settimeout(SOCKET_TIMEOUT_SECONDS)
+    connection.connect(SOCKET_PATH)
+    connection.sendall(request_bytes)
+    while True:
+        part = connection.recv(READ_CHUNK)
+        if not part:
+            break
+        if len(raw) + len(part) > MAX_WIRE_BYTES:
+            raise ValueError("WIRE_LIMIT_EXCEEDED_DURING_READ")
+        raw.extend(part)
+        split = raw.find(b"\r\n\r\n")
+        if split >= 0:
+            if split > MAX_HEADER_BYTES:
+                raise ValueError("HEADER_LIMIT_EXCEEDED_DURING_READ")
+            if len(raw) - split - 4 > MAX_RAW_BYTES:
+                raise ValueError("BODY_LIMIT_EXCEEDED_DURING_READ")
+        elif len(raw) > MAX_HEADER_BYTES + 4:
+            raise ValueError("HEADER_LIMIT_EXCEEDED_DURING_READ")
+    return bytes(raw)
+
+
+def _bounded_socket_get(context: Any, request: Any) -> bytes:
+    """Socket-opening boundary: exact route + independent runtime fuses.
+
+    No socket is created until both exact-route validation and every literal
+    one-use approval guard pass; current revision cannot pass those guards.
+    """
+    request_bytes = _request_for_path(context, request)
+    if not _runtime_gate():
+        raise ValueError("TRANSPORT_HARD_OFF")
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+        return _read_from_connection(connection, request_bytes)
+
+
+def inspect_once(context: Any, request: Any) -> TransportStatus:
+    """EXPLICIT HARD OFF. No env variable or input can grant authority."""
+    if not _runtime_gate():
         return _fail("TRANSPORT_HARD_OFF")
     # This path is inaccessible at this source revision. A future reviewed
     # change must replace source constants with independently checked,
