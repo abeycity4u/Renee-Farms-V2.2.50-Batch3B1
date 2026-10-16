@@ -17,9 +17,11 @@ SPEC.loader.exec_module(MODULE)
 class SupervisorOfflineContract(unittest.TestCase):
     def test_literal_fuse_and_approval_sentinels_are_off(self):
         self.assertIs(MODULE.EXECUTION_ENABLED, False)
-        self.assertIsNone(MODULE.APPROVED_ONE_USE_RUN)
-        self.assertIsNone(MODULE.APPROVED_RUNTIME_COMMIT)
-        self.assertIsNone(MODULE.APPROVED_SUPERVISOR_BLOB)
+        self.assertIsNone(MODULE.TRUSTED_APPROVER_PUBLIC_KEY_SHA256)
+        self.assertEqual(MODULE.APPROVAL_CONTRACT,
+                         "B12-MAC12C-RC01-ONE-USE-V1")
+        self.assertFalse(hasattr(MODULE, "APPROVED_SUPERVISOR_BLOB"))
+        self.assertFalse(hasattr(MODULE, "APPROVED_RUNTIME_COMMIT"))
 
     def test_off_path_has_no_docker_network_or_db_calls(self):
         with mock.patch.object(MODULE.subprocess, "run",
@@ -203,10 +205,16 @@ class SupervisorOfflineContract(unittest.TestCase):
                         )
 
     def test_source_only_execution_sentinels_reject_direct_entry(self):
-        with mock.patch.object(MODULE, "verify_source",
-                               side_effect=AssertionError("source check reached")):
-            with self.assertRaises(MODULE.Blocked):
-                MODULE.execute_one_use()
+        with mock.patch.object(MODULE, "load_signed_approval",
+                               side_effect=MODULE.Blocked(
+                                   "TRUSTED_APPROVER_NOT_CONFIGURED"
+                               )):
+            with mock.patch.object(MODULE, "verify_source",
+                                   side_effect=AssertionError(
+                                       "source check reached"
+                                   )):
+                with self.assertRaises(MODULE.Blocked):
+                    MODULE.execute_one_use()
 
 
 if __name__ == "__main__":
