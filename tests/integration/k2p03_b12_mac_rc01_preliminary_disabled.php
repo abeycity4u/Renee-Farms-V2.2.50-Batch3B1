@@ -73,9 +73,22 @@ function rc01_connection(): PDO
         'exact disposable DB name');
     rc01_assert(getenv('B12_RC01_BARRIER_PARENT') === '/b12-run',
         'closed writable barrier mount');
-    $password = getenv('B12_RC01_DB_PASSWORD');
-    rc01_assert(is_string($password) && $password !== '',
-        'test-only credential present');
+    // Docker receives the disposable test credential via STDIN into a
+    // 0600 file on container-local tmpfs. No secret in Docker env/inspect,
+    // argv, bind mounts or the host-observer channel.
+    $privatePath = '/b12-private/test_password';
+    rc01_assert(getenv('B12_RC01_DB_PASSWORD_FILE') === $privatePath,
+        'private credential transport approved');
+    $mode = @fileperms($privatePath);
+    rc01_assert(is_file($privatePath) && !is_link($privatePath) &&
+        $mode !== false && (($mode & 0777) === 0600),
+        'test credential private file mode');
+    $password = @file_get_contents($privatePath);
+    rc01_assert(is_string($password) && strlen($password) > 0 &&
+        strlen($password) <= 512 && strpos($password, "\0") === false,
+        'private test credential present');
+    $password = rtrim($password, "\r\n");
+    rc01_assert($password !== '', 'test-only credential is nonempty');
     $pdo = new PDO(
         B12_RC01_TCP_DSN, 'b12_test', $password,
         [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
