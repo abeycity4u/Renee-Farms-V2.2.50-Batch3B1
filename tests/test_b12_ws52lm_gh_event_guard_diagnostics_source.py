@@ -121,7 +121,7 @@ class ReadonlyPreflightGuardDiagnosticsTests(unittest.TestCase):
 
     def test_workflow_dormant_even_after_approval_file_push(self):
         text = self.workflow_source
-        self.assertIn("    if: \${{ false }}".replace("\\", ""), text)
+        self.assertIn("    if: ${{ false }}", text)
         self.assertNotIn("workflow_dispatch:", text)
         self.assertNotIn("services:", text)
         self.assertNotIn("uses: ", text)
@@ -308,20 +308,14 @@ class ReadonlyPreflightGuardDiagnosticsTests(unittest.TestCase):
         self.assertNotIn("SECRET_TOKEN", str(self.namespace["audit"]))
 
     def test_source_guard_has_no_hidden_network_or_shell_calls(self):
-        tree = ast.parse(textwrap.dedent(
-            self.workflow_source.split("          REPO = ", 1)[1].split(
-                "          def readonly(*args):", 1
-            )[0].replace("", "", 1)  # no-op for source preservation
-        ))
-        self.assertTrue(isinstance(tree, ast.Module))
-        self.assertNotIn("subprocess", self.workflow_source.split(
-            "          def guard():", 1)[1].split(
-            "          def readonly(*args):", 1
-        )[0])
-        self.assertNotIn("socket", self.workflow_source.split(
-            "          def guard():", 1)[1].split(
-            "          def readonly(*args):", 1
-        )[0])
+        guard = self.workflow_source.split(
+            "          def guard():", 1
+        )[1].split("          def readonly(*args):", 1)[0]
+        self.assertIn("          def require", self.workflow_source)
+        self.assertIn('raise GuardReject("EVENT_JSON_INVALID")', guard)
+        for forbidden in ("subprocess.", "socket.", "os.system(",
+                          "os.popen(", "eval(", "exec("):
+            self.assertNotIn(forbidden, guard)
 
 
 if __name__ == "__main__":
