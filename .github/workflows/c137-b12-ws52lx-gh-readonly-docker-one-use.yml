@@ -1,6 +1,6 @@
 name: "C137 B12 WS52-LX single-use read-only GitHub runner metadata preflight"
 
-# WS52-LX EXECUTABLE CANDIDATE, NOT AUTHORIZED TO RUN.
+# WS52-LX SECURITY STOP-GATE: JOB HARD DISABLED; NOT AUTHORIZED TO RUN.
 # The unique approval document does NOT exist. DO NOT add or create it
 # absent a fresh one-use user authorization after independent source freeze.
 # Pin full prepared source HEAD/workflow blob externally to this workload.
@@ -24,14 +24,10 @@ concurrency:
 
 jobs:
   docker-readonly-preflight:
-    # Job triggers only on exact new one-file approval commit, first run.
-    # Independent user approval/source freeze MUST precede that commit.
-    if: >-
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/c137-gc24-k2p03-b12-ws52lx-final-readonly-preflight-candidate' &&
-      github.event.head_commit.message == 'ci-b12(ws52lx-run): authorize one readonly Docker and GitHub commit API preflight' &&
-      github.run_number == 1 &&
-      github.run_attempt == 1
+    # STOP-GATE: repo branch unprotected, required-reviewer gate unverified.
+    # Do NOT re-enable on this branch. Future candidate needs independently
+    # verified GitHub protection and a distinct one-use authorization.
+    if: ${{ false }}
     name: "One-use GitHub-hosted Docker metadata inspection (NO MUTATION)"
     runs-on: ubuntu-24.04
     timeout-minutes: 5
