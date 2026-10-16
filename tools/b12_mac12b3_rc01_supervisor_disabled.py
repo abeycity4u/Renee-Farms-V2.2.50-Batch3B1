@@ -431,6 +431,10 @@ def execute_one_use() -> None:
         require(secret_proc.wait(timeout=2) == 0,
                 "TEST_CREDENTIAL_PIPE_FAILED")
         verify_schema_empty(db)
+        # PHP cleanup must already have removed its private barrier and
+        # fixture; never report PASS with pending barrier artifacts.
+        require(find_barrier(root) is None and not list(root.iterdir()),
+                "PHP_BARRIER_CLEANUP_INCOMPLETE")
         succeeded = True
     finally:
         try:
@@ -455,7 +459,12 @@ def execute_one_use() -> None:
         if not (succeeded and stopped):
             sys.stderr.write("B12_MAC12C=QUARANTINE_MANUAL_REVIEW\n")
     require(succeeded and stopped, "FINAL_RESULT_OR_CLEANUP_INCOMPLETE")
-    # Preserve run directory for independent second-stage disposal review.
+    # The private run directory is empty and is the only owned host path.
+    # Verify its identity before disposing of it.
+    require(root.parent == LAB and root.name.startswith("b12_mac12b3_")
+            and root.is_dir() and not root.is_symlink()
+            and not list(root.iterdir()), "RUN_ROOT_CLEANUP_UNVERIFIED")
+    root.rmdir()
     print("B12_MAC12C=PRELIMINARY_NONCERTIFYING_PASS")
 
 
