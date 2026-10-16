@@ -122,7 +122,7 @@ class InertCommitDeltaProofTests(unittest.TestCase):
 
     def test_no_dependency_on_push_added_file_list(self):
         self.assertNotIn('require(head.get("added")', self.text)
-        self.assertIn("verify_commit_delta_via_api(sha)", self.text)
+        self.assertIn("verify_commit_delta_via_api(sha, before)", self.text)
 
     def test_wrong_sha_blocked(self):
         for sha in ("", None, "0" * 39, "x" * 40):
