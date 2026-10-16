@@ -46,3 +46,13 @@
 **SOURCE_SCOPE_REVIEW=PASS_WITH_DISCLOSED_EXTERNAL_AUTHORIZATION_RISK.** **PHYSICAL_ISOLATION_CERTIFICATION=NOT_ESTABLISHED.** The candidate workflow is executable only if a person with repository write authority creates the unique approval trigger file; it cannot independently verify the user's one-use consent. As of this source review **no approval file was created and no physical preflight was launched**.
 
 `THIRD_PHYSICAL_PREFLIGHT=NOT_AUTHORIZED`; `RUNTIME_RC01_APPROVAL=NOT_GRANTED`; `REPAIRED_RC01_RC14_CERTIFIED_PASSES=0`; `MIGRATION_092=NOT_AUTHORIZED`; `B12_CUTOVER=HARD_OFF`.
+## 6. Verified GitHub branch-enforcement gap (additional read-only review, 2026-10-16)
+
+- GitHub branch metadata for `c137-gc24-k2p03-b12-ws52lx-final-readonly-preflight-candidate` at `0ecd2855bea52ef565352f385d6b541c4943478f` reports **`protected: false`**.
+- `GET /repos/abeycity4u/Renee-Farms-V2.2.50-Batch3B1/rulesets?includes_parents=true` returned **zero rulesets visible to this integration**.
+- The specific branch-protection endpoint returned HTTP **403** (`Resource not accessible by integration`), so no additional protection configuration could be verified there. The GitHub environments endpoint was unavailable through the current connector, so required environment reviewers were **not verified** either.
+- **Authorization readiness: BLOCKED.** The candidate is executable if a sufficiently privileged repository writer pushes the unique approval file, and the source cannot itself prove independent user consent. No user consent was granted for this third physical execution. Do NOT create that file or authorize physical execution while this enforcement gap remains unaddressed.
+- Required remediation before physical authorization: GitHub owner/admin must establish and independently verify a branch write restriction or a properly configured environment-level required-reviewer gate for the precise candidate run, compatible with the one-use source-freeze/approval flow. Merely naming an environment in YAML or storing an approval document in the repo is not a verified reviewer gate.
+- After any changes to source, branch permissions or workflow environment, re-establish final prepared HEAD S, exact workflow blob, observed branch rules/environment protection, approved actor and external one-use authority. Treat this snapshot as **reviewed but not independently access-controlled or safely approved to trigger**.
+
+**WS52-LX updated disposition: `SOURCE_DIFF_REVIEW=PASS`, `BRANCH_APPROVAL_GATE=NOT_ESTABLISHED`, `THIRD_PHYSICAL_PREFLIGHT=NOT_AUTHORIZED`, `GITHUB_ACTIONS_RUNS=0`, `B12_CUTOVER=HARD_OFF`.**
