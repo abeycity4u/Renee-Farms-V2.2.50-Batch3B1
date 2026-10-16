@@ -215,8 +215,7 @@ class UnixTransportHardoffTests(unittest.TestCase):
         request_bytes = li._request_for_path(ctx, req)
         raw = response()
         fake = FakeSocket((raw[:7], raw[7:]))
-        with mock.patch.object(li.socket, "socket", return_value=fake):
-            received = li._bounded_socket_get(ctx, req)
+        received = li._read_from_connection(fake, request_bytes)
         self.assertEqual(received, raw)
         self.assertEqual(fake.path, li.SOCKET_PATH)
         self.assertEqual(fake.request, request_bytes)
@@ -226,18 +225,16 @@ class UnixTransportHardoffTests(unittest.TestCase):
     def test_bounded_socket_reader_rejects_overlong_header_before_eof(self):
         ctx, req = metadata(0)
         fake = FakeSocket((b"A" * (li.MAX_HEADER_BYTES + 20),))
-        with mock.patch.object(li.socket, "socket", return_value=fake):
-            with self.assertRaises(ValueError):
-                li._bounded_socket_get(ctx, req)
+        with self.assertRaises(ValueError):
+            li._read_from_connection(fake, li._request_for_path(ctx, req))
         self.assertTrue(fake.closed)
 
     def test_bounded_socket_reader_rejects_oversized_payload_before_eof(self):
         ctx, req = metadata(0)
         payload = response(b"x" * (li.MAX_RAW_BYTES + 1))
         fake = FakeSocket((payload,))
-        with mock.patch.object(li.socket, "socket", return_value=fake):
-            with self.assertRaises(ValueError):
-                li._bounded_socket_get(ctx, req)
+        with self.assertRaises(ValueError):
+            li._read_from_connection(fake, li._request_for_path(ctx, req))
         self.assertTrue(fake.closed)
 
     def test_internal_socket_boundary_rejects_unallowlisted_requests_before_socket(self):
@@ -256,6 +253,12 @@ class UnixTransportHardoffTests(unittest.TestCase):
             with mock.patch.object(li.socket, "socket", side_effect=AssertionError("SOCKET_TOUCHED")):
                 with self.assertRaises(ValueError):
                     li._bounded_socket_get(ctx, req)
+
+    def test_valid_private_socket_primitive_is_also_hard_off_before_socket(self):
+        ctx, req = metadata(0)
+        with mock.patch.object(li.socket, "socket", side_effect=AssertionError("SOCKET_TOUCHED")):
+            with self.assertRaisesRegex(ValueError, "TRANSPORT_HARD_OFF"):
+                li._bounded_socket_get(ctx, req)
 
     def test_public_entrypoint_never_contacts_socket_even_when_passed_valid_ids(self):
         ctx, req = metadata(0)
