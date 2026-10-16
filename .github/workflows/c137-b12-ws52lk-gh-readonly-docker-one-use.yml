@@ -1,0 +1,198 @@
+name: "C137 B12 WS52-LK single-use read-only Docker runner preflight"
+
+# Authorized by user ONLY for a disposable GitHub-hosted runner metadata preflight.
+# No checkout action, services, image pulls, containers, volumes, SQL, backup,
+# registry/CDN, production/staging, migration or concurrency execution.
+# This workflow has a single-use exact-branch/approval-path/commit-message gate.
+on:
+  push:
+    branches:
+      - c137-gc24-k2p03-b12-ws52lk-gh-readonly-docker-preflight
+    paths:
+      - docs/C137_GC24_K2_P03_B12_WS52LK_READONLY_PREFLIGHT_ONE_USE_APPROVAL.txt
+
+permissions: {}
+
+concurrency:
+  group: c137-b12-ws52lk-single-readonly-preflight
+  cancel-in-progress: false
+
+jobs:
+  docker-readonly-preflight:
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/c137-gc24-k2p03-b12-ws52lk-gh-readonly-docker-preflight' &&
+      github.event.head_commit.message == 'ci-b12(ws52lk-run): approve one readonly Docker preflight' &&
+      github.run_number == 1 &&
+      github.run_attempt == 1
+    name: "One-use GitHub-hosted Docker metadata inspection (NO MUTATION)"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: "Validate one-use approval event; inspect runner and Docker read-only"
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
+          import json
+          import os
+          import re
+          import stat
+          import subprocess
+          import sys
+
+          REPO = "abeycity4u/Renee-Farms-V2.2.50-Batch3B1"
+          REF = "refs/heads/c137-gc24-k2p03-b12-ws52lk-gh-readonly-docker-preflight"
+          APPROVAL = "docs/C137_GC24_K2_P03_B12_WS52LK_READONLY_PREFLIGHT_ONE_USE_APPROVAL.txt"
+          MESSAGE = "ci-b12(ws52lk-run): approve one readonly Docker preflight"
+          audit = {
+              "ONE_USE_EVENT_GUARD": "NOT_VERIFIED",
+              "GITHUB_HOSTED_RUNNER_CLAIM": "NOT_VERIFIED",
+              "DOCKER_LOCAL_UNIX_SOCKET": "NOT_VERIFIED",
+              "DOCKER_READONLY_COMMANDS": "NOT_RUN",
+              "ENGINE_METADATA_READ": "NO",
+              "ENGINE_ID_PRESENT": "NOT_VERIFIED",
+              "DOCKER_CONTAINERS_EXIST": "NOT_VERIFIED",
+              "DOCKER_VOLUMES_EXIST": "NOT_VERIFIED",
+              "UNEXPECTED_NETWORKS_EXIST": "NOT_VERIFIED",
+              "TCP_3306_LISTENER": "NOT_VERIFIED",
+          }
+
+          def emit(result, reason):
+              print("#####COPY FROM HERE#####")
+              print("AUDIT=B12_WS52LK_GITHUB_READONLY_PHYSICAL_PREFLIGHT")
+              print("RESULT=" + result)
+              print("REASON=" + reason)
+              for key, val in audit.items():
+                  print(key + "=" + val)
+              print("RUNNER_PROVENANCE=SELF_REPORTED_GITHUB_HOSTED_ONLY")
+              print("ENGINE_PROVENANCE=DAEMON_SELF_REPORTED_ONLY")
+              print("INDEPENDENT_ATTESTOR=NOT_ESTABLISHED")
+              print("EGRESS_ISOLATION=NOT_ATTESTED")
+              print("DOCKER_BROKER_PRIVILEGE_SEPARATION=NOT_CERTIFIED")
+              print("IMAGE_DOWNLOADS=NO")
+              print("REGISTRY_REQUESTS=0")
+              print("CONTAINERS_CREATED=0")
+              print("CONTAINERS_REMOVED=0")
+              print("VOLUMES_CREATED=0")
+              print("VOLUMES_REMOVED=0")
+              print("DATABASE_CONNECTIONS=0")
+              print("SQL_EXECUTED=NO")
+              print("CUSTOMER_DATA_ACCESSED=NO")
+              print("RC01_WORKERS_EXECUTED=NO")
+              print("RUNTIME_RC01_APPROVAL=NOT_GRANTED")
+              print("REPAIRED_RC01_RC14_CERTIFIED_PASSES=0")
+              print("MIGRATION_092=NOT_AUTHORIZED")
+              print("B12_CUTOVER=HARD_OFF")
+              print("#####COPY TO HERE#####")
+              sys.stdout.flush()
+
+          def guard():
+              assert os.environ.get("GITHUB_ACTIONS") == "true"
+              assert os.environ.get("GITHUB_EVENT_NAME") == "push"
+              assert os.environ.get("GITHUB_REPOSITORY") == REPO
+              assert os.environ.get("GITHUB_REF") == REF
+              assert os.environ.get("GITHUB_RUN_NUMBER") == "1"
+              assert os.environ.get("GITHUB_RUN_ATTEMPT") == "1"
+              assert os.environ.get("RUNNER_OS") == "Linux"
+              assert os.environ.get("RUNNER_ARCH") == "X64"
+              assert os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted"
+              event_path = os.environ["GITHUB_EVENT_PATH"]
+              with open(event_path, "rb") as stream:
+                  raw = stream.read(262145)
+              assert 0 < len(raw) <= 262144
+              event = json.loads(raw.decode("utf-8", "strict"))
+              head = event["head_commit"]
+              assert head["id"] == os.environ["GITHUB_SHA"]
+              assert head["message"] == MESSAGE
+              assert head["added"] == [APPROVAL]
+              assert head["modified"] == []
+              assert head["removed"] == []
+              assert len(event["commits"]) == 1
+              assert event["ref"] == REF
+              assert event.get("deleted") is False
+              assert event["repository"]["full_name"] == REPO
+              before = event["before"]
+              assert re.fullmatch(r"[a-f0-9]{40}", before)
+              assert before != "0" * 40
+              audit["ONE_USE_EVENT_GUARD"] = "PASS"
+              audit["GITHUB_HOSTED_RUNNER_CLAIM"] = "PASS_SELF_REPORTED"
+
+          def readonly(*args):
+              approved = {
+                  ("version", "--format", "{{json .Server}}"),
+                  ("info", "--format", "{{json .}}"),
+                  ("container", "ls", "--all", "--no-trunc", "--quiet"),
+                  ("volume", "ls", "--quiet"),
+                  ("network", "ls", "--format", "{{json .}}"),
+              }
+              assert args in approved
+              proc = subprocess.run(
+                  ["/usr/bin/docker", *args],
+                  shell=False,
+                  stdin=subprocess.DEVNULL,
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.PIPE,
+                  timeout=12,
+                  check=False,
+              )
+              assert proc.returncode == 0
+              assert len(proc.stdout) <= 131072
+              return proc.stdout.decode("utf-8", "strict")
+
+          def check_listener():
+              # Host-kernel metadata only. Never open a TCP connection.
+              for filename in ("/proc/net/tcp", "/proc/net/tcp6"):
+                  with open(filename, "rt", encoding="ascii") as f:
+                      next(f)
+                      for line in f:
+                          fields = line.split()
+                          if len(fields) < 4:
+                              continue
+                          port = int(fields[1].split(":")[-1], 16)
+                          if port == 3306 and fields[3] == "0A":
+                              return True
+              return False
+
+          try:
+              guard()
+              assert not os.environ.get("DOCKER_CONTEXT")
+              assert os.environ.get("DOCKER_HOST", "") in ("", "unix:///var/run/docker.sock")
+              assert not os.environ.get("DOCKER_TLS_VERIFY")
+              assert not os.environ.get("DOCKER_CERT_PATH")
+              assert os.path.exists("/usr/bin/docker")
+              assert not os.path.islink("/var/run/docker.sock")
+              assert stat.S_ISSOCK(os.stat("/var/run/docker.sock").st_mode)
+              audit["DOCKER_LOCAL_UNIX_SOCKET"] = "PRESENT"
+              version = json.loads(readonly("version", "--format", "{{json .Server}}"))
+              info = json.loads(readonly("info", "--format", "{{json .}}"))
+              assert type(version) is dict and type(info) is dict
+              assert isinstance(info.get("ID"), str) and bool(info["ID"])
+              assert isinstance(version.get("Version"), str) and bool(version["Version"])
+              assert isinstance(info.get("ServerVersion"), str)
+              assert info["ServerVersion"] == version["Version"]
+              audit["ENGINE_METADATA_READ"] = "YES_DOCKER_CLI"
+              audit["ENGINE_ID_PRESENT"] = "YES_DAEMON_SELF_REPORTED"
+              containers = [x for x in readonly("container", "ls", "--all", "--no-trunc", "--quiet").splitlines() if x]
+              volumes = [x for x in readonly("volume", "ls", "--quiet").splitlines() if x]
+              networks = [json.loads(line) for line in readonly("network", "ls", "--format", "{{json .}}").splitlines() if line]
+              assert all(type(n) is dict and isinstance(n.get("Name"), str) for n in networks)
+              names = {n["Name"] for n in networks}
+              audit["DOCKER_READONLY_COMMANDS"] = "PASS"
+              audit["DOCKER_CONTAINERS_EXIST"] = "YES" if containers else "NO"
+              audit["DOCKER_VOLUMES_EXIST"] = "YES" if volumes else "NO"
+              audit["UNEXPECTED_NETWORKS_EXIST"] = "YES" if (names - {"bridge", "host", "none"}) else "NO"
+              audit["TCP_3306_LISTENER"] = "YES" if check_listener() else "NO"
+              if containers or volumes or (names - {"bridge", "host", "none"}):
+                  emit("BLOCKED", "PREEXISTING_DOCKER_RESOURCES_PRESENT")
+                  sys.exit(2)
+              if audit["TCP_3306_LISTENER"] != "NO":
+                  emit("BLOCKED", "LOCAL_TCP_3306_IN_USE")
+                  sys.exit(2)
+              emit("READONLY_OBSERVATION_PASS", "NONE")
+          except Exception:
+              # Never reflect arbitrary stderr, paths, host names, socket
+              # diagnostics or Docker response payloads into public logs.
+              emit("BLOCKED", "ONE_USE_OR_DOCKER_READONLY_PREFLIGHT_FAILED")
+              sys.exit(2)
+          PY
