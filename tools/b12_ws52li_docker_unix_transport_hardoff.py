@@ -17,7 +17,7 @@ import socket
 from typing import Any
 
 from b12_ws52kz_broker_projection_source_contract import (
-    ROUTE_NAMES, _routes, assess_broker_fixture,
+    ROUTE_NAMES, _routes, assess_broker_fixture, CONTAINER_RE, VOLUME_RE,
 )
 from b12_ws52le_raw_docker_response_projection_core import (
     MAX_RAW_BYTES, project_raw_response,
@@ -75,6 +75,8 @@ def _request_for_path(context: Any, request: Any) -> bytes:
     cid, vol = context.get("container_id"), context.get("volume_name")
     path = request.get("path")
     if (type(cid) is not str or type(vol) is not str or
+            CONTAINER_RE.fullmatch(cid) is None or
+            VOLUME_RE.fullmatch(vol) is None or
             type(path) is not str or request.get("method") != "GET" or
             ("GET", path) not in _routes(cid, vol)):
         raise ValueError("UNALLOWLISTED_METHOD_OR_PATH")
@@ -147,12 +149,13 @@ def _parse_http_wire(data: Any) -> WireBody:
     return WireBody(body, 200, "application/json", "identity")
 
 
-def _bounded_socket_get(request_bytes: bytes) -> bytes:
+def _bounded_socket_get(context: Any, request: Any) -> bytes:
     """Engine-touching primitive; NEVER CALL without separate code/host review.
 
-    A general Docker socket grants powerful mutating capability even if this
-    client sends GET. No live calls occur from the public hard-off entrypoint.
+    This exact-route validation occurs at the socket boundary. No raw caller
+    request bytes are accepted. The public entrypoint remains HARD OFF.
     """
+    request_bytes = _request_for_path(context, request)
     raw = bytearray()
     # socket is created ONLY inside this internal primitive, not at import.
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
@@ -207,7 +210,7 @@ def inspect_once(context: Any, request: Any) -> TransportStatus:
         }
         if not assess_broker_fixture(context, request, envelope).shape_valid:
             return _fail("REQUEST_POLICY_REJECTED")
-        raw = _bounded_socket_get(_request_for_path(context, request))
+        raw = _bounded_socket_get(context, request)
         wire = _parse_http_wire(raw)
         projected = project_raw_response(
             context, request, wire.body,
