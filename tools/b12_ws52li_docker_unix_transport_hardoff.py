@@ -68,8 +68,16 @@ def _fail(label: str) -> TransportStatus:
     return TransportStatus(False, label)
 
 
-def _request_for_path(path: Any) -> bytes:
-    """Fixed syntax; callers cannot supply absolute URLs or custom headers."""
+def _request_for_path(context: Any, request: Any) -> bytes:
+    """Fixed syntax plus six exact KZ paths; no arbitrary Docker requests."""
+    if type(context) is not dict or type(request) is not dict:
+        raise ValueError("REQUEST_CONTEXT_INVALID")
+    cid, vol = context.get("container_id"), context.get("volume_name")
+    path = request.get("path")
+    if (type(cid) is not str or type(vol) is not str or
+            type(path) is not str or request.get("method") != "GET" or
+            ("GET", path) not in _routes(cid, vol)):
+        raise ValueError("UNALLOWLISTED_METHOD_OR_PATH")
     if type(path) is not str or not path.startswith("/") or len(path) > 180:
         raise ValueError("REQUEST_PATH_INVALID")
     if not all(ch.isascii() and (
@@ -199,7 +207,7 @@ def inspect_once(context: Any, request: Any) -> TransportStatus:
         }
         if not assess_broker_fixture(context, request, envelope).shape_valid:
             return _fail("REQUEST_POLICY_REJECTED")
-        raw = _bounded_socket_get(_request_for_path(pair[1]))
+        raw = _bounded_socket_get(_request_for_path(context, request))
         wire = _parse_http_wire(raw)
         projected = project_raw_response(
             context, request, wire.body,
