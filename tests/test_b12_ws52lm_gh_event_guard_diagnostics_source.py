@@ -152,7 +152,9 @@ class ReadonlyPreflightGuardDiagnosticsTests(unittest.TestCase):
         self.assertEqual(n["MESSAGE"], ALLOWED_MESSAGE)
 
     def test_github_actions_environment_stage(self):
-        for value in ("false", "", None, True):
+        # os.environ accepts strings only; boolean True fails in the mock
+        # before guard() can check the invalid value.
+        for value in ("false", "", None, "TRUE"):
             env = _default_env()
             if value is None:
                 del env["GITHUB_ACTIONS"]
