@@ -216,7 +216,7 @@ class UnixTransportHardoffTests(unittest.TestCase):
         raw = response()
         fake = FakeSocket((raw[:7], raw[7:]))
         with mock.patch.object(li.socket, "socket", return_value=fake):
-            received = li._bounded_socket_get(request_bytes)
+            received = li._bounded_socket_get(ctx, req)
         self.assertEqual(received, raw)
         self.assertEqual(fake.path, li.SOCKET_PATH)
         self.assertEqual(fake.request, request_bytes)
@@ -228,7 +228,7 @@ class UnixTransportHardoffTests(unittest.TestCase):
         fake = FakeSocket((b"A" * (li.MAX_HEADER_BYTES + 20),))
         with mock.patch.object(li.socket, "socket", return_value=fake):
             with self.assertRaises(ValueError):
-                li._bounded_socket_get(li._request_for_path(ctx, req))
+                li._bounded_socket_get(ctx, req)
         self.assertTrue(fake.closed)
 
     def test_bounded_socket_reader_rejects_oversized_payload_before_eof(self):
@@ -237,8 +237,25 @@ class UnixTransportHardoffTests(unittest.TestCase):
         fake = FakeSocket((payload,))
         with mock.patch.object(li.socket, "socket", return_value=fake):
             with self.assertRaises(ValueError):
-                li._bounded_socket_get(li._request_for_path(ctx, req))
+                li._bounded_socket_get(ctx, req)
         self.assertTrue(fake.closed)
+
+    def test_internal_socket_boundary_rejects_unallowlisted_requests_before_socket(self):
+        for path in ("/containers/prune", "/containers/create",
+                     "/volumes/not-run-volume", "/info?all=1"):
+            ctx, req = metadata(0)
+            req["path"] = path
+            with mock.patch.object(li.socket, "socket", side_effect=AssertionError("SOCKET_TOUCHED")):
+                with self.assertRaises(ValueError):
+                    li._bounded_socket_get(ctx, req)
+
+    def test_internal_socket_boundary_rejects_invalid_resource_identity(self):
+        for value in ("../etc/passwd", "not-hex", "b" * 63):
+            ctx, req = metadata(3)
+            ctx["container_id"] = value
+            with mock.patch.object(li.socket, "socket", side_effect=AssertionError("SOCKET_TOUCHED")):
+                with self.assertRaises(ValueError):
+                    li._bounded_socket_get(ctx, req)
 
     def test_public_entrypoint_never_contacts_socket_even_when_passed_valid_ids(self):
         ctx, req = metadata(0)
