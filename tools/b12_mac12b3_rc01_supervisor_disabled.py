@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """MAC-12B3. Source-only Mac host supervisor for preliminary synthetic B12 RC01.
 
-HARD OFF: execution requires a later reviewed commit setting the literal fuse
-and explicit commit/blob/one-use approval sentinels. No current authorization
+HARD OFF: execution requires a separately reviewed activation commit and a
+fresh, externally signed one-use approval manifest. No current authorization
 to create SQL fixtures, run workers, stop a container, or generate a proof.
 PHP also has its own independent OFF fuse.
 """
 from __future__ import annotations
 import hashlib
 import json
+from datetime import datetime, timezone, timedelta
 import os
 from pathlib import Path
 import re
@@ -20,9 +21,13 @@ import time
 import uuid
 
 EXECUTION_ENABLED = False
-APPROVED_ONE_USE_RUN = None
-APPROVED_RUNTIME_COMMIT = None
-APPROVED_SUPERVISOR_BLOB = None
+# Future signer setup is a separate reviewed key-ceremony commit, NOT env input.
+# Pin the SHA-256 digest of the signer's trusted RSA public-key PEM after a
+# distinct explicit approval. The private signing key must never enter Git.
+TRUSTED_APPROVER_PUBLIC_KEY_SHA256 = None
+APPROVAL_CONTRACT = "B12-MAC12C-RC01-ONE-USE-V1"
+APPROVAL_SCOPE = "ISOLATED_SYNTHETIC_LAYER_EDIT_EDIT_ONLY"
+APPROVAL_DIR_NAME = ".b12-approvals"
 
 PROJECT = "renee_b12_rc_mac"
 DATABASE = "renee_b12_disposable"
@@ -92,14 +97,14 @@ def owned_secret(path: Path) -> bool:
         return False
 
 
-def verify_source() -> None:
+def verify_source(approval: dict) -> None:
     require(SOURCE_ROOT.is_dir() and not SOURCE_ROOT.is_symlink(),
             "SOURCE_ROOT_UNSAFE")
     require(command(["git", "-C", str(SOURCE_ROOT),
                      "branch", "--show-current"]) == REPO_BRANCH,
             "SOURCE_BRANCH_DRIFT")
     require(command(["git", "-C", str(SOURCE_ROOT),
-                     "rev-parse", "HEAD"]) == APPROVED_RUNTIME_COMMIT,
+                     "rev-parse", "HEAD"]) == approval["source_commit"],
             "SOURCE_COMMIT_DRIFT")
     require(command(["git", "-C", str(SOURCE_ROOT),
                      "status", "--porcelain"]) == "",
@@ -109,8 +114,150 @@ def verify_source() -> None:
         require(path.is_file() and not path.is_symlink()
                 and git_blob(path.read_bytes()) == sha,
                 "SOURCE_BLOB_DRIFT")
-    require(git_blob(Path(__file__).read_bytes()) == APPROVED_SUPERVISOR_BLOB,
+    require(git_blob(Path(__file__).read_bytes()) == approval["supervisor_blob"],
             "SUPERVISOR_BLOB_DRIFT")
+    require(approval["harness_blob"] == SOURCE_BLOBS[HARNESS],
+            "SIGNED_HARNESS_BLOB_MISMATCH")
+
+
+def approval_directory() -> Path:
+    directory = LAB / APPROVAL_DIR_NAME
+    info = directory.lstat()
+    require(stat.S_ISDIR(info.st_mode) and info.st_uid == os.getuid()
+            and stat.S_IMODE(info.st_mode) == 0o700,
+            "APPROVAL_DIRECTORY_NOT_PRIVATE")
+    return directory
+
+
+def reject_duplicate_json_keys(pairs: list[tuple[str, object]]) -> dict:
+    result = {}
+    for key, value in pairs:
+        require(key not in result, "DUPLICATE_APPROVAL_JSON_KEY")
+        result[key] = value
+    return result
+
+
+def validate_approval_payload(data: dict, now: datetime) -> dict:
+    required = {
+        "contract", "scope", "run_id", "issued_utc", "expires_utc",
+        "repository", "branch", "source_commit", "supervisor_blob",
+        "harness_blob", "database", "php_image_id",
+        "maximum_runs", "synthetic_only", "production_contact",
+    }
+    require(isinstance(data, dict) and set(data) == required,
+            "APPROVAL_FIELDS_MISMATCH")
+    require(data["contract"] == APPROVAL_CONTRACT
+            and data["scope"] == APPROVAL_SCOPE
+            and data["repository"] == "abeycity4u/Renee-Farms-V2.2.50-Batch3B1"
+            and data["branch"] == REPO_BRANCH
+            and data["database"] == DATABASE
+            and data["php_image_id"] == PHP_IMAGE
+            and data["maximum_runs"] == 1
+            and type(data["maximum_runs"]) is int
+            and data["synthetic_only"] is True
+            and data["production_contact"] is False,
+            "APPROVAL_SCOPE_INVALID")
+    require(isinstance(data["run_id"], str)
+            and re.fullmatch(r"[a-f0-9]{32}", data["run_id"]) is not None,
+            "APPROVAL_RUN_ID_INVALID")
+    for key in ("source_commit", "supervisor_blob", "harness_blob"):
+        require(isinstance(data[key], str)
+                and re.fullmatch(r"[a-f0-9]{40}", data[key]) is not None,
+                "APPROVAL_SHA_INVALID")
+    for key in ("issued_utc", "expires_utc"):
+        require(isinstance(data[key], str)
+                and re.fullmatch(r"20[0-9]{2}-[0-9]{2}-[0-9]{2}T"
+                                 r"[0-9]{2}:[0-9]{2}:[0-9]{2}Z",
+                                 data[key]) is not None,
+                "APPROVAL_TIME_FORMAT_INVALID")
+    try:
+        issued = datetime.strptime(
+            data["issued_utc"], "%Y-%m-%dT%H:%M:%SZ"
+        ).replace(tzinfo=timezone.utc)
+        expires = datetime.strptime(
+            data["expires_utc"], "%Y-%m-%dT%H:%M:%SZ"
+        ).replace(tzinfo=timezone.utc)
+    except ValueError as error:
+        raise Blocked("APPROVAL_TIME_INVALID") from error
+    require(issued <= now < expires
+            and expires - issued <= timedelta(minutes=15),
+            "APPROVAL_EXPIRED_OR_TOO_WIDE")
+    return data
+
+
+def load_signed_approval() -> dict:
+    """Read a fixed external path; no env/argv approval or mutable self-SHA."""
+    require(isinstance(TRUSTED_APPROVER_PUBLIC_KEY_SHA256, str)
+            and re.fullmatch(r"[a-f0-9]{64}",
+                             TRUSTED_APPROVER_PUBLIC_KEY_SHA256) is not None,
+            "TRUSTED_APPROVER_NOT_CONFIGURED")
+    directory = approval_directory()
+    files = {
+        "manifest": directory / "mac12c_one_use.json",
+        "signature": directory / "mac12c_one_use.sig",
+        "public_key": directory / "trusted_approver_public.pem",
+    }
+    limits = {"manifest": 4096, "signature": 2048, "public_key": 8192}
+    snapshot = {}
+    for role, path in files.items():
+        require(owned_secret(path), "APPROVAL_FILE_NOT_PRIVATE")
+        info = path.lstat()
+        require(0 < info.st_size <= limits[role],
+                "APPROVAL_FILE_SIZE_INVALID")
+        raw = path.read_bytes()
+        require(len(raw) == info.st_size, "APPROVAL_FILE_CHANGED")
+        snapshot[role] = raw
+    require(hashlib.sha256(snapshot["public_key"]).hexdigest()
+            == TRUSTED_APPROVER_PUBLIC_KEY_SHA256,
+            "UNTRUSTED_APPROVAL_SIGNER")
+    # Verify a snapshot, not the original files (avoid verify/parse TOCTOU).
+    # RSA-SHA256 works with the macOS OpenSSL/LibreSSL dgst verifier.
+    with tempfile.TemporaryDirectory(prefix="mac12c_sig_", dir=directory) as tmp:
+        base = Path(tmp)
+        for role, name in (
+            ("manifest", "manifest.json"),
+            ("signature", "signature.sig"),
+            ("public_key", "approver.pem"),
+        ):
+            file = base / name
+            with file.open("xb") as stream:
+                stream.write(snapshot[role])
+            file.chmod(0o600)
+        output = command([
+            "openssl", "dgst", "-sha256", "-verify",
+            str(base / "approver.pem"), "-signature",
+            str(base / "signature.sig"), str(base / "manifest.json")
+        ], timeout=8)
+        require(output == "Verified OK", "APPROVAL_SIGNATURE_INVALID")
+    try:
+        data = json.loads(snapshot["manifest"].decode("utf-8"),
+                          object_pairs_hook=reject_duplicate_json_keys)
+    except (UnicodeError, json.JSONDecodeError) as error:
+        raise Blocked("APPROVAL_JSON_INVALID") from error
+    return validate_approval_payload(data, datetime.now(timezone.utc))
+
+
+def claim_one_use(approval: dict) -> None:
+    """Local anti-replay marker; never deleted automatically, even on failure."""
+    directory = approval_directory() / "claims"
+    info = directory.lstat()
+    require(stat.S_ISDIR(info.st_mode) and info.st_uid == os.getuid()
+            and stat.S_IMODE(info.st_mode) == 0o700,
+            "ONE_USE_CLAIM_DIRECTORY_UNSAFE")
+    require(re.fullmatch(r"[a-f0-9]{32}", approval["run_id"]) is not None,
+            "ONE_USE_RUN_ID_INVALID")
+    file = directory / ("claimed_" + approval["run_id"])
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        fd = os.open(file, flags, 0o600)
+    except FileExistsError as error:
+        raise Blocked("ONE_USE_ALREADY_CLAIMED_NO_RETRY") from error
+    with os.fdopen(fd, "w", encoding="ascii") as stream:
+        stream.write(approval["source_commit"] + "\n")
+        stream.flush()
+        os.fsync(stream.fileno())
 
 
 def verify_docker() -> str:
@@ -388,17 +535,12 @@ def quarantine_or_stop_only_owned_container(name: str) -> bool:
 
 
 def execute_one_use() -> None:
-    require(APPROVED_RUNTIME_COMMIT is not None
-            and APPROVED_SUPERVISOR_BLOB is not None
-            and APPROVED_ONE_USE_RUN == "MAC12C-EXPLICIT-ONE-USE",
-            "ONE_USE_COMMIT_AND_RUN_APPROVAL_MISSING")
-    require(re.fullmatch(r"[a-f0-9]{40}", APPROVED_RUNTIME_COMMIT) is not None
-            and re.fullmatch(r"[a-f0-9]{40}", APPROVED_SUPERVISOR_BLOB)
-                is not None,
-            "APPROVED_SOURCE_FORMAT_INVALID")
-    verify_source()
+    approval = load_signed_approval()
+    verify_source(approval)
     db = verify_docker()
     verify_schema_empty(db)
+    # Permanently claim the signed nonce BEFORE creating fixtures/workers.
+    claim_one_use(approval)
     name = "b12-mac12b3-" + uuid.uuid4().hex[:16]
     require(name not in docker("ps", "-a", "--format",
                                "{{.Names}}").splitlines(),
