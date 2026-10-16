@@ -215,7 +215,8 @@ class UnixTransportHardoffTests(unittest.TestCase):
         request_bytes = li._request_for_path(ctx, req)
         raw = response()
         fake = FakeSocket((raw[:7], raw[7:]))
-        received = li._read_from_connection(fake, request_bytes)
+        with fake:
+            received = li._read_from_connection(fake, request_bytes)
         self.assertEqual(received, raw)
         self.assertEqual(fake.path, li.SOCKET_PATH)
         self.assertEqual(fake.request, request_bytes)
@@ -225,16 +226,18 @@ class UnixTransportHardoffTests(unittest.TestCase):
     def test_bounded_socket_reader_rejects_overlong_header_before_eof(self):
         ctx, req = metadata(0)
         fake = FakeSocket((b"A" * (li.MAX_HEADER_BYTES + 20),))
-        with self.assertRaises(ValueError):
-            li._read_from_connection(fake, li._request_for_path(ctx, req))
+        with fake:
+            with self.assertRaises(ValueError):
+                li._read_from_connection(fake, li._request_for_path(ctx, req))
         self.assertTrue(fake.closed)
 
     def test_bounded_socket_reader_rejects_oversized_payload_before_eof(self):
         ctx, req = metadata(0)
         payload = response(b"x" * (li.MAX_RAW_BYTES + 1))
         fake = FakeSocket((payload,))
-        with self.assertRaises(ValueError):
-            li._read_from_connection(fake, li._request_for_path(ctx, req))
+        with fake:
+            with self.assertRaises(ValueError):
+                li._read_from_connection(fake, li._request_for_path(ctx, req))
         self.assertTrue(fake.closed)
 
     def test_internal_socket_boundary_rejects_unallowlisted_requests_before_socket(self):
