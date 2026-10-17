@@ -185,9 +185,28 @@ class SupervisorOfflineContract(unittest.TestCase):
                     lab, snapshot
                 )
                 joined = " ".join(cmd)
+                mounts = [
+                    cmd[index + 1] for index, value in enumerate(cmd[:-1])
+                    if value == "--mount"
+                ]
+                self.assertEqual(len(mounts),
+                                 len(MODULE.SOURCE_BLOBS) + 1)
                 for name in MODULE.SOURCE_BLOBS:
-                    self.assertIn("src=" + str(snapshot / name), joined)
-                    self.assertNotIn("src=" + str(ROOT / name), joined)
+                    target = "/b12-source/" + name
+                    # Docker bind() resolves macOS /var -> /private/var.
+                    # Compare the exact canonical, read-only mount argument.
+                    expected = (
+                        "type=bind,src="
+                        + str((snapshot / name).resolve(strict=True))
+                        + ",dst=" + target + ",readonly"
+                    )
+                    unapproved = (
+                        "type=bind,src="
+                        + str((ROOT / name).resolve(strict=True))
+                        + ",dst=" + target + ",readonly"
+                    )
+                    self.assertIn(expected, mounts)
+                    self.assertNotIn(unapproved, mounts)
                 MODULE.remove_verified_source_snapshot(snapshot)
                 self.assertFalse(snapshot.exists())
         joined = " ".join(cmd)
