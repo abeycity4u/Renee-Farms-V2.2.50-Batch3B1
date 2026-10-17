@@ -120,6 +120,80 @@ def verify_source(approval: dict) -> None:
             "SIGNED_HARNESS_BLOB_MISMATCH")
 
 
+def snapshot_entries() -> set[str]:
+    """Exactly the five approved files and the directories containing them."""
+    names = set(SOURCE_BLOBS)
+    for name in SOURCE_BLOBS:
+        parent = Path(name).parent
+        while parent != Path("."):
+            names.add(parent.as_posix())
+            parent = parent.parent
+    return names
+
+
+def verify_source_snapshot(directory: Path) -> None:
+    """Fail closed if the private, separately mounted source copy has drifted."""
+    require(directory.parent == LAB and
+            directory.name.startswith("b12_mac12b8_src_") and
+            not directory.is_symlink(), "SNAPSHOT_ROOT_UNSAFE")
+    info = directory.lstat()
+    require(stat.S_ISDIR(info.st_mode) and info.st_uid == os.getuid()
+            and stat.S_IMODE(info.st_mode) == 0o700,
+            "SNAPSHOT_ROOT_PERMISSIONS")
+    entries = {p.relative_to(directory).as_posix(): p
+               for p in directory.rglob("*")}
+    require(set(entries) == snapshot_entries(),
+            "SNAPSHOT_CONTENT_MANIFEST")
+    for relative, path in entries.items():
+        info = path.lstat()
+        require(info.st_uid == os.getuid() and not path.is_symlink(),
+                "SNAPSHOT_ENTRY_UNSAFE")
+        if relative in SOURCE_BLOBS:
+            require(stat.S_ISREG(info.st_mode)
+                    and stat.S_IMODE(info.st_mode) == 0o400
+                    and git_blob(path.read_bytes()) == SOURCE_BLOBS[relative],
+                    "SNAPSHOT_SOURCE_DRIFT")
+        else:
+            require(stat.S_ISDIR(info.st_mode)
+                    and stat.S_IMODE(info.st_mode) == 0o700,
+                    "SNAPSHOT_DIRECTORY_UNSAFE")
+
+
+def stage_source_snapshot(directory: Path) -> None:
+    """Copy pinned source into a private sibling, never the writable barrier."""
+    require(directory.parent == LAB and
+            directory.name.startswith("b12_mac12b8_src_") and
+            directory.is_dir() and not directory.is_symlink()
+            and directory.stat().st_uid == os.getuid()
+            and stat.S_IMODE(directory.stat().st_mode) == 0o700
+            and not list(directory.iterdir()), "SNAPSHOT_STAGING_UNSAFE")
+    for relative, expected in SOURCE_BLOBS.items():
+        original = SOURCE_ROOT / relative
+        require(original.is_file() and not original.is_symlink(),
+                "SNAPSHOT_ORIGINAL_UNSAFE")
+        raw = original.read_bytes()
+        require(git_blob(raw) == expected, "SNAPSHOT_ORIGINAL_DRIFT")
+        target = directory / relative
+        target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        with target.open("xb") as out:
+            out.write(raw)
+            out.flush()
+            os.fsync(out.fileno())
+        target.chmod(0o400)
+    verify_source_snapshot(directory)
+
+
+def remove_verified_source_snapshot(directory: Path) -> None:
+    """Remove only the exact owned snapshot after independent success."""
+    verify_source_snapshot(directory)
+    for relative in SOURCE_BLOBS:
+        (directory / relative).unlink()
+    folders = snapshot_entries() - set(SOURCE_BLOBS)
+    for relative in sorted(folders, key=lambda p: (-p.count("/"), p)):
+        (directory / relative).rmdir()
+    directory.rmdir()
+
+
 def approval_directory() -> Path:
     directory = LAB / APPROVAL_DIR_NAME
     info = directory.lstat()
@@ -258,6 +332,16 @@ def claim_one_use(approval: dict) -> None:
         stream.write(approval["source_commit"] + "\n")
         stream.flush()
         os.fsync(stream.fileno())
+    # Persist the new directory entry as well as its contents. On failure the
+    # claimed file remains: never silently permit another attempt.
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    dir_fd = os.open(directory, flags)
+    try:
+        os.fsync(dir_fd)
+    finally:
+        os.close(dir_fd)
 
 
 def verify_docker() -> str:
@@ -484,7 +568,9 @@ def bind(source: Path, target: str, readonly: bool = True) -> str:
     )
 
 
-def php_command(container: str, run_name: str, run_root: Path) -> list[str]:
+def php_command(container: str, run_name: str, run_root: Path,
+                source_snapshot: Path) -> list[str]:
+    verify_source_snapshot(source_snapshot)
     require(re.fullmatch(r"b12-mac12b3-[a-f0-9]{16}", run_name) is not None,
             "PHP_CONTAINER_NAME_INVALID")
     args = [
@@ -498,7 +584,7 @@ def php_command(container: str, run_name: str, run_root: Path) -> list[str]:
         "--mount", bind(run_root, "/b12-run", False)
     ]
     for name in SOURCE_BLOBS:
-        args += ["--mount", bind(SOURCE_ROOT / name,
+        args += ["--mount", bind(source_snapshot / name,
                                "/b12-source/" + name)]
     for key, val in (
         ("B12_RC01_ISOLATED_MAC_ATTESTED", "YES"),
@@ -539,6 +625,8 @@ def execute_one_use() -> None:
     verify_source(approval)
     db = verify_docker()
     verify_schema_empty(db)
+    # Recheck the short signed window after potentially slow preflight.
+    validate_approval_payload(approval, datetime.now(timezone.utc))
     # Permanently claim the signed nonce BEFORE creating fixtures/workers.
     claim_one_use(approval)
     name = "b12-mac12b3-" + uuid.uuid4().hex[:16]
@@ -549,18 +637,22 @@ def execute_one_use() -> None:
     require(not root.is_symlink()
             and stat.S_IMODE(root.stat().st_mode) == 0o700,
             "RUN_ROOT_NOT_PRIVATE")
+    snapshot = Path(tempfile.mkdtemp(prefix="b12_mac12b8_src_", dir=LAB))
     secret_proc = None
     php_proc = None
     succeeded = False
     stopped = False
     try:
+        stage_source_snapshot(snapshot)
+        # Expiration after claiming must fail closed; preserve the claim.
+        validate_approval_payload(approval, datetime.now(timezone.utc))
         secret_proc = subprocess.Popen(
             ["docker", "exec", db, "sh", "-c",
              "set -eu; exec cat /run/secrets/test_password"],
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
         )
         php_proc = subprocess.Popen(
-            php_command(db, name, root),
+            php_command(db, name, root, snapshot),
             stdin=secret_proc.stdout, stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL
         )
@@ -607,6 +699,11 @@ def execute_one_use() -> None:
             and root.is_dir() and not root.is_symlink()
             and not list(root.iterdir()), "RUN_ROOT_CLEANUP_UNVERIFIED")
     root.rmdir()
+    try:
+        remove_verified_source_snapshot(snapshot)
+    except Exception:
+        sys.stderr.write("B12_MAC12C=SNAPSHOT_QUARANTINE_MANUAL_REVIEW\n")
+        raise
     print("B12_MAC12C=PRELIMINARY_NONCERTIFYING_PASS")
 
 
