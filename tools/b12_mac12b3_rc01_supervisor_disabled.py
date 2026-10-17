@@ -174,7 +174,21 @@ def stage_source_snapshot(directory: Path) -> None:
         raw = original.read_bytes()
         require(git_blob(raw) == expected, "SNAPSHOT_ORIGINAL_DRIFT")
         target = directory / relative
-        target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        # pathlib.mkdir(parents=True) applies 0777 (masked by umask) to
+        # intermediate parents, not the requested 0700. Create every
+        # component explicitly and verify it before writing source bytes.
+        parent = directory
+        for component in Path(relative).parts[:-1]:
+            parent = parent / component
+            try:
+                parent.mkdir(mode=0o700)
+            except FileExistsError:
+                pass
+            info = parent.lstat()
+            require(stat.S_ISDIR(info.st_mode)
+                    and info.st_uid == os.getuid()
+                    and stat.S_IMODE(info.st_mode) == 0o700
+                    and not parent.is_symlink(), "SNAPSHOT_DIRECTORY_UNSAFE")
         with target.open("xb") as out:
             out.write(raw)
             out.flush()
