@@ -2,6 +2,7 @@
 import contextlib
 import importlib.util
 import io
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -200,6 +201,30 @@ class SupervisorOfflineContract(unittest.TestCase):
         self.assertNotIn("docker.sock", joined)
         self.assertNotIn("--publish", joined)
         self.assertIn("test_password; chmod 600", joined)
+
+    def test_snapshot_nested_parents_are_private_under_umask_022(self):
+        # Regression: mkdir(parents=True) used 0777 for intermediate parents.
+        with tempfile.TemporaryDirectory() as tmp:
+            lab = Path(tmp)
+            snapshot = Path(tempfile.mkdtemp(
+                prefix="b12_mac12b8_src_", dir=lab))
+            with mock.patch.object(MODULE, "LAB", lab):
+                previous_umask = os.umask(0o022)
+                try:
+                    MODULE.stage_source_snapshot(snapshot)
+                finally:
+                    os.umask(previous_umask)
+                folders = (MODULE.snapshot_entries()
+                           - set(MODULE.SOURCE_BLOBS))
+                self.assertTrue(folders)
+                for name in folders:
+                    with self.subTest(directory=name):
+                        self.assertEqual(
+                            (snapshot / name).stat().st_mode & 0o777,
+                            0o700
+                        )
+                MODULE.remove_verified_source_snapshot(snapshot)
+                self.assertFalse(snapshot.exists())
 
     def test_source_snapshot_detects_tampering_before_php_launch(self):
         with tempfile.TemporaryDirectory() as tmp:
