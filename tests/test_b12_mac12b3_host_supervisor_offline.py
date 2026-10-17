@@ -183,9 +183,10 @@ class SupervisorOfflineContract(unittest.TestCase):
                     "db-identity", "b12-mac12b3-" + "a"*16,
                     lab, snapshot
                 )
+                joined = " ".join(cmd)
                 for name in MODULE.SOURCE_BLOBS:
-                    self.assertIn(str(snapshot / name), cmd)
-                    self.assertNotIn(str(ROOT / name), cmd)
+                    self.assertIn("src=" + str(snapshot / name), joined)
+                    self.assertNotIn("src=" + str(ROOT / name), joined)
                 MODULE.remove_verified_source_snapshot(snapshot)
                 self.assertFalse(snapshot.exists())
         joined = " ".join(cmd)
