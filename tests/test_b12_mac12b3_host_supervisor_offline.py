@@ -174,9 +174,20 @@ class SupervisorOfflineContract(unittest.TestCase):
 
     def test_no_secrets_or_root_mount_in_php_command(self):
         with tempfile.TemporaryDirectory() as tmp:
-            cmd = MODULE.php_command(
-                "db-identity", "b12-mac12b3-" + "a"*16, Path(tmp)
-            )
+            lab = Path(tmp)
+            snapshot = Path(tempfile.mkdtemp(
+                prefix="b12_mac12b8_src_", dir=lab))
+            with mock.patch.object(MODULE, "LAB", lab):
+                MODULE.stage_source_snapshot(snapshot)
+                cmd = MODULE.php_command(
+                    "db-identity", "b12-mac12b3-" + "a"*16,
+                    lab, snapshot
+                )
+                for name in MODULE.SOURCE_BLOBS:
+                    self.assertIn(str(snapshot / name), cmd)
+                    self.assertNotIn(str(ROOT / name), cmd)
+                MODULE.remove_verified_source_snapshot(snapshot)
+                self.assertFalse(snapshot.exists())
         joined = " ".join(cmd)
         self.assertIn("--pull=never", joined)
         self.assertIn("--network=container:db-identity", joined)
@@ -188,6 +199,29 @@ class SupervisorOfflineContract(unittest.TestCase):
         self.assertNotIn("docker.sock", joined)
         self.assertNotIn("--publish", joined)
         self.assertIn("test_password; chmod 600", joined)
+
+    def test_source_snapshot_detects_tampering_before_php_launch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            lab = Path(tmp)
+            snapshot = Path(tempfile.mkdtemp(
+                prefix="b12_mac12b8_src_", dir=lab))
+            with mock.patch.object(MODULE, "LAB", lab):
+                MODULE.stage_source_snapshot(snapshot)
+                for name in MODULE.SOURCE_BLOBS:
+                    file = snapshot / name
+                    self.assertEqual(file.stat().st_mode & 0o777, 0o400)
+                path = snapshot / MODULE.HARNESS
+                path.chmod(0o600)
+                path.write_bytes(b"tampered")
+                path.chmod(0o400)
+                with self.assertRaises(MODULE.Blocked):
+                    MODULE.php_command(
+                        "db-identity", "b12-mac12b3-" + "a"*16,
+                        lab, snapshot
+                    )
+                with self.assertRaises(MODULE.Blocked):
+                    MODULE.remove_verified_source_snapshot(snapshot)
+                self.assertTrue(snapshot.exists())
 
     def test_unowned_container_must_not_be_stopped(self):
         with mock.patch.object(MODULE, "docker",
