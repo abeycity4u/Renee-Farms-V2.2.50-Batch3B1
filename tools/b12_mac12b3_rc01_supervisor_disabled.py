@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""MAC-12B3. Source-only Mac host supervisor for preliminary synthetic B12 RC01.
+"""MAC-12C. Isolated, source-only activation candidate for preliminary synthetic RC01.
 
-HARD OFF: execution requires a separately reviewed activation commit and a
-fresh, externally signed one-use approval manifest. No current authorization
-to create SQL fixtures, run workers, stop a container, or generate a proof.
-PHP also has its own independent OFF fuse.
+CANDIDATE ONLY: source fuses are enabled on this isolated review branch,
+but no approval manifest, fixture, container operation, or worker execution
+is authorized. Do not invoke this supervisor without a new explicit one-use
+authorization, exact-source and disposable-lab preflight, and signed grant.
+Never deploy this candidate into production or use it for certification.
 """
 from __future__ import annotations
 import hashlib
@@ -20,7 +21,7 @@ import tempfile
 import time
 import uuid
 
-EXECUTION_ENABLED = False
+EXECUTION_ENABLED = True
 # Future signer setup is a separate reviewed key-ceremony commit, NOT env input.
 # Pin the SHA-256 digest of the signer's trusted RSA public-key PEM after a
 # distinct explicit approval. The private signing key must never enter Git.
@@ -33,13 +34,13 @@ PROJECT = "renee_b12_rc_mac"
 DATABASE = "renee_b12_disposable"
 NETWORK = PROJECT + "_isolated"
 VOLUME = PROJECT + "_db_data"
-REPO_BRANCH = "c137-gc24-k2p03-b12-mac12b1-disabled-rc01"
+REPO_BRANCH = "c137-gc24-k2p03-b12-mac12c-activation-candidate-r01"
 PHP_IMAGE = "sha256:7399b946d775888f85299b9e1597a9ad633cd164cfc816b16f1f77e2da839445"
 SOURCE_ROOT = Path(__file__).resolve().parents[1]
 LAB = Path.home() / "renee-b12-rc-mac"
 HARNESS = "tests/integration/k2p03_b12_mac_rc01_preliminary_disabled.php"
 SOURCE_BLOBS = {
-    HARNESS: "2e288c611e0b43217eb1b8e15234ee823b65f940",
+    HARNESS: "cf24dbd54be7b60bee39b89c3d8e0904d5d08cb3",
     "lib/daily_record_revision_authority.php": "5fbb90903b0cc801be45c684f6c3db85c660979a",
     "lib/daily_record_revision_cutover_gate.php": "6e88c913ad5e5b371a9d0c92ce08870214ac1268",
     "lib/daily_record_revision_schema_plan.php": "a0ddbec542e891d484b48d1adbdac17442eaadf8",

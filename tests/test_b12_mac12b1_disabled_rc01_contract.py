@@ -30,9 +30,9 @@ class MacRc01DisabledContract(unittest.TestCase):
             with self.subTest(path=path.name):
                 self.assertEqual(blob(path), expected)
 
-    def test_hard_disabled_fuse_before_dispatch(self):
+    def test_candidate_fuse_has_guard_before_dispatch(self):
         text = self.text
-        self.assertRegex(text, r"const\s+B12_RC01_EXECUTION_ENABLED\s*=\s*false\s*;")
+        self.assertRegex(text, r"const\s+B12_RC01_EXECUTION_ENABLED\s*=\s*true\s*;")
         self.assertRegex(
             text, r"if\s*\(\s*!B12_RC01_EXECUTION_ENABLED\s*\)\s*\{"
         )

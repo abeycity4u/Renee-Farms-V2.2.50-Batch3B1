@@ -3,22 +3,22 @@ declare(strict_types=1);
 
 /**
  * B12 MAC-12B1: preliminary synthetic RC01, independent MariaDB connections.
- * SOURCE-ONLY, HARD-DISABLED. Not an execution authorization or certification.
+ * ISOLATED ACTIVATION CANDIDATE. Source-only preparation, NOT permission to run.
  * Mac-specific transport is TCP loopback inside the MariaDB container's
  * network namespace, with b12_test credentials supplied only at runtime.
  * A separate Mac host observer MUST query InnoDB lock waits with root
  * retained inside the DB container before writing the observer proof marker.
  * The marker alone is NOT independent proof without that future host attestation.
  *
- * The hard-disabled fuse MUST NOT be changed without a reviewed commit and
- * fresh explicit approval naming the exact isolated DB, fixture operations,
+ * Candidate fuse is enabled ONLY on a separately reviewed candidate branch;
+ * runtime use still requires fresh explicit approval naming isolated DB and fixtures,
  * worker execution, teardown and resulting commit SHA. No workflow invokes it.
  *
  * RC01 deliberately tests only the actual shared CAS authority. RC02 will
  * separately exercise the complete save pipeline and downstream writers.
  * Preserve the original historical k2p03_b12_real_mariadb.php unmodified.
  */
-const B12_RC01_EXECUTION_ENABLED = false;
+const B12_RC01_EXECUTION_ENABLED = true;
 const B12_RC01_DATABASE = 'renee_b12_disposable';
 const B12_RC01_TCP_DSN = 'mysql:host=127.0.0.1;port=3306;dbname=renee_b12_disposable;charset=utf8mb4';
 const B12_RC01_RECORD_DATE = '2026-09-21';

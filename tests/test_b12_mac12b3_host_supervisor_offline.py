@@ -1,4 +1,4 @@
-"""Offline-only safety tests for hard-disabled MAC-12B3 host supervisor."""
+"""Offline-only safety tests for isolated MAC-12C source activation candidate."""
 import contextlib
 import importlib.util
 import io
@@ -16,8 +16,8 @@ SPEC.loader.exec_module(MODULE)
 
 
 class SupervisorOfflineContract(unittest.TestCase):
-    def test_literal_fuse_off_and_trusted_signer_pin(self):
-        self.assertIs(MODULE.EXECUTION_ENABLED, False)
+    def test_candidate_fuse_and_trusted_signer_pin(self):
+        self.assertIs(MODULE.EXECUTION_ENABLED, True)
         self.assertEqual(MODULE.TRUSTED_APPROVER_PUBLIC_KEY_SHA256,
                          "d7a8c59c31898eedb4a894769f7c1ddc145d38a560632cfa0d1683a1935e8735")
         self.assertEqual(MODULE.APPROVAL_CONTRACT,
@@ -25,18 +25,22 @@ class SupervisorOfflineContract(unittest.TestCase):
         self.assertFalse(hasattr(MODULE, "APPROVED_SUPERVISOR_BLOB"))
         self.assertFalse(hasattr(MODULE, "APPROVED_RUNTIME_COMMIT"))
 
-    def test_off_path_has_no_docker_network_or_db_calls(self):
-        with mock.patch.object(MODULE.subprocess, "run",
-                               side_effect=AssertionError("subprocess invoked")):
-            with mock.patch.object(MODULE.subprocess, "Popen",
-                                   side_effect=AssertionError("worker invoked")):
-                with mock.patch.object(MODULE, "execute_one_use",
-                                       side_effect=AssertionError("execution invoked")):
-                    stderr = io.StringIO()
-                    with contextlib.redirect_stderr(stderr):
-                        self.assertEqual(MODULE.main(), 90)
-                    self.assertEqual(stderr.getvalue(),
-                                     "B12_MAC12B3=SOURCE_ONLY_HARD_DISABLED\n")
+    def test_candidate_main_without_manifest_fails_before_docker(self):
+        with tempfile.TemporaryDirectory() as td:
+            approval = Path(td) / MODULE.APPROVAL_DIR_NAME
+            approval.mkdir(mode=0o700)
+            with mock.patch.object(MODULE, "LAB", Path(td)), \
+                 mock.patch.object(MODULE.subprocess, "run",
+                                   side_effect=AssertionError("subprocess invoked")), \
+                 mock.patch.object(MODULE.subprocess, "Popen",
+                                   side_effect=AssertionError("worker invoked")), \
+                 mock.patch.object(MODULE, "docker",
+                                   side_effect=AssertionError("docker invoked")):
+                stderr = io.StringIO()
+                with contextlib.redirect_stderr(stderr):
+                    self.assertEqual(MODULE.main(), 1)
+                self.assertEqual(stderr.getvalue(),
+                                 "B12_MAC12B3=FAIL_CLOSED_MANUAL_REVIEW\n")
 
     def test_pinned_authority_and_cutover_unchanged(self):
         pinned = {
@@ -52,14 +56,14 @@ class SupervisorOfflineContract(unittest.TestCase):
                 self.assertEqual(MODULE.git_blob((ROOT / path).read_bytes()),
                                  expected)
 
-    def test_mac_harness_pinned_and_still_disabled(self):
+    def test_mac_harness_pinned_in_candidate(self):
         path = ROOT / MODULE.HARNESS
         self.assertEqual(
             MODULE.git_blob(path.read_bytes()),
-            "2e288c611e0b43217eb1b8e15234ee823b65f940"
+            "cf24dbd54be7b60bee39b89c3d8e0904d5d08cb3"
         )
         source = path.read_text(encoding="utf-8")
-        self.assertIn("const B12_RC01_EXECUTION_ENABLED = false;", source)
+        self.assertIn("const B12_RC01_EXECUTION_ENABLED = true;", source)
         self.assertIn("B12_RC01_DB_PASSWORD_FILE", source)
         self.assertIn("'/b12-private/test_password'", source)
         self.assertNotIn("getenv('B12_RC01_DB_PASSWORD')", source)

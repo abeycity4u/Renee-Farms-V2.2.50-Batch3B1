@@ -49,8 +49,8 @@ def payload(now=NOW):
 
 
 class SignedApprovalOfflineContract(unittest.TestCase):
-    def test_source_fuse_off_and_signer_pinned(self):
-        self.assertIs(M.EXECUTION_ENABLED, False)
+    def test_candidate_fuse_and_signer_pinned(self):
+        self.assertIs(M.EXECUTION_ENABLED, True)
         self.assertEqual(M.TRUSTED_APPROVER_PUBLIC_KEY_SHA256,
                          "d7a8c59c31898eedb4a894769f7c1ddc145d38a560632cfa0d1683a1935e8735")
         self.assertFalse(hasattr(M, "APPROVED_RUNTIME_COMMIT"))
