@@ -8,7 +8,7 @@
 
 - Supervisor `tools/b12_mac12b3_rc01_supervisor_disabled.py` has verified Git blob `9628679e80836cfc4c148f17790638c70c5e2cbf`.
 - Source has `EXECUTION_ENABLED = False` and `TRUSTED_APPROVER_PUBLIC_KEY_SHA256 = None`. PHP harness `tests/integration/k2p03_b12_mac_rc01_preliminary_disabled.php` Git blob `2e288c611e0b43217eb1b8e15234ee823b65f940` has `B12_RC01_EXECUTION_ENABLED = false`.
-- Existing `B12-MAC12C-RC01-ONE-USE-V1` contract accepts exactly 16 fields, signed RSA-SHA256, ≤15-minute issued/expires UTC window, fixed synthetic scope/database/branch/commit/blobs/image, one-use 32-hex `run_id` and persistent `O_EXCL` local claim; no `decision_id`, revocation, independent time attestation or remote one-use ledger exists in the current supervisor.
+- Existing `B12-MAC12C-RC01-ONE-USE-V1` contract accepts exactly 15 fields, signed RSA-SHA256, ≤15-minute issued/expires UTC window, fixed synthetic scope/database/branch/commit/blobs/image, one-use 32-hex `run_id` and persistent `O_EXCL` local claim; no `decision_id`, revocation, independent time attestation or remote one-use ledger exists in the current supervisor.
 - MAC-12B12-OFF local evidence under parent HEAD: nine pinned source/test files PASS; 44/44 offline tests, 0 failures/skips; RSA positive/swapped-signature/concurrent local claim PASS; Python hard-off exit 90; owned staging cleaned. **No new tests have been executed for this document.**
 - Official repaired RC01–RC14 certification: **0/14**. Migration 092: **NOT AUTHORIZED**. B12 cutover: **HARD OFF**. No protected production/staging/GA source or real customer database touched.
 
