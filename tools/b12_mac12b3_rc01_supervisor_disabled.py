@@ -24,7 +24,7 @@ EXECUTION_ENABLED = False
 # Future signer setup is a separate reviewed key-ceremony commit, NOT env input.
 # Pin the SHA-256 digest of the signer's trusted RSA public-key PEM after a
 # distinct explicit approval. The private signing key must never enter Git.
-TRUSTED_APPROVER_PUBLIC_KEY_SHA256 = None
+TRUSTED_APPROVER_PUBLIC_KEY_SHA256 = "d7a8c59c31898eedb4a894769f7c1ddc145d38a560632cfa0d1683a1935e8735"
 APPROVAL_CONTRACT = "B12-MAC12C-RC01-ONE-USE-V1"
 APPROVAL_SCOPE = "ISOLATED_SYNTHETIC_LAYER_EDIT_EDIT_ONLY"
 APPROVAL_DIR_NAME = ".b12-approvals"

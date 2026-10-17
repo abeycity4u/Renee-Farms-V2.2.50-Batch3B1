@@ -49,19 +49,21 @@ def payload(now=NOW):
 
 
 class SignedApprovalOfflineContract(unittest.TestCase):
-    def test_source_fuse_and_signer_default_to_disabled(self):
+    def test_source_fuse_off_and_signer_pinned(self):
         self.assertIs(M.EXECUTION_ENABLED, False)
-        self.assertIsNone(M.TRUSTED_APPROVER_PUBLIC_KEY_SHA256)
+        self.assertEqual(M.TRUSTED_APPROVER_PUBLIC_KEY_SHA256,
+                         "d7a8c59c31898eedb4a894769f7c1ddc145d38a560632cfa0d1683a1935e8735")
         self.assertFalse(hasattr(M, "APPROVED_RUNTIME_COMMIT"))
         self.assertFalse(hasattr(M, "APPROVED_SUPERVISOR_BLOB"))
 
     def test_no_key_refuses_before_io_and_docker(self):
-        with mock.patch.object(M, "approval_directory",
-                               side_effect=AssertionError("filesystem touched")):
-            with mock.patch.object(M, "docker",
-                                   side_effect=AssertionError("docker touched")):
-                with self.assertRaises(M.Blocked):
-                    M.load_signed_approval()
+        with mock.patch.object(M, "TRUSTED_APPROVER_PUBLIC_KEY_SHA256", None):
+            with mock.patch.object(M, "approval_directory",
+                                   side_effect=AssertionError("filesystem touched")):
+                with mock.patch.object(M, "docker",
+                                       side_effect=AssertionError("docker touched")):
+                    with self.assertRaises(M.Blocked):
+                        M.load_signed_approval()
 
     def test_exact_valid_scope_and_signed_commit_fields(self):
         good = payload()

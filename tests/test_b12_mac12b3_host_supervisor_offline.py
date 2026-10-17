@@ -16,9 +16,10 @@ SPEC.loader.exec_module(MODULE)
 
 
 class SupervisorOfflineContract(unittest.TestCase):
-    def test_literal_fuse_and_approval_sentinels_are_off(self):
+    def test_literal_fuse_off_and_trusted_signer_pin(self):
         self.assertIs(MODULE.EXECUTION_ENABLED, False)
-        self.assertIsNone(MODULE.TRUSTED_APPROVER_PUBLIC_KEY_SHA256)
+        self.assertEqual(MODULE.TRUSTED_APPROVER_PUBLIC_KEY_SHA256,
+                         "d7a8c59c31898eedb4a894769f7c1ddc145d38a560632cfa0d1683a1935e8735")
         self.assertEqual(MODULE.APPROVAL_CONTRACT,
                          "B12-MAC12C-RC01-ONE-USE-V1")
         self.assertFalse(hasattr(MODULE, "APPROVED_SUPERVISOR_BLOB"))
