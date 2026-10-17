@@ -3,7 +3,9 @@
 Only ephemeral RSA test keys are created in an automatically deleted temp dir.
 They are NOT the production/testing approval signer and must never be reused.
 """
+import contextlib
 from datetime import datetime, timedelta, timezone
+import io
 import hashlib
 import importlib.util
 import json
@@ -151,9 +153,85 @@ class SignedApprovalOfflineContract(unittest.TestCase):
                 with self.assertRaises(OSError):
                     M.claim_one_use(payload())
 
+    def test_one_use_claim_fsyncs_file_and_parent_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            claims = base / "claims"
+            claims.mkdir(mode=0o700)
+            claims.chmod(0o700)
+            native_fsync = os.fsync
+            with mock.patch.object(M, "approval_directory",
+                                   return_value=base):
+                with mock.patch.object(M.os, "fsync",
+                                       wraps=native_fsync) as sync:
+                    M.claim_one_use(payload())
+            self.assertEqual(sync.call_count, 2)
+            marker = claims / ("claimed_" + "a" * 32)
+            self.assertTrue(marker.is_file())
+
+    def test_claim_remains_if_parent_directory_fsync_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            claims = base / "claims"
+            claims.mkdir(mode=0o700)
+            claims.chmod(0o700)
+            with mock.patch.object(M, "approval_directory",
+                                   return_value=base):
+                with mock.patch.object(
+                        M.os, "fsync",
+                        side_effect=[None, OSError("dir sync blocked")]):
+                    with self.assertRaises(OSError):
+                        M.claim_one_use(payload())
+            marker = claims / ("claimed_" + "a" * 32)
+            self.assertTrue(marker.exists())
+            with mock.patch.object(M, "approval_directory",
+                                   return_value=base):
+                with self.assertRaises(M.Blocked):
+                    M.claim_one_use(payload())
+
+    def test_expiry_rechecked_after_slow_preflight_before_claim(self):
+        expired = payload(datetime.now(timezone.utc)
+                          - timedelta(hours=1))
+        with mock.patch.object(M, "load_signed_approval",
+                               return_value=expired), \
+             mock.patch.object(M, "verify_source"), \
+             mock.patch.object(M, "verify_docker",
+                               return_value="synthetic-db"), \
+             mock.patch.object(M, "verify_schema_empty"), \
+             mock.patch.object(M, "claim_one_use",
+                               side_effect=AssertionError("claim attempted")):
+            with self.assertRaises(M.Blocked):
+                M.execute_one_use()
+
+    def test_second_expiry_check_blocks_workers_after_claim(self):
+        grant = payload(datetime.now(timezone.utc))
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.object(M, "LAB", Path(tmp)), \
+                 mock.patch.object(M, "load_signed_approval",
+                                   return_value=grant), \
+                 mock.patch.object(M, "verify_source"), \
+                 mock.patch.object(M, "verify_docker",
+                                   return_value="synthetic-db"), \
+                 mock.patch.object(M, "verify_schema_empty"), \
+                 mock.patch.object(M, "docker", return_value=""), \
+                 mock.patch.object(M, "claim_one_use") as claim, \
+                 mock.patch.object(M, "stage_source_snapshot"), \
+                 mock.patch.object(
+                     M, "validate_approval_payload",
+                     side_effect=[grant, M.Blocked("EXPIRED_AFTER_CLAIM")]), \
+                 mock.patch.object(
+                     M.subprocess, "Popen",
+                     side_effect=AssertionError("worker started")):
+                with contextlib.redirect_stderr(io.StringIO()):
+                    with self.assertRaises(M.Blocked):
+                        M.execute_one_use()
+                claim.assert_called_once_with(grant)
+
     def test_real_offline_rsa_signature_and_tampering(self):
-        if not shutil.which("openssl"):
-            self.skipTest("openssl not installed; separate gate remains unverified")
+        self.assertIsNotNone(
+            shutil.which("openssl"),
+            "OpenSSL is required; RSA positive verification must not skip"
+        )
         with tempfile.TemporaryDirectory() as tmp:
             lab = Path(tmp)
             directory = lab / M.APPROVAL_DIR_NAME
