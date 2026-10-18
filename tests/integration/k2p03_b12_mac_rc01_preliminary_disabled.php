@@ -18,7 +18,7 @@ declare(strict_types=1);
  * separately exercise the complete save pipeline and downstream writers.
  * Preserve the original historical k2p03_b12_real_mariadb.php unmodified.
  */
-const B12_RC01_EXECUTION_ENABLED = true;
+const B12_RC01_EXECUTION_ENABLED = false;
 const B12_RC01_DATABASE = 'renee_b12_disposable';
 const B12_RC01_TCP_DSN = 'mysql:host=127.0.0.1;port=3306;dbname=renee_b12_disposable;charset=utf8mb4';
 const B12_RC01_RECORD_DATE = '2026-09-21';

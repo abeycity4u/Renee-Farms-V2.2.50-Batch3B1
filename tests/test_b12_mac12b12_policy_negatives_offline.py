@@ -265,6 +265,8 @@ class MAC12B12ExistingV1Negatives(unittest.TestCase):
                                    return_value=approval), \
                  mock.patch.object(M, "load_signed_approval",
                                    return_value=sample), \
+                  mock.patch.object(M, "verify_human_launch_decision",
+                                    return_value="f"*64), \
                  mock.patch.object(M, "verify_source"), \
                  mock.patch.object(M, "verify_docker",
                                    return_value="test-only-db"), \

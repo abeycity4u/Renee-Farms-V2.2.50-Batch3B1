@@ -17,7 +17,7 @@ SPEC.loader.exec_module(MODULE)
 
 class SupervisorOfflineContract(unittest.TestCase):
     def test_candidate_fuse_and_trusted_signer_pin(self):
-        self.assertIs(MODULE.EXECUTION_ENABLED, True)
+        self.assertIs(MODULE.EXECUTION_ENABLED, False)
         self.assertEqual(MODULE.TRUSTED_APPROVER_PUBLIC_KEY_SHA256,
                          "d7a8c59c31898eedb4a894769f7c1ddc145d38a560632cfa0d1683a1935e8735")
         self.assertEqual(MODULE.APPROVAL_CONTRACT,
@@ -38,9 +38,9 @@ class SupervisorOfflineContract(unittest.TestCase):
                                    side_effect=AssertionError("docker invoked")):
                 stderr = io.StringIO()
                 with contextlib.redirect_stderr(stderr):
-                    self.assertEqual(MODULE.main(), 1)
+                    self.assertEqual(MODULE.main(), 90)
                 self.assertEqual(stderr.getvalue(),
-                                 "B12_MAC12B3=FAIL_CLOSED_MANUAL_REVIEW\n")
+                                 "B12_MAC12B3=SOURCE_ONLY_HARD_DISABLED\n")
 
     def test_pinned_authority_and_cutover_unchanged(self):
         pinned = {
@@ -60,10 +60,10 @@ class SupervisorOfflineContract(unittest.TestCase):
         path = ROOT / MODULE.HARNESS
         self.assertEqual(
             MODULE.git_blob(path.read_bytes()),
-            "cf24dbd54be7b60bee39b89c3d8e0904d5d08cb3"
+            "eb76719b1f47805c1206e5112c4688eb09f66c47"
         )
         source = path.read_text(encoding="utf-8")
-        self.assertIn("const B12_RC01_EXECUTION_ENABLED = true;", source)
+        self.assertIn("const B12_RC01_EXECUTION_ENABLED = false;", source)
         self.assertIn("B12_RC01_DB_PASSWORD_FILE", source)
         self.assertIn("'/b12-private/test_password'", source)
         self.assertNotIn("getenv('B12_RC01_DB_PASSWORD')", source)
@@ -222,7 +222,8 @@ class SupervisorOfflineContract(unittest.TestCase):
         self.assertIn("B12_RC01_DB_PASSWORD_FILE", joined)
         self.assertNotIn("root_password", joined)
         self.assertNotIn("B12_RC01_DB_PASSWORD=", joined)
-        self.assertNotIn("docker.sock", joined)
+        self.assertIn("--host=unix://" + str(MODULE.DOCKER_SOCKET), joined)
+        self.assertTrue(all("docker.sock" not in m for m in mounts))
         self.assertNotIn("--publish", joined)
         self.assertIn("test_password; chmod 600", joined)
 

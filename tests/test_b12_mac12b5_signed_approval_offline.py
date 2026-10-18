@@ -50,7 +50,7 @@ def payload(now=NOW):
 
 class SignedApprovalOfflineContract(unittest.TestCase):
     def test_candidate_fuse_and_signer_pinned(self):
-        self.assertIs(M.EXECUTION_ENABLED, True)
+        self.assertIs(M.EXECUTION_ENABLED, False)
         self.assertEqual(M.TRUSTED_APPROVER_PUBLIC_KEY_SHA256,
                          "d7a8c59c31898eedb4a894769f7c1ddc145d38a560632cfa0d1683a1935e8735")
         self.assertFalse(hasattr(M, "APPROVED_RUNTIME_COMMIT"))
@@ -196,6 +196,8 @@ class SignedApprovalOfflineContract(unittest.TestCase):
                           - timedelta(hours=1))
         with mock.patch.object(M, "load_signed_approval",
                                return_value=expired), \
+             mock.patch.object(M, "verify_human_launch_decision",
+                               return_value="f"*64), \
              mock.patch.object(M, "verify_source"), \
              mock.patch.object(M, "verify_docker",
                                return_value="synthetic-db"), \
@@ -211,6 +213,8 @@ class SignedApprovalOfflineContract(unittest.TestCase):
             with mock.patch.object(M, "LAB", Path(tmp)), \
                  mock.patch.object(M, "load_signed_approval",
                                    return_value=grant), \
+                  mock.patch.object(M, "verify_human_launch_decision",
+                                    return_value="f"*64), \
                  mock.patch.object(M, "verify_source"), \
                  mock.patch.object(M, "verify_docker",
                                    return_value="synthetic-db"), \

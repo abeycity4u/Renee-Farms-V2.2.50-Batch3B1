@@ -21,7 +21,7 @@ import tempfile
 import time
 import uuid
 
-EXECUTION_ENABLED = True
+EXECUTION_ENABLED = False
 # Future signer setup is a separate reviewed key-ceremony commit, NOT env input.
 # Pin the SHA-256 digest of the signer's trusted RSA public-key PEM after a
 # distinct explicit approval. The private signing key must never enter Git.
@@ -34,13 +34,13 @@ PROJECT = "renee_b12_rc_mac"
 DATABASE = "renee_b12_disposable"
 NETWORK = PROJECT + "_isolated"
 VOLUME = PROJECT + "_db_data"
-REPO_BRANCH = "c137-gc24-k2p03-b12-mac12c-activation-candidate-r01"
+REPO_BRANCH = "c137-gc24-k2p03-b12-mac12c-launch-gate-hardening-r01"
 PHP_IMAGE = "sha256:7399b946d775888f85299b9e1597a9ad633cd164cfc816b16f1f77e2da839445"
 SOURCE_ROOT = Path(__file__).resolve().parents[1]
 LAB = Path.home() / "renee-b12-rc-mac"
 HARNESS = "tests/integration/k2p03_b12_mac_rc01_preliminary_disabled.php"
 SOURCE_BLOBS = {
-    HARNESS: "cf24dbd54be7b60bee39b89c3d8e0904d5d08cb3",
+    HARNESS: "eb76719b1f47805c1206e5112c4688eb09f66c47",
     "lib/daily_record_revision_authority.php": "5fbb90903b0cc801be45c684f6c3db85c660979a",
     "lib/daily_record_revision_cutover_gate.php": "6e88c913ad5e5b371a9d0c92ce08870214ac1268",
     "lib/daily_record_revision_schema_plan.php": "a0ddbec542e891d484b48d1adbdac17442eaadf8",
@@ -79,8 +79,18 @@ def command(argv: list[str], timeout: float = 15) -> str:
     return proc.stdout.strip()
 
 
+DOCKER_EXECUTABLE = "/Applications/Docker.app/Contents/Resources/bin/docker"
+DOCKER_SOCKET = Path.home() / ".docker/run/docker.sock"
+
+def docker_argv(*argv: str) -> list[str]:
+    return [
+        DOCKER_EXECUTABLE,
+        "--host=unix://" + str(DOCKER_SOCKET),
+        *argv
+    ]
+
 def docker(*argv: str) -> str:
-    return command(["docker", *argv])
+    return command(docker_argv(*argv))
 
 
 def inspect(kind: str, identity: str) -> dict:
@@ -326,6 +336,144 @@ def load_signed_approval() -> dict:
     return validate_approval_payload(data, datetime.now(timezone.utc))
 
 
+HUMAN_LAUNCH_CONTRACT = "B12-MAC12C-RC01-HUMAN-LAUNCH-V1"
+HUMAN_LAUNCH_ACTIONS = [
+    "SYNTHETIC_FIXTURE_INSERT",
+    "TWO_WORKER_LAYER_EDIT_EDIT_RACE",
+    "INDEPENDENT_INNODB_WAIT_OBSERVER",
+    "EXACT_FIXTURE_TEARDOWN",
+    "FAILURE_QUARANTINE",
+]
+
+
+def verify_human_launch_decision(approval: dict) -> str:
+    """R-A cooperative-operator human gate, separate from RSA grant.
+
+    The initial hold record is historical and never itself an approval.
+    An explicit future one-use decision must independently match the
+    exact signed grant identity and its short validity window.
+    """
+    evidence = LAB / ".b12-evidence"
+    case = evidence / "mac12c-r01"
+    preflight = case / "preflight"
+
+    for directory in (evidence, case, preflight):
+        info = directory.lstat()
+        require(stat.S_ISDIR(info.st_mode)
+                and info.st_uid == os.getuid()
+                and stat.S_IMODE(info.st_mode) == 0o700,
+                "HUMAN_EVIDENCE_DIRECTORY_UNSAFE")
+
+    role = case / "role_assignment.txt"
+    hold = case / "authorization_record.txt"
+    require(owned_secret(role) and owned_secret(hold),
+            "HUMAN_BASELINE_RECORD_UNSAFE")
+
+    role_text = role.read_text(encoding="utf-8")
+    hold_text = hold.read_text(encoding="utf-8")
+
+    require("RESPONSIBLE_PERSON=Abiodun Ayinde\n" in role_text
+            and "INDEPENDENT_HUMAN_OVERSIGHT=NO\n" in role_text
+            and "HUMAN_ROLE_ASSIGNMENT=CONFIRMED_IN_CHAT\n" in role_text,
+            "HUMAN_ROLE_RECORD_DRIFT")
+    require("RECORD_TYPE=PREAUTHORIZATION_HOLD_RECORD\n" in hold_text
+            and "HUMAN_LAUNCH_APPROVAL=NOT_ISSUED\n" in hold_text,
+            "HUMAN_HISTORICAL_HOLD_DRIFT")
+
+    path = preflight / "human_oneuse_launch.json"
+    require(owned_secret(path), "HUMAN_DECISION_FILE_UNSAFE")
+    info = path.lstat()
+    require(0 < info.st_size <= 4096,
+            "HUMAN_DECISION_FILE_SIZE")
+
+    raw = path.read_bytes()
+    require(len(raw) == info.st_size,
+            "HUMAN_DECISION_FILE_CHANGED")
+
+    try:
+        decision = json.loads(
+            raw.decode("utf-8"),
+            object_pairs_hook=reject_duplicate_json_keys
+        )
+    except (UnicodeError, json.JSONDecodeError) as error:
+        raise Blocked("HUMAN_DECISION_JSON_INVALID") from error
+
+    required = {
+        "contract", "decision", "decision_id", "decision_utc",
+        "authorizer", "operator", "security_model",
+        "repository", "branch", "run_id", "source_commit",
+        "supervisor_blob", "harness_blob",
+        "issued_utc", "expires_utc", "scope",
+        "database", "php_image_id",
+        "authorized_actions", "production_contact",
+        "independent_human_oversight", "launch_approved"
+    }
+    require(isinstance(decision, dict)
+            and set(decision) == required,
+            "HUMAN_DECISION_FIELDS_MISMATCH")
+
+    require(
+        decision["contract"] == HUMAN_LAUNCH_CONTRACT
+        and decision["decision"]
+            == "APPROVE_ONE_PRELIMINARY_RC01_LAUNCH"
+        and isinstance(decision["decision_id"], str)
+        and re.fullmatch(
+            r"[A-Z0-9][A-Z0-9_-]{7,63}",
+            decision["decision_id"]
+        ) is not None
+        and decision["authorizer"] == "Abiodun Ayinde"
+        and decision["operator"] == "Abiodun Ayinde"
+        and decision["security_model"] == "R-A_LIMITED_SYNTHETIC_ONLY"
+        and decision["authorized_actions"] == HUMAN_LAUNCH_ACTIONS
+        and decision["production_contact"] is False
+        and decision["independent_human_oversight"] is False
+        and decision["launch_approved"] is True,
+        "HUMAN_DECISION_AUTHORITY_INVALID"
+    )
+
+    for field in (
+        "repository", "branch", "run_id", "source_commit",
+        "supervisor_blob", "harness_blob",
+        "issued_utc", "expires_utc", "scope",
+        "database", "php_image_id"
+    ):
+        require(
+            type(decision[field]) is str
+            and decision[field] == approval[field],
+            "HUMAN_DECISION_GRANT_MISMATCH"
+        )
+
+    stamp = decision["decision_utc"]
+    require(
+        isinstance(stamp, str)
+        and re.fullmatch(
+            r"20[0-9]{2}-[0-9]{2}-[0-9]{2}T"
+            r"[0-9]{2}:[0-9]{2}:[0-9]{2}Z",
+            stamp
+        ) is not None,
+        "HUMAN_DECISION_TIME_FORMAT_INVALID"
+    )
+
+    try:
+        decided = datetime.strptime(
+            stamp, "%Y-%m-%dT%H:%M:%SZ"
+        ).replace(tzinfo=timezone.utc)
+        issued = datetime.strptime(
+            approval["issued_utc"], "%Y-%m-%dT%H:%M:%SZ"
+        ).replace(tzinfo=timezone.utc)
+        expires = datetime.strptime(
+            approval["expires_utc"], "%Y-%m-%dT%H:%M:%SZ"
+        ).replace(tzinfo=timezone.utc)
+    except ValueError as error:
+        raise Blocked("HUMAN_DECISION_TIME_INVALID") from error
+
+    require(
+        issued <= decided <= datetime.now(timezone.utc) < expires,
+        "HUMAN_DECISION_NOT_IN_LIVE_GRANT_WINDOW"
+    )
+    return hashlib.sha256(raw).hexdigest()
+
+
 def claim_one_use(approval: dict) -> None:
     """Local anti-replay marker; never deleted automatically, even on failure."""
     directory = approval_directory() / "claims"
@@ -359,72 +507,162 @@ def claim_one_use(approval: dict) -> None:
         os.close(dir_fd)
 
 
+def normalize_mount_source(source: str) -> str:
+    for prefix in ("/run/desktop/mnt/host", "/host_mnt"):
+        if source.startswith(prefix + "/"):
+            return source[len(prefix):]
+    return source
+
+
+def verify_database_mounts(mounts: object) -> None:
+    require(isinstance(mounts, list) and len(mounts) == 3,
+            "DB_MOUNT_COUNT_DRIFT")
+    require(all(isinstance(item, dict) for item in mounts),
+            "DB_MOUNT_STRUCTURE_INVALID")
+    by_dest = {item.get("Destination"): item for item in mounts}
+    require(set(by_dest) == {
+        "/var/lib/mysql",
+        "/run/secrets/root_password",
+        "/run/secrets/test_password"
+    }, "DB_MOUNT_DESTINATION_DRIFT")
+
+    data = by_dest["/var/lib/mysql"]
+    require(data.get("Type") == "volume"
+            and data.get("Name") == VOLUME
+            and data.get("RW") is True,
+            "DB_DATA_VOLUME_DRIFT")
+
+    for name in ("root_password", "test_password"):
+        item = by_dest["/run/secrets/" + name]
+        expected = str(LAB / ".b12-secrets" / name)
+        require(item.get("Type") == "bind"
+                and item.get("RW") is False
+                and isinstance(item.get("Source"), str)
+                and normalize_mount_source(item["Source"]) == expected,
+                "DB_SECRET_MOUNT_DRIFT")
+
+
 def verify_docker() -> str:
     require(sys.platform == "darwin", "NOT_MACOS")
-    require(not os.environ.get("DOCKER_HOST")
-            and not os.environ.get("DOCKER_CONTEXT"),
-            "NONSTANDARD_DOCKER_ENDPOINT")
-    ctx = docker("context", "show")
-    endpoint = docker("context", "inspect", ctx,
-                      "--format", "{{.Endpoints.docker.Host}}")
-    require(endpoint.startswith("unix://"), "NONLOCAL_DOCKER_CONTEXT")
-    require(LAB.is_dir() and not LAB.is_symlink(), "LAB_UNSAFE")
-    for secret in ("root_password", "test_password"):
-        require(owned_secret(LAB / ".b12-secrets" / secret),
+
+    for name in ("DOCKER_HOST", "DOCKER_CONTEXT",
+                 "DOCKER_TLS_VERIFY", "DOCKER_CERT_PATH"):
+        require(not os.environ.get(name),
+                "DOCKER_ENDPOINT_OVERRIDE")
+
+    try:
+        binary = Path(DOCKER_EXECUTABLE)
+        binary_info = binary.lstat()
+        socket_info = DOCKER_SOCKET.lstat()
+    except OSError as error:
+        raise Blocked("PINNED_DOCKER_ENDPOINT_MISSING") from error
+
+    require(stat.S_ISREG(binary_info.st_mode)
+            and os.access(binary, os.X_OK),
+            "DOCKER_CLIENT_IDENTITY_DRIFT")
+    require(stat.S_ISSOCK(socket_info.st_mode)
+            and socket_info.st_uid == os.getuid(),
+            "DOCKER_SOCKET_IDENTITY_DRIFT")
+
+    require(LAB.is_dir() and not LAB.is_symlink(),
+            "LAB_UNSAFE")
+    lab_info = LAB.lstat()
+    require(lab_info.st_uid == os.getuid()
+            and stat.S_IMODE(lab_info.st_mode) == 0o700,
+            "LAB_PERMISSIONS_DRIFT")
+
+    secret_dir = LAB / ".b12-secrets"
+    secret_info = secret_dir.lstat()
+    require(stat.S_ISDIR(secret_info.st_mode)
+            and secret_info.st_uid == os.getuid()
+            and stat.S_IMODE(secret_info.st_mode) == 0o700,
+            "SECRET_DIRECTORY_UNSAFE")
+
+    for name in ("root_password", "test_password"):
+        require(owned_secret(secret_dir / name),
                 "SECRET_IDENTITY_UNSAFE")
+
     lock = LAB / "image-id.lock"
     require(owned_secret(lock), "DB_IMAGE_LOCK_UNSAFE")
-    db_image = lock.read_text(encoding="utf-8").strip()
-    img = inspect("image", "mariadb:10.11")
-    require(img.get("Id") == db_image and img.get("Os") == "linux"
-            and img.get("Architecture") == "amd64",
+    db_image = lock.read_text(encoding="ascii").strip()
+    require(re.fullmatch(r"sha256:[a-f0-9]{64}", db_image)
+            is not None, "DB_IMAGE_LOCK_INVALID")
+
+    image = inspect("image", "mariadb:10.11")
+    require(image.get("Id") == db_image
+            and image.get("Os") == "linux"
+            and image.get("Architecture") == "amd64",
             "DB_IMAGE_DRIFT")
+
     php = inspect("image", "renee-b12-php82-pdo-mac12a4:local")
-    require(php.get("Id") == PHP_IMAGE and php.get("Os") == "linux"
+    require(php.get("Id") == PHP_IMAGE
+            and php.get("Os") == "linux"
             and php.get("Architecture") == "amd64",
             "PHP_IMAGE_DRIFT")
+
     ids = docker("ps", "-aq", "--filter",
                  "label=com.docker.compose.project=" + PROJECT).splitlines()
     require(len(ids) == 1, "DB_CONTAINER_COUNT")
+
     db = inspect("container", ids[0])
     host = db.get("HostConfig") or {}
-    labels = (db.get("Config") or {}).get("Labels") or {}
-    nets = (db.get("NetworkSettings") or {}).get("Networks") or {}
-    ports = (db.get("NetworkSettings") or {}).get("Ports") or {}
+    config = db.get("Config") or {}
+    labels = config.get("Labels") or {}
+    state = db.get("State") or {}
+    settings = db.get("NetworkSettings") or {}
+    nets = settings.get("Networks") or {}
+    ports = settings.get("Ports") or {}
+
     require(db.get("Image") == db_image
-            and db.get("State", {}).get("Running") is True
+            and state.get("Running") is True
+            and state.get("Paused") is not True
+            and state.get("Restarting") is not True
             and labels.get("com.docker.compose.project") == PROJECT
             and labels.get("com.docker.compose.service") == "mariadb"
             and host.get("Memory") == 1073741824
             and host.get("PidsLimit") == 128
-            and not host.get("Privileged") and not host.get("CapAdd")
-            and not host.get("PortBindings") and not any(ports.values()),
+            and host.get("Privileged") is False
+            and not host.get("CapAdd")
+            and not host.get("Devices")
+            and not host.get("PortBindings")
+            and not any(ports.values()),
             "DB_CONTAINER_POLICY_DRIFT")
+
     require(set(nets) == {NETWORK}, "DB_NETWORK_DRIFT")
-    net = inspect("network", NETWORK)
-    members = list((net.get("Containers") or {}).values())
-    require(net.get("Internal") is True and net.get("Driver") == "bridge"
-            and net.get("Labels", {}).get("com.docker.compose.project") == PROJECT
-            and nets[NETWORK].get("NetworkID") == net.get("Id")
+    network_info = inspect("network", NETWORK)
+    members = list((network_info.get("Containers") or {}).values())
+
+    require(network_info.get("Internal") is True
+            and network_info.get("Driver") == "bridge"
+            and (network_info.get("Labels") or {}).get(
+                "com.docker.compose.project") == PROJECT
+            and nets[NETWORK].get("NetworkID") == network_info.get("Id")
             and len(members) == 1
-            and members[0].get("EndpointID") == nets[NETWORK].get("EndpointID")
+            and members[0].get("EndpointID")
+                == nets[NETWORK].get("EndpointID")
             and members[0].get("Name", "").lstrip("/")
-               == db.get("Name", "").lstrip("/"),
-            "DB_NETWORK_IDENTITY_DRIFT")
-    vol = inspect("volume", VOLUME)
-    require(vol.get("Labels", {}).get("com.docker.compose.project") == PROJECT
-            and any(x.get("Type") == "volume" and x.get("Name") == VOLUME
-                    and x.get("Destination") == "/var/lib/mysql"
-                    for x in db.get("Mounts", [])),
-            "DB_VOLUME_DRIFT")
-    env = dict(x.split("=", 1) for x in db["Config"]["Env"] if "=" in x)
+                == db.get("Name", "").lstrip("/"),
+            "DB_NETWORK_POLICY_DRIFT")
+
+    volume_info = inspect("volume", VOLUME)
+    require((volume_info.get("Labels") or {}).get(
+                "com.docker.compose.project") == PROJECT,
+            "DB_VOLUME_IDENTITY_DRIFT")
+
+    verify_database_mounts(db.get("Mounts"))
+
+    env = dict(entry.split("=", 1)
+               for entry in config.get("Env", []) if "=" in entry)
     require(env.get("MARIADB_DATABASE") == DATABASE
             and env.get("MARIADB_USER") == "b12_test"
             and env.get("MARIADB_PASSWORD_FILE")
                 == "/run/secrets/test_password"
             and env.get("MARIADB_ROOT_PASSWORD_FILE")
-                == "/run/secrets/root_password",
+                == "/run/secrets/root_password"
+            and "MARIADB_PASSWORD" not in env
+            and "MARIADB_ROOT_PASSWORD" not in env,
             "DB_ENV_DRIFT")
+
     return ids[0]
 
 
@@ -439,10 +677,86 @@ def db_select(container: str, sql: str, *, root: bool = False) -> str:
         + ' --batch --skip-column-names --raw --local-infile=0 '
         '--connect-timeout=5 --execute "$1"'
     )
-    return command(
-        ["docker", "exec", container, "sh", "-c", shell,
-         "b12-readonly", sql], timeout=10
+    require(
+        isinstance(sql, str)
+        and re.match(r"\ASELECT[ \t]+", sql, re.IGNORECASE)
+            is not None
+        and not any(x in sql for x in (";", "\n", "\r", "\x00")),
+        "DB_SELECT_ONLY_POLICY"
     )
+    proc = subprocess.run(
+        docker_argv("exec", container, "sh", "-c", shell,
+                    "b12-readonly", sql),
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=10
+    )
+    require(proc.returncode == 0,
+            "DB_SELECT_COMMAND_FAILED")
+    require(
+        isinstance(proc.stdout, str)
+        and proc.stdout.endswith("\n"),
+        "DB_SELECT_OUTPUT_TERMINATOR"
+    )
+    # Remove exactly one MariaDB row terminator.
+    # Preserve unexpected trailing blank rows for validation.
+    return proc.stdout[:-1]
+
+
+
+REVISION_TABLES = frozenset({
+    "layer_daily_records",
+    "broiler_daily_records",
+    "ruminant_daily_records"
+})
+
+
+def verify_revision_column_metadata(raw: str) -> None:
+    """Fail closed on exact three-table revision metadata.
+
+    Accept MariaDB's quoted or unquoted numeric default 1.
+    Never infer revision compatibility from column count alone.
+    """
+    require(isinstance(raw, str),
+            "REVISION_METADATA_INVALID_TYPE")
+
+    rows = raw.split("\n")
+    require(len(rows) == 3,
+            "REVISION_METADATA_ROW_COUNT")
+
+    seen = set()
+
+    for row in rows:
+        fields = row.split("\t")
+        require(len(fields) == 4,
+                "REVISION_METADATA_FIELD_COUNT")
+
+        table, column_type, nullable, default = fields
+
+        require(
+            table in REVISION_TABLES and table not in seen,
+            "REVISION_METADATA_TABLE_IDENTITY"
+        )
+
+        require(
+            re.fullmatch(
+                r"bigint(?:\([0-9]+\))? unsigned",
+                column_type.lower().strip()
+            ) is not None,
+            "REVISION_METADATA_TYPE_DRIFT"
+        )
+
+        require(nullable.strip().upper() == "NO",
+                "REVISION_METADATA_NULLABILITY_DRIFT")
+
+        require(default.strip() in ("1", "'1'"),
+                "REVISION_METADATA_DEFAULT_DRIFT")
+
+        seen.add(table)
+
+    require(seen == REVISION_TABLES,
+            "REVISION_METADATA_TABLE_SET_DRIFT")
 
 
 def verify_schema_empty(container: str) -> None:
@@ -474,6 +788,15 @@ def verify_schema_empty(container: str) -> None:
     ).split("\t")
     require(metadata == ["69", "886", "193", "3", "0", "0", "0", "0"],
             "SCHEMA_FINGERPRINT")
+    revision_metadata = db_select(
+        container,
+        "SELECT TABLE_NAME,COLUMN_TYPE,IS_NULLABLE,COLUMN_DEFAULT "
+        "FROM information_schema.COLUMNS "
+        "WHERE TABLE_SCHEMA=DATABASE() "
+        "AND COLUMN_NAME='record_revision' "
+        "ORDER BY TABLE_NAME"
+    )
+    verify_revision_column_metadata(revision_metadata)
     names = db_select(container,
         "SELECT TABLE_NAME FROM information_schema.TABLES "
         "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_TYPE='BASE TABLE' "
@@ -588,8 +911,8 @@ def php_command(container: str, run_name: str, run_root: Path,
     verify_source_snapshot(source_snapshot)
     require(re.fullmatch(r"b12-mac12b3-[a-f0-9]{16}", run_name) is not None,
             "PHP_CONTAINER_NAME_INVALID")
-    args = [
-        "docker", "run", "-i", "--rm", "--pull=never",
+    args = docker_argv(
+        "run", "-i", "--rm", "--pull=never",
         "--name", run_name, "--label=b12.owner=mac12b3-rc01",
         "--network=container:" + container, "--read-only",
         "--cap-drop=ALL", "--security-opt=no-new-privileges",
@@ -597,7 +920,7 @@ def php_command(container: str, run_name: str, run_root: Path,
         "--user=" + str(os.getuid()) + ":" + str(os.getgid()),
         "--tmpfs=/b12-private:rw,nosuid,nodev,noexec,size=65536",
         "--mount", bind(run_root, "/b12-run", False)
-    ]
+    )
     for name in SOURCE_BLOBS:
         args += ["--mount", bind(source_snapshot / name,
                                "/b12-source/" + name)]
@@ -630,18 +953,21 @@ def quarantine_or_stop_only_owned_container(name: str) -> bool:
             and obj.get("Name", "").lstrip("/") == name,
             "REFUSE_TO_STOP_UNOWNED_CONTAINER")
     if obj.get("State", {}).get("Running"):
-        command(["docker", "stop", "--time=2", name], timeout=10)
+        command(docker_argv("stop", "--time=2", name), timeout=10)
     return name not in docker("ps", "-a", "--format",
                               "{{.Names}}").splitlines()
 
 
 def execute_one_use() -> None:
     approval = load_signed_approval()
+    decision_digest = verify_human_launch_decision(approval)
     verify_source(approval)
     db = verify_docker()
     verify_schema_empty(db)
     # Recheck the short signed window after potentially slow preflight.
     validate_approval_payload(approval, datetime.now(timezone.utc))
+    require(verify_human_launch_decision(approval) == decision_digest,
+            "HUMAN_DECISION_CHANGED_BEFORE_CLAIM")
     # Permanently claim the signed nonce BEFORE creating fixtures/workers.
     claim_one_use(approval)
     name = "b12-mac12b3-" + uuid.uuid4().hex[:16]
@@ -661,9 +987,11 @@ def execute_one_use() -> None:
         stage_source_snapshot(snapshot)
         # Expiration after claiming must fail closed; preserve the claim.
         validate_approval_payload(approval, datetime.now(timezone.utc))
+        require(verify_human_launch_decision(approval) == decision_digest,
+                "HUMAN_DECISION_CHANGED_BEFORE_WORKERS")
         secret_proc = subprocess.Popen(
-            ["docker", "exec", db, "sh", "-c",
-             "set -eu; exec cat /run/secrets/test_password"],
+            docker_argv("exec", db, "sh", "-c",
+                        "set -eu; exec cat /run/secrets/test_password"),
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
         )
         php_proc = subprocess.Popen(
